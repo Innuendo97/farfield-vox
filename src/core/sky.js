@@ -558,7 +558,7 @@ export function applySky(scene) {
 // declares fog: false, and a scene fog is only consulted by materials that ask
 // for it. So it was a fourth colour of air that could never appear, sitting
 // beside three that do, and it went on 2026-08-20 with the rest of the haze
-// hygiene. What replaced it is one seat in src/world/terrain.js.
+// hygiene. What replaced it is one seat in src/world/air.js.
 
 /**
  * Height fog hook.

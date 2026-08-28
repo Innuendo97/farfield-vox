@@ -15,7 +15,8 @@ import { DEFAULT_FOV, POSE_TARGET } from '../core/poses.js';
 import {
   SCENE_LIGHT_UNIFORMS, SKY_UNIFORMS, applySky, setSceneLight, setSkyPreset,
 } from '../core/sky.js';
-import { createTerrain, setAir } from '../world/terrain.js';
+import { setAir } from '../world/air.js';
+import { createTerrain } from '../world/terrain.js';
 import { createVegetation } from '../world/vegetation.js';
 import { engrave, loadEngravingFont } from '../world/engraving.js';
 import { AREA_CENTER, MONOLITHS } from '../world/layout.js';

@@ -6,7 +6,7 @@ import {
   SKY_GLSL, SKY_REFLECTION, SKY_REFLECTION_GLSL, SKY_UNIFORMS,
 } from '../core/sky.js';
 import { smoothstep } from './terrain-field.js';
-import { fogUniforms, FOG_GLSL, FOG_RADIANCE } from './terrain.js';
+import { fogUniforms, FOG_GLSL, FOG_RADIANCE } from './air.js';
 
 // Everything past the meadow: the standing water, the ring of hills, and the
 // giants that are not in the reference framing.

@@ -4,7 +4,7 @@ import {
 } from 'three';
 import { SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS } from '../core/sky.js';
 import { LIGHT_FILTER, lightFilterGlsl, lightFilterUniforms } from './light-filter.js';
-import { FOG_GLSL, fogUniforms, GROUND_EXPOSURE } from './terrain.js';
+import { FOG_GLSL, fogUniforms, GROUND_EXPOSURE } from './air.js';
 import {
   clamp01, GRID, pathCoord, pathRun, smoothstep,
 } from './terrain-field.js';

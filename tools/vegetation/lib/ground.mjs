@@ -37,9 +37,9 @@ export function sampleGroundLight(ground, x, z) {
 
 /** Exposure the ground material declares, on top of the stored light. */
 export function groundExposure() {
-  const source = readFileSync(join(REPO_ROOT, 'src', 'world', 'terrain.js'), 'utf8');
+  const source = readFileSync(join(REPO_ROOT, 'src', 'world', 'air.js'), 'utf8');
   const found = /export const GROUND_EXPOSURE = ([0-9.]+);/.exec(source);
-  if (!found) throw new Error('GROUND_EXPOSURE not found in src/world/terrain.js');
+  if (!found) throw new Error('GROUND_EXPOSURE not found in src/world/air.js');
   return Number(found[1]);
 }
 

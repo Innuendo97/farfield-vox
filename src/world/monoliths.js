@@ -7,7 +7,7 @@ import {
   SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS, SKY_GLSL, SKY_REFLECTION,
   SKY_REFLECTION_GLSL, SKY_UNIFORMS,
 } from '../core/sky.js';
-import { FOG_GLSL, fogUniforms, LOW_SKY } from './terrain.js';
+import { FOG_GLSL, fogUniforms, LOW_SKY } from './air.js';
 import { MONOLITHS } from './layout.js';
 import MONOLITH_BAKE from '../../assets-src/monoliths/monoliths.json';
 

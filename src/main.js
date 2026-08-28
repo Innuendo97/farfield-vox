@@ -485,12 +485,12 @@ assets.loadCritical(onCriticalByte)
       light: assets.get('terrain-light'),
       // The material of the paving under the walker's feet, which the bent atlas
       // cannot hold at that size: see the note over DETAIL in
-      // src/world/terrain.js. It goes to the ground alone and not to the stair.
+      // src/world/air.js. It goes to the ground alone and not to the stair.
       detail: assets.get('terrain-detail'),
       // And where the joints of that paving are, as a distance rather than as a
       // picture of one: the same atlas cannot draw a joint finer than its own
       // texel, but it can say where one is. See the note over STRIP in
-      // src/world/terrain.js. It goes to the ground alone and not to the stair.
+      // src/world/air.js. It goes to the ground alone and not to the stair.
       strip: assets.get('terrain-path'),
       stairsAlbedo: assets.get('stairs-albedo'),
       stairsLight: assets.get('stairs-light'),

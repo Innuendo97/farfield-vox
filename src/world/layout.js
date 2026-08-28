@@ -33,7 +33,7 @@ export const GROUND_SIZE = 400;
 // a stone slate, a sky blue, a fog blue, and a near and far distance for a
 // linear fog. Not one of them had a reader left: every surface in this world
 // takes its colour from a painted albedo and every one of them fades into the
-// air that src/world/terrain.js keeps. They were the last of the placeholder
+// air that src/world/air.js keeps. They were the last of the placeholder
 // palette, and a placeholder colour that still compiles is a colour somebody
 // will eventually reach for.
 

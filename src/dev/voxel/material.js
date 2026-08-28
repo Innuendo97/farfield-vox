@@ -1,6 +1,6 @@
 import { ShaderMaterial, Vector2, Vector3 } from 'three';
 import { SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS, SKY_UNIFORMS } from '../../core/sky.js';
-import { FOG_GLSL, GROUND_EXPOSURE, fogUniforms } from '../../world/terrain.js';
+import { FOG_GLSL, GROUND_EXPOSURE, fogUniforms } from '../../world/air.js';
 import TERRAIN from '../../../assets-src/terrain/terrain.json';
 
 // The material of a cube, and the five things the reference was measured to be

@@ -88,7 +88,7 @@ function crackAt(u, v) {
  * on rock and stone every face carries a real albedo. So the atlas is spent
  * here and nowhere else, which is both the faithful reading and the cheap one.
  *
- * Two channels and not three, for the reason src/world/terrain.js gives over
+ * Two channels and not three, for the reason src/world/air.js gives over
  * DETAIL.relief: a height read twice a step apart IS a slope, so the little
  * shade on a chip costs one more fetch of a texture already in hand and not one
  * stored normal.

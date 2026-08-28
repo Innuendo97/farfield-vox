@@ -4,9 +4,8 @@ import {
 import {
   applySky, setCloudDrift, setCloudSky,
 } from '../core/sky.js';
-import {
-  createBakedMaterial, createHeightSampler, createTerrain, setAir,
-} from './terrain.js';
+import { createBakedMaterial, setAir } from './air.js';
+import { createHeightSampler, createTerrain } from './terrain.js';
 import { CLOUD_LEVEL, createClouds } from './clouds.js';
 import { createDistance } from './distant.js';
 import { createMonoliths, STAIR_GLOW } from './monoliths.js';

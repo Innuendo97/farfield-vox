@@ -6,7 +6,7 @@ import {
   SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS, SKY_GLSL, SKY_REFLECTION,
   SKY_REFLECTION_GLSL, SKY_UNIFORMS,
 } from '../core/sky.js';
-import { FOG_GLSL, fogUniforms, GROUND_EXPOSURE, LOW_SKY } from './terrain.js';
+import { FOG_GLSL, fogUniforms, GROUND_EXPOSURE, LOW_SKY } from './air.js';
 import PLAN from '../../assets-src/rocks/rocks.json';
 import BAKE from '../../assets-src/rocks/rocks-bake.json';
 import PALETTE from '../../assets-src/vegetation/palette.json';

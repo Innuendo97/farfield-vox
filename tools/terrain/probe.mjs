@@ -152,7 +152,7 @@ export function traceGround(direction, { maxDistance = 260 } = {}) {
   };
 }
 
-/** The height fog of src/world/terrain.js, evaluated on the CPU. */
+/** The height fog of src/world/air.js, evaluated on the CPU. */
 export function fogAmount(distance, fragmentHeight, fog) {
   const dy = fragmentHeight - EYE.y;
   const a = Math.exp(-Math.max(EYE.y, 0) / fog.height);
@@ -235,11 +235,11 @@ export async function loadGround() {
   }
   const terrain = JSON.parse(readFileSync(join(DIR, 'terrain.json'), 'utf8'));
   const fogColour = constant(
-    'src/world/terrain.js',
+    'src/world/air.js',
     /FOG_RADIANCE = \[([-0-9.]+), ?([-0-9.]+), ?([-0-9.]+)\]/, 'FOG_RADIANCE',
   ).slice(1, 4).map(Number);
   const exposure = Number(constant(
-    'src/world/terrain.js', /GROUND_EXPOSURE = ([0-9.]+)/, 'GROUND_EXPOSURE',
+    'src/world/air.js', /GROUND_EXPOSURE = ([0-9.]+)/, 'GROUND_EXPOSURE',
   )[1]);
   const density = Number(constant(
     'src/core/sky.js', /FOG_DENSITY = ([0-9.]+)/, 'FOG_DENSITY',
