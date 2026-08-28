@@ -1,0 +1,338 @@
+{
+  "howToReadThis": [
+    "THE RECIPE OF THE MATTER, FROZEN, WITH THE DOUBLE READING.",
+    "",
+    "Every entry carries two numbers: what the forensics SPECIFIED, and what the",
+    "targets MEASURE under an estimator that reads render and target the same way.",
+    "Where the two disagree the TARGET WINS -- a specification nobody has checked",
+    "against the picture is a requirement the picture itself may not satisfy, and",
+    "this campaign has already lost a gate to exactly that.",
+    "",
+    "Every number carries the WINDOW and the METHOD it came out of. A ratio read",
+    "off an image is a property of the crop as much as of the world: three of the",
+    "entries below move by more than a tenth between two windows of open meadow,",
+    "and an entry quoted without its window is not a measurement.",
+    "",
+    "Where the render cannot reach the target today, the entry carries a CEILING:",
+    "the best the render has been measured to do, and why it stops there. A gap",
+    "with a cause written beside it is work; a gap without one is an argument.",
+    "",
+    "This file is a CONTRACT, not a tuning. The sessions read it before they build",
+    "and the gate judges against it. Changing a measured value means re-measuring",
+    "and saying so here."
+  ],
+
+  "measuredBy": {
+    "session": "V0c",
+    "date": "2026-08-28",
+    "targets": [
+      "farfield-day-voxel-target.png",
+      "farfield-night-voxel-target.png"
+    ],
+    "frame": { "width": 1672, "height": 941 },
+    "estimator": [
+      "ricerca-demo/misure/fedelta.mjs, imported unchanged. The image is cut into",
+      "regions of near constant luminance -- in a world of flat faces a region IS a",
+      "face -- and the region means are grouped into three families by an area",
+      "weighted k-means. Reproduced verbatim on the window the demo used, which is",
+      "the check that this file is using the estimator the campaign's numbers came",
+      "from and not a second one."
+    ],
+    "camera": {
+      "why": [
+        "The fitted camera of the day target, from the monolith silhouettes. It is",
+        "here because half the entries below need it: it turns a window into a piece",
+        "of GROUND, it says how many pixels a ten centimetre face should read, and it",
+        "gives a face of stone a bearing."
+      ],
+      "position": { "x": 0.915, "y": 2.733, "z": 11.357 },
+      "yaw": 2.506,
+      "pitch": 1.009,
+      "fov": 51.342,
+      "residual": "7.8 px rms, 4.5 px median, over 92 silhouette points on the five blocks"
+    }
+  },
+
+  "windows": {
+    "why": [
+      "Two of open, LEVEL meadow either side of the path, the same size and the",
+      "same rows, plus the window the demo published its numbers on. The first pair",
+      "tried reached further west and took in the terrace under monolith 01, whose",
+      "faces are a slope and not a meadow: its brightest family came out a third",
+      "darker than the eastern one's, which is a fault of the window and not a",
+      "reading about light."
+    ],
+    "prato-est": {
+      "box": { "left": 990, "top": 720, "width": 230, "height": 120 },
+      "ground": "x 1.8 to 4.9, z -0.4 to 3.7, range 8.2 to 12.7 m"
+    },
+    "prato-ovest": {
+      "box": { "left": 360, "top": 720, "width": 230, "height": 120 },
+      "ground": "x -5.2 to -1.3, z -0.1 to 3.9, range 8.3 to 13.1 m"
+    },
+    "finestra-demo": {
+      "box": { "left": 940, "top": 720, "width": 340, "height": 190 },
+      "ground": "the window ricerca-demo published 1,00 / 0,65 / 0,36 and 18,7% on"
+    },
+    "rocce-est": {
+      "box": { "left": 1290, "top": 765, "width": 145, "height": 105 },
+      "ground": "the foreground stone cluster east of the eye, range about 10 m",
+      "why": [
+        "The one place in either target where three orientations of ONE material can",
+        "be told apart by geometry instead of by brightness. The fitted camera says",
+        "+X projects to (117.6, 1.6) pixels per metre there and +Z to (63.7, 41.3),",
+        "so a cube's top lies above its own centre, its west face to the left and",
+        "half as wide, and its south face to the right and twice as wide -- which is",
+        "what the picture shows and what makes the ladder below a reading about",
+        "orientation rather than a sorting by luminance."
+      ]
+    }
+  },
+
+  "entries": [
+    {
+      "id": "orientation-ladder",
+      "what": "luminance of a face by its orientation, over the brightest family",
+      "specification": "1.00 / 0.63 / 0.34",
+      "measured": {
+        "finestra-demo": "1.000 / 0.653 / 0.362",
+        "prato-est": "1.000 / 0.590 / 0.360",
+        "prato-ovest": "1.000 / 0.700 / 0.339",
+        "rocce-est": "1.000 / 0.91 / 0.327, and here the three ARE top / west facing / south facing"
+      },
+      "wins": "target",
+      "note": [
+        "The three rungs of a grass window are three CLUSTERS and not three",
+        "orientations: a meadow shows tops, two flanks and a scatter of white flowers,",
+        "and a k-means with three centres has to put four populations somewhere. That",
+        "is why the middle rung moves by 0.11 between two windows of the same meadow",
+        "while the third moves by 0.02. On the rocks, where the orientation of every",
+        "face is known from the camera, the middle rung is 0.91 -- a lit vertical face",
+        "stands within a tenth of a top face in this picture, which no reading of the",
+        "grass windows shows.",
+        "The third rung is the one the light was refitted against, because it is the",
+        "one a sun cannot reach: half the sky and nothing else."
+      ],
+      "renderNow": {
+        "prato-est": "1.000 / 0.738 / 0.322",
+        "prato-ovest": "1.000 / 0.667 / 0.373",
+        "before the refit": "1.000 / 0.734 / 0.269 and 1.000 / 0.676 / 0.353",
+        "method": "src/dev/voxeltest.html at the fitted camera, cards off, tier basso"
+      }
+    },
+    {
+      "id": "per-voxel-tint",
+      "what": "sd of the region means INSIDE the brightest family, over its own mean",
+      "specification": "at least 20% (24.2% claimed)",
+      "measured": {
+        "finestra-demo": "18.7%",
+        "prato-est": "15.7%",
+        "prato-ovest": "15.3%",
+        "the two halves of prato-est": "8.7% and 13.6%"
+      },
+      "wins": "target, 18.7% on the window the campaign fixed",
+      "note": [
+        "The spread is the most window-sensitive number in this file: halving the",
+        "window takes it from 15.7% to 8.7%, because a smaller crop holds fewer faces",
+        "and the k-means splits them differently. Quote it with its window or not at",
+        "all."
+      ],
+      "ceiling": {
+        "value": "9.2%",
+        "measuredAt": "ricerca-demo/corse/taratura.json, the sweep of tint: 0.84 -> 6.3%, 1.30 -> 7.8%, 1.80 -> 9.2%, and then it stops",
+        "renderNow": "6.8% at prato-est, 9.8% at prato-ovest, tint 1.30",
+        "causes": [
+          "the multiplier on the albedo reaches through nought at one end",
+          "the tone curve flattens the other"
+        ],
+        "owner": "V1: the gap between 9.2% and 18.7% is the analysis phase of the ground, half of it the tone curve. If it is structural it goes to the committente as an A/B."
+      }
+    },
+    {
+      "id": "joint",
+      "what": "the darkest pixel on the seam between two COPLANAR faces, over their mean",
+      "specification": "0.94 +/- 0.02, 1 to 2 px wide",
+      "measured": {
+        "finestra-demo": "0.957, width 2 px (p90 3)",
+        "prato-est": "0.948, width 2 px (p90 3)",
+        "prato-ovest": "0.958, width 2 px (p90 3)"
+      },
+      "wins": "target",
+      "renderNow": "0.959 width 3 px at prato-est, 0.967 width 2 px at prato-ovest",
+      "note": "A line and not a well. One pixel wider in the render than in the target."
+    },
+    {
+      "id": "edge-rise",
+      "what": "pixels a step takes to go from a tenth of itself to nine tenths",
+      "specification": "at most 2 px",
+      "measured": {
+        "finestra-demo": "1 px (p90 4)",
+        "prato-est": "1 px (p90 4)",
+        "prato-ovest": "2 px (p90 4)",
+        "night target": "2 px (p90 4)"
+      },
+      "wins": "agreed",
+      "renderNow": "2 px (p90 2)"
+    },
+    {
+      "id": "ambient-occlusion",
+      "what": "luminance against distance from a face's own edge, over its own interior",
+      "specification": "no well wider than 2 px",
+      "measured": {
+        "prato-ovest, day": "1.007 1.004 1.002 0.999 0.999 1.006 1.001 at d = 0..6 px",
+        "prato-ovest, night": "1.006 1.008 1.000 1.001 0.999 0.998 1.001",
+        "prato-est, night": "1.002 1.005 0.996 0.999 1.001 1.002"
+      },
+      "wins": "agreed: there is none, in either target",
+      "renderNow": "0.998 0.999 0.999 0.999 0.999 1.000 1.000",
+      "note": "The AO of these targets is the joint above: 4 to 5 per cent over one or two pixels. A screen space or a broad baked occlusion would be wrong as well as dear."
+    },
+    {
+      "id": "lightened-arris",
+      "what": "thin bright regions along the top of a boundary, and how blue they are",
+      "specification": "1.8 to 2.6x, blue over red about 3.5",
+      "measured": {
+        "finestra-demo": "1.085x, B/R 0.430 (n 48)",
+        "prato-est": "1.09x, B/R 0.50 (n 19)",
+        "prato-ovest": "1.07x, B/R 0.27 (n 9)"
+      },
+      "wins": "target, and by a factor of two on the ratio and of eight on the blue",
+      "renderNow": "1.17x, B/R 0.63 at prato-est",
+      "note": "The render is a little too strong and a little too blue, which is the arris being built as a facet leaning up rather than as a paler colour: both come out of the light and neither is fitted."
+    },
+    {
+      "id": "voxel-step",
+      "what": "how many pixels a face of the meadow reads, against what the camera predicts for ten centimetres",
+      "specification": "0.10 m, one step, no ring scale",
+      "measured": {
+        "prato-est": "10 px read, 9.8 px predicted at 10.0 m -> 1.02x",
+        "finestra-demo": "9 px read, 9.3 px predicted at 10.5 m -> 0.97x"
+      },
+      "wins": "agreed, and this is the only direct check of the ten centimetre step against a target there is",
+      "renderNow": {
+        "value": "17 to 18 px",
+        "why": "NOT a bigger cube: the render's tint spread is 6.8% against the target's 15.7%, so neighbouring tops stay inside the estimator's tolerance and MERGE into one region. The size the estimator reports is therefore a reading about the tint and not about the step -- and it will fall to a cube's own size when the entry above is closed."
+      }
+    },
+    {
+      "id": "face-flatness",
+      "what": "whether a face carries a texture, measured as whether it stays ONE region",
+      "method": "region size against the size the fitted camera gives a face. Near one is a flat face; well under one is a face that breaks up under a three and a half per cent tolerance, which is a texture.",
+      "measured": {
+        "grass, prato-est": "1.02x -- flat",
+        "grass, finestra-demo": "0.97x -- flat",
+        "stone, rocce-est": "0.31x -- three pieces across a face: TEXTURED",
+        "stone, monolith 03 at 28 m": "1.59x against a course of 0.22 m -- at that range the courses themselves are 8 px and nothing finer is resolvable"
+      },
+      "wins": "target, and it settles the amendment below"
+    },
+    {
+      "id": "the-light",
+      "what": "where the sun is and how much of a top face it carries",
+      "specification": "elevation 34, azimuth -9.5, sun 84% of a top face (the plan) or 82% (the demo)",
+      "measured": {
+        "the seat as it stood": "81.07% of the light on a top face, luminance weighted -- neither 82 nor 84. 79.4% summing the channels, 80.0% in green alone, and 87.3% under fit-scene-light's own 'open level ground' definition, which is a different quantity.",
+        "elevation": "47 deg. From rocce-est with its south face taking no sun: cot(elevation) * cos(270 - azimuth) = 0.899, which is 47.6 deg at azimuth 280 and moves by less than two degrees over every azimuth the faces allow.",
+        "azimuth": "280 deg, +/- 15. There is NO readable cast shadow in either target -- the avatar throws none on the paving and no block throws one on the meadow -- so the direction is read off the lit faces: east of the eye the west facing flanks are lit and the south facing ones are not, west of the eye neither the east facing nor the south facing ones are, and the brightest stone face in the picture looks along 252.",
+        "share": "70% of a top face. Five readings: 65.4% and 73.9% by reproducing the encoded ladder of prato-est and prato-ovest through this render's own AgX and grade, 67.4% the same way on the demo's window, 77.4% from rocce-est as light, 73.2% from the meadow as light."
+      },
+      "wins": "target",
+      "written": "assets-src/sky/sky.json day.sun elevation 47 azimuth 280; scene-light.json sunStrength 0.2722 skyStrength 0.1201",
+      "note": "The 29% in circulation compares an encoded ratio on one side with a linear one on the other. Held in one space, the same arithmetic gives 70."
+    }
+  ],
+
+  "texturePerFace": {
+    "rule": [
+      "TEXTURE PER FACE WHERE THE TARGETS SHOW IT -- stone, moss, wood; on grass and",
+      "foliage the targets show a FLAT PER-VOXEL TINT and no texture at all.",
+      "Depth and unevenness are GEOMETRY: chamfers, courses, steps. Unevenness of",
+      "colour is TINT. The gate judges against the targets."
+    ],
+    "stone": {
+      "verdict": "texture, measured",
+      "evidence": "rocce-est: a face breaks into about three regions across (0.31x), where a face of grass stays one (1.02x)",
+      "owner": "V2 (the built stone, the atlas of tiles), V5 (the ruins)"
+    },
+    "moss": {
+      "verdict": "a family of stone, with its own texture",
+      "evidence": "green patches sit on the monolith faces and on the terrace edges of both targets; they are not separately measured here because they never fill a window",
+      "owner": "V2 with the stone atlas"
+    },
+    "wood": {
+      "verdict": "not measurable in these targets",
+      "evidence": "the trees stand at 25 m and further, where a trunk is about ten pixels across and two or three cubes tall; the foliage there is flat per-voxel tint, which is measurable and agrees with the rule",
+      "owner": "V4 measures it against its own crops when it builds them"
+    },
+    "grassAndFoliage": {
+      "verdict": "flat tint per voxel, no texture",
+      "evidence": "1.02x and 0.97x above, on two windows",
+      "owner": "V1 (the meadow), V4 (the cards and the trees)"
+    }
+  },
+
+  "absencesToDefend": [
+    {
+      "id": "depth-of-field",
+      "verdict": "absent",
+      "evidence": "the 10-90 rise is 1 px (p90 4) in the day target and 2 px (p90 4) in the night, at every window"
+    },
+    {
+      "id": "broad-ambient-occlusion",
+      "verdict": "absent",
+      "evidence": "the border profile is flat to within 0.008 out to 6 px from a face's own edge, in both targets"
+    },
+    {
+      "id": "chromatic-aberration",
+      "verdict": "absent, measured",
+      "evidence": "sub-pixel 50% crossings on 17 silhouette edges spread across the frame: red minus green 0.041 px, blue minus green -0.032 px"
+    },
+    {
+      "id": "motion-blur",
+      "verdict": "absent by construction",
+      "evidence": "a still frame cannot show one; kept as a rule rather than a measurement"
+    },
+    {
+      "id": "vignette",
+      "verdict": "PRESENT, measured -- and the campaign's amendment says it is not",
+      "evidence": [
+        "Clear sky only, binned by the ELEVATION the fitted camera gives each pixel,",
+        "so the sky's own gradient with height is out of the comparison. At 16 deg of",
+        "elevation the day target reads 66 at the left eighth of the frame, 112 to 133",
+        "across the middle and 82 at the right eighth: half the light at one edge and",
+        "six tenths at the other. The night target has the same shape -- 12, 19 to 22,",
+        "12.",
+        "It cannot be the sky's own azimuthal gradient. The frame spans bearings 317",
+        "to 38 and the sun stands at 280, so the sky would be BRIGHTEST at the left",
+        "edge, 37 deg off the sun, and darkest at the right, 118 deg off it. It reads",
+        "the other way round and falls off on both sides at once, which no sky does",
+        "and every lens does.",
+        "And the shape is familiar: the historic reference's own fitted veil wanted",
+        "0.23 at the upper left corner and 0.46 at the upper right -- darker on the",
+        "left, exactly as measured here. These targets appear to carry the same corner",
+        "shading the photorealistic reference did.",
+        "RAISED, NOT DECIDED. Whether to reproduce it is the coordinator's, and the",
+        "amendment that says the targets have no vignette was written before this",
+        "measurement existed."
+      ]
+    }
+  ],
+
+  "architecture": [
+    "Never a per-voxel property inside a vertex attribute. Measured violation: 3.0x the geometry of the world.",
+    "ONE step, 0.10 m, and no ring scale. Rings anchored to the world are false as soon as the walker moves: 11x of apparent size error, measured.",
+    "bakedLight() stays at two terms, bit for bit, with one producer: src/world/face-light.js."
+  ],
+
+  "theNightTarget": {
+    "warning": [
+      "THE ESTIMATOR DOES NOT READ THE NIGHT TARGET'S MATERIAL, and that is worth",
+      "knowing before somebody quotes a number off it. Its brightest family comes out",
+      "at 252,248,239 with a spread of 0.2 per cent: those are the lamps and their",
+      "haloes, saturated, not cube tops. The ladder, the tint and the joint of the",
+      "night target are therefore not readings about the matter -- only the rise and",
+      "the border profile survive, and both are quoted above.",
+      "V7 needs a window with no point light in it, or its own estimator."
+    ]
+  }
+}
