@@ -1,18 +1,30 @@
 import { createHash } from 'node:crypto';
 import {
-  copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync,
+  copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync,
+  writeFileSync,
 } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { formatBytes, loadToolchain, REPO_ROOT, run } from './toolchain.mjs';
 
 // Turns the sources in assets-src/ into what public/assets/ serves: binary
 // glTF with meshopt geometry and KTX2 textures. Output shape and first frame
-// budget are declared in assets-src/assets.json and republished into
+// budget are declared in assets-src/assets.d/ and republished into
 // public/assets/manifest.json, which is what the runtime actually reads.
+//
+// WHY THE SOURCE MANIFEST IS IN PIECES. It was one file, and one file that
+// every session has to add a line to is a file every session collides in --
+// eight branches, one list, and a merge conflict on the delivery for anybody
+// who so much as renames a texture. Now each session owns a fragment named
+// after it, and this concatenates them.
+//
+// THE ORDER IS THE FILENAME'S, sorted, and it is stated rather than incidental:
+// a build that shuffles its own manifest between runs is a build whose output
+// cannot be compared with the last one. The layer ids sort in their own order
+// already (v1 before v2 before v4), and comune.json sorts before all of them.
 
 const SRC_DIR = join(REPO_ROOT, 'assets-src');
 const OUT_DIR = join(REPO_ROOT, 'public', 'assets');
-const SOURCE_MANIFEST = join(SRC_DIR, 'assets.json');
+const SOURCE_DIR = join(SRC_DIR, 'assets.d');
 const OUT_MANIFEST = join(OUT_DIR, 'manifest.json');
 const CACHE_FILE = join(REPO_ROOT, 'tools', 'bin', '.cache', 'assets-build.json');
 const TEMP_DIR = join(REPO_ROOT, 'tools', 'bin', '.cache', 'assets-temp');
@@ -143,6 +155,50 @@ function readJson(path) {
   return JSON.parse(readFileSync(path, 'utf8').replace(/^﻿/, ''));
 }
 
+/**
+ * The source manifest, concatenated out of the fragments in assets-src/assets.d.
+ *
+ * Deterministic by filename, and strict about the two ways the pieces can
+ * disagree with each other -- because those are exactly the failures that only
+ * show up once two sessions have merged, which is far too late:
+ *
+ *   two fragments claiming the same id  -- one of them would silently win, and
+ *                                          which one would depend on a sort
+ *   no fragment, or two, declaring the budget -- the budget is the whole
+ *                                          world's and belongs to one seat
+ */
+function readSourceManifest() {
+  if (!existsSync(SOURCE_DIR)) {
+    throw new Error(`missing source manifest directory: ${SOURCE_DIR}`);
+  }
+  const files = readdirSync(SOURCE_DIR).filter((f) => f.endsWith('.json')).sort();
+  if (files.length === 0) throw new Error(`no fragments in ${SOURCE_DIR}`);
+
+  const assets = [];
+  const seen = new Map();
+  let budget = null;
+  let budgetFrom = null;
+  for (const file of files) {
+    const fragment = readJson(join(SOURCE_DIR, file));
+    if (fragment.budget) {
+      if (budget) {
+        throw new Error(`two fragments declare a budget: ${budgetFrom} and ${file}`);
+      }
+      budget = fragment.budget;
+      budgetFrom = file;
+    }
+    for (const entry of fragment.assets || []) {
+      if (seen.has(entry.id)) {
+        throw new Error(`"${entry.id}" is declared twice: ${seen.get(entry.id)} and ${file}`);
+      }
+      seen.set(entry.id, file);
+      assets.push(entry);
+    }
+  }
+  if (!budget) throw new Error(`no fragment in ${SOURCE_DIR} declares a budget`);
+  return { budget, assets, fragments: files };
+}
+
 function hashFile(path) {
   return createHash('sha256').update(readFileSync(path)).digest('hex').slice(0, 16);
 }
@@ -246,10 +302,22 @@ function buildTexture(entry, srcPath, outPath, env) {
 }
 
 function main() {
-  if (!existsSync(SOURCE_MANIFEST)) {
-    throw new Error(`missing source manifest: ${SOURCE_MANIFEST}`);
+  const source = readSourceManifest();
+  // The concatenation on its own, and nothing built. What it is FOR is proving
+  // that a change to how the pieces are put together did not change what they
+  // come to -- which is a question about a JSON document and must never require
+  // an encoder, a delivery, or half an hour.
+  //
+  //   node tools/build-assets.mjs --dry-run
+  if (process.argv.includes('--dry-run')) {
+    process.stdout.write(`${JSON.stringify(
+      { budget: source.budget, assets: source.assets }, null, 2,
+    )}
+`);
+    return;
   }
-  const source = readJson(SOURCE_MANIFEST);
+  process.stdout.write(`manifest: ${source.fragments.join(' + ')}
+`);
   const env = ktxEnv();
   const cache = loadCache();
   const nextCache = {};

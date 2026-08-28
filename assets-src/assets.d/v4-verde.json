@@ -1,0 +1,20 @@
+{
+  "owner": "V4",
+  "note": "The green. The cards stay in the pivot; what changes is how one takes its light, which is code and not a sheet.",
+  "assets": [
+    {
+      "id": "grass-atlas",
+      "type": "texture",
+      "role": "albedo",
+      "source": "vegetation/grass-atlas.png",
+      "priority": "high"
+    },
+    {
+      "id": "props-atlas",
+      "type": "texture",
+      "role": "albedo",
+      "source": "vegetation/props-atlas.png",
+      "priority": "high"
+    }
+  ]
+}

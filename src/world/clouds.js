@@ -117,7 +117,7 @@ const ARC_PLANE_LIMIT = 1;
 // manifest whose own `source` said the runtime draws the other field. They are
 // out of the tree and out of the assets, and what stays is this path and the
 // bake that writes it — so bringing the generated field back is a repack and
-// four entries in assets-src/assets.json, not a rewrite. Nothing but this line
+// four entries in assets-src/assets.d/, not a rewrite. Nothing but this line
 // keeps it out of the frame.
 export const PLATE_FIELD = CLOUDS.source === 'plates';
 

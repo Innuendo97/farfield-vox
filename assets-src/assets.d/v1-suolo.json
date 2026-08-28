@@ -1,0 +1,37 @@
+{
+  "owner": "V1",
+  "note": "The ground. The two maps of the paving travel here because today the ground's own material eats them; they are V3's to claim when the path becomes geometry of its own.",
+  "assets": [
+    {
+      "id": "terrain-albedo",
+      "type": "texture",
+      "role": "albedo",
+      "source": "terrain/terrain-albedo.png",
+      "priority": "critical"
+    },
+    {
+      "id": "terrain-detail",
+      "type": "texture",
+      "role": "coverage",
+      "channels": 2,
+      "source": "terrain/terrain-detail.png",
+      "priority": "critical",
+      "note": "the material of the paving under the walker's own feet, which the bent ground atlas cannot hold: two metres of ground to a repeat, so it has no atlas and no Nyquist of its own. It carries the role of a coverage because it needs exactly what a coverage needs and for the same reasons - linear and not sRGB because it is a factor and not a picture, mipmapped, filtered linearly, and never through a block codec, since what a codec would put into a fine grain that is then repeated over the whole path is its own block pattern, everywhere. TWO channels and not one, because the body of the path and its verge are two materials and not one at two strengths: red is the packed gravel of the verge and of the broken ground, green the worn slab down the middle, and the shader crosses from one to the other. Both have mean a half, so every point of the crossing does too. The blue of the source is not written and does not ship"
+    },
+    {
+      "id": "terrain-path",
+      "type": "texture",
+      "role": "coverage",
+      "source": "terrain/terrain-path.png",
+      "priority": "critical",
+      "note": "how far the nearest joint of the paving is, laid along the run of the path instead of over the world. It is a ruler and not a picture, which is why it is a coverage: linear, mipmapped, filtered linearly, and never through a block codec. WHAT IT BUYS is the one thing the ground atlas cannot give at any amplitude - the atlas spends 4 to 15 mm of ground on a texel across the run and 33 to 65 along it, so a joint of the paving is drawn there as a smear 95 to 115 mm long and the eye reads the whole middle of the path as strokes rather than as stones. The floor is not the painter's, it is Nyquist's: a step narrower than about two texels cannot be written. A distance does not have that floor, because eight bits of it interpolate to a POSITION and the frame can draw an edge finer than the texel that told it where the edge was. Measured against the lattice it is a ruler for: the joint's edge lands within 2.80 mm of where the paving puts it at the median and 5.40 at the ninetieth, and it lands there just as well along the run as across it, which is the whole defect closed. ONE channel and not two, because a distance is one number; unsigned and clamped at 64 mm, because a signed field averaged by a mip cancels in the middle of a slab and draws a joint that is not there, the length of the path"
+    },
+    {
+      "id": "terrain-light",
+      "type": "texture",
+      "role": "lightmap",
+      "source": "terrain/terrain-light.png",
+      "priority": "critical"
+    }
+  ]
+}

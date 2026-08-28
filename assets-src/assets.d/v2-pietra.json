@@ -1,0 +1,60 @@
+{
+  "owner": "V2",
+  "note": "The built stone: the stair, the blocks and the rocks. Every one of these is a bake that the masonry generator replaces, so this fragment is expected to empty out rather than grow.",
+  "assets": [
+    {
+      "id": "stairs-albedo",
+      "type": "texture",
+      "role": "albedo",
+      "source": "terrain/stairs-albedo.png",
+      "priority": "critical"
+    },
+    {
+      "id": "stairs-light",
+      "type": "texture",
+      "role": "lightmap",
+      "source": "terrain/stairs-light.png",
+      "priority": "critical"
+    },
+    {
+      "id": "monoliths-scene",
+      "type": "model",
+      "source": "monoliths/monoliths.glb",
+      "priority": "critical"
+    },
+    {
+      "id": "monolith-albedo",
+      "type": "texture",
+      "role": "albedo",
+      "source": "monoliths/stone-albedo.png",
+      "priority": "critical"
+    },
+    {
+      "id": "monolith-relief",
+      "type": "texture",
+      "role": "normal",
+      "source": "monoliths/stone-normal.png",
+      "priority": "critical"
+    },
+    {
+      "id": "monolith-light",
+      "type": "texture",
+      "role": "lightmap",
+      "source": "monoliths/monolith-light.png",
+      "priority": "critical"
+    },
+    {
+      "id": "rocks-scene",
+      "type": "model",
+      "source": "rocks/rocks.glb",
+      "priority": "high"
+    },
+    {
+      "id": "rock-light",
+      "type": "texture",
+      "role": "lightmap",
+      "source": "rocks/rock-light.png",
+      "priority": "high"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "owner": "nessuno: il coordinatore",
+  "note": "The budget of the first frame and of the sky, which belong to the whole world and not to a session, and the two entries of the bake probe in src/dev/baketest.js, which belong to nobody. A session that wants to spend more of the first frame than its own share asks here, and the answer is the coordinator's.",
+  "budget": {
+    "firstFrameBytes": 6291456,
+    "note": "walkable first frame: sum of the assets marked priority \"critical\", diagnostics excluded",
+    "skyBytes": 4194304,
+    "skyNote": "everything a visitor downloads for the sky, whatever its priority: the sum over the shipped entries whose id begins \"cloud-\". Counted here and not in a verbale because a weight nobody builds is a weight that comes back — two and a third megabytes of generated relighting table were streamed and thrown away by every visitor of the plate delivery, and no first-frame budget could see it, because none of it is critical"
+  },
+  "assets": [
+    {
+      "id": "baketest-scene",
+      "type": "model",
+      "source": "baked/baketest.glb",
+      "priority": "deferred",
+      "scope": "dev",
+      "textures": {
+        "emissiveTexture": "lightmap"
+      }
+    },
+    {
+      "id": "baketest-lightmap",
+      "type": "texture",
+      "role": "lightmap",
+      "source": "baked/baketest-lightmap.png",
+      "priority": "deferred",
+      "scope": "dev"
+    }
+  ]
+}
