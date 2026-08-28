@@ -1,0 +1,72 @@
+{
+  "why": [
+    "This is the light the two voxel targets were measured to be lit by, copied out of",
+    "the two files that carry it so that a change to either can be SEEN. The elevation",
+    "and the azimuth come from the direction of the lit faces in the targets, because",
+    "neither target carries a readable cast shadow; the split between sun and sky comes",
+    "from reproducing the targets' own orientation ladder through this render's tone",
+    "curve, and it puts seventy per cent of an open top face's light in the beam.",
+    "",
+    "IT IS SEALED BECAUSE IT MOVES EVERYTHING AT ONCE. The meadow, the paving, the",
+    "worked stone, the rocks and the weather are all lit through these numbers, so a",
+    "session that nudges one of them to make its own crop land has moved every other",
+    "session's crop at the same time -- and the next gate reads that as a fitting error",
+    "somewhere else and fits against it. There is no session from inside which that",
+    "change can be judged, which is why the decision is the coordinator's.",
+    "",
+    "tools/guards/guard-luce-sigillo.mjs compares this against what is on disk and",
+    "refuses on any drift. The coordinator takes the decision deliberately:",
+    "",
+    "    npm run guard:all -- --coordinator",
+    "",
+    "which re-seals and says so. Commit a re-seal on its own, so the walk that approves",
+    "the new light has one change to look at.",
+    "",
+    "sun.elevationRange and sun.azimuthSpread are under the seal with the two angles.",
+    "They are not the sun: they are the window the dome's optics were fitted inside, and",
+    "rewriting them without redoing that fit would falsify the record of it."
+  ],
+  "sealed": {
+    "assets-src/sky/sky.json": {
+      "sun": {
+        "elevation": 47,
+        "azimuth": 280,
+        "elevationRange": [
+          34,
+          62
+        ],
+        "azimuthSpread": 10.3
+      },
+      "day.sun": {
+        "elevation": 47,
+        "azimuth": 280,
+        "vector": [
+          -0.671636,
+          0.731354,
+          -0.118423
+        ]
+      }
+    },
+    "assets-src/sky/scene-light.json": {
+      "day": {
+        "skyIrradiance": [
+          0.067857,
+          0.263061,
+          0.805087
+        ],
+        "skyBalance": [
+          0.395334,
+          0.672855,
+          1
+        ],
+        "sunBeam": [
+          1,
+          0.883163,
+          0.738496
+        ],
+        "skyStrength": 0.1201,
+        "sunStrength": 0.2722
+      }
+    }
+  }
+}
