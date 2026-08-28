@@ -7,6 +7,7 @@ import {
   SKY_REFLECTION_GLSL, SKY_UNIFORMS,
 } from '../../core/sky.js';
 import { FOG_GLSL, LOW_SKY, fogUniforms } from '../../world/air.js';
+import { faceLightGlsl, faceLightUniforms } from '../../world/face-light.js';
 import { MONOLITHS } from '../../world/layout.js';
 import { STONE_METRES, buildMasonry } from './courses.js';
 import MONOLITH_BAKE from '../../../assets-src/monoliths/monoliths.json';
@@ -128,7 +129,6 @@ const FRAGMENT = /* glsl */`
   uniform vec3 uAlbedo;
   uniform float uGain;
   uniform float uTile;
-  uniform float uLightScale;
   uniform float uJoint;
   uniform float uF0;
   uniform float uRim;
@@ -147,6 +147,9 @@ const FRAGMENT = /* glsl */`
 
   ${SCENE_LIGHT_GLSL}
   ${SKY_GLSL}
+  // After SKY_GLSL and not before it: that chunk is what declares uSunDir in
+  // this program, and a uniform has to be declared above the line that reads it.
+  ${faceLightGlsl({ sunDeclared: true })}
   ${SKY_REFLECTION_GLSL}
   ${FOG_GLSL}
 
@@ -163,14 +166,19 @@ const FRAGMENT = /* glsl */`
     vec2 upSun = normalize(vec2(uSunDir.x, uSunDir.z) + 1e-5) * (0.012 * uTile);
     float above = texture2D(tStone, tile + upSun).g;
 
-    // The same two analytic terms as the meadow, on the same contract: a flat
-    // face under a fixed sun and an isotropic sky, handed to the same
-    // bakedLight() the delivered world consumes. One producer for the whole
-    // scene, so a block and the grass at its foot cannot disagree about the
-    // hour.
-    vec2 terms = vec2(max(dot(n, uSunDir), 0.0), 0.5 + 0.5 * n.y);
+    // The same two analytic terms as the meadow, because they come from the
+    // same place: src/world/face-light.js is the one producer of the pair, and
+    // this file used to write out a second copy of it. A block and the grass at
+    // its foot cannot disagree about the hour if neither of them owns the
+    // arithmetic.
+    //
+    // The pair is BENT before it becomes light, which is what faceLightOf()
+    // exists to allow: the relief of the stone takes sun off a face that leans
+    // out of the beam, and bending a pair you were given is a material's
+    // business. Producing one is not.
+    vec2 terms = faceTerms(n);
     terms.x *= clamp(1.0 - uRelief * (above - pair.g), 0.45, 1.9);
-    vec3 light = bakedLight(vec3(terms, 0.0)) * uLightScale;
+    vec3 light = faceLightOf(terms);
 
     // The joint between blocks: the same six per cent over the same one or two
     // pixels as the meadow's, because it is the same thing seen on stone. Held
@@ -244,7 +252,7 @@ export function createMasonry(id, tile, ready = null) {
       uAlbedo: { value: new Vector3(...STONE_ALBEDO) },
       uGain: { value: STONE_GAIN },
       uTile: { value: 1 / STONE_METRES },
-      uLightScale: { value: MONOLITH_BAKE.lightScale * STONE_EXPOSURE },
+      ...faceLightUniforms(MONOLITH_BAKE.lightScale * STONE_EXPOSURE),
       uJoint: { value: 0.10 },
       uRelief: { value: 2.2 },
       uF0: { value: STONE_F0 },

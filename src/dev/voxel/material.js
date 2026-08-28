@@ -1,5 +1,6 @@
 import { ShaderMaterial, Vector2, Vector3 } from 'three';
-import { SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS, SKY_UNIFORMS } from '../../core/sky.js';
+import { SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS } from '../../core/sky.js';
+import { FACE_LIGHT_GLSL, faceLightUniforms } from '../../world/face-light.js';
 import { FOG_GLSL, GROUND_EXPOSURE, fogUniforms } from '../../world/air.js';
 import TERRAIN from '../../../assets-src/terrain/terrain.json';
 
@@ -16,10 +17,12 @@ import TERRAIN from '../../../assets-src/terrain/terrain.json';
 // comment.
 //
 // AND THE LIGHT IS NOT A SECOND OPINION. It goes through bakedLight() — the
-// four lines in src/core/sky.js, untouched — with the two terms produced here
+// four lines in src/core/sky.js, untouched — with the two terms computed
 // instead of read out of an atlas. The consumer is the same, so a night is the
 // same pair of uniforms moving and nothing here has to know it happened. What
-// changes is only who writes the terms.
+// changes is only who writes the terms, and that is not this file either: the
+// pair comes from src/world/face-light.js, which is the one producer of it in
+// the world.
 
 /** The tunables, live, so a sweep costs a redraw and not a rebuild. */
 export function voxelSettings() {
@@ -66,37 +69,14 @@ export function voxelSettings() {
     arrisPixels: 2.2,
     // How far the facet leans, nought for none and one for halfway to level.
     arrisLean: 1.0,
-    // THE TWO KNOBS THAT ARE NOT THE VOXEL'S, and they are here so the miss
-    // they answer can be SEEN instead of argued. The reference's own shading
-    // implies a sun much higher and much weaker than the one this world is
-    // fitted to, so the orientation ladder cannot land while the light stays
-    // where S2 sealed it. Both are one at rest, which is the honest reading;
-    // moving them is a refit of scene-light.json and would move the paving and
-    // the stone with it. Never a per-material fudge in a delivery.
+    // THE TWO KNOBS THAT ARE NOT THE VOXEL'S. They are still reachable from
+    // here, because a sweep on the page is what they exist for; what they MEAN,
+    // and why a delivery ships them at one, is stated once over NEUTRAL_LIFT in
+    // src/world/face-light.js, which is also where they are applied.
     sunLift: 1,
     skyLift: 1,
   };
 }
-
-// Where a face's own light comes from, and it is four lines because a flat face
-// under a fixed sun and an isotropic sky IS four lines.
-//
-// The sun term is the cosine the face turns to the beam and the sky term is the
-// share of the hemisphere it can see, which for a plane is exactly half of one
-// plus its own vertical. Those are the two numbers a bake would have stored,
-// computed instead of fetched, and they are exact rather than sampled — the
-// reason the reference's faces measure flat to three per cent and an atlas's do
-// not.
-const FACE_LIGHT_GLSL = /* glsl */`
-  uniform vec3 uSunDir;
-  uniform float uLightScale;
-  uniform vec2 uLift;
-
-  vec3 faceLight(vec3 n) {
-    vec2 terms = vec2(max(dot(n, uSunDir), 0.0), 0.5 + 0.5 * n.y) * uLift;
-    return bakedLight(vec3(terms, 0.0)) * uLightScale;
-  }
-`;
 
 // Two decorrelated draws from three whole numbers, without a transcendental.
 //
@@ -264,13 +244,13 @@ export function createVoxelMaterial(voxel, settings) {
       uArris: { value: settings.arris },
       uArrisPixels: { value: settings.arrisPixels },
       uArrisLean: { value: settings.arrisLean },
-      uLift: { value: new Vector2(settings.sunLift, settings.skyLift) },
-      uLightScale: { value: TERRAIN.lightScale * GROUND_EXPOSURE },
-      // Shared by reference with the rest of the world, all three of them: one
-      // sun, one pair of light colours, one body of air. A copy here would be a
-      // second answer to where the sun is, which is the defect this campaign
+      // The sun, the exposure and the two lifts, from the one seat that
+      // produces the pair they act on. Shared by reference with the rest of the
+      // world, as are the light colours and the air below: a copy here would be
+      // a second answer to where the sun is, which is the defect this campaign
       // spent a session removing.
-      uSunDir: SKY_UNIFORMS.uSunDir,
+      ...faceLightUniforms(TERRAIN.lightScale * GROUND_EXPOSURE,
+        [settings.sunLift, settings.skyLift]),
       ...SCENE_LIGHT_UNIFORMS,
       ...fogUniforms(),
     },
