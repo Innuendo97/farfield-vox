@@ -2,8 +2,11 @@ import { Euler, Quaternion } from 'three';
 import {
   EYE_HEIGHT, PLATFORM, RUN_SPEED, STAIRS, WALK_SPEED,
 } from '../world/layout.js';
-import { stairHeightAt } from '../world/stairs.js';
-import { pathCoord, pathRun } from '../world/terrain-field.js';
+// THE CONTRACTS AND NOT THE FILES BEHIND THEM. This used to reach straight
+// into src/world/stairs.js, which the stone session rewrites; the height of a
+// nosing and the name of what is underfoot both come through one door now, so
+// that rewrite reaches src/world/contracts.js and stops there.
+import { materialAt, stairHeightAt } from '../world/contracts.js';
 
 // The body under the eye.
 //
@@ -365,10 +368,13 @@ function clamp(value, low, high) {
 /**
  * How far the plane through the nosings sits above the ground under the walker.
  *
- * Zero off the worked stone. On it, the continuous companion of stepHeight() in
- * src/world/stairs.js: the same run described as a ramp instead of as six
- * boxes, clamped at both ends so that the head of the run and the platform
- * agree and the top tread does not hand the eye a step of its own.
+ * Zero off the worked stone. On it, the continuous companion of the run the
+ * contract measures: the same six boxes described as a ramp, clamped at both
+ * ends so that the head of the run and the platform agree and the top tread
+ * does not hand the eye a step of its own.
+ *
+ * It asks for the STAIR and not for built stone in general, which is why the
+ * contract keeps the two apart: the platform is flat and this is a ramp.
  *
  * It is measured against where the walker's feet ACTUALLY are and not against
  * the tread they are over, and the difference matters in one direction. Going
@@ -388,28 +394,6 @@ export function stairEaseAt(x, z, groundY) {
   return clamp(ramp - groundY, -limit, limit);
 }
 
-/**
- * What is under the feet, by name.
- *
- * For the unit that has to play a footfall, which needs to know whether the
- * foot is landing on worn stone or in grass. Nothing here is new information:
- * the platform is a rotated box in the layout, the stair run answers for itself
- * in src/world/stairs.js, and the path is the same signed distance from the
- * same fitted centreline that paints the albedo and cuts the relief — so the
- * sound and the picture can never disagree about where the stone stops.
- */
-const PLATFORM_SIN = Math.sin(PLATFORM.rotationY * DEG);
-const PLATFORM_COS = Math.cos(PLATFORM.rotationY * DEG);
-
-export function surfaceAt(x, z) {
-  const dx = x - PLATFORM.x;
-  const dz = z - PLATFORM.z;
-  if (Math.abs(dx * PLATFORM_COS - dz * PLATFORM_SIN) <= PLATFORM.width / 2
-    && Math.abs(dx * PLATFORM_SIN + dz * PLATFORM_COS) <= PLATFORM.depth / 2) return 'piattaforma';
-  if (stairHeightAt(x, z) !== -Infinity) return 'scalinata';
-  if (pathRun(z) > 0.5 && Math.abs(pathCoord(x, z)) <= 1) return 'sentiero';
-  return 'erba';
-}
 
 const STORAGE_KEY = 'farfield.motion';
 
@@ -667,7 +651,7 @@ export function createPresence({ frozen = false, choice = null } = {}) {
         state.footImpact = 0;
         state.zoomAmount = 0;
         state.fovDeg = 0;
-        state.surface = surfaceAt(m.x, m.z);
+        state.surface = materialAt(m.x, m.z);
         quiet = true;
         return;
       }
@@ -901,7 +885,7 @@ export function createPresence({ frozen = false, choice = null } = {}) {
       state.footfall = footfalls;
       state.foot = foot;
       state.footImpact = footImpact;
-      state.surface = surfaceAt(m.x, m.z);
+      state.surface = materialAt(m.x, m.z);
       state.effort = effort;
       state.movingFor = movingFor;
       state.stillFor = stillFor;

@@ -1,9 +1,8 @@
 import { Scene } from 'three';
 import { applySky } from '../core/sky.js';
 import { setAir } from './air.js';
-import { createHeightSampler } from './terrain.js';
+import { builtHeightAt, groundHeightAt as meadowHeightAt } from './contracts.js';
 import { ROCK_BLOCKERS } from './rocks.js';
-import { stairHeightAt } from './stairs.js';
 import { MONOLITHS, PLATFORM } from './layout.js';
 import { LAYERS, layer, layersAt } from './layers/registry.js';
 
@@ -21,28 +20,6 @@ const DEG = Math.PI / 180;
 // src/world/layers/registry.js, and each of them states its own needs beside the
 // code that eats them.
 
-/**
- * Height of the built stone under a point, or -Infinity where there is none.
- *
- * The stair and the platform are the only places the walker leaves the meadow,
- * and they are flat topped boxes: their height is an arithmetic answer, not
- * something that needs a sampled grid the way the ground does.
- */
-function builtHeightAt(x, z) {
-  const c = Math.cos(PLATFORM.rotationY * DEG);
-  const s = Math.sin(PLATFORM.rotationY * DEG);
-  const dx = x - PLATFORM.x;
-  const dz = z - PLATFORM.z;
-  // Back into the platform's own frame, which is the inverse of the rotation
-  // applied in stairs.js.
-  const lx = dx * c - dz * s;
-  const lz = dx * s + dz * c;
-  if (Math.abs(lx) <= PLATFORM.width / 2 && Math.abs(lz) <= PLATFORM.depth / 2) {
-    return PLATFORM.height;
-  }
-  return stairHeightAt(x, z);
-}
-
 export function buildHub() {
   const scene = new Scene();
   // The dome goes up with the scene rather than with a delivery. It costs no
@@ -57,7 +34,6 @@ export function buildHub() {
   // The ground knows its own shape from the first frame, before any of its
   // textures have arrived: the walker has to stand on the right height
   // immediately, and the meshes can catch up.
-  const meadowHeightAt = createHeightSampler();
   const groundHeightAt = (x, z) => Math.max(meadowHeightAt(x, z), builtHeightAt(x, z));
 
   // The blocks stop the walker from the first frame, whether or not their mesh

@@ -4,7 +4,7 @@ import {
 import { DETAIL, createBakedMaterial } from './air.js';
 import TERRAIN from '../../assets-src/terrain/terrain.json';
 import {
-  FIELD, GRID, gridToOffset, heightAt, pathCoord,
+  GRID, gridToOffset, heightAt, pathCoord,
 } from './terrain-field.js';
 import { pathStripUv } from './path-strip.js';
 
@@ -14,8 +14,11 @@ import { pathStripUv } from './path-strip.js';
 // builds a painted-albedo-times-baked-light surface all left for
 // src/world/air.js, because five other modules were reading them out of this
 // file and could not be left depending on the one file the ground gets rewritten
-// in. What is here is the ground and nothing else: the mesh, the height under a
-// foot, and the hanging of the two.
+// in. The height under a foot left too, for src/world/contracts.js, because
+// three other sessions have to ask it and none of them may ask this file.
+//
+// What is here is the mesh of the meadow and the hanging of it, and one module
+// imports it: src/world/layers/v1-suolo.js, which is the same session's.
 
 // The ground.
 //
@@ -105,52 +108,17 @@ function buildGround() {
 }
 
 /**
- * Height of the ground under a point, in metres.
- *
- * The field is arithmetic and could be evaluated directly, but it is sampled
- * into a grid once and read back bilinearly instead: the walker asks for this
- * every frame, and a grid read costs the same whatever the field grows into
- * later.
- */
-export function createHeightSampler() {
-  const { samples, originX, originZ, spacing } = FIELD;
-  const grid = new Float32Array(samples * samples);
-  for (let j = 0; j < samples; j++) {
-    const z = originZ + j * spacing;
-    for (let i = 0; i < samples; i++) {
-      grid[j * samples + i] = heightAt(originX + i * spacing, z);
-    }
-  }
-
-  return function height(x, z) {
-    const fx = (x - originX) / spacing;
-    const fz = (z - originZ) / spacing;
-    // Outside the grid the field is flat, so the rim value is the right answer.
-    const i = Math.max(0, Math.min(samples - 2, Math.floor(fx)));
-    const j = Math.max(0, Math.min(samples - 2, Math.floor(fz)));
-    const tx = Math.max(0, Math.min(1, fx - i));
-    const tz = Math.max(0, Math.min(1, fz - j));
-    const a = grid[j * samples + i];
-    const b = grid[j * samples + i + 1];
-    const c = grid[(j + 1) * samples + i];
-    const d = grid[(j + 1) * samples + i + 1];
-    return (a * (1 - tx) + b * tx) * (1 - tz) + (c * (1 - tx) + d * tx) * tz;
-  };
-}
-
-/**
  * Builds the ground.
  *
  * One mesh, one material, nothing animated: the path is stone all the way
  * across, lit and shaded by the bake alone.
  *
  * @param {object} assets  albedo and light textures
- * @returns {{ meshes: Mesh[], height: Function }}
+ * @returns {{ meshes: Mesh[] }}
  */
 export function createTerrain({
   albedo, light, detail = null, strip = null, lightScale = TERRAIN.lightScale,
 }) {
-  const height = createHeightSampler();
   const meshes = [];
 
   if (albedo && light) {
@@ -214,5 +182,5 @@ export function createTerrain({
     meshes.push(ground);
   }
 
-  return { meshes, height };
+  return { meshes };
 }
