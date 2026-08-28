@@ -1,0 +1,29 @@
+{
+  "size": 512,
+  "columns": 2,
+  "rows": 2,
+  "margin": 8,
+  "bushFrom": 0,
+  "bushCount": 2,
+  "flowerFrom": 2,
+  "flowerCount": 2,
+  "coverage": 0.2466,
+  "cells": [
+    {
+      "index": 0,
+      "kind": "bush"
+    },
+    {
+      "index": 1,
+      "kind": "bush"
+    },
+    {
+      "index": 2,
+      "kind": "flower"
+    },
+    {
+      "index": 3,
+      "kind": "flower"
+    }
+  ]
+}

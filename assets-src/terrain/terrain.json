@@ -1,0 +1,26 @@
+{
+  "lightScale": 1.5,
+  "lightSize": 2048,
+  "samples": 384,
+  "terms": {
+    "ground": {
+      "sun": 0.87049,
+      "sky": 1.1426
+    },
+    "groundColourGivenUp": {
+      "sun": 0.00122,
+      "sky": 0.02
+    },
+    "stair": {
+      "sun": 0.9075,
+      "sky": 1.0937
+    }
+  },
+  "stairAtlas": 512,
+  "sun": {
+    "elevation": 34.0,
+    "bearing": -9.5,
+    "energy": 1.0,
+    "angle": 0.009285
+  }
+}

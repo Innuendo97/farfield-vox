@@ -1,0 +1,34 @@
+{
+  "purpose": "The seven readings the sky of the arrival composition has to keep. The capitolato's net for every session after the sky one is «cielo entro 2 livelli», and a net needs something to be tied to: this file is that anchor, and tools/grade/check-sky-zones.mjs is the hand that pulls it.",
+  "sealedOn": "2026-08-25",
+  "provenance": "Measured by the reviewer's gate at the close of the sky-and-grading session, on the composition the committente ratified on that date: the arrival veil at its approved depth, over the sky sealed by the session before it. The values are that frame read to a tenth of a level; the rounding is at most 0.05 and the tolerance below is 2.",
+  "reference": "the state WITH THE APPROVED VEIL at the reference pose, not the bare drawing buffer. Bare, the frame is a different picture by design — the permanent corner shading left src/core/post.js when the veil took it over — and it is not what this file measures.",
+  "tolerance": 2,
+  "check": "npm run sky:zones",
+  "conditions": {
+    "url": "?dev&t0",
+    "whyThatUrl": "the frozen clock holds the arrival: src/ui/veil.js keeps the veil up instead of letting go after its two seconds, so the one instant the reference was measured at can be photographed as many times as a comparison needs.",
+    "viewport": { "width": 1672, "height": 941, "deviceScaleFactor": 1 },
+    "pose": "posa-P",
+    "poseFrom": "tools/grade/lib/survey-poses.mjs",
+    "quality": "alta",
+    "subject": "page",
+    "whySubjectIsThePage": "the veil is a DOM overlay, not something the renderer draws, so a canvas read back through toDataURL is the frame WITHOUT it. What target.png carries is the page, so the page is what gets photographed.",
+    "hidden": [".dev-hud", ".dev-panel", ".overlay-start", ".reticle"],
+    "kept": [".sky-veil", "the game's own HUD"],
+    "whyKept": "target.png carries both, so hiding them would be measuring a different picture.",
+    "guard": "tools/grade/lib/dressed-frame.mjs — nothing is measured until the frame is proven to carry the world.",
+    "luminance": "Rec.709 on the coded 8-bit values: the mean R, G and B of the box first, then 0.2126*R + 0.7152*G + 0.0722*B of that mean. Coded and not linear because that is the space the capitolato counts levels in and the space target.png is written in.",
+    "renderer": "a real GPU through ANGLE/D3D11. A run that lands on SwiftShader is reported and its numbers are not comparable."
+  },
+  "zones": [
+    { "name": "sky-upper-centre", "box": { "x": 780, "y": 60, "w": 110, "h": 50 }, "luminance": 127.1 },
+    { "name": "sky-upper-left", "box": { "x": 30, "y": 30, "w": 110, "h": 50 }, "luminance": 76.5 },
+    { "name": "sky-upper-right", "box": { "x": 1530, "y": 30, "w": 110, "h": 50 }, "luminance": 135.3 },
+    { "name": "sky-left-midway", "box": { "x": 30, "y": 300, "w": 110, "h": 50 }, "luminance": 127.9 },
+    { "name": "sky-right-midway", "box": { "x": 1530, "y": 250, "w": 110, "h": 50 }, "luminance": 165.5 },
+    { "name": "cloud-highlight", "box": { "x": 1180, "y": 120, "w": 110, "h": 50 }, "luminance": 166.1 },
+    { "name": "sky-zenith-blue", "box": { "x": 700, "y": 20, "w": 110, "h": 50 }, "luminance": 126.7 }
+  ],
+  "whyTheseBoxes": "Sky and only sky, at four distances from the centre of the frame, because corner shading is a function of that distance and nothing else: read as a column the seven are a trend, and a change that is the veil's can be told apart from a change that is the sky's."
+}

@@ -1,0 +1,334 @@
+// What the frame is allowed to cost on this machine, and what is given up to
+// keep it there.
+//
+// There is one rule above every number below: the identity of the picture is
+// never a tier. The sky, the baked light, the tone curve with the fitted grade
+// and its vignette, the air, and everything that glows are the same on every
+// machine — a slower one gets the same world drawn over fewer pixels with less
+// grass in it, never a different world. Everything that may be spent is in
+// LEVERS, in the order it is spent, and the order is not arbitrary: it runs
+// from what changes nothing about what is in the frame to what changes what is
+// in it, so the first thing to go is always the least visible thing left.
+//
+//   1  resolution      the same frame over fewer pixels
+//   2  grass           the only thing here drawn in real time, and the only
+//                      thing whose cost grows with where the eye is pointed
+//   3  bloom           a coarser halo, never no halo
+//   4  multisampling   four samples down to two
+//
+// Two more were named and are not taken, for the same reason: they are worth
+// nothing here. Anisotropy in this world is set on exactly two surfaces, the
+// engraved writing and the open panels, both flat and both read close to head
+// on, where the sampler asks for one tap whatever it is allowed. And there is
+// no level of detail to drop on the rocks or the bushes, because there is no
+// chain to drop it from: they are baked stone and single cards, and the frame
+// spends its time filling the meadow, not submitting them.
+
+export const TIERS = [
+  {
+    id: 'oltre',
+    label: 'Oltre',
+    // Reached only by the benchmark, and only on a machine that draws the
+    // reference framing in under five milliseconds. It is the same world with
+    // more of the one thing that was rationed for the machines that cannot:
+    // never a feature the other tiers do not have.
+    scale: 1,
+    samples: 4,
+    bloom: 'half',
+    grass: { density: 1.3, radius: 16 },
+  },
+  {
+    id: 'alto',
+    label: 'Alta',
+    scale: 1,
+    samples: 4,
+    bloom: 'half',
+    grass: { density: 1, radius: 12 },
+  },
+  {
+    id: 'medio',
+    label: 'Media',
+    scale: 0.85,
+    samples: 4,
+    bloom: 'quarter',
+    grass: { density: 0.7, radius: 12 },
+  },
+  {
+    id: 'basso',
+    label: 'Bassa',
+    scale: 0.75,
+    samples: 2,
+    bloom: 'quarter',
+    grass: { density: 0.4, radius: 12 },
+  },
+];
+
+// What the walker may ask for by hand. The best tier is not among them: it is
+// an answer about a machine, not a preference, and offering it on a machine
+// that cannot hold it would be offering a stutter.
+export const CHOICES = ['auto', 'alta', 'media', 'bassa'];
+
+const CHOICE_TIER = { alta: 'alto', media: 'medio', bassa: 'basso' };
+
+export const DEFAULT_TIER = 'medio';
+
+// Where the benchmark puts the line, in milliseconds of GPU time at the median.
+// The budget for a frame on the target hardware is between eight and twelve
+// milliseconds; these sit just inside it, so a machine that lands on a boundary
+// is given the tier it can hold rather than the one it can just reach.
+export const BENCH_THRESHOLDS = { high: 9, medium: 13, discrete: 5 };
+
+// The governor.
+//
+// A median over ninety frames is what is watched, because a single frame says
+// nothing: a texture upload, a lattice refill or another window waking up all
+// cost more than the frame does. Coming down is quick and going up is slow and
+// both are far apart, so the tier can never sit on a boundary and oscillate —
+// which would be worse than either tier, since the change is the only part of
+// this the walker can see.
+const WINDOW = 90;
+const DROP_AFTER = 45;      // consecutive frames over the ceiling
+const RAISE_AFTER = 300;    // consecutive frames under the floor
+const CEILING_MS = 18;
+const FLOOR_MS = 12;
+const HOLD_MS = 20000;
+
+// A change of buffer is an allocation and a change of resolution is several, so
+// both wait for a frame in which the eye is not moving. Not forever, though: a
+// walker who never stands still would otherwise never get the tier they need.
+const STILL_LOOK = 8;       // degrees per second
+const STILL_MOVE = 0.35;    // metres per second
+const SNAP_PATIENCE_MS = 2500;
+
+const STORAGE_KEY = 'farfield.quality';
+
+// How far the frame may change size before what was measured about this machine
+// stops being about this frame.
+//
+// The calibration answers a question about a number of pixels, not about a
+// graphics card: the same machine that draws a windowed frame in nine
+// milliseconds draws a full screen one in seventeen. A third more or a quarter
+// fewer pixels is enough to move a tier, so past that the stored answer is
+// treated as no answer and the three seconds are paid again — on the next
+// visit, never in the middle of one, because taking the eye off a walker who is
+// already walking is worse than any tier.
+const PIXEL_TOLERANCE = 0.35;
+
+function tierIndex(id) {
+  const found = TIERS.findIndex((tier) => tier.id === id);
+  return found === -1 ? TIERS.findIndex((t) => t.id === DEFAULT_TIER) : found;
+}
+
+/** What was decided about this machine last time, if anything was. */
+export function readStored() {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const stored = JSON.parse(raw);
+    return {
+      tier: typeof stored.tier === 'string' ? stored.tier : null,
+      choice: CHOICES.includes(stored.choice) ? stored.choice : 'auto',
+      benchMs: typeof stored.benchMs === 'number' ? stored.benchMs : null,
+      pixels: typeof stored.pixels === 'number' ? stored.pixels : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeStored(state) {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // A machine that refuses to remember gets calibrated again next time,
+    // which is three seconds and not a failure.
+  }
+}
+
+/** Whether this machine still has to be asked, for a frame of this many pixels. */
+export function needsBenchmark(pixels) {
+  const stored = readStored();
+  if (!stored?.tier) return true;
+  if (!stored.pixels || !pixels) return false;
+  const ratio = pixels / stored.pixels;
+  return ratio > 1 + PIXEL_TOLERANCE || ratio < 1 - PIXEL_TOLERANCE;
+}
+
+export function forgetStored() {
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch { /* see above */ }
+}
+
+/**
+ * Holds the frame to a tier, and moves it when the machine says so.
+ *
+ * @param {object} parts  the renderer facade and the hub, which between them
+ *                        own every lever there is
+ */
+export function createQuality({ renderer, hub }) {
+  const stored = readStored();
+  let choice = stored?.choice ?? 'auto';
+  let benched = stored?.tier ?? null;
+  // What the calibration found, and how big the frame was when it found it.
+  // Both survive a change of mind about the tier: a walker who picks a tier by
+  // hand and later goes back to Auto gets the machine's own answer back, not a
+  // second calibration.
+  let benchMs = stored?.benchMs ?? null;
+  let benchPixels = stored?.pixels ?? null;
+  let index = tierIndex(choice === 'auto' ? (benched ?? DEFAULT_TIER) : CHOICE_TIER[choice]);
+  let applied = null;
+
+  // What is waiting for a still frame, and since when.
+  let pending = null;
+  let pendingSince = 0;
+
+  const samples = new Float32Array(WINDOW);
+  let count = 0;
+  let cursor = 0;
+  let hot = 0;
+  let cold = 0;
+  let changedAt = -HOLD_MS;
+  const listeners = [];
+
+  function announce() {
+    for (const listener of listeners) listener(TIERS[index], choice);
+  }
+
+  /** Everything that can be moved without allocating anything. */
+  function applySoft(tier) {
+    hub.setGrassQuality(tier.grass);
+    renderer.setBloomTier(tier.bloom);
+  }
+
+  /** And the two that reallocate the buffers the frame is drawn into. */
+  function applyHard(tier) {
+    renderer.setSamples(tier.samples);
+    renderer.setRenderScale(tier.scale);
+  }
+
+  function apply(tier, { immediate = false } = {}) {
+    applySoft(tier);
+    const needsHard = !applied || applied.scale !== tier.scale || applied.samples !== tier.samples;
+    if (!needsHard) {
+      applied = tier;
+      return;
+    }
+    if (immediate) {
+      applyHard(tier);
+      applied = tier;
+      pending = null;
+      return;
+    }
+    pending = tier;
+    pendingSince = performance.now();
+  }
+
+  function settle(tier, { immediate = false } = {}) {
+    index = tierIndex(tier);
+    changedAt = performance.now();
+    hot = 0;
+    cold = 0;
+    count = 0;
+    cursor = 0;
+    apply(TIERS[index], { immediate });
+    announce();
+  }
+
+  function store() {
+    writeStored({
+      tier: benched, choice, benchMs, pixels: benchPixels,
+    });
+  }
+
+  function median() {
+    if (count < WINDOW) return null;
+    const sorted = Float32Array.from(samples).sort();
+    return sorted[WINDOW >> 1];
+  }
+
+  function percentile(fraction) {
+    if (count === 0) return null;
+    const sorted = Float32Array.from(samples.subarray(0, count)).sort();
+    return sorted[Math.min(count - 1, Math.floor(count * fraction))];
+  }
+
+  const api = {
+    get tier() { return TIERS[index]; },
+    get choice() { return choice; },
+    get automatic() { return choice === 'auto'; },
+    get medianMs() { return median(); },
+    get p95Ms() { return percentile(0.95); },
+    get pending() { return pending; },
+
+    onChange(listener) { listeners.push(listener); return api; },
+
+    /** Puts the current tier on the frame at once, buffers and all. */
+    start() {
+      apply(TIERS[index], { immediate: true });
+      announce();
+    },
+
+    /** What the benchmark decided, which is only ever a starting point. */
+    setBenchmark(tierId, medianMs) {
+      const buffer = renderer.drawingBuffer();
+      benched = tierId;
+      benchMs = medianMs;
+      benchPixels = buffer.width * buffer.height;
+      store();
+      if (choice !== 'auto') return;
+      settle(tierId, { immediate: true });
+    },
+
+    /** What the walker asked for, which outranks it. */
+    setChoice(next) {
+      if (!CHOICES.includes(next) || next === choice) return;
+      choice = next;
+      store();
+      settle(choice === 'auto' ? (benched ?? DEFAULT_TIER) : CHOICE_TIER[choice]);
+    },
+
+    /**
+     * One frame of evidence.
+     *
+     * @param {number} gpuMs   what the frame cost, by the driver's clock or the
+     *                         wall clock filtered
+     * @param {object} motion  how fast the eye is turning and the body moving
+     */
+    sample(gpuMs, motion) {
+      const now = performance.now();
+
+      // The deferred half of a tier change, taken the moment the eye is still —
+      // or taken anyway, once waiting for that has become the worse of the two.
+      if (pending) {
+        const still = motion.lookRate < STILL_LOOK && motion.speed < STILL_MOVE;
+        if (still || now - pendingSince > SNAP_PATIENCE_MS) {
+          applyHard(pending);
+          applied = pending;
+          pending = null;
+        }
+      }
+
+      if (!Number.isFinite(gpuMs) || gpuMs <= 0) return;
+      samples[cursor] = gpuMs;
+      cursor = (cursor + 1) % WINDOW;
+      if (count < WINDOW) count++;
+
+      hot = gpuMs > CEILING_MS ? hot + 1 : 0;
+      cold = gpuMs < FLOOR_MS ? cold + 1 : 0;
+
+      if (choice !== 'auto' || now - changedAt < HOLD_MS) return;
+
+      if (hot >= DROP_AFTER && index < TIERS.length - 1) {
+        settle(TIERS[index + 1].id);
+        return;
+      }
+      // Never above what the machine was measured at: the benchmark saw the
+      // whole framing at once and a quiet stretch of walking has not.
+      const ceiling = tierIndex(benched ?? DEFAULT_TIER);
+      if (cold >= RAISE_AFTER && index > ceiling) settle(TIERS[index - 1].id);
+    },
+  };
+
+  return api;
+}

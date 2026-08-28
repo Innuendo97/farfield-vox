@@ -1,0 +1,57 @@
+{
+  "id": "01",
+  "chiave": "personalita",
+  "titolo": "Personalità",
+  "icona": "lampadina",
+  "copertura": 0.15,
+  "incisione": {
+    "titolo": "PERSONALITÀ",
+    "parolechiave": ["Curioso", "Resiliente", "Creativo", "Empatico", "Determinato"],
+    "fonte": "inquadratura di riferimento",
+    "stato": "in_attesa_committente",
+    "nota": "cinque parole provvisorie riprese dall'inquadratura di riferimento: il CV non contiene tratti personali, servono le parole scelte dal committente"
+  },
+  "timeline": [
+    {
+      "id": "pressione",
+      "tipo": "tratto",
+      "titolo": "Lucidità sotto pressione",
+      "periodo": "2021 — 2022",
+      "sottotitolo": "Sala operativa, emergenze marittime",
+      "riassunto": "Un anno di comunicazioni operative in contesti time-critical e ad alto stress.",
+      "dettaglio": "Operatore in sala operativa per il coordinamento di emergenze marittime via radio e linea 1530. È l'esperienza che ha rafforzato disciplina, resilienza e capacità decisionale sotto pressione.",
+      "tecnologie": [],
+      "fonte": "Curriculum Vitae.tex, sezione Esperienza Militare; LinkedIn - Profilo Ottimizzato.md, esperienza Marina Militare"
+    },
+    {
+      "id": "apprendimento",
+      "tipo": "tratto",
+      "titolo": "Apprendimento continuo",
+      "periodo": null,
+      "sottotitolo": "Certificazioni e laurea",
+      "riassunto": "Ventiquattro certificati fra piattaforme di formazione e vendor tecnologici, accanto alla laurea triennale in Ingegneria Informatica.",
+      "dettaglio": "I titoli coprono machine learning, sviluppo su cloud, containerizzazione, networking e database. Gli anni della laurea, 2021 — 2024, si sovrappongono per intero al servizio in Marina Militare e ai due impieghi da sviluppatore.",
+      "tecnologie": [],
+      "fonte": "Curriculum Vitae.tex, sezioni Certificazioni e Formazione"
+    },
+    {
+      "id": "tratti-questionario",
+      "tipo": "tratto",
+      "titolo": "In aggiornamento",
+      "periodo": null,
+      "sottotitolo": null,
+      "riassunto": null,
+      "dettaglio": null,
+      "tecnologie": [],
+      "stato": "in_attesa_committente",
+      "nota": "il monolite espone cinque tratti con relativo racconto: nessuna delle due fonti li contiene, vanno raccolti dal committente"
+    }
+  ],
+  "stanza": {
+    "chiave": "personalita",
+    "ancoraMonolite": "01",
+    "presentazione": "timeline-verticale",
+    "elementi": [],
+    "stato": "da_progettare"
+  }
+}

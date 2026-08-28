@@ -1,0 +1,334 @@
+/* The room of one entry.
+ *
+ * It lies over the world without hiding it: the hub keeps drawing behind a
+ * blur, which is why the plate is a wash and not a colour. Every measure is in
+ * rem against the root size src/ui/style.css sets from the shorter side of the
+ * viewport, so the room keeps the proportions of the rest of the interface.
+ */
+
+.room {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 2rem;
+  pointer-events: auto;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  /* The world stays legible behind it. The tint is barely more than the fog of
+     the scene, so the frame keeps its colour instead of turning to slate. */
+  background: rgba(9, 18, 26, 0.42);
+  backdrop-filter: blur(7px) saturate(0.92);
+  -webkit-backdrop-filter: blur(7px) saturate(0.92);
+}
+
+.room[hidden] { display: none; }
+.room.is-open { opacity: 1; }
+
+.room-shell {
+  display: flex;
+  flex-direction: column;
+  width: min(68rem, 100%);
+  max-height: 100%;
+  border: 1px solid var(--ui-line);
+  background: linear-gradient(
+    170deg,
+    rgba(11, 24, 34, 0.72),
+    rgba(8, 17, 25, 0.80)
+  );
+  box-shadow: 0 0 0 1px rgba(6, 14, 20, 0.5), 0 1.5rem 4rem rgba(3, 9, 14, 0.55);
+  transform: translateY(0.75rem) scale(0.995);
+  transition: transform 0.25s ease;
+}
+
+.room.is-open .room-shell { transform: none; }
+
+/* ------------------------------------------------------------------- head */
+
+.room-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 1.125rem 1.5rem 0.9375rem;
+  border-bottom: 1px solid rgba(203, 233, 249, 0.16);
+}
+
+.room-index {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  letter-spacing: 0.22em;
+  color: var(--ui-mark);
+  text-shadow: var(--ui-shadow);
+}
+
+.room-title {
+  flex: 1;
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 200;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ui-ink);
+  text-shadow: var(--ui-shadow);
+}
+
+.room-close {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 0.8125rem;
+  letter-spacing: 0.14em;
+  color: var(--ui-ink-soft);
+  text-shadow: var(--ui-shadow);
+  cursor: pointer;
+  align-self: center;
+}
+
+.room-close:hover { color: var(--ui-mark); }
+.room-close:hover .keycap { border-color: var(--ui-line-strong); }
+
+/* ------------------------------------------------------------------- body */
+
+.room-body {
+  display: grid;
+  grid-template-columns: 17.5rem minmax(0, 1fr);
+  min-height: 0;
+  flex: 1;
+}
+
+.room-list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0.75rem 0;
+  overflow-y: auto;
+  border-right: 1px solid rgba(203, 233, 249, 0.16);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(158, 236, 249, 0.28) transparent;
+}
+
+/* The vertical timeline: one rule down the column, one node per entry, which is
+   the same figure the panels draw in the world. */
+.room-entry {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1875rem;
+  width: 100%;
+  padding: 0.6875rem 1.125rem 0.6875rem 2.25rem;
+  border: 0;
+  border-left: 2px solid transparent;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: var(--ui-ink-soft);
+  cursor: pointer;
+}
+
+.room-entry::before {
+  content: '';
+  position: absolute;
+  left: 1.0625rem;
+  top: 1.0625rem;
+  width: 0.3125rem;
+  height: 0.3125rem;
+  border: 1px solid var(--ui-line);
+  transform: rotate(45deg);
+}
+
+.room-entry::after {
+  content: '';
+  position: absolute;
+  left: 1.28125rem;
+  top: 1.4375rem;
+  bottom: -0.25rem;
+  width: 1px;
+  background: rgba(203, 233, 249, 0.16);
+}
+
+.room-entry:last-child::after { display: none; }
+
+.room-entry.is-selected {
+  border-left-color: var(--accent);
+  background: linear-gradient(90deg, rgba(127, 212, 245, 0.13), rgba(127, 212, 245, 0));
+}
+
+.room-entry.is-selected::before {
+  border-color: var(--ui-mark);
+  background: var(--ui-mark);
+  box-shadow: 0 0 0.5rem rgba(127, 212, 245, 0.65);
+}
+
+.room-entry:hover .room-entry-title { color: var(--ui-mark); }
+
+.room-entry-title {
+  font-size: 0.875rem;
+  font-weight: 340;
+  letter-spacing: 0.045em;
+  color: var(--ui-ink);
+  text-shadow: var(--ui-shadow);
+}
+
+.room-entry.is-selected .room-entry-title { color: var(--ui-mark); }
+
+.room-entry-meta {
+  font-size: 0.75rem;
+  font-weight: 300;
+  letter-spacing: 0.05em;
+  color: rgba(190, 232, 253, 0.62);
+}
+
+/* Discreet on purpose: it marks a line the owner of the content has still to
+   settle, and it must not read as a warning. */
+.room-badge {
+  align-self: flex-start;
+  margin-top: 0.125rem;
+  padding: 0.0625rem 0.375rem;
+  border: 1px solid rgba(158, 236, 249, 0.38);
+  border-radius: 0.625rem;
+  font-size: 0.625rem;
+  font-weight: 340;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(158, 236, 249, 0.82);
+  white-space: nowrap;
+}
+
+.room-detail-meta .room-badge {
+  display: inline-block;
+  margin-left: 0.625rem;
+  vertical-align: 0.0625rem;
+}
+
+/* ----------------------------------------------------------------- detail */
+
+.room-detail {
+  min-height: 0;
+  padding: 1.375rem 1.75rem 2rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(158, 236, 249, 0.28) transparent;
+}
+
+.room-detail-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 300;
+  letter-spacing: 0.09em;
+  color: var(--ui-ink);
+  text-shadow: var(--ui-shadow);
+}
+
+.room-detail-meta {
+  margin: 0.4375rem 0 0;
+  font-size: 0.8125rem;
+  font-weight: 300;
+  letter-spacing: 0.08em;
+  color: var(--ui-mark);
+}
+
+.room-lead {
+  margin: 1.125rem 0 0;
+  max-width: 44rem;
+  font-size: 0.9375rem;
+  font-weight: 300;
+  line-height: 1.62;
+  color: var(--ui-ink);
+}
+
+.room-prose {
+  max-width: 44rem;
+  font-size: 0.875rem;
+  font-weight: 300;
+  line-height: 1.68;
+  color: var(--ui-ink-soft);
+}
+
+.room-prose p { margin: 0.875rem 0 0; }
+.room-prose h4,
+.room-prose h5,
+.room-prose h6 {
+  margin: 1.25rem 0 0;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ui-mark);
+}
+
+.room-prose ul,
+.room-prose ol { margin: 0.75rem 0 0; padding-left: 1.125rem; }
+.room-prose li { margin: 0.3125rem 0; }
+.room-prose strong { font-weight: 500; color: var(--ui-ink); }
+.room-prose em { font-style: italic; }
+
+.room-prose code {
+  padding: 0.0625rem 0.3125rem;
+  border: 1px solid rgba(203, 233, 249, 0.18);
+  border-radius: 0.125rem;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 0.8125rem;
+  color: var(--ui-mark);
+}
+
+.room-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin: 1.375rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.room-chips li {
+  padding: 0.1875rem 0.5625rem;
+  border: 1px solid rgba(203, 233, 249, 0.22);
+  font-size: 0.75rem;
+  font-weight: 320;
+  letter-spacing: 0.06em;
+  color: var(--ui-ink-soft);
+  background: rgba(127, 212, 245, 0.05);
+}
+
+.room-link {
+  display: inline-block;
+  margin: 1.25rem 0 0;
+  font-size: 0.875rem;
+  letter-spacing: 0.05em;
+  color: var(--ui-mark);
+  text-decoration-color: rgba(158, 236, 249, 0.4);
+  text-underline-offset: 0.25rem;
+}
+
+.room-empty {
+  margin: 1.125rem 0 0;
+  font-size: 0.875rem;
+  font-weight: 300;
+  font-style: italic;
+  color: rgba(190, 232, 253, 0.6);
+}
+
+/* A narrow window puts the list above the detail instead of beside it; the two
+   never share a scrollbar. */
+@media (max-width: 52rem) {
+  .room-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: 12rem minmax(0, 1fr); }
+  .room-list { border-right: 0; border-bottom: 1px solid rgba(203, 233, 249, 0.16); }
+}
+
+/* A walker who has asked for no motion gets no MOVEMENT: the shell stops
+   travelling and settling, which is the part of this that moves. The room
+   itself still fades — a scrim and a blur over the whole world switched on
+   between two frames is the hard cut the setting exists to spare them, and a
+   flat sheet changing opacity moves nothing. Short, so it is over before it is
+   noticed. src/ui/room.js takes the panel off the page on its own clock, which
+   is longer than either of these, so nothing is cut short by it. */
+@media (prefers-reduced-motion: reduce) {
+  .room { transition: opacity 140ms var(--ui-ease); }
+  .room-shell { transition: none; transform: none; }
+}

@@ -1,0 +1,578 @@
+/* The opening scene's own sheet, imported by src/ui/intro.js and by nothing
+ * else. That is deliberate and it is the whole economy of the scene: because
+ * the import is dynamic and the sheet travels with the module, a page that does
+ * not want the scene never asks for either — no chunk, no stylesheet, nothing
+ * on the wire. A rule written into src/ui/style.css instead would be paid for
+ * by every visit, including the measured ones.
+ *
+ * WHAT IS IN HERE AND WHAT IS IN THE MODULE. Every number that decides the
+ * PICTURE — where the pole is, how many trails, how wide the orbit is, how
+ * long a turn takes — is decided in intro.js and handed over, because the
+ * module is the only thing that can measure the block it has to keep clear of.
+ * This sheet holds what a stylesheet is actually for: the stacking, the type,
+ * and the fact that everything which moves moves on the compositor.
+ *
+ * NOTHING IN HERE ANIMATES A PROPERTY THAT COSTS A LAYOUT OR A PAINT. During
+ * this load the main thread is decoding four megabytes of texture, cutting six
+ * faces of type and running a three second calibration, and frames two and a
+ * third seconds apart have been measured on this world. transform and opacity
+ * are the two the compositor can carry on its own; they are the two used.
+ */
+
+.intro {
+  position: fixed;
+  inset: 0;
+  /* Over the cover main.js laid down, which sits at 30, and over everything in
+     the interface layer including the room at 20. #ui is positioned with no
+     z-index of its own, so it makes no stacking context and this number is
+     read against the page rather than against its parent. */
+  z-index: 31;
+  /* The sky is a square two radii on a side and it hangs off every edge of the
+     window on purpose — a trail must not end where the frame does. This is what
+     stops that overhang from becoming a scrollbar. */
+  overflow: hidden;
+  /* The interface layer takes no pointer events; this one has to. Every click
+     that lands here is a click the world does not get: the canvas never hears
+     one, so the lock is never asked for early and the calibration behind this
+     sheet is never stopped by a visitor tapping the glass. */
+  pointer-events: auto;
+  cursor: pointer;
+  /* The night the cover was painted in, so the handover between the two is not
+     a change of colour, and so a frame delivered before the field canvas has
+     been put up is still night rather than nothing. */
+  background: #050b13;
+  opacity: 1;
+  transition: opacity var(--intro-fade, 900ms) var(--ui-ease);
+  will-change: opacity;
+}
+
+.intro.is-going { opacity: 0; }
+
+/* ------------------------------------------------------- how the scene begins
+ *
+ * NOTHING SWITCHES ON. Every layer below is on the page, drawn and laid out, at
+ * nothing; the module adds .is-here one flush later and each of them comes up
+ * on its own length and its own delay, both handed down as custom properties
+ * because when a thing arrives is a matter of the picture and the picture is
+ * decided in the module.
+ *
+ * The order is the order the eye should read them: the ground of the night,
+ * then the sky over it, then the name, then the sentence, then the empty
+ * circle, and last the star that has begun to draw it. The sky is TURNING
+ * throughout — its rotation started when it was still invisible — so the trails
+ * are never once seen standing still and then lighting up.
+ *
+ * opacity and nothing else: this is the moment the chunk has just landed and
+ * the world's own load is at its heaviest, and an entrance that needed the main
+ * thread would arrive in two jumps or not at all.
+ */
+
+.intro-field,
+.intro-trails,
+.intro-spark,
+.intro h1,
+.intro-word,
+.intro-orbit-track,
+.intro-orbit-half,
+.intro-orbit-head {
+  opacity: 0;
+}
+
+.intro-field   { transition: opacity var(--in-field)  var(--ui-ease) var(--in-field-at); }
+.intro-trails  { transition: opacity var(--in-trails) var(--ui-ease) var(--in-trails-at); }
+.intro-spark   { transition: opacity var(--in-trails) var(--ui-ease) var(--in-trails-at); }
+.intro h1      { transition: opacity var(--in-title)  var(--ui-ease) var(--in-title-at); }
+.intro-word    { transition: opacity var(--in-word)   var(--ui-ease) var(--in-word-at); }
+.intro-orbit-track { transition: opacity var(--in-track) var(--ui-ease) var(--in-track-at); }
+.intro-orbit-half  { transition: opacity var(--in-star)  var(--ui-ease) var(--in-star-at); }
+.intro-orbit-head  { transition: opacity var(--in-star)  var(--ui-ease) var(--in-star-at); }
+
+.intro.is-here .intro-field,
+.intro.is-here .intro-trails,
+.intro.is-here .intro-spark,
+.intro.is-here .intro-orbit-track,
+.intro.is-here .intro-orbit-half,
+.intro.is-here .intro-orbit-head {
+  opacity: 1;
+}
+
+/* THE TYPE WAITS FOR ITS OWN FACE. The world's sheet asks for Farfield Sans
+   with font-display: swap, so a name shown before the file lands is a name that
+   changes shape in front of the visitor — the pop this whole entrance exists to
+   abolish, and the one nobody would forgive on the title. So these two are not
+   under .is-here at all: the module puts this class on when the face is in hand,
+   or when it has waited long enough that a name matters more than a face. */
+.intro.is-lettered h1,
+.intro.is-lettered .intro-word {
+  opacity: 1;
+}
+
+/* A window resized is a canvas redrawn, and a canvas redrawn at full strength
+   is the pop by another name. The sky goes out, is repainted while it is not
+   there, and comes back. Written after the rule above so that at equal
+   specificity this is the one that wins. */
+.intro.is-swapping .intro-field,
+.intro.is-swapping .intro-trails,
+.intro.is-swapping .intro-spark {
+  opacity: 0;
+  transition: opacity var(--intro-swap, 200ms) var(--ui-ease) 0ms;
+}
+
+/* ------------------------------------------------------------- the eyelids
+ *
+ * UNDER THE SCENE, AND ON THE PAGE FROM THE START. The scene is at 31 and these
+ * are at 30, so for the whole of the load they are behind an opaque night and
+ * cannot be seen; when the night dissolves, what is behind it is a pair of shut
+ * eyes and not a world. Put up at mount rather than at the gesture because the
+ * gesture is the one moment of this arrival that must not pay for a layout: at
+ * the click there is nothing to build, nothing to measure and no layer to
+ * promote — only a class.
+ *
+ * THE ONE PROPERTY EITHER OF THEM EVER ANIMATES IS A TRANSLATION. No height, no
+ * clip, no inset: those are a layout and a paint per frame, and this runs while
+ * the world is taking its first frames and its heaviest ones. The @keyframes
+ * themselves are built in src/ui/intro.js out of the same table the focus and
+ * the audio are drawn from — there is one timeline in this scene and it is not
+ * written twice.
+ *
+ * WHAT SHAPE THEY ARE IS DECIDED IN THE MODULE and handed down as an ellipse,
+ * because the four numbers a person can taste — how far down the middle a lid
+ * is opaque, how much deeper it hangs at the corners, how far it takes to
+ * vanish, how tall it is — are not the numbers an ellipse is made of. What the
+ * sheet is answerable for is that a lid is black, that it moves only by a
+ * translation, and that it moves on the compositor.
+ *
+ * The two constraints those four hold together, written here as well because
+ * this is where they are visible: SHUT IS OPAQUE — twice the opaque depth
+ * clears the frame, so the two solids overlap and each soft edge falls on the
+ * other lid's solid rather than on the world — and OPEN IS OPEN, because the
+ * throw is the lid's whole height rather than its opaque part. The second was
+ * got wrong first and the recording found it: a gradient still banked against
+ * the top and bottom edges at the moment the eyes were supposed to be all the
+ * way open, and 98.2% of the frame read where 100 was wanted. */
+.intro-lids {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* AND THE INNER EDGE IS AN ARC, NOT A LINE.
+ *
+ * «La forma di apertura sia meno rettilinea, più morbida, più tonda, come una
+ * vera palpebra.» An eye opens as an almond: tallest down the middle, closing
+ * to nothing at the corners, because the lid's own margin is a curve. One
+ * elliptical gradient gives both halves of that at once — the curve AND the
+ * softness — where a straight ramp under a rounded corner would only have given
+ * a curved cut with a straight fade behind it.
+ *
+ * Transparent INSIDE the ellipse and opaque outside, with the ellipse centred
+ * well below the lid: both of its arcs then bulge upward at the middle of the
+ * frame, so the lid hangs lower at the corners than at the centre, which is the
+ * way round a real one is. Every number in it is solved in src/ui/intro.js out
+ * of four readable ones — how deep, how much deeper at the sides, how far to
+ * vanish, how tall — because an ellipse is not a thing anybody can taste. */
+.intro-lid-up,
+.intro-lid-down {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: var(--lid-h, 80vh);
+  will-change: transform;
+}
+
+.intro-lid-up {
+  top: 0;
+  background: radial-gradient(var(--lid-rx, 160.128%) 100% at 50% var(--lid-top, 165%),
+    rgba(2, 6, 12, 0) 0 var(--lid-stop, 82.5%), #02060c 100%);
+}
+
+.intro-lid-down {
+  bottom: 0;
+  background: radial-gradient(var(--lid-rx, 160.128%) 100% at 50% var(--lid-bottom, -65%),
+    rgba(2, 6, 12, 0) 0 var(--lid-stop, 82.5%), #02060c 100%);
+}
+
+/* One animation each, of its own length and after its own delay, held at the
+   last keyframe. The `linear` here is the shorthand's slot and is overridden
+   segment by segment from inside the keyframes: a lid flies up, falls back, and
+   lands the last time on the interface's own curve. */
+.intro-lids.is-waking .intro-lid-up {
+  animation: intro-lid-up var(--wake-span) linear var(--wake-first) 1 forwards;
+}
+
+.intro-lids.is-waking .intro-lid-down {
+  animation: intro-lid-down var(--wake-span) linear var(--wake-first) 1 forwards;
+}
+
+/* By this point both lids are off the top and the bottom of the frame anyway.
+   This is what covers a browser that landed the animation a hair short of its
+   last keyframe, and it is the grace the element leaves the page by rather than
+   vanishing off it. */
+.intro-lids.is-gone {
+  opacity: 0;
+  transition: opacity var(--wake-grace, 300ms) linear;
+}
+
+/* ------------------------------------------------------------------ the sky */
+
+.intro-field,
+.intro-trails,
+.intro-spark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  /* These are the picture, not the page: they must never be what a click or a
+     tap lands on, and they must never be read out. */
+  pointer-events: none;
+}
+
+/* ONE DRAWING, TURNED BY THE COMPOSITOR.
+ *
+ * The canvas is a square centred on the pole, so its own middle IS the pole and
+ * the origin needs no correction. A rigid rotation about the pole is exactly
+ * what a star trail is, which is the happy part of this: giving the motion away
+ * to the compositor costs the picture nothing at all, and buys it the one thing
+ * the main thread cannot promise during an arrival — that it keeps moving.
+ *
+ * Anticlockwise: this is the northern sky, seen from under it.
+ */
+.intro-trails {
+  transform-origin: 50% 50%;
+  animation: intro-spin var(--intro-spin, 400s) linear infinite;
+  will-change: transform;
+}
+
+@keyframes intro-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(-360deg); }
+}
+
+/* A visitor who asked their machine for no motion still gets the sky — it is
+   drawn either way, and a night with no stars in it is not the kinder version
+   of this. It simply does not turn. */
+.intro.is-still .intro-trails { animation: none; }
+
+/* --------------------------------------------------------------- the name */
+
+/* Centred ON THE POLE and not on the frame: the still point of a turning sky is
+   where the name belongs, and the quiet it sits in is the sky's own doing.
+   Placed by the module, because only the module knows where the pole is. */
+.intro-block {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: grid;
+  justify-items: center;
+  gap: 1.15rem;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* The face and the tracking of the way in, one size up: this is the title of
+   the world rather than a prompt over it. The halo is the family the engravings
+   and the marks are already lit with.
+
+   AND THE TRACKING IS TAKEN BACK OFF THE RIGHT, WITH THE SIGN THE OTHER WAY.
+   letter-spacing puts its space AFTER every letter including the last, so the
+   box a browser centres is the ink plus one whole 0.42em of nothing on the
+   right, and the name it centres therefore sits half of that to the left. A
+   POSITIVE margin here — which is what the way in has, and what this had, and
+   which is where it came from — does not undo that: it adds a second 0.42em on
+   the same side and doubles the error. Measured on the ink itself at 1600x900
+   before this line was corrected, FARFIELD stood 16.5 px LEFT of the axis of
+   the frame, which is 0.42em at this size to a tenth of a pixel. Negative, the
+   margin box is exactly the ink and the ink is exactly on the axis: measured
+   0.5 px, and the same at 21:9, 4:3 and on a narrow window. */
+.intro h1 {
+  margin: 0;
+  font-size: 2.6rem;
+  font-weight: 200;
+  line-height: 1;
+  letter-spacing: 0.42em;
+  margin-right: -0.42em;
+  text-transform: uppercase;
+  color: var(--ui-ink);
+  text-shadow: var(--ui-shadow), 0 0 18px rgba(127, 212, 245, 0.35);
+}
+
+/* BOTH SENTENCES, STACKED IN THE SAME CELL, from the first frame. That is what
+   makes the change a dissolve rather than a swap, and it is also what stops the
+   block from reflowing when it happens: the grid was already as wide and as
+   tall as the longer of the two, so the quiet radius measured around it on the
+   first layout is still the right one at the last. */
+.intro-word {
+  margin: 0;
+  display: grid;
+  font-size: 1rem;
+  font-weight: 300;
+  letter-spacing: 0.09em;
+  /* The same ghost, at a ninth of the size: 1.0 px off the axis measured, and
+     nought after. The spans are stretched to this box, so correcting it here
+     corrects both sentences at once. */
+  margin-right: -0.09em;
+  color: var(--ui-ink-soft);
+  text-shadow: var(--ui-shadow);
+}
+
+.intro-word span {
+  grid-area: 1 / 1;
+  opacity: 0;
+  transition: opacity var(--ui-fade) var(--ui-ease);
+}
+
+.intro-word span.is-on { opacity: 1; }
+
+/* THE SENTENCE BREATHES WHILE IT WAITS. «Vorrei che pulsasse dolcemente finché
+   l'utente non starta.» A slow symmetrical swell and never a blink: the low end
+   is high enough to read at every instant of it, and the period is a calm
+   breath rather than an indicator's.
+
+   IT BEGINS WHERE THE CROSSFADE LEFT IT. The delay is exactly the length of
+   that crossfade and the first keyframe is exactly the value it lands on, so
+   the sentence arrives and then starts breathing — rather than the animation
+   taking the property away mid-fade, which would put the words on the glass in
+   one step. Opacity only, on its own layer. */
+.intro.is-ready .intro-word span.is-on {
+  animation: intro-breath var(--intro-pulse, 3600ms) ease-in-out var(--ui-fade) infinite both;
+  will-change: opacity;
+}
+
+@keyframes intro-breath {
+  0%   { opacity: 1; }
+  50%  { opacity: var(--intro-pulse-low, 0.55); }
+  100% { opacity: 1; }
+}
+
+/* --------------------------------------------------------------- the orbit */
+
+/* A POINT AT THE POLE. Every piece of the orbit is placed against this and
+   turns about it, so there is exactly one number — the pole — that the sky, the
+   name and the visitor's own trail all agree on. */
+.intro-orbit {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+/* The circle before anyone has been round it. Barely there: enough that the eye
+   knows the path is closed, not enough to be mistaken for having been walked.
+   A border on a round box rather than a drawn ring, because a border is the one
+   circle the browser draws for nothing. */
+.intro-orbit-track {
+  position: absolute;
+  border-style: solid;
+  border-color: rgba(190, 232, 253, var(--intro-track-alpha, 0.11));
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+/* ONE FIXED HALF OF THE PLANE, and inside it one turning window. A single
+   turning half-plane can uncover half a circle and no more, so the full turn
+   takes two of them: the left is uncovered over the first half of the load and
+   then stands open while the right is uncovered over the second. Their shared
+   edge runs through the pole, top to bottom, so the handover happens at six
+   o'clock — where the star is at exactly the moment it crosses. */
+.intro-orbit-half {
+  position: absolute;
+  overflow: hidden;
+}
+
+/* AND ONE THAT HAS NOT SET OUT IS NOT THERE AT ALL. A window at rest sits with
+   its edge exactly on the seam — the only angle at which it uncovers none of
+   its own half — and the antialiasing of a rotated box does not stop on a pixel
+   boundary. That one pixel, with the trail's glow on it, is the tick the
+   committente photographed standing at six o'clock before the star had moved.
+   Visibility rather than opacity, so the entrance's own fade is left to the
+   entrance; and nothing that would have been seen is hidden, because at the
+   moment either half is given back its visibility the arc it uncovers is
+   nothing wide. */
+.intro-orbit-half.is-idle { visibility: hidden; }
+
+.intro-orbit-wipe {
+  position: absolute;
+  overflow: hidden;
+  transform-origin: 50% 100%;
+  will-change: transform;
+}
+
+/* AND WHEN THE CIRCLE IS CLOSED, THE TWO WINDOWS HAND IT TO A COMET.
+ *
+ * The ring's gradient runs the whole way round, so somewhere its maximum has to
+ * meet its minimum. That place is the head — the seam is under the star's own
+ * glow by construction — and it STAYS there only if the ring turns with the
+ * star instead of being nailed to the frame.
+ *
+ * Turning the two halves would have done it, and it was tried: each half is a
+ * clipped, composited layer and their boxes meet on the vertical through the
+ * pole, which crosses the trail at twelve o'clock and at six. At those two
+ * places the layers leave a hairline — measured, a black bar through a
+ * two-pixel trail, standing there for the whole of the idle. So once there is
+ * nothing left to reveal, what turns is a single canvas with NO CLIP ON IT AT
+ * ALL, and the windows go out under it.
+ *
+ * The handover is a crossfade of a picture into the identical picture: at that
+ * instant the two halves and this canvas hold exactly the same whole ring, so
+ * there is nothing to see cross. What it buys is that neither the seam nor any
+ * sub-pixel difference between them can flick. */
+.intro-orbit-comet {
+  position: absolute;
+  opacity: 0;
+  transform-origin: 50% 50%;
+  transition: opacity var(--intro-hand, 400ms) linear;
+}
+
+.intro.is-ready .intro-orbit-comet {
+  opacity: 1;
+  animation: intro-comet var(--intro-idle, 24000ms) linear infinite both;
+  will-change: transform;
+}
+
+@keyframes intro-comet {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(-360deg); }
+}
+
+/* And the windows leave, because from here they can only add a seam. Written
+   after the entrance rules so that at equal specificity this is the one that
+   wins. */
+.intro.is-ready .intro-orbit-half {
+  opacity: 0;
+  transition: opacity var(--intro-hand, 400ms) linear;
+}
+
+.intro.is-still .intro-orbit-comet { animation: none; }
+
+/* The whole closed trail, drawn once into a bitmap and never touched again. It
+   turns backwards by exactly what its window turns, which is what keeps the
+   circle still in the world while the window sweeps over it. */
+.intro-orbit-ring {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+
+/* THE STAR IS ON TWO ARMS NESTED AT THE SAME PIVOT, and that is not a
+   flourish: it is what keeps the head ON the front.
+
+   The two windows do not share one angle — the left one owns the first half
+   turn and the right one the second — so a head driven by the progress itself
+   is driven by a third quantity, and on the update that crosses the halfway
+   mark all three interpolate independently. The committente photographed what
+   that looks like: the real front still coming down the left, a second lit
+   segment setting off from six o'clock with the star on it, and a dark gap
+   between them.
+
+   Nested, the head's angle is the SUM of the two windows' travels, by
+   construction, on every frame and whatever the timing does. The outer arm is
+   the left window's angle and the inner is the right's, each with that window's
+   own duration and delay, so exactly one of them is ever moving and the star is
+   standing on the front of the one that is. */
+.intro-orbit-arm,
+.intro-orbit-swing {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.intro-orbit-head {
+  position: absolute;
+  border-radius: 50%;
+  background: #eef6fb;
+  box-shadow: 0 0 10px rgba(127, 212, 245, 0.75), 0 0 3px rgba(232, 248, 255, 0.9);
+}
+
+.intro-orbit-halo {
+  position: absolute;
+  inset: -13px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(158, 236, 249, 0.55), rgba(158, 236, 249, 0) 68%);
+  opacity: 0;
+}
+
+/* One leg of the travel, one duration. The second is delayed by the first, so
+   a step that crosses six o'clock hands the time over rather than sharing it,
+   and the two fronts are never both in flight.
+
+   AND ONE CURVE, CUT IN TWO, WHEN BOTH LEGS MOVE. With --ui-ease on each of
+   them a step across six o'clock decelerated to a standstill there and set off
+   again — a check in the middle of one movement, at the same place every time.
+   The module hands down a pair of curves instead: the first accelerates from
+   rest and ends at a slope of 1.5, the second starts at that slope and settles.
+   The legs are given time in proportion to their distance, so their mean speeds
+   are equal and equal slopes are equal speeds. When only one leg moves, both
+   properties fall back to the interface's own curve, whole. */
+.intro-orbit-half.is-first .intro-orbit-wipe,
+.intro-orbit-half.is-first .intro-orbit-ring,
+.intro-orbit-arm {
+  transition: transform var(--intro-follow-a, 900ms) var(--intro-ease-a, var(--ui-ease));
+}
+
+.intro-orbit-half.is-second .intro-orbit-wipe,
+.intro-orbit-half.is-second .intro-orbit-ring,
+.intro-orbit-swing {
+  transition: transform var(--intro-follow-b, 900ms) var(--intro-ease-b, var(--ui-ease))
+    var(--intro-delay-b, 0ms);
+}
+
+/* Laying the orbit out again after a resize is not the star moving. */
+.intro-orbit.is-placing .intro-orbit-wipe,
+.intro-orbit.is-placing .intro-orbit-ring,
+.intro-orbit.is-placing .intro-orbit-arm,
+.intro-orbit.is-placing .intro-orbit-swing {
+  transition: none;
+}
+
+/* AND THE STAR DOES NOT STOP WHEN THE CIRCLE CLOSES.
+ *
+ * «A orbita completata, finché l'utente non parte, la stella non si ferma.» The
+ * trail stays whole and the head goes on round it, one turn in seventy-two
+ * seconds — five degrees a second, alive and calm. It is put on the OUTER arm,
+ * whose angle at that moment is exactly half a turn, and the keyframes start
+ * from that half turn: the animation takes over from the transition at the
+ * value the transition ended on, so nothing steps. The inner arm holds the
+ * other half and the sum goes on round.
+ *
+ * At the gesture nothing stops it — it fades with everything else, which is a
+ * scene letting go rather than a scene being switched off. */
+.intro.is-ready .intro-orbit-arm {
+  animation: intro-idle var(--intro-idle, 72000ms) linear infinite both;
+}
+
+@keyframes intro-idle {
+  from { transform: rotate(-180deg); }
+  to   { transform: rotate(-540deg); }
+}
+
+.intro.is-still .intro-orbit-arm { animation: none; }
+
+/* One pulse when the orbit closes: the visitor's star arriving, and the only
+   moment in the whole scene that is allowed to be an event. Opacity and
+   transform, so even this is the compositor's. */
+.intro.is-ready .intro-orbit-halo {
+  animation: intro-halo 900ms var(--ui-ease) 1 both;
+}
+
+@keyframes intro-halo {
+  0%   { opacity: 0; transform: scale(0.4); }
+  28%  { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.9); }
+}
+
+/* No motion asked for: the chase is short and even, and there is no pulse. The
+   orbit still tells the truth — it is only that it stops performing. */
+.intro.is-still .intro-orbit-wipe,
+.intro.is-still .intro-orbit-ring,
+.intro.is-still .intro-orbit-arm {
+  transition-timing-function: linear;
+}
+
+.intro.is-still .intro-orbit-halo { animation: none; }

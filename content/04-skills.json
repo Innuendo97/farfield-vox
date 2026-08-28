@@ -1,0 +1,148 @@
+{
+  "id": "04",
+  "chiave": "skills",
+  "titolo": "Skills",
+  "icona": "valigetta",
+  "copertura": 0.95,
+  "incisione": {
+    "titolo": "SKILLS",
+    "parolechiave": ["Code", "Design", "Problem Solving", "Teamwork", "Continuous Learning"],
+    "fonte": "inquadratura di riferimento",
+    "stato": "in_attesa_committente",
+    "nota": "l'incisione mostra cinque voci, il CV ne elenca otto categorie: serve la scelta delle cinque da incidere, oppure la conferma delle parole di riferimento"
+  },
+  "timeline": [
+    {
+      "id": "linguaggi",
+      "titolo": "Linguaggi",
+      "periodo": null,
+      "sottotitolo": null,
+      "riassunto": "Java (8/21), Groovy, JavaScript/TypeScript, Python, SQL",
+      "dettaglio": null,
+      "tecnologie": ["Java 8", "Java 21", "Groovy", "JavaScript", "TypeScript", "Python", "SQL"]
+    },
+    {
+      "id": "backend",
+      "titolo": "Backend",
+      "periodo": null,
+      "sottotitolo": null,
+      "riassunto": "Spring, Spring Boot, JSP/JSF, Django, Flask, REST API",
+      "dettaglio": null,
+      "tecnologie": ["Spring", "Spring Boot", "JSP", "JSF", "Django", "Flask", "REST API"]
+    },
+    {
+      "id": "frontend",
+      "titolo": "Frontend",
+      "periodo": null,
+      "sottotitolo": null,
+      "riassunto": "Angular, AngularJS, HTML5, CSS, Bootstrap",
+      "dettaglio": null,
+      "tecnologie": ["Angular", "AngularJS", "HTML5", "CSS", "Bootstrap"]
+    },
+    {
+      "id": "cms",
+      "titolo": "CMS",
+      "periodo": null,
+      "sottotitolo": null,
+      "riassunto": "Oracle WebCenter Sites (WCS)",
+      "dettaglio": null,
+      "tecnologie": ["Oracle WebCenter Sites"]
+    },
+    {
+      "id": "cloud-devops",
+      "titolo": "Cloud & DevOps",
+      "periodo": null,
+      "sottotitolo": null,
+      "riassunto": "RedHat OpenShift / Kubernetes, Jenkins (CI/CD), Azure, Maven, Git, SVN",
+      "dettaglio": null,
+      "tecnologie": ["RedHat OpenShift", "Kubernetes", "Jenkins", "Azure", "Maven", "Git", "SVN"]
+    },
+    {
+      "id": "database",
+      "titolo": "Database",
+      "periodo": null,
+      "sottotitolo": null,
+      "riassunto": "Oracle, MongoDB",
+      "dettaglio": null,
+      "tecnologie": ["Oracle", "MongoDB"]
+    },
+    {
+      "id": "ai-tooling",
+      "titolo": "AI & Tooling",
+      "periodo": null,
+      "sottotitolo": null,
+      "riassunto": "Claude Code avanzato (skill/plugin, MCP server, multi-agent orchestration, memory, Artifacts) — 11 cert. Anthropic Academy; prompt & context engineering; OpenAI Codex; Google Gemini; modelli open-source (Kimi, Qwen, DeepSeek); Figma",
+      "dettaglio": null,
+      "tecnologie": [],
+      "fonte": "Curriculum Vitae.tex, riga «AI & Tooling» delle Competenze Tecniche",
+      "nota": "riga riportata fedele al CV su indicazione del committente"
+    },
+    {
+      "id": "metodologie",
+      "titolo": "Metodologie",
+      "periodo": null,
+      "sottotitolo": null,
+      "riassunto": "Agile/Scrum, Waterfall, Jira, Confluence",
+      "dettaglio": null,
+      "tecnologie": ["Agile", "Scrum", "Waterfall", "Jira", "Confluence"]
+    },
+    {
+      "id": "lingue",
+      "titolo": "Lingue",
+      "periodo": null,
+      "sottotitolo": null,
+      "riassunto": "Italiano (madrelingua) · Inglese (B1/B2)",
+      "dettaglio": null,
+      "tecnologie": []
+    }
+  ],
+  "certificazioni": {
+    "totale": 24,
+    "stato": "in_attesa_committente",
+    "nota": "il conteggio complessivo va confermato: sommando le righe del CV si arriva a 24 certificati, mentre altrove ne sono stati indicati 27",
+    "gruppi": [
+      {
+        "id": "udemy",
+        "ente": "Udemy",
+        "voci": [
+          "Machine Learning: il corso completo",
+          "Mastering ML within AI",
+          "Impara a utilizzare l'IA",
+          "Django, Python e Bootstrap",
+          "Go (Golang) da Zero",
+          "AZ-900: Azure Fundamentals",
+          "AZ-204: Developing Solutions for Azure",
+          "Docker Per Comuni Mortali"
+        ],
+        "vociOmesse": 2,
+        "stato": "in_attesa_committente",
+        "nota": "due corsi riguardano gli strumenti citati nella riga skills «AI & Tooling»: il titolo esteso è riportato solo lì, in attesa di conferma su come pubblicarli"
+      },
+      {
+        "id": "academy-ai",
+        "ente": null,
+        "voci": [],
+        "conteggio": 11,
+        "stato": "in_attesa_committente",
+        "nota": "undici certificati dell'academy citata nella riga skills «AI & Tooling»; l'elenco per titolo resta in quella riga, in attesa di conferma su come pubblicarlo"
+      },
+      {
+        "id": "mongodb",
+        "ente": "MongoDB Inc.",
+        "voci": ["SI Architect Certification"]
+      },
+      {
+        "id": "cisco",
+        "ente": "Cisco Systems",
+        "voci": ["CCNA Routing and Switching", "IT Essentials"]
+      }
+    ]
+  },
+  "stanza": {
+    "chiave": "skills",
+    "ancoraMonolite": "04",
+    "presentazione": "griglia-categorie",
+    "elementi": [],
+    "stato": "da_progettare"
+  }
+}

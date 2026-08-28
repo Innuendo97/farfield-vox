@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Portfolio esplorabile di Daniele Galasso, Software Engineer full stack: carriera, progetti, competenze e contatti da attraversare a piedi. Tutti i contenuti sono leggibili anche in edizione testuale." />
+    <meta name="author" content="Daniele Galasso" />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#0f1720" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="it_IT" />
+    <meta property="og:site_name" content="Farfield" />
+    <meta property="og:title" content="Farfield — Daniele Galasso" />
+    <meta property="og:description" content="Portfolio esplorabile di Daniele Galasso, Software Engineer full stack. Carriera, progetti, competenze e contatti, da attraversare a piedi o da leggere." />
+    <title>Farfield — Daniele Galasso</title>
+    <!-- The marker that stands at the foot of every monolith, so the tab carries
+         the same sign as the world. Inline, so there is no second request. -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230f1720'/%3E%3Cpath d='M16 5.5 26.5 16 16 26.5 5.5 16Z' fill='none' stroke='%237fd4f5' stroke-width='1.6'/%3E%3Cpath d='M16 11 21 16 16 21 11 16Z' fill='%239eecf9'/%3E%3C/svg%3E" />
+    <link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/src/ui/style.css" />
+    <!-- The way out of the world, for a reader the world cannot carry: no
+         script, no WebGL2, or a screen with no keyboard to walk with. It is
+         written here rather than in the interface sheet because it has to stand
+         on its own — with scripting off, nothing of src/ has run. -->
+    <style>
+      .away {
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        display: grid;
+        place-content: center;
+        gap: 0.9rem;
+        justify-items: center;
+        padding: 2rem;
+        text-align: center;
+        background: radial-gradient(120% 80% at 50% 0%, #16283a 0%, #0f1720 62%);
+        font-family: 'Farfield Sans', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+        color: #bee8fd;
+      }
+      .away h1 {
+        margin: 0;
+        font-size: 1.6rem;
+        font-weight: 200;
+        letter-spacing: 0.34em;
+        margin-right: 0.34em;
+        text-transform: uppercase;
+        color: #e6f4fb;
+      }
+      .away p { margin: 0; max-width: 30rem; font-weight: 300; line-height: 1.6; }
+      .away a {
+        margin-top: 0.5rem;
+        padding: 0.55rem 1.2rem;
+        border: 1px solid rgba(202, 238, 255, 0.42);
+        font-size: 0.95rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        text-decoration: none;
+        color: #9eecf9;
+      }
+      .away a:hover { border-color: #9eecf9; }
+    </style>
+  </head>
+  <body>
+    <canvas id="stage"></canvas>
+    <div id="ui"></div>
+    <noscript>
+      <div class="away">
+        <h1>Farfield</h1>
+        <p>Questo mondo si attraversa a piedi e per farlo ha bisogno di JavaScript.
+          Tutto quello che contiene è però scritto anche in una pagina da leggere.</p>
+        <a href="./cv/">Vai all’edizione testuale</a>
+      </div>
+    </noscript>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

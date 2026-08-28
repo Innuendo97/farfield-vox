@@ -1,0 +1,378 @@
+import { Euler, Vector3 } from 'three';
+import {
+  AREA_CENTER, AREA_HARD_RADIUS, AREA_SOFT_RADIUS,
+  EYE_HEIGHT, RUN_SPEED, SPAWN, WALK_SPEED,
+} from '../world/layout.js';
+import { criticalStep, TUNING } from './presence.js';
+
+// THE LOOK IS TWO ANGLES, NOT ONE.
+//
+// The target is the raw sum of everything the mouse has said, to the last
+// count, and it is what decides how far a gesture turns the world: it is
+// untouched arithmetic and the sensitivity below is exactly the sensitivity it
+// always was. The pose is a critically damped chase of that target, and it is
+// what the frame is drawn from. Between the two sits every millisecond of silk
+// and no degree of authority: the pose always arrives at the target, so the
+// same gesture turns the same amount, and nothing here can drift, float, or
+// hand back less rotation than was asked for.
+//
+// What it removes is the QUANTISATION. A mouse reports in whole counts on its
+// own clock and a frame samples whatever has arrived by the time it looks: at
+// a hundred and twenty five reports a second against sixty frames, some frames
+// get two counts and some get three, and the eye turns in a rhythm that belongs
+// to neither the hand nor the world. Src/core/input.js now takes the raw stream
+// where the browser has one, so the sum is right to the report rather than to
+// the frame; this makes the sum SMOOTH as well as right.
+//
+// The tuning lives with the rest of the body, in src/core/presence.js: it is
+// the same thing being tuned — how this world feels to be inside — and one
+// live object on window.farfield.presence.tuning is worth more at three in the
+// morning than two tidy ones.
+
+const DEG = Math.PI / 180;
+const PITCH_LIMIT = 85 * DEG;
+const LOOK_SENSITIVITY = 0.0022;   // radians per pixel of raw mouse movement
+const ACCEL_TAU = 0.09;            // seconds; short enough to feel direct, long enough to weigh
+const RECALL_TURN_RATE = 22 * DEG; // radians per second of steering back toward the centre
+const PLAYER_RADIUS = 0.45;
+
+// The ledge rule.
+//
+// The stair run is a flat topped box a metre and a third tall at its head, and
+// nothing was stopping a walker from leaving it sideways: one step off the top
+// tread and the ground under the eye fell the whole height of the platform
+// between two frames. Everything else in this world that a body cannot pass
+// through has a footprint, but the run has to be walked along, so its sides
+// cannot be one — the rule has to be about the drop and not about the shape.
+//
+// A step is refused when it would fall further than a stride can fall. The
+// second test is what keeps that from turning a hillside into a wall: a drop
+// only counts as a ledge if it is steeper than anything a slope could be, so a
+// long stride taken on a slow machine still walks downhill.
+const MAX_STEP_DOWN = 0.30;
+const LEDGE_SLOPE = 2.0;
+
+// And whatever is still a drop after that is taken over a few frames rather
+// than in one. Short: this is a step down, not a fall, and a body that floats
+// down a tread reads as a body on a lift.
+const FALL_TAU = 0.07;
+
+/** First order approach, framerate independent. */
+function damp(current, target, tau, dt) {
+  return current + (target - current) * (1 - Math.exp(-dt / tau));
+}
+
+// Smooth 1 -> 0 ramp used for the invisible perimeter. Cubic so the onset is
+// not felt as a step and the stop at the hard radius is asymptotic.
+function falloff(value, start, end) {
+  const t = (value - start) / (end - start);
+  if (t <= 0) return 1;
+  if (t >= 1) return 0;
+  return 1 - t * t * (3 - 2 * t);
+}
+
+export class Player {
+  // Where the mouse has asked to be, exactly, and where the eye has got to.
+  #yawTarget = SPAWN.yaw * DEG;
+  #pitchTarget = 0;
+  #yawF = { x: SPAWN.yaw * DEG, v: 0 };
+  #pitchF = { x: 0, v: 0 };
+  // The target as it was last frame, which is the only honest way to ask how
+  // fast the hand is going.
+  #yawAsked = SPAWN.yaw * DEG;
+  #pitchAsked = 0;
+  // How fast the hand is going, in degrees a second, smoothed: it rises fast
+  // and falls slowly, so a flick keeps its short response through its own tail.
+  #handRate = 0;
+  // How much of the mouse a leaned-in lens is allowed to have. One until
+  // somebody says otherwise, and never zero.
+  #lookScale = 1;
+  #velocity = new Vector3();
+  #euler = new Euler(0, 0, 0, 'YXZ');
+  #groundHeight = () => 0;
+  #blockers = [];
+  // Where the feet are, which follows the ground down rather than jumping to
+  // it. Null until the first frame has somewhere to stand.
+  #stance = null;
+  #lookRate = 0;
+  // Which way the eye is turning and how fast, in degrees a second. lookRate
+  // above is unsigned and includes the pitch, because what reads it is a
+  // governor that only cares how much of the frame is changing; a body that
+  // banks into a turn has to know which turn.
+  #yawRate = 0;
+  // How many times the walker has been PLACED rather than walked. The reference
+  // pose, the survey poses and the calibration sweep all go through setPose,
+  // and everything downstream that has to tell a placement from a walk can tell
+  // them apart by watching this instead of being told by each caller.
+  #poseSerial = 0;
+
+  position = new Vector3(SPAWN.x, EYE_HEIGHT, SPAWN.z);
+
+  setGroundSampler(fn) { this.#groundHeight = fn; return this; }
+
+  // Footprints the player cannot walk into: { x, z, halfWidth, halfDepth, rotationY }
+  setBlockers(list) { this.#blockers = list; return this; }
+
+  /**
+   * How far a leaned-in lens has slowed the mouse, as a plain multiplier.
+   *
+   * It is a ratio of tangents and not of angles, so what stays constant is how
+   * far across the SCREEN a push of the hand carries the frame. See TUNING.zoom
+   * in src/core/presence.js, which is where the number comes from.
+   */
+  setLookScale(scale) {
+    this.#lookScale = scale > 0 ? scale : 1;
+    return this;
+  }
+
+  setPose(pose) {
+    this.position.set(pose.position.x, pose.position.y, pose.position.z);
+    // A placement is not a turn. Target and pose are set to the same angle and
+    // the filter's velocity is thrown away, so the very first frame at a pose
+    // is already exactly the pose — which is the whole of the determinism rail
+    // this campaign's paired crops stand on, and it would be undone by a
+    // smoother that arrived a frame later.
+    this.#yawTarget = pose.yaw * DEG;
+    this.#pitchTarget = pose.pitch * DEG;
+    this.#yawF.x = this.#yawTarget;
+    this.#pitchF.x = this.#pitchTarget;
+    this.#yawF.v = 0;
+    this.#pitchF.v = 0;
+    this.#yawAsked = this.#yawTarget;
+    this.#pitchAsked = this.#pitchTarget;
+    this.#handRate = 0;
+    this.#lookRate = 0;
+    this.#yawRate = 0;
+    this.#velocity.set(0, 0, 0);
+    // A pose is a placement, not a walk: whatever it stands on, it stands on
+    // from the first frame.
+    this.#stance = null;
+    this.#poseSerial++;
+    return this;
+  }
+
+  /**
+   * Everything the mouse has said since the last frame, into the target.
+   *
+   * The pitch keeps the limit it always had, to the degree. What changes is the
+   * last few degrees before it: inside the cushion a pixel of mouse buys less
+   * and less, down to a floor, so the eye eases into the ceiling of the sky
+   * instead of being stopped against it. The clamp is still there underneath —
+   * the floor is a floor and not a zero, so the limit is reachable, and it is
+   * the same limit.
+   */
+  look(delta) {
+    const sensitivity = LOOK_SENSITIVITY * this.#lookScale;
+    this.#yawTarget -= delta.x * sensitivity;
+    let dp = -delta.y * sensitivity;
+    if (dp !== 0) {
+      const cushion = TUNING.look.pitchCushionDeg * DEG;
+      const headroom = dp > 0 ? PITCH_LIMIT - this.#pitchTarget : PITCH_LIMIT + this.#pitchTarget;
+      if (headroom < cushion) {
+        const floor = TUNING.look.pitchCushionFloor;
+        dp *= floor + (1 - floor) * (headroom / cushion);
+      }
+      this.#pitchTarget = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, this.#pitchTarget + dp));
+    }
+  }
+
+  /**
+   * One frame of the chase, and the two rates that come out of it.
+   *
+   * The response is chosen by how fast the hand is going, and it is chosen by
+   * an ANGLE: never let the pose sit more than lagCapDeg behind the target. At
+   * a slow, aiming hand that cap is never reached and the full smoothing
+   * applies — sixty milliseconds at ten degrees a second is two thirds of a
+   * degree of lag, which is a fifth of what the mouse itself quantises to. At a
+   * sweep it tightens continuously, and at a flick it sits at the floor. There
+   * is no threshold and there are no modes: one division, clamped.
+   */
+  #chase(dt) {
+    if (dt <= 0) return;
+    const look = TUNING.look;
+    // What the HAND is doing, read off what the target moved and not off how
+    // far behind the pose is. The two are not the same number and the
+    // difference is not small: the pose trails the target by the response, so
+    // the gap divided by the frame is the rate multiplied by the response over
+    // the frame — seven times the truth on a fast machine, and a response that
+    // shrank because the machine was quick.
+    const dYaw = this.#yawTarget - this.#yawAsked;
+    const dPitch = this.#pitchTarget - this.#pitchAsked;
+    this.#yawAsked = this.#yawTarget;
+    this.#pitchAsked = this.#pitchTarget;
+    // One rate for both axes, so a diagonal sweep is not smoothed differently
+    // from a flat one.
+    const asked = Math.hypot(dYaw, dPitch) / DEG / dt;
+    this.#handRate = damp(
+      this.#handRate, asked,
+      asked > this.#handRate ? look.rateRiseTau : look.rateFallTau, dt,
+    );
+    const response = Math.min(
+      look.responseMs / 1000,
+      Math.max(look.responseMinMs / 1000, look.lagCapDeg / Math.max(this.#handRate, 1e-6)),
+    );
+    const omega = 2 / response;
+    const wasFacing = this.#yawF.x;
+    const wasPitch = this.#pitchF.x;
+    criticalStep(this.#yawF, this.#yawTarget, omega, dt);
+    criticalStep(this.#pitchF, this.#pitchTarget, omega, dt);
+    // Both rates are read off the POSE and not off the target: what a quality
+    // governor wants to know is how much of the frame is changing, and what a
+    // body wants to bank into is the turn the eye is actually making.
+    this.#yawRate = ((this.#yawF.x - wasFacing) / DEG) / dt;
+    this.#lookRate = (Math.abs(this.#yawF.x - wasFacing) + Math.abs(this.#pitchF.x - wasPitch)) / DEG / dt;
+  }
+
+  update(dt, input) {
+    if (input.locked) this.look(input.drainLook());
+    this.#chase(dt);
+
+    const axis = input.engaged ? input.axis() : { x: 0, z: 0 };
+    const speed = input.running ? RUN_SPEED : WALK_SPEED;
+    const sin = Math.sin(this.#yawF.x);
+    const cos = Math.cos(this.#yawF.x);
+
+    // Yaw 0 looks north (-Z). Forward is (-sin, -cos) and right is (cos, -sin);
+    // axis.z is negative when walking forward, so it multiplies the backward
+    // vector (sin, cos).
+    let wishX = (axis.x * cos + axis.z * sin) * speed;
+    let wishZ = (-axis.x * sin + axis.z * cos) * speed;
+
+    const perimeter = this.#perimeter();
+    if (perimeter.damping < 1) {
+      // Only the component that leaves the area is damped; sliding along the
+      // boundary and walking back in stay at full speed.
+      const outward = wishX * perimeter.nx + wishZ * perimeter.nz;
+      if (outward > 0) {
+        const removed = outward * (1 - perimeter.damping);
+        wishX -= removed * perimeter.nx;
+        wishZ -= removed * perimeter.nz;
+      }
+    }
+
+    const blend = 1 - Math.exp(-dt / ACCEL_TAU);
+    this.#velocity.x += (wishX - this.#velocity.x) * blend;
+    this.#velocity.z += (wishZ - this.#velocity.z) * blend;
+
+    if (perimeter.damping < 1) this.#recall(dt, perimeter);
+
+    const fromX = this.position.x;
+    const fromZ = this.position.z;
+    this.position.x += this.#velocity.x * dt;
+    this.position.z += this.#velocity.z * dt;
+
+    this.#resolveBlockers();
+    this.#refuseLedges(fromX, fromZ);
+
+    const ground = this.#groundHeight(this.position.x, this.position.z);
+    if (this.#stance === null || ground >= this.#stance) this.#stance = ground;
+    else this.#stance += (ground - this.#stance) * (1 - Math.exp(-dt / FALL_TAU));
+    this.position.y = this.#stance + EYE_HEIGHT;
+  }
+
+  /**
+   * Undoes whichever half of the step walked off a ledge.
+   *
+   * The two axes are tried on their own so that a walker pressed against the
+   * side of the stair run still walks along it: only the component that leaves
+   * the stone is given back, exactly as the perimeter and the footprints do.
+   */
+  #refuseLedges(fromX, fromZ) {
+    const toX = this.position.x;
+    const toZ = this.position.z;
+    const start = this.#groundHeight(fromX, fromZ);
+    const moved = Math.hypot(toX - fromX, toZ - fromZ);
+    if (moved <= 1e-6) return;
+    const isLedge = (x, z) => {
+      const drop = start - this.#groundHeight(x, z);
+      return drop > MAX_STEP_DOWN && drop > moved * LEDGE_SLOPE;
+    };
+    if (!isLedge(toX, toZ)) return;
+    if (!isLedge(toX, fromZ)) this.position.z = fromZ;
+    else if (!isLedge(fromX, toZ)) this.position.x = fromX;
+    else this.position.set(fromX, this.position.y, fromZ);
+  }
+
+  // A barely perceptible curve of the walking direction back toward the centre,
+  // so leaving the area feels like drifting rather than hitting something.
+  #recall(dt, perimeter) {
+    const speed = Math.hypot(this.#velocity.x, this.#velocity.z);
+    if (speed < 0.05) return;
+    const strength = 1 - perimeter.damping;
+    const heading = Math.atan2(this.#velocity.z, this.#velocity.x);
+    const inward = Math.atan2(-perimeter.nz, -perimeter.nx);
+    let diff = ((inward - heading + Math.PI) % (Math.PI * 2)) - Math.PI;
+    if (diff < -Math.PI) diff += Math.PI * 2;
+    const step = Math.max(-1, Math.min(1, diff)) * RECALL_TURN_RATE * strength * dt;
+    const turned = heading + step;
+    this.#velocity.x = Math.cos(turned) * speed;
+    this.#velocity.z = Math.sin(turned) * speed;
+  }
+
+  #perimeter() {
+    const dx = this.position.x - AREA_CENTER.x;
+    const dz = this.position.z - AREA_CENTER.z;
+    const r = Math.hypot(dx, dz) || 1e-6;
+    return {
+      radius: r,
+      nx: dx / r,
+      nz: dz / r,
+      damping: falloff(r, AREA_SOFT_RADIUS, AREA_HARD_RADIUS),
+    };
+  }
+
+  #resolveBlockers() {
+    for (const b of this.#blockers) {
+      const s = Math.sin(b.rotationY);
+      const c = Math.cos(b.rotationY);
+      const dx = this.position.x - b.x;
+      const dz = this.position.z - b.z;
+      // Into the box's local frame, where the footprint is axis aligned.
+      let lx = dx * c - dz * s;
+      let lz = dx * s + dz * c;
+      const ex = b.halfWidth + PLAYER_RADIUS;
+      const ez = b.halfDepth + PLAYER_RADIUS;
+      if (Math.abs(lx) >= ex || Math.abs(lz) >= ez) continue;
+      // Push out along the shallowest axis of penetration.
+      if (ex - Math.abs(lx) < ez - Math.abs(lz)) lx = Math.sign(lx || 1) * ex;
+      else lz = Math.sign(lz || 1) * ez;
+      this.position.x = b.x + lx * c + lz * s;
+      this.position.z = b.z - lx * s + lz * c;
+    }
+  }
+
+  applyTo(camera) {
+    camera.position.copy(this.position);
+    this.#euler.set(this.#pitchF.x, this.#yawF.x, 0);
+    camera.quaternion.setFromEuler(this.#euler);
+  }
+
+  /**
+   * Everything a body model needs from this one, into an object it already has.
+   *
+   * One call rather than eight getters, and no allocation a frame: this is read
+   * every frame for as long as the page is open.
+   */
+  motionInto(out) {
+    const sin = Math.sin(this.#yawF.x);
+    const cos = Math.cos(this.#yawF.x);
+    out.speed = Math.hypot(this.#velocity.x, this.#velocity.z);
+    // Signed along the walker's own axes: forward is (-sin, -cos) and right is
+    // (cos, -sin), the same frame the step above walks in.
+    out.forward = this.#velocity.x * -sin + this.#velocity.z * -cos;
+    out.right = this.#velocity.x * cos + this.#velocity.z * -sin;
+    out.yaw = this.#yawF.x;
+    out.yawRate = this.#yawRate;
+    out.x = this.position.x;
+    out.z = this.position.z;
+    out.eyeY = this.position.y;
+    out.poseSerial = this.#poseSerial;
+    return out;
+  }
+
+  get speed() { return Math.hypot(this.#velocity.x, this.#velocity.z); }
+  get yawDegrees() { return (this.#yawF.x / DEG) % 360; }
+  get pitchDegrees() { return this.#pitchF.x / DEG; }
+  /** How fast the eye is turning, in degrees a second. */
+  get lookRate() { return this.#lookRate; }
+}

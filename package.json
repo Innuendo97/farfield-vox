@@ -1,0 +1,34 @@
+{
+  "name": "farfield",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Portfolio 3D esplorabile di Daniele Galasso",
+  "author": "Innuendo97",
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "setup:tools": "powershell -ExecutionPolicy Bypass -NonInteractive -File tools/setup-tools.ps1 -SkipBlender",
+    "turf": "node tools/turf/build-turf.mjs",
+    "assets:build": "node tools/build-assets.mjs",
+    "suns:check": "node tools/lighting/check-suns.mjs",
+    "sky:pick": "node tools/grade/pick-sky.mjs",
+    "sky:bake": "node tools/grade/grade-sky.mjs --size=4096",
+    "sky:check": "node tools/grade/check-dome.mjs",
+    "sky:zones": "node tools/grade/check-sky-zones.mjs",
+    "grade:fit": "node tools/grade/fit-lut.mjs",
+    "grade:compare": "node tools/grade/compare.mjs",
+    "grade:check": "node tools/grade/check-png.mjs assets-src/clouds/cloud-sprites.png assets-src/clouds/cloud-equirect.png public/assets/grade-lut.png"
+  },
+  "dependencies": {
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@gltf-transform/cli": "^4.4.2",
+    "meshoptimizer": "^1.2.0",
+    "sharp": "^0.35.3",
+    "vite": "^7.0.0"
+  }
+}

@@ -1,0 +1,751 @@
+{
+  "note": "Proposal A, the reference continued. The coverage the photograph carries at each height, asked of every bearing equally, so that turning round shows the same weather the frame shows. Inside the framing both proposals are the same sky and are fitted to the reading of the reference sector by sector, not to its band profile alone: the bank stands right of the axis, the fragments are low and to the left, and the top left corner is left open, because that is where the photograph puts them. Nothing rises above thirty degrees anywhere, which is the ceiling the reference itself stops at and the room the night sky needs.",
+  "grain": "The bodies in the arrival frame are the size the reference's are. That took lifting one rule: a scaled piece used to be forbidden from reaching into the sector the reference framing shows, because inside it every pixel was the photograph's own and a resized piece over it was invention laid on measurement. The weather in there is generated now, so there is no photograph to protect, and the rule was costing the one thing it never meant to: the smallest body any piece makes at its own size is 10.9 degrees across, against a median of 1.79 in the reference.",
+  "howToChoose": "Two proposals stand; one of them becomes the sky. To adopt one, copy it over assets-src/clouds/cloud-field.json — that is the name tools/clouds/pack-atlas.mjs --compose is pointed at and the only one the delivery reads. The other stays here as the alternative that was not taken, which is worth more in the tree than in a message. Nothing else has to change: the format is the one the bake's own bench composition is already validated end to end against, and the window and the silhouette of every piece are read off the bake rather than stated here, so a piece that comes out of the oven a different shape needs no edit to this file.",
+  "tiles": [
+    {
+      "id": "grande-1",
+      "kind": "library",
+      "azimuth": -20,
+      "elevation": 7.91
+    },
+    {
+      "id": "grande-2",
+      "kind": "library",
+      "azimuth": 30,
+      "elevation": 13.3
+    },
+    {
+      "id": "grande-3",
+      "kind": "library",
+      "azimuth": 12.5,
+      "elevation": 19.59
+    },
+    {
+      "id": "grande-4",
+      "kind": "library",
+      "azimuth": -15,
+      "elevation": 2.86
+    },
+    {
+      "id": "grande-5",
+      "kind": "library",
+      "azimuth": 65,
+      "elevation": 10.73
+    },
+    {
+      "id": "grande-6",
+      "kind": "library",
+      "azimuth": 25,
+      "elevation": 5.78
+    },
+    {
+      "id": "grande-7",
+      "kind": "library",
+      "azimuth": -10,
+      "elevation": 5.62
+    },
+    {
+      "id": "grande-8",
+      "kind": "library",
+      "azimuth": -15,
+      "elevation": 15.41
+    },
+    {
+      "id": "medio-1",
+      "kind": "library",
+      "azimuth": -25,
+      "elevation": 10.66
+    },
+    {
+      "id": "medio-2",
+      "kind": "library",
+      "azimuth": -25,
+      "elevation": 0.55
+    },
+    {
+      "id": "medio-3",
+      "kind": "library",
+      "azimuth": -135,
+      "elevation": 8.94
+    },
+    {
+      "id": "medio-4",
+      "kind": "library",
+      "azimuth": -55,
+      "elevation": 3.14
+    },
+    {
+      "id": "medio-5",
+      "kind": "library",
+      "azimuth": -5,
+      "elevation": 10.26
+    },
+    {
+      "id": "medio-6",
+      "kind": "library",
+      "azimuth": 30,
+      "elevation": 2.91
+    },
+    {
+      "id": "medio-7",
+      "kind": "library",
+      "azimuth": -45,
+      "elevation": 11.87
+    },
+    {
+      "id": "medio-8",
+      "kind": "library",
+      "azimuth": 25,
+      "elevation": 13.66
+    },
+    {
+      "id": "torre-1",
+      "kind": "library",
+      "azimuth": 55,
+      "elevation": 5.99
+    },
+    {
+      "id": "torre-2",
+      "kind": "library",
+      "azimuth": -180,
+      "elevation": 15.65
+    },
+    {
+      "id": "torre-3",
+      "kind": "library",
+      "azimuth": -120,
+      "elevation": 17.3
+    },
+    {
+      "id": "torre-4",
+      "kind": "library",
+      "azimuth": 45,
+      "elevation": 18.5
+    },
+    {
+      "id": "torre-5",
+      "kind": "library",
+      "azimuth": -100,
+      "elevation": 15.21
+    },
+    {
+      "id": "torre-6",
+      "kind": "library",
+      "azimuth": -30,
+      "elevation": 5.51
+    },
+    {
+      "id": "torre-7",
+      "kind": "library",
+      "azimuth": 150,
+      "elevation": 8.83
+    },
+    {
+      "id": "torre-8",
+      "kind": "library",
+      "azimuth": 135,
+      "elevation": 16.87
+    }
+  ],
+  "placements": [
+    {
+      "id": "grande-3@13",
+      "tile": "grande-3",
+      "azimuth": 12.5,
+      "elevation": 19.59,
+      "scale": 1.2,
+      "roll": 0,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "medio-7@-45",
+      "tile": "medio-7",
+      "azimuth": -45,
+      "elevation": 11.87,
+      "scale": 0.8,
+      "roll": 0,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "torre-4@45",
+      "tile": "torre-4",
+      "azimuth": 45,
+      "elevation": 18.5,
+      "scale": 0.8,
+      "roll": 0,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "torre-1@55",
+      "tile": "torre-1",
+      "azimuth": 55,
+      "elevation": 5.99,
+      "scale": 0.45,
+      "roll": 0,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "torre-2@-180",
+      "tile": "torre-2",
+      "azimuth": -180,
+      "elevation": 15.65,
+      "scale": 0.9,
+      "roll": 0,
+      "flip": -1
+    },
+    {
+      "id": "torre-4@-150",
+      "tile": "torre-4",
+      "azimuth": -150,
+      "elevation": 16.44,
+      "scale": 0.7,
+      "roll": 0,
+      "flip": -1
+    },
+    {
+      "id": "torre-3@-120",
+      "tile": "torre-3",
+      "azimuth": -120,
+      "elevation": 17.3,
+      "scale": 0.7,
+      "roll": 0,
+      "flip": -1
+    },
+    {
+      "id": "torre-3@75",
+      "tile": "torre-3",
+      "azimuth": 75,
+      "elevation": 17.3,
+      "scale": 0.7,
+      "roll": 0,
+      "flip": -1
+    },
+    {
+      "id": "torre-2@-90",
+      "tile": "torre-2",
+      "azimuth": -90,
+      "elevation": 15.65,
+      "scale": 0.9,
+      "roll": -6,
+      "flip": 1
+    },
+    {
+      "id": "torre-2@105",
+      "tile": "torre-2",
+      "azimuth": 105,
+      "elevation": 15.65,
+      "scale": 0.9,
+      "roll": -6,
+      "flip": 1
+    },
+    {
+      "id": "torre-8@135",
+      "tile": "torre-8",
+      "azimuth": 135,
+      "elevation": 16.87,
+      "scale": 0.7,
+      "roll": 0,
+      "flip": -1
+    },
+    {
+      "id": "torre-7@150",
+      "tile": "torre-7",
+      "azimuth": 150,
+      "elevation": 8.83,
+      "scale": 0.7,
+      "roll": -6,
+      "flip": 1
+    },
+    {
+      "id": "torre-7@-60",
+      "tile": "torre-7",
+      "azimuth": -60,
+      "elevation": 18.83,
+      "scale": 0.7,
+      "roll": -6,
+      "flip": 1
+    },
+    {
+      "id": "medio-3@-135",
+      "tile": "medio-3",
+      "azimuth": -135,
+      "elevation": 8.94,
+      "scale": 0.7,
+      "roll": -6,
+      "flip": 1
+    },
+    {
+      "id": "medio-3@120",
+      "tile": "medio-3",
+      "azimuth": 120,
+      "elevation": 8.94,
+      "scale": 0.7,
+      "roll": 0,
+      "flip": -1
+    },
+    {
+      "id": "torre-8@-75",
+      "tile": "torre-8",
+      "azimuth": -75,
+      "elevation": 6.87,
+      "scale": 0.7,
+      "roll": -6,
+      "flip": 1
+    },
+    {
+      "id": "grande-1@-20",
+      "tile": "grande-1",
+      "azimuth": -20,
+      "elevation": 7.91,
+      "scale": 0.33,
+      "roll": 0,
+      "flip": 1
+    },
+    {
+      "id": "medio-5@-5",
+      "tile": "medio-5",
+      "azimuth": -5,
+      "elevation": 10.26,
+      "scale": 0.33,
+      "roll": 0,
+      "flip": 1
+    },
+    {
+      "id": "grande-8@-15",
+      "tile": "grande-8",
+      "azimuth": -15,
+      "elevation": 15.41,
+      "scale": 0.33,
+      "roll": -6,
+      "flip": 1
+    },
+    {
+      "id": "torre-6@-30",
+      "tile": "torre-6",
+      "azimuth": -30,
+      "elevation": 5.51,
+      "scale": 0.33,
+      "roll": -6,
+      "flip": 1
+    },
+    {
+      "id": "grande-4@-15",
+      "tile": "grande-4",
+      "azimuth": -15,
+      "elevation": 2.86,
+      "scale": 0.33,
+      "roll": 0,
+      "flip": -1
+    },
+    {
+      "id": "grande-8@165",
+      "tile": "grande-8",
+      "azimuth": 165,
+      "elevation": 15.41,
+      "scale": 0.33,
+      "roll": -6,
+      "flip": 1
+    },
+    {
+      "id": "grande-3@-165",
+      "tile": "grande-3",
+      "azimuth": -165,
+      "elevation": 5.51,
+      "scale": 0.33,
+      "roll": -6,
+      "flip": 1
+    },
+    {
+      "id": "grande-3@90",
+      "tile": "grande-3",
+      "azimuth": 90,
+      "elevation": 5.51,
+      "scale": 0.33,
+      "roll": 0,
+      "flip": -1
+    },
+    {
+      "id": "medio-5@-105",
+      "tile": "medio-5",
+      "azimuth": -105,
+      "elevation": 5.26,
+      "scale": 0.33,
+      "roll": 0,
+      "flip": -1
+    },
+    {
+      "id": "medio-6@30",
+      "tile": "medio-6",
+      "azimuth": 30,
+      "elevation": 2.91,
+      "scale": 0.33,
+      "roll": 0,
+      "flip": -1
+    },
+    {
+      "id": "grande-1@70",
+      "tile": "grande-1",
+      "azimuth": 70,
+      "elevation": 5.41,
+      "scale": 0.33,
+      "roll": -6,
+      "flip": -1
+    },
+    {
+      "id": "torre-5@-100",
+      "tile": "torre-5",
+      "azimuth": -100,
+      "elevation": 15.21,
+      "scale": 0.33,
+      "roll": 6,
+      "flip": 1
+    },
+    {
+      "id": "medio-5@90",
+      "tile": "medio-5",
+      "azimuth": 90,
+      "elevation": 15.26,
+      "scale": 0.33,
+      "roll": 0,
+      "flip": -1
+    },
+    {
+      "id": "medio-5@165",
+      "tile": "medio-5",
+      "azimuth": 165,
+      "elevation": 5.26,
+      "scale": 0.33,
+      "roll": -6,
+      "flip": 1
+    },
+    {
+      "id": "medio-8@25",
+      "tile": "medio-8",
+      "azimuth": 25,
+      "elevation": 13.66,
+      "scale": 0.2,
+      "roll": -6,
+      "flip": -1
+    },
+    {
+      "id": "torre-6@-165",
+      "tile": "torre-6",
+      "azimuth": -165,
+      "elevation": 15.51,
+      "scale": 0.33,
+      "roll": 0,
+      "flip": -1
+    },
+    {
+      "id": "grande-7@-10",
+      "tile": "grande-7",
+      "azimuth": -10,
+      "elevation": 5.62,
+      "scale": 0.15,
+      "roll": -6,
+      "flip": -1
+    },
+    {
+      "id": "torre-3@-10",
+      "tile": "torre-3",
+      "azimuth": -10,
+      "elevation": 13.28,
+      "scale": 0.15,
+      "roll": 6,
+      "flip": 1
+    },
+    {
+      "id": "grande-1@-115",
+      "tile": "grande-1",
+      "azimuth": -115,
+      "elevation": 5.78,
+      "scale": 0.15,
+      "roll": -6,
+      "flip": -1
+    },
+    {
+      "id": "grande-7@80",
+      "tile": "grande-7",
+      "azimuth": 80,
+      "elevation": 5.62,
+      "scale": 0.15,
+      "roll": 0,
+      "flip": 1
+    },
+    {
+      "id": "medio-7@125",
+      "tile": "medio-7",
+      "azimuth": 125,
+      "elevation": 13.16,
+      "scale": 0.15,
+      "roll": 0,
+      "flip": 1
+    },
+    {
+      "id": "grande-2@30",
+      "tile": "grande-2",
+      "azimuth": 30,
+      "elevation": 13.3,
+      "scale": 0.15,
+      "roll": -6,
+      "flip": 1
+    },
+    {
+      "id": "medio-1@-25",
+      "tile": "medio-1",
+      "azimuth": -25,
+      "elevation": 10.66,
+      "scale": 0.15,
+      "roll": -6,
+      "flip": -1
+    },
+    {
+      "id": "medio-2@-25",
+      "tile": "medio-2",
+      "azimuth": -25,
+      "elevation": 0.55,
+      "scale": 0.15,
+      "roll": 6,
+      "flip": 1
+    },
+    {
+      "id": "grande-6@25",
+      "tile": "grande-6",
+      "azimuth": 25,
+      "elevation": 5.78,
+      "scale": 0.15,
+      "roll": 6,
+      "flip": 1
+    },
+    {
+      "id": "medio-4@-55",
+      "tile": "medio-4",
+      "azimuth": -55,
+      "elevation": 3.14,
+      "scale": 0.15,
+      "roll": 6,
+      "flip": 1
+    },
+    {
+      "id": "medio-4@-130",
+      "tile": "medio-4",
+      "azimuth": -130,
+      "elevation": 13.14,
+      "scale": 0.15,
+      "roll": -6,
+      "flip": -1
+    },
+    {
+      "id": "grande-8@60",
+      "tile": "grande-8",
+      "azimuth": 60,
+      "elevation": 13.28,
+      "scale": 0.15,
+      "roll": 0,
+      "flip": -1
+    },
+    {
+      "id": "grande-7@-120",
+      "tile": "grande-7",
+      "azimuth": -120,
+      "elevation": 5.62,
+      "scale": 0.15,
+      "roll": -6,
+      "flip": 1
+    },
+    {
+      "id": "medio-8@120",
+      "tile": "medio-8",
+      "azimuth": 120,
+      "elevation": 13.12,
+      "scale": 0.15,
+      "roll": -6,
+      "flip": 1
+    },
+    {
+      "id": "medio-7@-155",
+      "tile": "medio-7",
+      "azimuth": -155,
+      "elevation": 5.66,
+      "scale": 0.15,
+      "roll": 6,
+      "flip": -1
+    },
+    {
+      "id": "medio-6@-140",
+      "tile": "medio-6",
+      "azimuth": -140,
+      "elevation": 13.28,
+      "scale": 0.15,
+      "roll": 0,
+      "flip": 1
+    },
+    {
+      "id": "medio-4@115",
+      "tile": "medio-4",
+      "azimuth": 115,
+      "elevation": 13.14,
+      "scale": 0.15,
+      "roll": 6,
+      "flip": 1
+    },
+    {
+      "id": "torre-3@155",
+      "tile": "torre-3",
+      "azimuth": 155,
+      "elevation": 13.28,
+      "scale": 0.15,
+      "roll": 0,
+      "flip": 1
+    },
+    {
+      "id": "torre-1@-110",
+      "tile": "torre-1",
+      "azimuth": -110,
+      "elevation": 2.83,
+      "scale": 0.12,
+      "roll": 0,
+      "flip": 1
+    },
+    {
+      "id": "grande-3@-80",
+      "tile": "grande-3",
+      "azimuth": -80,
+      "elevation": 13.32,
+      "scale": 0.15,
+      "roll": 6,
+      "flip": -1
+    },
+    {
+      "id": "torre-1@-30",
+      "tile": "torre-1",
+      "azimuth": -30,
+      "elevation": 12.83,
+      "scale": 0.12,
+      "roll": 0,
+      "flip": -1
+    },
+    {
+      "id": "grande-4@-160",
+      "tile": "grande-4",
+      "azimuth": -160,
+      "elevation": 10.76,
+      "scale": 0.15,
+      "roll": 6,
+      "flip": 1
+    },
+    {
+      "id": "grande-5@65",
+      "tile": "grande-5",
+      "azimuth": 65,
+      "elevation": 10.73,
+      "scale": 0.15,
+      "roll": 0,
+      "flip": 1
+    },
+    {
+      "id": "grande-6@-180",
+      "tile": "grande-6",
+      "azimuth": -180,
+      "elevation": 3.28,
+      "scale": 0.15,
+      "roll": 0,
+      "flip": -1
+    },
+    {
+      "id": "torre-5@75",
+      "tile": "torre-5",
+      "azimuth": 75,
+      "elevation": 2.85,
+      "scale": 0.12,
+      "roll": 0,
+      "flip": -1
+    },
+    {
+      "id": "medio-1@135",
+      "tile": "medio-1",
+      "azimuth": 135,
+      "elevation": 5.66,
+      "scale": 0.15,
+      "roll": -6,
+      "flip": 1
+    },
+    {
+      "id": "medio-2@170",
+      "tile": "medio-2",
+      "azimuth": 170,
+      "elevation": 5.55,
+      "scale": 0.15,
+      "roll": 0,
+      "flip": 1
+    },
+    {
+      "id": "grande-2@110",
+      "tile": "grande-2",
+      "azimuth": 110,
+      "elevation": 5.8,
+      "scale": 0.15,
+      "roll": 6,
+      "flip": -1
+    },
+    {
+      "id": "grande-5@-125",
+      "tile": "grande-5",
+      "azimuth": -125,
+      "elevation": 5.73,
+      "scale": 0.15,
+      "roll": 0,
+      "flip": 1
+    },
+    {
+      "id": "medio-8@-150",
+      "tile": "medio-8",
+      "azimuth": -150,
+      "elevation": 5.62,
+      "scale": 0.15,
+      "roll": 0,
+      "flip": -1
+    },
+    {
+      "id": "medio-2@85",
+      "tile": "medio-2",
+      "azimuth": 85,
+      "elevation": 5.55,
+      "scale": 0.15,
+      "roll": -6,
+      "flip": -1
+    },
+    {
+      "id": "torre-7@-135",
+      "tile": "torre-7",
+      "azimuth": -135,
+      "elevation": 12.76,
+      "scale": 0.12,
+      "roll": 0,
+      "flip": -1
+    },
+    {
+      "id": "grande-2@-175",
+      "tile": "grande-2",
+      "azimuth": -175,
+      "elevation": 5.44,
+      "scale": 0.12,
+      "roll": 6,
+      "flip": 1
+    },
+    {
+      "id": "grande-1@145",
+      "tile": "grande-1",
+      "azimuth": 145,
+      "elevation": 13.28,
+      "scale": 0.15,
+      "roll": 6,
+      "flip": 1
+    }
+  ]
+}

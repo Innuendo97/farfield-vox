@@ -1,0 +1,113 @@
+{
+  "size": 32,
+  "regularisation": 0.3,
+  "identityHold": 0.1,
+  "anchorLevels": [
+    0,
+    0.02,
+    0.05,
+    0.12,
+    0.25,
+    0.5,
+    0.75,
+    1
+  ],
+  "worstUntouchedDrift": 0.0386,
+  "worstCollateral": 0.315,
+  "collateralLimit": 0.5,
+  "skyTolerance": 3,
+  "anchorDrift": 0.047,
+  "weights": {
+    "sky": 1
+  },
+  "basis": [
+    "r",
+    "g",
+    "b",
+    "1",
+    "r2",
+    "g2",
+    "b2"
+  ],
+  "coefficients": [
+    [
+      1.00017,
+      0.000097,
+      0.000169,
+      0.000132,
+      -0.00027,
+      -0.000168,
+      -0.000148
+    ],
+    [
+      0.002716,
+      1.004735,
+      0.006068,
+      0.000045,
+      -0.003922,
+      -0.005336,
+      -0.005787
+    ],
+    [
+      0.004981,
+      0.009544,
+      1.01257,
+      0.000159,
+      -0.007542,
+      -0.010864,
+      -0.012102
+    ]
+  ],
+  "deltaE": {
+    "before": {
+      "sky-top-left": 1.6,
+      "sky-top-mid": 1.69,
+      "sky-top-right": 2.31,
+      "cloud-tower-lit": 1.16,
+      "cloud-tower-shade": 0.92,
+      "cloud-left": 0.85,
+      "sky-horizon-mid": 3.65,
+      "sky-horizon-left": 1.96,
+      "sky-horizon-right": 1.81,
+      "grass-lit": 7.42,
+      "grass-mid": 8.13,
+      "grass-shade": 4.24,
+      "path": 15.97,
+      "stone-lit": 12.27,
+      "stone-shade": 5.27,
+      "stone-face": 13.53,
+      "water-lake-left": 4.31,
+      "water-rivulet": 11.72,
+      "hills-left": 5.19,
+      "hills-right": 5.62,
+      "rock-crest": 19.81,
+      "rock-moss": 6.91
+    },
+    "after": {
+      "sky-top-left": 1.3,
+      "sky-top-mid": 1.38,
+      "sky-top-right": 1.99,
+      "cloud-tower-lit": 0.84,
+      "cloud-tower-shade": 0.65,
+      "cloud-left": 0.63,
+      "sky-horizon-mid": 3.32,
+      "sky-horizon-left": 2.32,
+      "sky-horizon-right": 1.8,
+      "grass-lit": 7.45,
+      "grass-mid": 8.3,
+      "grass-shade": 4,
+      "path": 15.87,
+      "stone-lit": 12.33,
+      "stone-shade": 5.43,
+      "stone-face": 13.27,
+      "water-lake-left": 4.28,
+      "water-rivulet": 12.03,
+      "hills-left": 5.09,
+      "hills-right": 5.67,
+      "rock-crest": 19.81,
+      "rock-moss": 6.81
+    },
+    "meanBefore": 6.2,
+    "meanAfter": 6.12
+  }
+}

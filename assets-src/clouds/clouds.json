@@ -1,0 +1,2703 @@
+{
+  "source": "plates",
+  "aerialBaked": 1,
+  "atlas": {
+    "width": 2048,
+    "height": 1024,
+    "levelScale": 4.81715,
+    "cover": "cloud-cover.png"
+  },
+  "counts": {
+    "tiles": 19,
+    "plates": 19,
+    "placements": 104,
+    "standing": 104
+  },
+  "sun": {
+    "elevation": 34,
+    "azimuth": -9.5,
+    "vector": [
+      -0.13683,
+      0.55919,
+      -0.81767
+    ]
+  },
+  "shade": {
+    "ambient": 0.42,
+    "diffuse": 0.72,
+    "forward": 0.55,
+    "normalSlope": 5
+  },
+  "sampling": {
+    "texelDeg": 0.05,
+    "texelDegNote": "degrees of sky a texel spans WHERE THE PIECE STANDS. A tile is cut at this over the largest scale the composition ever stands it at, so that every piece is equally sharp on the screen rather than inside its own window; a plate may ask for coarser still in the roster's own texelDeg and the coarser of the two wins. Each tile's degPerTexel below is what it was actually cut at.",
+    "calibratedAt": 15,
+    "worldSky": 0.11031,
+    "skyProfile": {
+      "from": -4,
+      "step": 1,
+      "values": [
+        0.330409,
+        0.330779,
+        0.331082,
+        0.331149,
+        0.329974,
+        0.323554,
+        0.311528,
+        0.295707,
+        0.278369,
+        0.26109,
+        0.244708,
+        0.229584,
+        0.215816,
+        0.203367,
+        0.192143,
+        0.182028,
+        0.172906,
+        0.164667,
+        0.157212,
+        0.150453,
+        0.144313,
+        0.138723,
+        0.133625,
+        0.128965,
+        0.124697,
+        0.120777,
+        0.117167,
+        0.113833,
+        0.110742,
+        0.107865,
+        0.105173,
+        0.102642,
+        0.100248,
+        0.097971,
+        0.095793,
+        0.093696,
+        0.091669,
+        0.089699,
+        0.356441,
+        0.085904,
+        0.084068,
+        0.082272,
+        0.080514,
+        0.078798,
+        0.077125
+      ]
+    },
+    "gains": {
+      "vdb-01-massa-dx-1": {
+        "at": 8.03,
+        "gain": 0.648,
+        "density": 1.6,
+        "shoulder": 1,
+        "skyBalance": 0,
+        "tint": [
+          1,
+          1,
+          1
+        ],
+        "centroidT": -0.0269
+      },
+      "vdb-02-torre-sx-1": {
+        "at": 9.37,
+        "gain": 0.5992,
+        "density": 1.3,
+        "shoulder": 1,
+        "skyBalance": 0,
+        "tint": [
+          1,
+          1,
+          1
+        ],
+        "centroidT": -0.0723
+      },
+      "vdb-03-brandelli-a-1": {
+        "at": 14.52,
+        "gain": 0.463,
+        "density": 1.6,
+        "shoulder": 1,
+        "skyBalance": 0,
+        "tint": [
+          1,
+          1,
+          1
+        ],
+        "centroidT": 0.0144
+      },
+      "vdb-04-brandelli-b-1": {
+        "at": 4.5,
+        "gain": 0.8109,
+        "density": 1.6,
+        "shoulder": 1,
+        "skyBalance": 0,
+        "tint": [
+          1,
+          1,
+          1
+        ],
+        "centroidT": 0.0106
+      },
+      "vdb-05-brandelli-c-1": {
+        "at": 10.72,
+        "gain": 0.5561,
+        "density": 1.6,
+        "shoulder": 1,
+        "skyBalance": 0,
+        "tint": [
+          1,
+          1,
+          1
+        ],
+        "centroidT": 0.0006
+      },
+      "vdb-06-corona-a-1": {
+        "at": 18.13,
+        "gain": 0.4011,
+        "density": 1.3,
+        "shoulder": 1,
+        "skyBalance": 0,
+        "tint": [
+          1,
+          1,
+          1
+        ],
+        "centroidT": -0.0152
+      },
+      "vdb-07-corona-b-1": {
+        "at": 4.83,
+        "gain": 0.7941,
+        "density": 1.3,
+        "shoulder": 1,
+        "skyBalance": 0,
+        "tint": [
+          1,
+          1,
+          1
+        ],
+        "centroidT": -0.0189
+      },
+      "vdb-08-medi-a-1": {
+        "at": 9.25,
+        "gain": 0.6032,
+        "density": 1.6,
+        "shoulder": 1,
+        "skyBalance": 0,
+        "tint": [
+          1,
+          1,
+          1
+        ],
+        "centroidT": 0.0236
+      },
+      "vdb-09-medi-b-1": {
+        "at": 10.73,
+        "gain": 0.5558,
+        "density": 1.6,
+        "shoulder": 1,
+        "skyBalance": 0,
+        "tint": [
+          1,
+          1,
+          1
+        ],
+        "centroidT": 0.0618
+      },
+      "vdb-10-medi-c-1": {
+        "at": 7.52,
+        "gain": 0.6683,
+        "density": 1.6,
+        "shoulder": 1,
+        "skyBalance": 0,
+        "tint": [
+          1,
+          1,
+          1
+        ],
+        "centroidT": 0.1212
+      },
+      "vdb-11-medi-d-1": {
+        "at": 11.14,
+        "gain": 0.5441,
+        "density": 1.6,
+        "shoulder": 1,
+        "skyBalance": 0,
+        "tint": [
+          1,
+          1,
+          1
+        ],
+        "centroidT": -0.0732
+      },
+      "vdb-12-medi-e-1": {
+        "at": 6.6,
+        "gain": 0.7082,
+        "density": 1.6,
+        "shoulder": 1,
+        "skyBalance": 0,
+        "tint": [
+          1,
+          1,
+          1
+        ],
+        "centroidT": -0.0593
+      },
+      "vdb-13-frammento-1": {
+        "at": 11.24,
+        "gain": 0.5413,
+        "density": 1.6,
+        "shoulder": 1,
+        "skyBalance": 0,
+        "tint": [
+          1,
+          1,
+          1
+        ],
+        "centroidT": 0.1372
+      },
+      "vdb-14-banco-a-1": {
+        "at": 4.01,
+        "gain": 0.8368,
+        "density": 1.3,
+        "shoulder": 1,
+        "skyBalance": 0,
+        "tint": [
+          1,
+          1,
+          1
+        ],
+        "centroidT": -0.0798
+      },
+      "vdb-15-banco-b-1": {
+        "at": 6.81,
+        "gain": 0.6986,
+        "density": 1.6,
+        "shoulder": 1,
+        "skyBalance": 0,
+        "tint": [
+          1,
+          1,
+          1
+        ],
+        "centroidT": 0.0375
+      },
+      "vdb-16-zenit-a-1": {
+        "at": 23.16,
+        "gain": 0.3414,
+        "density": 1.6,
+        "shoulder": 1,
+        "skyBalance": 0,
+        "tint": [
+          1,
+          1,
+          1
+        ],
+        "centroidT": 0.1086
+      },
+      "vdb-17-zenit-b-1": {
+        "at": 27.48,
+        "gain": 0.3057,
+        "density": 1.3,
+        "shoulder": 1,
+        "skyBalance": 0,
+        "tint": [
+          1,
+          1,
+          1
+        ],
+        "centroidT": -0.0215
+      },
+      "vdb-18-velo-a-1": {
+        "at": 16.6,
+        "gain": 0.4248,
+        "density": 1.3,
+        "shoulder": 1,
+        "skyBalance": 0,
+        "tint": [
+          1,
+          1,
+          1
+        ],
+        "centroidT": 0.3119
+      },
+      "vdb-19-velo-b-1": {
+        "at": 20.38,
+        "gain": 0.3714,
+        "density": 1.3,
+        "shoulder": 1,
+        "skyBalance": 0,
+        "tint": [
+          1,
+          1,
+          1
+        ],
+        "centroidT": 0.1416
+      }
+    }
+  },
+  "tiles": [
+    {
+      "id": "vdb-01-massa-dx-1",
+      "kind": "library",
+      "rect": {
+        "x": 0,
+        "y": 8,
+        "width": 624,
+        "height": 256
+      },
+      "azimuth": 0,
+      "elevation": -0.218,
+      "halfU": 0.446125,
+      "halfV": 0.173876,
+      "sunSource": [
+        0,
+        0.56235,
+        0.8269
+      ],
+      "degPerTexel": 0.07706,
+      "parts": [
+        [
+          -0.9167,
+          0.8333,
+          0.9167,
+          1
+        ],
+        [
+          -0.9167,
+          0.6667,
+          1,
+          0.8333
+        ],
+        [
+          -1,
+          0.5,
+          1,
+          0.6667
+        ],
+        [
+          -1,
+          0.3333,
+          1,
+          0.5
+        ],
+        [
+          -1,
+          0.1667,
+          1,
+          0.3333
+        ],
+        [
+          -1,
+          0,
+          1,
+          0.1667
+        ],
+        [
+          -1,
+          -0.1667,
+          1,
+          0
+        ],
+        [
+          -1,
+          -0.3333,
+          1,
+          -0.1667
+        ],
+        [
+          -1,
+          -0.5,
+          1,
+          -0.3333
+        ],
+        [
+          -1,
+          -0.6667,
+          1,
+          -0.5
+        ],
+        [
+          -1,
+          -0.8333,
+          1,
+          -0.6667
+        ],
+        [
+          -1,
+          -1,
+          1,
+          -0.8333
+        ]
+      ],
+      "cells": "24x12",
+      "areaRatio": 0.9896,
+      "borderAlpha": 0.000002,
+      "fadeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeEdgePeak": {
+        "top": 0,
+        "bottom": 0.00418,
+        "left": 0,
+        "right": 0
+      },
+      "closeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "plate": "vdb-01-massa-dx"
+    },
+    {
+      "id": "vdb-02-torre-sx-1",
+      "kind": "library",
+      "rect": {
+        "x": 632,
+        "y": 8,
+        "width": 448,
+        "height": 340
+      },
+      "azimuth": 0.763,
+      "elevation": 1.395,
+      "halfU": 0.145721,
+      "halfV": 0.110262,
+      "sunSource": [
+        -0.01103,
+        0.53885,
+        0.84233
+      ],
+      "degPerTexel": 0.037013,
+      "parts": [
+        [
+          -1,
+          0.75,
+          0.4,
+          1
+        ],
+        [
+          -1,
+          0.5,
+          1,
+          0.75
+        ],
+        [
+          -1,
+          0.25,
+          1,
+          0.5
+        ],
+        [
+          -1,
+          0,
+          1,
+          0.25
+        ],
+        [
+          -1,
+          -0.25,
+          1,
+          0
+        ],
+        [
+          -1,
+          -0.5,
+          1,
+          -0.25
+        ],
+        [
+          -1,
+          -0.75,
+          1,
+          -0.5
+        ],
+        [
+          -1,
+          -1,
+          1,
+          -0.75
+        ]
+      ],
+      "cells": "10x8",
+      "areaRatio": 0.9625,
+      "borderAlpha": 0.000002,
+      "fadeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeEdgePeak": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0.00434,
+        "right": 0
+      },
+      "closeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "plate": "vdb-02-torre-sx"
+    },
+    {
+      "id": "vdb-03-brandelli-a-1",
+      "kind": "library",
+      "rect": {
+        "x": 1456,
+        "y": 688,
+        "width": 300,
+        "height": 144
+      },
+      "azimuth": -0.147,
+      "elevation": 0.241,
+      "halfU": 0.0614,
+      "halfV": 0.029444,
+      "sunSource": [
+        0.00212,
+        0.5557,
+        0.83138
+      ],
+      "degPerTexel": 0.023424,
+      "parts": [
+        [
+          -1,
+          0,
+          1,
+          1
+        ],
+        [
+          -1,
+          -1,
+          1,
+          0
+        ]
+      ],
+      "cells": "4x2",
+      "areaRatio": 1,
+      "borderAlpha": 0,
+      "fadeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeEdgePeak": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "plate": "vdb-03-brandelli-a"
+    },
+    {
+      "id": "vdb-04-brandelli-b-1",
+      "kind": "library",
+      "rect": {
+        "x": 1764,
+        "y": 688,
+        "width": 240,
+        "height": 164
+      },
+      "azimuth": 0.922,
+      "elevation": -0.059,
+      "halfU": 0.027578,
+      "halfV": 0.018842,
+      "sunSource": [
+        -0.01334,
+        0.56004,
+        0.82836
+      ],
+      "degPerTexel": 0.013164,
+      "parts": [
+        [
+          -1,
+          0,
+          1,
+          1
+        ],
+        [
+          -1,
+          -1,
+          1,
+          0
+        ]
+      ],
+      "cells": "2x2",
+      "areaRatio": 1,
+      "borderAlpha": 0.000022,
+      "fadeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeEdgePeak": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0.02273,
+        "right": 0
+      },
+      "closeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0.00097,
+        "right": 0
+      },
+      "plate": "vdb-04-brandelli-b"
+    },
+    {
+      "id": "vdb-05-brandelli-c-1",
+      "kind": "library",
+      "rect": {
+        "x": 0,
+        "y": 772,
+        "width": 172,
+        "height": 64
+      },
+      "azimuth": 1.648,
+      "elevation": 0.037,
+      "halfU": 0.031324,
+      "halfV": 0.011652,
+      "sunSource": [
+        -0.02384,
+        0.55866,
+        0.82905
+      ],
+      "degPerTexel": 0.020862,
+      "parts": [
+        [
+          -1,
+          0,
+          1,
+          1
+        ],
+        [
+          -1,
+          -1,
+          1,
+          0
+        ]
+      ],
+      "cells": "2x2",
+      "areaRatio": 1,
+      "borderAlpha": 0,
+      "fadeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeEdgePeak": {
+        "top": 0,
+        "bottom": 0.0139,
+        "left": 0,
+        "right": 0
+      },
+      "closeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "plate": "vdb-05-brandelli-c"
+    },
+    {
+      "id": "vdb-06-corona-a-1",
+      "kind": "library",
+      "rect": {
+        "x": 656,
+        "y": 724,
+        "width": 272,
+        "height": 144
+      },
+      "azimuth": 0.021,
+      "elevation": 0.325,
+      "halfU": 0.100314,
+      "halfV": 0.05298,
+      "sunSource": [
+        -0.0003,
+        0.55448,
+        0.8322
+      ],
+      "degPerTexel": 0.042121,
+      "parts": [
+        [
+          -1,
+          0.5,
+          1,
+          1
+        ],
+        [
+          -1,
+          0,
+          1,
+          0.5
+        ],
+        [
+          -1,
+          -0.5,
+          1,
+          0
+        ],
+        [
+          -1,
+          -1,
+          1,
+          -0.5
+        ]
+      ],
+      "cells": "7x4",
+      "areaRatio": 1,
+      "borderAlpha": 0,
+      "fadeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeEdgePeak": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "plate": "vdb-06-corona-a"
+    },
+    {
+      "id": "vdb-07-corona-b-1",
+      "kind": "library",
+      "rect": {
+        "x": 516,
+        "y": 356,
+        "width": 480,
+        "height": 216
+      },
+      "azimuth": 1.509,
+      "elevation": 0.325,
+      "halfU": 0.087999,
+      "halfV": 0.039518,
+      "sunSource": [
+        -0.02184,
+        0.55448,
+        0.83191
+      ],
+      "degPerTexel": 0.020954,
+      "parts": [
+        [
+          -1,
+          0.3333,
+          1,
+          1
+        ],
+        [
+          -1,
+          -0.3333,
+          1,
+          0.3333
+        ],
+        [
+          -1,
+          -1,
+          1,
+          -0.3333
+        ]
+      ],
+      "cells": "6x3",
+      "areaRatio": 1,
+      "borderAlpha": 0,
+      "fadeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeEdgePeak": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "plate": "vdb-07-corona-b"
+    },
+    {
+      "id": "vdb-08-medi-a-1",
+      "kind": "library",
+      "rect": {
+        "x": 1088,
+        "y": 8,
+        "width": 412,
+        "height": 328
+      },
+      "azimuth": 0.575,
+      "elevation": 0.359,
+      "halfU": 0.051438,
+      "halfV": 0.040937,
+      "sunSource": [
+        -0.00831,
+        0.55399,
+        0.83248
+      ],
+      "degPerTexel": 0.014294,
+      "parts": [
+        [
+          -1,
+          0.3333,
+          1,
+          1
+        ],
+        [
+          -1,
+          -0.3333,
+          1,
+          0.3333
+        ],
+        [
+          -1,
+          -1,
+          1,
+          -0.3333
+        ]
+      ],
+      "cells": "4x3",
+      "areaRatio": 1,
+      "borderAlpha": 0.000087,
+      "fadeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeEdgePeak": {
+        "top": 0,
+        "bottom": 0.05023,
+        "left": 0,
+        "right": 0
+      },
+      "closeBandCover": {
+        "top": 0,
+        "bottom": 0.00008,
+        "left": 0,
+        "right": 0
+      },
+      "plate": "vdb-08-medi-a"
+    },
+    {
+      "id": "vdb-09-medi-b-1",
+      "kind": "library",
+      "rect": {
+        "x": 1088,
+        "y": 344,
+        "width": 396,
+        "height": 200
+      },
+      "azimuth": -0.345,
+      "elevation": 0.188,
+      "halfU": 0.053941,
+      "halfV": 0.027223,
+      "sunSource": [
+        0.00499,
+        0.55647,
+        0.83085
+      ],
+      "degPerTexel": 0.015594,
+      "parts": [
+        [
+          -1,
+          0,
+          1,
+          1
+        ],
+        [
+          -1,
+          -1,
+          1,
+          0
+        ]
+      ],
+      "cells": "4x2",
+      "areaRatio": 1,
+      "borderAlpha": 0,
+      "fadeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeEdgePeak": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "plate": "vdb-09-medi-b"
+    },
+    {
+      "id": "vdb-10-medi-c-1",
+      "kind": "library",
+      "rect": {
+        "x": 1492,
+        "y": 492,
+        "width": 388,
+        "height": 188
+      },
+      "azimuth": 1.121,
+      "elevation": 0.11,
+      "halfU": 0.053,
+      "halfV": 0.025662,
+      "sunSource": [
+        -0.01622,
+        0.5576,
+        0.82995
+      ],
+      "degPerTexel": 0.015638,
+      "parts": [
+        [
+          -1,
+          0,
+          1,
+          1
+        ],
+        [
+          -1,
+          -1,
+          1,
+          0
+        ]
+      ],
+      "cells": "4x2",
+      "areaRatio": 1,
+      "borderAlpha": 0.000061,
+      "fadeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeEdgePeak": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0.05495,
+        "right": 0
+      },
+      "closeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0.00003,
+        "right": 0
+      },
+      "plate": "vdb-10-medi-c"
+    },
+    {
+      "id": "vdb-11-medi-d-1",
+      "kind": "library",
+      "rect": {
+        "x": 656,
+        "y": 580,
+        "width": 320,
+        "height": 136
+      },
+      "azimuth": 0.144,
+      "elevation": 0.216,
+      "halfU": 0.080517,
+      "halfV": 0.034159,
+      "sunSource": [
+        -0.00208,
+        0.55607,
+        0.83113
+      ],
+      "degPerTexel": 0.028771,
+      "parts": [
+        [
+          -1,
+          0,
+          1,
+          1
+        ],
+        [
+          -1,
+          -1,
+          1,
+          0
+        ]
+      ],
+      "cells": "6x2",
+      "areaRatio": 1,
+      "borderAlpha": 0,
+      "fadeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeEdgePeak": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "plate": "vdb-11-medi-d"
+    },
+    {
+      "id": "vdb-12-medi-e-1",
+      "kind": "library",
+      "rect": {
+        "x": 0,
+        "y": 272,
+        "width": 508,
+        "height": 232
+      },
+      "azimuth": -0.311,
+      "elevation": 0.247,
+      "halfU": 0.080942,
+      "halfV": 0.036902,
+      "sunSource": [
+        0.00451,
+        0.55561,
+        0.83143
+      ],
+      "degPerTexel": 0.018219,
+      "parts": [
+        [
+          -1,
+          0.3333,
+          1,
+          1
+        ],
+        [
+          -1,
+          -0.3333,
+          1,
+          0.3333
+        ],
+        [
+          -1,
+          -1,
+          1,
+          -0.3333
+        ]
+      ],
+      "cells": "6x3",
+      "areaRatio": 1,
+      "borderAlpha": 0,
+      "fadeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeEdgePeak": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "plate": "vdb-12-medi-e"
+    },
+    {
+      "id": "vdb-13-frammento-1",
+      "kind": "library",
+      "rect": {
+        "x": 0,
+        "y": 512,
+        "width": 288,
+        "height": 252
+      },
+      "azimuth": 0.975,
+      "elevation": -0.725,
+      "halfU": 0.026323,
+      "halfV": 0.023031,
+      "sunSource": [
+        -0.01411,
+        0.56964,
+        0.82178
+      ],
+      "degPerTexel": 0.010471,
+      "parts": [
+        [
+          -1,
+          0,
+          1,
+          1
+        ],
+        [
+          -1,
+          -1,
+          1,
+          0
+        ]
+      ],
+      "cells": "2x2",
+      "areaRatio": 1,
+      "borderAlpha": 0.000363,
+      "fadeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeEdgePeak": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0.09237,
+        "right": 0
+      },
+      "closeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0.00016,
+        "right": 0
+      },
+      "plate": "vdb-13-frammento"
+    },
+    {
+      "id": "vdb-14-banco-a-1",
+      "kind": "library",
+      "rect": {
+        "x": 296,
+        "y": 580,
+        "width": 352,
+        "height": 156
+      },
+      "azimuth": -0.547,
+      "elevation": 0.404,
+      "halfU": 0.146802,
+      "halfV": 0.064689,
+      "sunSource": [
+        0.00792,
+        0.55333,
+        0.83293
+      ],
+      "degPerTexel": 0.047452,
+      "parts": [
+        [
+          -1,
+          0.6,
+          0.6,
+          1
+        ],
+        [
+          -1,
+          0.2,
+          1,
+          0.6
+        ],
+        [
+          -1,
+          -0.2,
+          1,
+          0.2
+        ],
+        [
+          -1,
+          -0.6,
+          1,
+          -0.2
+        ],
+        [
+          -1,
+          -1,
+          1,
+          -0.6
+        ]
+      ],
+      "cells": "10x5",
+      "areaRatio": 0.96,
+      "borderAlpha": 0,
+      "fadeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeEdgePeak": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "plate": "vdb-14-banco-a"
+    },
+    {
+      "id": "vdb-15-banco-b-1",
+      "kind": "library",
+      "rect": {
+        "x": 1004,
+        "y": 552,
+        "width": 444,
+        "height": 148
+      },
+      "azimuth": 0.666,
+      "elevation": 0.404,
+      "halfU": 0.183939,
+      "halfV": 0.06071,
+      "sunSource": [
+        -0.00964,
+        0.55333,
+        0.83291
+      ],
+      "degPerTexel": 0.046948,
+      "parts": [
+        [
+          -1,
+          0.5,
+          1,
+          1
+        ],
+        [
+          -1,
+          0,
+          1,
+          0.5
+        ],
+        [
+          -1,
+          -0.5,
+          1,
+          0
+        ],
+        [
+          -1,
+          -1,
+          1,
+          -0.5
+        ]
+      ],
+      "cells": "13x4",
+      "areaRatio": 1,
+      "borderAlpha": 0,
+      "fadeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeEdgePeak": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "plate": "vdb-15-banco-b"
+    },
+    {
+      "id": "vdb-16-zenit-a-1",
+      "kind": "library",
+      "rect": {
+        "x": 1508,
+        "y": 8,
+        "width": 512,
+        "height": 256
+      },
+      "azimuth": 0,
+      "elevation": 0,
+      "halfU": 0.176327,
+      "halfV": 0.087489,
+      "sunSource": [
+        0,
+        0.55919,
+        0.82904
+      ],
+      "degPerTexel": 0.039063,
+      "parts": [
+        [
+          -0.8462,
+          0.6667,
+          1,
+          1
+        ],
+        [
+          -0.8462,
+          0.3333,
+          1,
+          0.6667
+        ],
+        [
+          -0.8462,
+          0,
+          1,
+          0.3333
+        ],
+        [
+          -0.8462,
+          -0.3333,
+          1,
+          0
+        ],
+        [
+          -0.8462,
+          -0.6667,
+          1,
+          -0.3333
+        ],
+        [
+          -0.8462,
+          -1,
+          1,
+          -0.6667
+        ]
+      ],
+      "cells": "13x6",
+      "areaRatio": 0.9231,
+      "borderAlpha": 0,
+      "fadeBandCover": {
+        "top": 0.19817,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeEdgePeak": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "plate": "vdb-16-zenit-a"
+    },
+    {
+      "id": "vdb-17-zenit-b-1",
+      "kind": "library",
+      "rect": {
+        "x": 984,
+        "y": 708,
+        "width": 300,
+        "height": 140
+      },
+      "azimuth": -0.375,
+      "elevation": 0.237,
+      "halfU": 0.103747,
+      "halfV": 0.04828,
+      "sunSource": [
+        0.00542,
+        0.55576,
+        0.83132
+      ],
+      "degPerTexel": 0.039487,
+      "parts": [
+        [
+          -1,
+          0.3333,
+          1,
+          1
+        ],
+        [
+          -1,
+          -0.3333,
+          1,
+          0.3333
+        ],
+        [
+          -1,
+          -1,
+          1,
+          -0.3333
+        ]
+      ],
+      "cells": "7x3",
+      "areaRatio": 1,
+      "borderAlpha": 0.000039,
+      "fadeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeEdgePeak": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0.0329
+      },
+      "closeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0.00003
+      },
+      "plate": "vdb-17-zenit-b"
+    },
+    {
+      "id": "vdb-18-velo-a-1",
+      "kind": "library",
+      "rect": {
+        "x": 1508,
+        "y": 272,
+        "width": 512,
+        "height": 212
+      },
+      "azimuth": 0,
+      "elevation": 0,
+      "halfU": 0.305731,
+      "halfV": 0.123477,
+      "sunSource": [
+        0,
+        0.55919,
+        0.82904
+      ],
+      "degPerTexel": 0.066406,
+      "parts": [
+        [
+          -1,
+          0.7778,
+          1,
+          1
+        ],
+        [
+          -1,
+          0.5556,
+          1,
+          0.7778
+        ],
+        [
+          -1,
+          0.3333,
+          1,
+          0.5556
+        ],
+        [
+          -1,
+          0.1111,
+          1,
+          0.3333
+        ],
+        [
+          -1,
+          -0.1111,
+          1,
+          0.1111
+        ],
+        [
+          -0.8095,
+          -0.3333,
+          1,
+          -0.1111
+        ],
+        [
+          -0.8095,
+          -0.5556,
+          1,
+          -0.3333
+        ],
+        [
+          -0.8095,
+          -0.7778,
+          0.8095,
+          -0.5556
+        ],
+        [
+          -0.619,
+          -1,
+          0.4286,
+          -0.7778
+        ]
+      ],
+      "cells": "21x9",
+      "areaRatio": 0.9048,
+      "borderAlpha": 0,
+      "fadeBandCover": {
+        "top": 0.31474,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeEdgePeak": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "plate": "vdb-18-velo-a"
+    },
+    {
+      "id": "vdb-19-velo-b-1",
+      "kind": "library",
+      "rect": {
+        "x": 296,
+        "y": 744,
+        "width": 328,
+        "height": 120
+      },
+      "azimuth": -1.06,
+      "elevation": 0.787,
+      "halfU": 0.194874,
+      "halfV": 0.070529,
+      "sunSource": [
+        0.01534,
+        0.54776,
+        0.8365
+      ],
+      "degPerTexel": 0.067239,
+      "parts": [
+        [
+          -1,
+          0.6,
+          1,
+          1
+        ],
+        [
+          -1,
+          0.2,
+          1,
+          0.6
+        ],
+        [
+          -1,
+          -0.2,
+          1,
+          0.2
+        ],
+        [
+          -1,
+          -0.6,
+          1,
+          -0.2
+        ],
+        [
+          -1,
+          -1,
+          1,
+          -0.6
+        ]
+      ],
+      "cells": "14x5",
+      "areaRatio": 1,
+      "borderAlpha": 0.000192,
+      "fadeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0
+      },
+      "closeEdgePeak": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0.04543
+      },
+      "closeBandCover": {
+        "top": 0,
+        "bottom": 0,
+        "left": 0,
+        "right": 0.00041
+      },
+      "plate": "vdb-19-velo-b"
+    }
+  ],
+  "placements": [
+    {
+      "id": "vdb-01-massa-dx-1@13.5",
+      "tile": "vdb-01-massa-dx-1",
+      "azimuth": 13.5,
+      "elevation": 8.203,
+      "scale": 0.62,
+      "roll": 3.325,
+      "flip": -1,
+      "arc": 2.2,
+      "pin": true,
+      "az0": 9.8,
+      "el0": 12.5
+    },
+    {
+      "id": "vdb-02-torre-sx-1@-22.4",
+      "tile": "vdb-02-torre-sx-1",
+      "azimuth": -22.4,
+      "elevation": 9.932,
+      "scale": 1.1634,
+      "roll": 8.735,
+      "flip": 1,
+      "arc": 2.2,
+      "pin": true,
+      "az0": -25.6,
+      "el0": 9.4
+    },
+    {
+      "id": "vdb-06-corona-a-1@15.5",
+      "tile": "vdb-06-corona-a-1",
+      "azimuth": 15.5,
+      "elevation": 18.387,
+      "scale": 1.5236,
+      "roll": 1.874,
+      "flip": -1,
+      "arc": 1.4,
+      "pin": true,
+      "az0": 15.5,
+      "el0": 19.5
+    },
+    {
+      "id": "vdb-07-corona-b-1@28.0",
+      "tile": "vdb-07-corona-b-1",
+      "azimuth": 28,
+      "elevation": 4.598,
+      "scale": 1.9005,
+      "roll": -4,
+      "flip": 1,
+      "arc": 1.4,
+      "pin": true,
+      "az0": 28,
+      "el0": 18.5
+    },
+    {
+      "id": "vdb-03-brandelli-a-1@-21.0",
+      "tile": "vdb-03-brandelli-a-1",
+      "azimuth": -21,
+      "elevation": 14.941,
+      "scale": 1.5701,
+      "roll": -7.639,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-16-zenit-a-1@27.0",
+      "tile": "vdb-16-zenit-a-1",
+      "azimuth": 27,
+      "elevation": 3.261,
+      "scale": 1.6126,
+      "roll": 1.73,
+      "flip": -1,
+      "arc": 1.4
+    },
+    {
+      "id": "vdb-15-banco-b-1@-26.0",
+      "tile": "vdb-15-banco-b-1",
+      "azimuth": -26,
+      "elevation": 1.533,
+      "scale": 1.0857,
+      "roll": 8.22,
+      "flip": -1,
+      "arc": 1.4
+    },
+    {
+      "id": "vdb-09-medi-b-1@-26.5",
+      "tile": "vdb-09-medi-b-1",
+      "azimuth": -26.5,
+      "elevation": 8.464,
+      "scale": 2.2023,
+      "roll": 1.93,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-03-brandelli-a-1@9.0",
+      "tile": "vdb-03-brandelli-a-1",
+      "azimuth": 9,
+      "elevation": 15,
+      "scale": 1.7197,
+      "roll": -2.54,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-11-medi-d-1@-5.0",
+      "tile": "vdb-11-medi-d-1",
+      "azimuth": -5,
+      "elevation": 10.579,
+      "scale": 1.8198,
+      "roll": 1.78,
+      "flip": 1,
+      "arc": 1.4
+    },
+    {
+      "id": "vdb-04-brandelli-b-1@-34.0",
+      "tile": "vdb-04-brandelli-b-1",
+      "azimuth": -34,
+      "elevation": 4.446,
+      "scale": 5.0234,
+      "roll": -4.83,
+      "flip": -1,
+      "arc": 1.4
+    },
+    {
+      "id": "vdb-13-frammento-1@-2.0",
+      "tile": "vdb-13-frammento-1",
+      "azimuth": -2,
+      "elevation": 9.785,
+      "scale": 8.0132,
+      "roll": 20,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-12-medi-e-1@-5.0",
+      "tile": "vdb-12-medi-e-1",
+      "azimuth": -5,
+      "elevation": 4.794,
+      "scale": 2.4267,
+      "roll": -3.05,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-19-velo-b-1@-63.0",
+      "tile": "vdb-19-velo-b-1",
+      "azimuth": -63,
+      "elevation": 2.749,
+      "scale": 1.144,
+      "roll": 11,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-03-brandelli-a-1@-49.0",
+      "tile": "vdb-03-brandelli-a-1",
+      "azimuth": -49,
+      "elevation": 13.517,
+      "scale": 0.8224,
+      "roll": 8,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-17-zenit-b-1@-70.0",
+      "tile": "vdb-17-zenit-b-1",
+      "azimuth": -70,
+      "elevation": 8.474,
+      "scale": 1.0596,
+      "roll": 5,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-09-medi-b-1@44.0",
+      "tile": "vdb-09-medi-b-1",
+      "azimuth": 44,
+      "elevation": 12.683,
+      "scale": 1.0571,
+      "roll": -6,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-12-medi-e-1@74.0",
+      "tile": "vdb-12-medi-e-1",
+      "azimuth": 74,
+      "elevation": 6.84,
+      "scale": 1.04,
+      "roll": -13,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-15-banco-b-1@57.0",
+      "tile": "vdb-15-banco-b-1",
+      "azimuth": 57,
+      "elevation": 4.533,
+      "scale": 1.0857,
+      "roll": 1,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-10-medi-c-1@80.0",
+      "tile": "vdb-10-medi-c-1",
+      "azimuth": 80,
+      "elevation": 10.669,
+      "scale": 0.9431,
+      "roll": -9,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-14-banco-a-1@97.0",
+      "tile": "vdb-14-banco-a-1",
+      "azimuth": 97,
+      "elevation": 5.435,
+      "scale": 0.8498,
+      "roll": 2,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-07-corona-b-1@-119.0",
+      "tile": "vdb-07-corona-b-1",
+      "azimuth": -119,
+      "elevation": 5.199,
+      "scale": 1.4782,
+      "roll": -4,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-11-medi-d-1@133.0",
+      "tile": "vdb-11-medi-d-1",
+      "azimuth": 133,
+      "elevation": 9.534,
+      "scale": 1.3648,
+      "roll": -3,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-05-brandelli-c-1@-136.0",
+      "tile": "vdb-05-brandelli-c-1",
+      "azimuth": -136,
+      "elevation": 10.721,
+      "scale": 2.0842,
+      "roll": 3,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-08-medi-a-1@150.0",
+      "tile": "vdb-08-medi-a-1",
+      "azimuth": 150,
+      "elevation": 5.789,
+      "scale": 2.4292,
+      "roll": 7,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-16-zenit-a-1@172.0",
+      "tile": "vdb-16-zenit-a-1",
+      "azimuth": 172,
+      "elevation": 7.162,
+      "scale": 1.5454,
+      "roll": -2,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-18-velo-a-1@-158.0",
+      "tile": "vdb-18-velo-a-1",
+      "azimuth": -158,
+      "elevation": 5.387,
+      "scale": 0.8858,
+      "roll": 6,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-16-zenit-a-1@-30.0",
+      "tile": "vdb-16-zenit-a-1",
+      "azimuth": -30,
+      "elevation": 58,
+      "scale": 1.967,
+      "roll": 0,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-17-zenit-b-1@150.0",
+      "tile": "vdb-17-zenit-b-1",
+      "azimuth": 150,
+      "elevation": 62,
+      "scale": 2.5099,
+      "roll": 2,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-18-velo-a-1@-12.0",
+      "tile": "vdb-18-velo-a-1",
+      "azimuth": -12,
+      "elevation": -0.167,
+      "scale": 1.4991,
+      "roll": 1,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-19-velo-b-1@-125.0",
+      "tile": "vdb-19-velo-b-1",
+      "azimuth": -125,
+      "elevation": 40,
+      "scale": 1.3144,
+      "roll": -2,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-18-velo-a-1@105.0",
+      "tile": "vdb-18-velo-a-1",
+      "azimuth": 105,
+      "elevation": 37,
+      "scale": 0.9587,
+      "roll": 2,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-19-velo-b-1@20.5",
+      "tile": "vdb-19-velo-b-1",
+      "azimuth": 20.5,
+      "elevation": 16.208,
+      "scale": 1.2666,
+      "roll": 5,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-17-zenit-b-1@27.0",
+      "tile": "vdb-17-zenit-b-1",
+      "azimuth": 27,
+      "elevation": 12.301,
+      "scale": 2.0133,
+      "roll": -3,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-14-banco-a-1@7.0",
+      "tile": "vdb-14-banco-a-1",
+      "azimuth": 7,
+      "elevation": 3.255,
+      "scale": 1.4276,
+      "roll": 2,
+      "flip": -1,
+      "arc": 1.4
+    },
+    {
+      "id": "vdb-15-banco-b-1@22.0",
+      "tile": "vdb-15-banco-b-1",
+      "azimuth": 22,
+      "elevation": 14,
+      "scale": 0.6721,
+      "roll": -3,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-10-medi-c-1@-19.0",
+      "tile": "vdb-10-medi-c-1",
+      "azimuth": -19,
+      "elevation": 3.806,
+      "scale": 2.2634,
+      "roll": -2,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-12-medi-e-1@18.5",
+      "tile": "vdb-12-medi-e-1",
+      "azimuth": 18.5,
+      "elevation": 3.363,
+      "scale": 1.6178,
+      "roll": 2,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-02-torre-sx-1@33.5",
+      "tile": "vdb-02-torre-sx-1",
+      "azimuth": 33.5,
+      "elevation": 9.717,
+      "scale": 0.8402,
+      "roll": -10,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-11-medi-d-1@12.5",
+      "tile": "vdb-11-medi-d-1",
+      "azimuth": 12.5,
+      "elevation": 13.998,
+      "scale": 1.7629,
+      "roll": -12,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-16-zenit-a-1@15.0",
+      "tile": "vdb-16-zenit-a-1",
+      "azimuth": 15,
+      "elevation": 21,
+      "scale": 0.7055,
+      "roll": 5,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-06-corona-a-1@31.5",
+      "tile": "vdb-06-corona-a-1",
+      "azimuth": 31.5,
+      "elevation": 18,
+      "scale": 1.3,
+      "roll": 4,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-12-medi-e-1@27.5",
+      "tile": "vdb-12-medi-e-1",
+      "azimuth": 27.5,
+      "elevation": 12.2,
+      "scale": 1.3,
+      "roll": -3,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-08-medi-a-1@36.0",
+      "tile": "vdb-08-medi-a-1",
+      "azimuth": 36,
+      "elevation": 12.5,
+      "scale": 1.3,
+      "roll": 6,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-17-zenit-b-1@-95.0",
+      "tile": "vdb-17-zenit-b-1",
+      "azimuth": -95,
+      "elevation": 61.399502,
+      "scale": 2.45,
+      "roll": -34,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-17-zenit-b-1@160.0",
+      "tile": "vdb-17-zenit-b-1",
+      "azimuth": 160,
+      "elevation": 55.399502,
+      "scale": 2.5,
+      "roll": 20,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-16-zenit-a-1@-35.0",
+      "tile": "vdb-16-zenit-a-1",
+      "azimuth": -35,
+      "elevation": 69.265412,
+      "scale": 1.85,
+      "roll": 41,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-16-zenit-a-1@105.0",
+      "tile": "vdb-16-zenit-a-1",
+      "azimuth": 105,
+      "elevation": 51.265412,
+      "scale": 1.95,
+      "roll": 14,
+      "flip": 1,
+      "arc": 1.4
+    },
+    {
+      "id": "vdb-18-velo-a-1@-140.0",
+      "tile": "vdb-18-velo-a-1",
+      "azimuth": -140,
+      "elevation": 45.314076,
+      "scale": 1.49,
+      "roll": -19,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-18-velo-a-1@35.0",
+      "tile": "vdb-18-velo-a-1",
+      "azimuth": 35,
+      "elevation": 43.314076,
+      "scale": 1.42,
+      "roll": 24,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-19-velo-b-1@60.0",
+      "tile": "vdb-19-velo-b-1",
+      "azimuth": 60,
+      "elevation": 47.403175,
+      "scale": 1.31,
+      "roll": 27,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-19-velo-b-1@-175.0",
+      "tile": "vdb-19-velo-b-1",
+      "azimuth": -175,
+      "elevation": 53.403175,
+      "scale": 1.29,
+      "roll": -12,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-06-corona-a-1@20.0",
+      "tile": "vdb-06-corona-a-1",
+      "azimuth": 20,
+      "elevation": 42.17177,
+      "scale": 1.52,
+      "roll": -27,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-03-brandelli-a-1@-122.0",
+      "tile": "vdb-03-brandelli-a-1",
+      "azimuth": -122,
+      "elevation": 29.827935,
+      "scale": 1.31,
+      "roll": 33,
+      "flip": 1,
+      "arc": 1.4
+    },
+    {
+      "id": "vdb-17-zenit-b-1@125.0",
+      "tile": "vdb-17-zenit-b-1",
+      "azimuth": 125,
+      "elevation": 27.399502,
+      "scale": 1.72,
+      "roll": 9,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-16-zenit-a-1@-70.0",
+      "tile": "vdb-16-zenit-a-1",
+      "azimuth": -70,
+      "elevation": 25.265412,
+      "scale": 1.31,
+      "roll": -9,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-11-medi-d-1@155.0",
+      "tile": "vdb-11-medi-d-1",
+      "azimuth": 155,
+      "elevation": 24.936864,
+      "scale": 1.31,
+      "roll": -22,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-06-corona-a-1@78.0",
+      "tile": "vdb-06-corona-a-1",
+      "azimuth": 78,
+      "elevation": 22.17177,
+      "scale": 1.06,
+      "roll": 16,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-13-frammento-1@-158.0",
+      "tile": "vdb-13-frammento-1",
+      "azimuth": -158,
+      "elevation": 19.114812,
+      "scale": 4.1,
+      "roll": 41,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-05-brandelli-c-1@-108.0",
+      "tile": "vdb-05-brandelli-c-1",
+      "azimuth": -108,
+      "elevation": 18.971345,
+      "scale": 1.41,
+      "roll": 22,
+      "flip": -1,
+      "arc": 1.4
+    },
+    {
+      "id": "vdb-09-medi-b-1@-73.0",
+      "tile": "vdb-09-medi-b-1",
+      "azimuth": -73,
+      "elevation": 18.126572,
+      "scale": 1.25,
+      "roll": 30,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-02-torre-sx-1@-166.0",
+      "tile": "vdb-02-torre-sx-1",
+      "azimuth": -166,
+      "elevation": 14.653904,
+      "scale": 0.68,
+      "roll": -22,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-08-medi-a-1@44.0",
+      "tile": "vdb-08-medi-a-1",
+      "azimuth": 44,
+      "elevation": 15.191759,
+      "scale": 1.1,
+      "roll": 17,
+      "flip": -1,
+      "arc": 1.4
+    },
+    {
+      "id": "vdb-01-massa-dx-1@104.0",
+      "tile": "vdb-01-massa-dx-1",
+      "azimuth": 104,
+      "elevation": 12.128442,
+      "scale": 0.37,
+      "roll": 8,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-12-medi-e-1@-136.0",
+      "tile": "vdb-12-medi-e-1",
+      "azimuth": -136,
+      "elevation": 12.391078,
+      "scale": 1.1,
+      "roll": -25,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-15-banco-b-1@-108.0",
+      "tile": "vdb-15-banco-b-1",
+      "azimuth": -108,
+      "elevation": 10.734687,
+      "scale": 0.65,
+      "roll": 28,
+      "flip": 1,
+      "arc": 1.4
+    },
+    {
+      "id": "vdb-10-medi-c-1@163.0",
+      "tile": "vdb-10-medi-c-1",
+      "azimuth": 163,
+      "elevation": 11.338218,
+      "scale": 1.1,
+      "roll": 20,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-17-zenit-b-1@-63.0",
+      "tile": "vdb-17-zenit-b-1",
+      "azimuth": -63,
+      "elevation": 8.399502,
+      "scale": 0.67,
+      "roll": -13,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-19-velo-b-1@92.0",
+      "tile": "vdb-19-velo-b-1",
+      "azimuth": 92,
+      "elevation": 7.403175,
+      "scale": 0.62,
+      "roll": 34,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-17-zenit-b-1@48.0",
+      "tile": "vdb-17-zenit-b-1",
+      "azimuth": 48,
+      "elevation": 7.399502,
+      "scale": 0.65,
+      "roll": 27,
+      "flip": -1,
+      "arc": 1.4
+    },
+    {
+      "id": "vdb-06-corona-a-1@-132.0",
+      "tile": "vdb-06-corona-a-1",
+      "azimuth": -132,
+      "elevation": 6.17177,
+      "scale": 0.62,
+      "roll": 21,
+      "flip": -1,
+      "arc": 1.4
+    },
+    {
+      "id": "vdb-03-brandelli-a-1@55.0",
+      "tile": "vdb-03-brandelli-a-1",
+      "azimuth": 55,
+      "elevation": 7.827935,
+      "scale": 0.83,
+      "roll": -18,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-04-brandelli-b-1@158.0",
+      "tile": "vdb-04-brandelli-b-1",
+      "azimuth": 158,
+      "elevation": 6.976048,
+      "scale": 2.58,
+      "roll": -26,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-07-corona-b-1@-84.0",
+      "tile": "vdb-07-corona-b-1",
+      "azimuth": -84,
+      "elevation": 7.01517,
+      "scale": 0.95,
+      "roll": 19,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-17-zenit-b-1@-150.0",
+      "tile": "vdb-17-zenit-b-1",
+      "azimuth": -150,
+      "elevation": 5.399502,
+      "scale": 0.62,
+      "roll": -25,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-16-zenit-a-1@68.0",
+      "tile": "vdb-16-zenit-a-1",
+      "azimuth": 68,
+      "elevation": 5.265412,
+      "scale": 0.73,
+      "roll": 25,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-03-brandelli-a-1@-172.0",
+      "tile": "vdb-03-brandelli-a-1",
+      "azimuth": -172,
+      "elevation": 5.827935,
+      "scale": 0.92,
+      "roll": 11,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-19-velo-b-1@-52.0",
+      "tile": "vdb-19-velo-b-1",
+      "azimuth": -52,
+      "elevation": 5.403175,
+      "scale": 0.58,
+      "roll": 15,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-14-banco-a-1@-54.0",
+      "tile": "vdb-14-banco-a-1",
+      "azimuth": -54,
+      "elevation": 6.216559,
+      "scale": 0.73,
+      "roll": -17,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-02-torre-sx-1@85.0",
+      "tile": "vdb-02-torre-sx-1",
+      "azimuth": 85,
+      "elevation": 4.653904,
+      "scale": 0.58,
+      "roll": 26,
+      "flip": -1,
+      "arc": 1.4
+    },
+    {
+      "id": "vdb-11-medi-d-1@-88.0",
+      "tile": "vdb-11-medi-d-1",
+      "azimuth": -88,
+      "elevation": 4.936864,
+      "scale": 0.8,
+      "roll": 16,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-16-zenit-a-1@-158.0",
+      "tile": "vdb-16-zenit-a-1",
+      "azimuth": -158,
+      "elevation": 3.265412,
+      "scale": 0.67,
+      "roll": -30,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-19-velo-b-1@148.0",
+      "tile": "vdb-19-velo-b-1",
+      "azimuth": 148,
+      "elevation": 3.403175,
+      "scale": 0.55,
+      "roll": -22,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-01-massa-dx-1@-128.0",
+      "tile": "vdb-01-massa-dx-1",
+      "azimuth": -128,
+      "elevation": 4.128442,
+      "scale": 0.34,
+      "roll": -21,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-11-medi-d-1@128.0",
+      "tile": "vdb-11-medi-d-1",
+      "azimuth": 128,
+      "elevation": 3.936864,
+      "scale": 0.73,
+      "roll": -30,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-13-frammento-1@72.0",
+      "tile": "vdb-13-frammento-1",
+      "azimuth": 72,
+      "elevation": 2.114812,
+      "scale": 2.76,
+      "roll": -31,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-16-zenit-a-1@138.0",
+      "tile": "vdb-16-zenit-a-1",
+      "azimuth": 138,
+      "elevation": 2.265412,
+      "scale": 0.62,
+      "roll": 48,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-15-banco-b-1@176.0",
+      "tile": "vdb-15-banco-b-1",
+      "azimuth": 176,
+      "elevation": 2.734687,
+      "scale": 0.55,
+      "roll": -16,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-12-medi-e-1@168.0",
+      "tile": "vdb-12-medi-e-1",
+      "azimuth": 168,
+      "elevation": 3.391078,
+      "scale": 0.98,
+      "roll": 9,
+      "flip": 1,
+      "arc": 1.4
+    },
+    {
+      "id": "vdb-08-medi-a-1@-152.0",
+      "tile": "vdb-08-medi-a-1",
+      "azimuth": -152,
+      "elevation": 3.191759,
+      "scale": 0.92,
+      "roll": -20,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-09-medi-b-1@98.0",
+      "tile": "vdb-09-medi-b-1",
+      "azimuth": 98,
+      "elevation": 3.126572,
+      "scale": 0.92,
+      "roll": -24,
+      "flip": -1,
+      "arc": 1.4
+    },
+    {
+      "id": "vdb-10-medi-c-1@-48.0",
+      "tile": "vdb-10-medi-c-1",
+      "azimuth": -48,
+      "elevation": 3.338218,
+      "scale": 0.98,
+      "roll": 14,
+      "flip": 1,
+      "arc": 1.4
+    },
+    {
+      "id": "vdb-19-velo-b-1@-120.0",
+      "tile": "vdb-19-velo-b-1",
+      "azimuth": -120,
+      "elevation": 2.403175,
+      "scale": 0.52,
+      "roll": 20,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-18-velo-a-1@82.0",
+      "tile": "vdb-18-velo-a-1",
+      "azimuth": 82,
+      "elevation": 1.314076,
+      "scale": 0.37,
+      "roll": -11,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-16-zenit-a-1@-110.0",
+      "tile": "vdb-16-zenit-a-1",
+      "azimuth": -110,
+      "elevation": 1.265412,
+      "scale": 0.58,
+      "roll": 18,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-05-brandelli-c-1@142.0",
+      "tile": "vdb-05-brandelli-c-1",
+      "azimuth": 142,
+      "elevation": 2.471345,
+      "scale": 1.05,
+      "roll": -29,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-07-corona-b-1@76.0",
+      "tile": "vdb-07-corona-b-1",
+      "azimuth": 76,
+      "elevation": 2.71517,
+      "scale": 0.86,
+      "roll": -32,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-04-brandelli-b-1@-132.0",
+      "tile": "vdb-04-brandelli-b-1",
+      "azimuth": -132,
+      "elevation": 1.976048,
+      "scale": 2.21,
+      "roll": 18,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-14-banco-a-1@118.0",
+      "tile": "vdb-14-banco-a-1",
+      "azimuth": 118,
+      "elevation": 2.216559,
+      "scale": 0.67,
+      "roll": 13,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-06-corona-a-1@115.0",
+      "tile": "vdb-06-corona-a-1",
+      "azimuth": 115,
+      "elevation": 2.17177,
+      "scale": 0.58,
+      "roll": -13,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-12-medi-e-1@-68.0",
+      "tile": "vdb-12-medi-e-1",
+      "azimuth": -68,
+      "elevation": 4.391078,
+      "scale": 0.92,
+      "roll": 31,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-18-velo-a-1@-100.0",
+      "tile": "vdb-18-velo-a-1",
+      "azimuth": -100,
+      "elevation": 0.314076,
+      "scale": 0.34,
+      "roll": 29,
+      "flip": -1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-18-velo-a-1@170.0",
+      "tile": "vdb-18-velo-a-1",
+      "azimuth": 170,
+      "elevation": -0.685924,
+      "scale": 0.35,
+      "roll": 14,
+      "flip": 1,
+      "arc": 2.2
+    },
+    {
+      "id": "vdb-18-velo-a-1@-58.0",
+      "tile": "vdb-18-velo-a-1",
+      "azimuth": -58,
+      "elevation": 0.314076,
+      "scale": 0.32,
+      "roll": -30,
+      "flip": -1,
+      "arc": 2.2
+    }
+  ]
+}

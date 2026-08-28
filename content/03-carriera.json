@@ -1,0 +1,132 @@
+{
+  "id": "03",
+  "chiave": "carriera",
+  "titolo": "Carriera",
+  "icona": "codice",
+  "copertura": 0.9,
+  "incisione": {
+    "titolo": "CARRIERA\nSVILUPPATORE SOFTWARE",
+    "parolechiave": ["I build solutions", "I solve problems", "I create impact"],
+    "snippet": "function future() {\n  return possibilities;\n}",
+    "fonte": "inquadratura di riferimento",
+    "stato": "in_attesa_committente",
+    "nota": "le tre frasi e lo snippet sono quelli dell'inquadratura di riferimento; il CV non propone un motto, va confermato o sostituito"
+  },
+  "chiSono": {
+    "titolo": "Chi sono",
+    "copertura": 0.7,
+    "paragrafi": [
+      {
+        "testo": "Sviluppo software enterprise da oltre 4 anni: backend Java/Spring Boot, frontend Angular, su architetture cloud-native (OpenShift/Kubernetes) e pipeline CI/CD.",
+        "fonte": "LinkedIn - Profilo Ottimizzato.md, sezione About"
+      },
+      {
+        "testo": "Attualmente in Capgemini seguo il progetto Poste Italiane: ho progettato e sviluppato \"Pensati Per Te\" (sezione contenuti promozionali del portale retail su Oracle WebCenter Sites) e contribuito al portale self-care \"Fatture e Pagamenti\" (Angular + Spring Boot su OpenShift/Kubernetes, pagamenti Request to Pay, notifiche multicanale). Ho inoltre guidato la migrazione di applicativi legacy a Java 21 e Spring Boot 3.4, introducendo OpenTelemetry e Redis.",
+        "fonte": "LinkedIn - Profilo Ottimizzato.md, sezione About"
+      },
+      {
+        "testo": "In precedenza ho lavorato su progetti enterprise per Unicredit (gestione successioni, ambienti Italia/Germania/Austria) e AmerisourceBergen (sistema di gestione magazzini, testing JUnit).",
+        "fonte": "LinkedIn - Profilo Ottimizzato.md, sezione About"
+      },
+      {
+        "testo": "Negli ultimi mesi ho affiancato allo sviluppo tradizionale un percorso approfondito di AI engineering: certificazioni su assistenti di sviluppo, orchestrazione multi-agente, MCP e prompt/context engineering, competenze che sto già applicando per velocizzare sviluppo, code review e documentazione nei progetti enterprise.",
+        "fonte": "LinkedIn - Profilo Ottimizzato.md, sezione About",
+        "stato": "in_attesa_committente",
+        "nota": "paragrafo riportato senza i nomi commerciali dei prodotti, che restano nella sola riga skills «AI & Tooling»; va confermata la formulazione da pubblicare"
+      },
+      {
+        "testo": "Il mio percorso è partito dall'Ingegneria Informatica (Universitas Mercatorum, tesi su IA e cybersicurezza) e da un anno come Sottufficiale in Marina Militare (Guardia Costiera), esperienza che mi ha dato disciplina e gestione della pressione in contesti time-critical.",
+        "fonte": "LinkedIn - Profilo Ottimizzato.md, sezione About"
+      },
+      {
+        "testo": "Sono aperto a nuove opportunità come Software/Full Stack Engineer su stack Java/Spring e Angular, in contesti cloud-native, con particolare interesse per ruoli che integrano strumenti di AI engineering nello sviluppo.",
+        "fonte": "LinkedIn - Profilo Ottimizzato.md, sezione About"
+      }
+    ]
+  },
+  "profilo": {
+    "nome": "Daniele Galasso",
+    "ruolo": "Software Engineer · Full Stack Developer",
+    "citta": "Napoli, Italia",
+    "sintesi": "Full Stack Developer e Software Engineer con oltre 4 anni di esperienza nello sviluppo e nella manutenzione di applicazioni enterprise per grandi clienti (Poste Italiane, Unicredit, AmerisourceBergen). Solida padronanza dell'ecosistema Java / Spring Boot e dei framework frontend Angular, con esperienza su architetture cloud-native (RedHat OpenShift / Kubernetes) e pipeline CI/CD. Laureato in Ingegneria Informatica.",
+    "fonte": "Curriculum Vitae.tex, intestazione e profilo"
+  },
+  "timeline": [
+    {
+      "id": "capgemini-associate",
+      "tipo": "lavoro",
+      "titolo": "Associate Software Engineer",
+      "periodo": "gennaio 2026 — oggi",
+      "sottotitolo": "Capgemini S.p.A. — progetto Poste Italiane, Napoli",
+      "riassunto": "Promozione dopo due anni e mezzo sul progetto Poste Italiane, con maggiore autonomia tecnica su sviluppi backend e frontend.",
+      "dettaglio": "Prosegue l'evoluzione del portale self-care \"Fatture e Pagamenti\" e degli applicativi MyPoste Business su stack **Angular + Java Spring Boot**, **OpenShift/Kubernetes**, CI/CD Jenkins.",
+      "tecnologie": ["Java 21", "Spring Boot 3.4", "Angular", "OpenShift/Kubernetes", "Jenkins", "Oracle DB"],
+      "stato": "in_attesa_committente",
+      "nota": "il CV riporta un unico ruolo «Software Engineer» dal 05/2023 a oggi, il profilo LinkedIn riporta la promozione ad Associate Software Engineer da gennaio 2026: vanno confermati titolo e data, e servono le attività svolte dal 2026 in poi"
+    },
+    {
+      "id": "capgemini-analyst",
+      "tipo": "lavoro",
+      "titolo": "Analyst Consultant",
+      "periodo": "maggio 2023 — gennaio 2026",
+      "sottotitolo": "Capgemini S.p.A. — progetto Poste Italiane (Business e Retail), Napoli",
+      "riassunto": "Sviluppo full stack sul portale retail e sui portali self-care business, dal CMS al backend cloud-native.",
+      "dettaglio": "Sei filoni di lavoro documentati nel CV: \"Pensati Per Te\", \"Fatture e Pagamenti\", migrazione Gen2 → Gen3 con upgrade a Java 21 e Spring Boot 3.4, MyPoste Business, reskin delle pagine pre-login e \"Prenota appuntamento da LIS\". Il dettaglio di ciascuno sta nella sezione Progetti.",
+      "tecnologie": ["Java 8/21", "Groovy", "Spring", "Spring Boot", "Angular", "AngularJS", "JSP", "Oracle WebCenter Sites", "OpenShift/Kubernetes", "Jenkins", "Oracle DB", "Git", "SVN", "Maven"],
+      "stato": "in_attesa_committente",
+      "nota": "titolo del ruolo e data di fine presi da LinkedIn, in contrasto con il CV: da confermare"
+    },
+    {
+      "id": "itconsulting",
+      "tipo": "lavoro",
+      "titolo": "Full Stack Developer",
+      "periodo": "febbraio 2022 — maggio 2023",
+      "sottotitolo": "Itconsulting S.r.l., Napoli",
+      "riassunto": "Progetti enterprise per clienti bancari e della distribuzione farmaceutica, più un progetto formativo interno.",
+      "dettaglio": "Progetto \"Successioni\" su ambienti Italia, Germania e Austria; progetto \"Monnalisa\" per la divisione francese del cliente; progetto formativo HYDRA.",
+      "tecnologie": ["Java", "Spring", "JSP", "JSF", "SQL", "Python", "Django", "Flask", "Angular", "TypeScript", "JUnit"],
+      "fonte": "Curriculum Vitae.tex, sezione Esperienza Professionale; il profilo LinkedIn intitola lo stesso ruolo «Software Developer», qui prevale la fonte primaria"
+    },
+    {
+      "id": "marina-militare",
+      "tipo": "militare",
+      "titolo": "Guardia Costiera",
+      "periodo": "maggio 2021 — febbraio 2022",
+      "sottotitolo": "Marina Militare Italiana, Imperia",
+      "riassunto": "Operatore in sala operativa per il coordinamento di emergenze marittime via radio e linea 1530.",
+      "dettaglio": "Formazione presso la **Scuola Sottufficiali di La Maddalena**. Gestione di comunicazioni operative in contesti time-critical e ad alto stress, uso dei sistemi informativi governativi Pelagus, PMIS, SSN, Giano e Folium, coordinamento interfunzionale con Capitanerie di Porto e unità navali.",
+      "tecnologie": ["Pelagus", "PMIS", "SSN", "Giano", "Folium"],
+      "stato": "in_attesa_committente",
+      "nota": "il CV indica «Sottufficiale» dal 05/2021, LinkedIn indica «Volontario in Ferma Prefissata (VFP1)» dal 03/2021: grado e data di inizio da confermare"
+    },
+    {
+      "id": "laurea",
+      "tipo": "formazione",
+      "titolo": "Laurea Triennale in Ingegneria Informatica",
+      "periodo": "2021 — 2024",
+      "sottotitolo": "Universitas Mercatorum, Roma — voto 93/110",
+      "riassunto": "Gli anni della laurea si sovrappongono per intero al servizio in Marina Militare e ai due impieghi da sviluppatore.",
+      "dettaglio": "Tesi: *L'era dell'IA nella battaglia per la cybersicurezza*.",
+      "tecnologie": []
+    },
+    {
+      "id": "diploma",
+      "tipo": "formazione",
+      "titolo": "Diploma di Perito in Informatica e Telecomunicazioni",
+      "periodo": "2011 — 2016",
+      "sottotitolo": "ITI «Galileo Ferraris», Napoli",
+      "riassunto": "Percorso quinquennale in informatica e telecomunicazioni.",
+      "dettaglio": null,
+      "tecnologie": [],
+      "stato": "in_attesa_committente",
+      "nota": "il CV riporta per il diploma lo stesso voto della laurea, 93/110, che non è una scala valida per il diploma: voto da confermare. Resta inoltre da chiarire il periodo 2016-2021, che nelle fonti non è coperto"
+    }
+  ],
+  "stanza": {
+    "chiave": "carriera",
+    "ancoraMonolite": "03",
+    "presentazione": "timeline-verticale",
+    "elementi": [],
+    "stato": "da_progettare"
+  }
+}

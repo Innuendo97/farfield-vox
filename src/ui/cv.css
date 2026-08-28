@@ -1,0 +1,445 @@
+/* The readable edition of the same material.
+ *
+ * It is the page the world falls back to: no canvas, no script, no request that
+ * leaves the host. tools/cv-page/build-cv.mjs inlines this sheet into the page
+ * it generates, so what reaches the reader is one file and one font.
+ *
+ * The colours are the ones the hub is graded to — the blue of the sky at the
+ * top of the frame, the cyan of the engraving — because a reader who arrives
+ * here from the world, or instead of it, should be in the same place.
+ */
+
+@font-face {
+  font-family: 'Farfield Sans';
+  src: url('../fonts/inter-latin.woff2') format('woff2');
+  font-weight: 200 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --ground: #0f1720;
+  --ground-deep: #0a1119;
+  --ink: #e6f4fb;
+  --ink-soft: rgba(190, 232, 253, 0.82);
+  --ink-faint: rgba(190, 232, 253, 0.55);
+  --accent: #7fd4f5;
+  --mark: #9eecf9;
+  --line: rgba(180, 222, 248, 0.22);
+  --line-strong: rgba(202, 238, 255, 0.42);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html {
+  /* Anchors from the index must not land under the top of the window. */
+  scroll-padding-top: 1.5rem;
+}
+
+body {
+  margin: 0;
+  padding: 0 1.5rem 4rem;
+  background:
+    radial-gradient(120% 70% at 50% 0%, #16283a 0%, rgba(22, 40, 58, 0) 62%),
+    var(--ground);
+  font-family: 'Farfield Sans', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 300;
+  font-size: 17px;
+  line-height: 1.62;
+  color: var(--ink-soft);
+  -webkit-text-size-adjust: 100%;
+}
+
+.cv-wrap {
+  max-width: 54rem;
+  margin: 0 auto;
+}
+
+a {
+  color: var(--mark);
+  text-decoration-color: rgba(158, 236, 249, 0.4);
+  text-underline-offset: 0.22em;
+}
+
+a:hover { text-decoration-color: var(--mark); }
+
+:focus-visible {
+  outline: 1px solid var(--line-strong);
+  outline-offset: 3px;
+}
+
+/* ------------------------------------------------------------------- notice */
+
+/* Shown only when the page is reached at its own anchor, which is how the
+   world sends a reader here from a machine it cannot be walked on. No script
+   is involved: the fragment does the whole of it. */
+.cv-notice { display: none; }
+
+.cv-notice:target {
+  display: block;
+  max-width: 54rem;
+  margin: 1.75rem auto 0;
+  padding: 0.875rem 1.125rem;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--accent);
+  background: rgba(127, 212, 245, 0.06);
+  font-size: 0.9375rem;
+  color: var(--ink);
+}
+
+/* --------------------------------------------------------------------- head */
+
+.cv-head {
+  padding: 3.5rem 0 2rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.cv-eyebrow {
+  margin: 0 0 1.25rem;
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--mark);
+}
+
+.cv-name {
+  margin: 0;
+  font-size: clamp(2rem, 6vw, 2.75rem);
+  font-weight: 200;
+  line-height: 1.1;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+}
+
+.cv-role {
+  margin: 0.5rem 0 0;
+  font-size: 1.0625rem;
+  font-weight: 300;
+  letter-spacing: 0.09em;
+  color: var(--ink);
+}
+
+.cv-place {
+  margin: 0.125rem 0 0;
+  font-size: 0.9375rem;
+  color: var(--ink-faint);
+}
+
+.cv-contacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9375rem;
+}
+
+.cv-contacts li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.cv-contacts .cv-kind {
+  font-size: 0.6875rem;
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.cv-summary {
+  margin: 1.75rem 0 0;
+  max-width: 44rem;
+  font-size: 1rem;
+  color: var(--ink);
+}
+
+/* -------------------------------------------------------------------- index */
+
+.cv-index {
+  margin: 1.75rem 0 0;
+  padding: 0 0 0.25rem;
+}
+
+.cv-index ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem 1.375rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8125rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.cv-index a { text-decoration: none; color: var(--ink-soft); }
+.cv-index a:hover { color: var(--mark); }
+.cv-index .cv-num { margin-right: 0.4em; color: var(--mark); }
+
+/* ----------------------------------------------------------------- sections */
+
+.cv-section {
+  padding: 2.75rem 0 0;
+}
+
+.cv-section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin: 0 0 1.5rem;
+  padding-bottom: 0.625rem;
+  border-bottom: 1px solid var(--line);
+  font-size: 1.25rem;
+  font-weight: 200;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.cv-section-title .cv-num {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  letter-spacing: 0.22em;
+  color: var(--mark);
+}
+
+.cv-about {
+  max-width: 44rem;
+  margin: 0 0 2rem;
+}
+
+.cv-about p { margin: 0 0 0.875rem; }
+.cv-about p:last-child { margin-bottom: 0; }
+
+/* ------------------------------------------------------------------ entries */
+
+/* The vertical timeline of the rooms, drawn once down the whole list: one rule
+   and a diamond at every entry, which is the figure the world uses in front of
+   each face. */
+.cv-entries {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cv-entry {
+  position: relative;
+  padding: 0 0 1.75rem 1.75rem;
+  border-left: 1px solid var(--line);
+}
+
+.cv-entry:last-child {
+  border-left-color: transparent;
+  padding-bottom: 0.5rem;
+}
+
+.cv-entry::before {
+  content: '';
+  position: absolute;
+  left: -0.28125rem;
+  top: 0.5rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border: 1px solid var(--line-strong);
+  background: var(--ground);
+  transform: rotate(45deg);
+}
+
+.cv-entry.is-pending::before {
+  border-color: rgba(158, 236, 249, 0.5);
+  background: var(--ground-deep);
+}
+
+.cv-entry-title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  color: var(--ink);
+}
+
+.cv-meta {
+  margin: 0.1875rem 0 0;
+  font-size: 0.8125rem;
+  font-weight: 300;
+  letter-spacing: 0.07em;
+  color: var(--mark);
+}
+
+.cv-lead {
+  margin: 0.75rem 0 0;
+  max-width: 44rem;
+  color: var(--ink);
+}
+
+.cv-prose {
+  max-width: 44rem;
+  font-size: 0.9375rem;
+}
+
+.cv-prose p { margin: 0.625rem 0 0; }
+.cv-prose ul, .cv-prose ol { margin: 0.5rem 0 0; padding-left: 1.125rem; }
+.cv-prose li { margin: 0.25rem 0; }
+.cv-prose strong { font-weight: 500; color: var(--ink); }
+.cv-prose em { font-style: italic; }
+
+.cv-prose h4, .cv-prose h5, .cv-prose h6 {
+  margin: 1rem 0 0;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--mark);
+}
+
+code {
+  padding: 0.0625rem 0.3125rem;
+  border: 1px solid rgba(203, 233, 249, 0.18);
+  border-radius: 0.125rem;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 0.8125rem;
+  color: var(--mark);
+}
+
+.cv-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3125rem;
+  margin: 0.875rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cv-chips li {
+  padding: 0.125rem 0.5rem;
+  border: 1px solid rgba(203, 233, 249, 0.2);
+  background: rgba(127, 212, 245, 0.05);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+}
+
+.cv-entry-link { display: inline-block; margin: 0.75rem 0 0; font-size: 0.9375rem; }
+
+.cv-empty {
+  margin: 0.625rem 0 0;
+  font-size: 0.9375rem;
+  font-style: italic;
+  color: var(--ink-faint);
+}
+
+/* Discreet on purpose: it marks a line the owner of the content has still to
+   settle, and it must not read as a warning. */
+.cv-badge {
+  display: inline-block;
+  margin-left: 0.625rem;
+  padding: 0.0625rem 0.4375rem;
+  border: 1px solid rgba(158, 236, 249, 0.38);
+  border-radius: 0.75rem;
+  font-size: 0.625rem;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  vertical-align: 0.1em;
+  color: rgba(158, 236, 249, 0.82);
+}
+
+/* ----------------------------------------------------------- certifications */
+
+/* Padded to the same rule the entries hang from, so the sheet has one left
+   edge and the certificates do not read as a different column. */
+.cv-certs { margin: 1.5rem 0 0; padding-left: 1.75rem; }
+
+.cv-certs-title {
+  margin: 0 0 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--mark);
+}
+
+.cv-certs dl {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr);
+  gap: 0.625rem 1.25rem;
+  margin: 0;
+}
+
+.cv-certs dt {
+  font-size: 0.875rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+
+.cv-certs dd { margin: 0; font-size: 0.9375rem; }
+.cv-certs dd ul { margin: 0; padding: 0; list-style: none; }
+.cv-certs dd li { margin: 0 0 0.125rem; }
+.cv-certs dd li.is-pending { color: var(--ink-faint); }
+
+/* ------------------------------------------------------------------- footer */
+
+.cv-foot {
+  margin: 3.5rem 0 0;
+  padding: 1.5rem 0 0;
+  border-top: 1px solid var(--line);
+  font-size: 0.8125rem;
+  color: var(--ink-faint);
+}
+
+.cv-foot p { margin: 0 0 0.5rem; }
+.cv-back { font-size: 0.9375rem; letter-spacing: 0.04em; }
+
+@media (max-width: 34rem) {
+  body { padding: 0 1.125rem 3rem; font-size: 16px; }
+  .cv-head { padding-top: 2.25rem; }
+  .cv-certs dl { grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
+  .cv-certs dd { margin-bottom: 0.75rem; }
+}
+
+/* -------------------------------------------------------------------- print */
+
+/* Printed or saved to PDF this has to be a document, not a screenshot of a
+   dark interface: ink on paper, the links spelled out because a printed anchor
+   cannot be followed, and no entry broken across two sheets. */
+@media print {
+  :root {
+    --ink: #101418;
+    --ink-soft: #26313a;
+    --ink-faint: #5c6b76;
+    --mark: #1f4e79;
+    --line: #c3ccd3;
+    --line-strong: #8c9aa5;
+    --ground: #ffffff;
+    --ground-deep: #ffffff;
+    color-scheme: light;
+  }
+
+  body {
+    padding: 0;
+    background: #ffffff;
+    color: var(--ink-soft);
+    font-size: 10.5pt;
+    line-height: 1.45;
+  }
+
+  .cv-wrap { max-width: none; }
+  .cv-notice, .cv-index, .cv-back { display: none; }
+  a { color: var(--ink-soft); text-decoration: none; }
+
+  .cv-contacts a[href^="http"]::after { content: ' (' attr(href) ')'; font-size: 8.5pt; }
+
+  .cv-head { padding: 0 0 0.75rem; }
+  .cv-section { padding-top: 1.25rem; }
+  .cv-section, .cv-entry, .cv-certs { break-inside: avoid; }
+  .cv-section-title { break-after: avoid; }
+  .cv-chips li { background: none; }
+  .cv-badge { border-color: var(--line-strong); color: var(--ink-faint); }
+}

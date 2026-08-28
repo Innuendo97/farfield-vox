@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Farfield — prova voxel</title>
+    <link rel="stylesheet" href="/src/ui/style.css" />
+    <!--
+      A PAGE OF ITS OWN, AND NOT A FLAG ON THE WORLD'S.
+
+      src/dev/baketest.js is the precedent for where this lives and for how it
+      is kept out of a delivery, but not for how it is reached. That one hangs a
+      single model on the finished hub; this one has to answer what ONE CORNER
+      costs — twenty draw calls and forty thousand triangles — and a corner
+      measured inside the whole standing world is not a corner, it is the world
+      plus a corner. So the scene is built here, and the numbers are about what
+      is in it.
+
+      It also means src/main.js is not touched. Nothing under src/world/ or
+      src/core/ is either: everything below imports them. Delete this file and
+      its two neighbours and the tree is exactly what it was.
+
+      The build never sees it. Vite's only input is index.html at the root, so
+      an HTML file sitting in src/ is not an entry, is not bundled, and cannot
+      reach a visitor however the flags are set.
+    -->
+    <style>
+      .vox-note {
+        position: fixed;
+        right: 12px;
+        bottom: 12px;
+        max-width: 22rem;
+        padding: 10px 12px;
+        font: 300 11px/1.55 'Farfield Sans', 'Segoe UI', sans-serif;
+        color: #bee8fd;
+        background: rgba(8, 14, 20, 0.72);
+        border: 1px solid rgba(160, 210, 235, 0.22);
+        white-space: pre-line;
+        pointer-events: none;
+      }
+      .vox-note b { color: #9eecf9; font-weight: 500; }
+    </style>
+  </head>
+  <body>
+    <canvas id="stage"></canvas>
+    <div id="ui"></div>
+    <script type="module" src="/src/dev/voxeltest.js"></script>
+  </body>
+</html>

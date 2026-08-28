@@ -1,0 +1,113 @@
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+
+.env
+.env.*
+!.env.example
+
+.DS_Store
+Thumbs.db
+
+.idea/
+.vscode/
+*.log
+npm-debug.log*
+
+# materiale di riferimento della lavorazione, non fa parte del prodotto.
+# I documenti di indirizzo sono famiglie e non singoli file: forkandoli per
+# questa campagna il nome ha preso un suffisso, e la regola deve reggere il
+# prossimo suffisso senza essere riscritta un'altra volta.
+/VISIONE*.md
+/target*.png
+# and the references of the path itself, whose names do not begin with the word
+# above: the close view of the material and the plan view of its texture. The
+# pattern is the family and not one file, because a third one arrived after the
+# second and the rule has to hold for the fourth without being edited again.
+/sentiero-*.png
+# and the two the voxel question was asked with, a day and a night of the same
+# corner. They are the committente's own material rather than a measurement of
+# ours, so they are read and never carried: an image handed over by its author
+# arrives with the author's provenance metadata inside it, and a repository is
+# the one place that must not quietly republish that. Same family rule as the
+# line above — a third framing will land under it without this file moving.
+/farfield-*-voxel-target.png
+/HANDOVER*.md
+/SESSIONI*.md
+/NUOVA-SESSIONE.md
+/proc/
+/riferimenti/
+# la ricerca che ha deciso il pivot: il rapporto dei dodici agenti e il verbale
+# della demo con le sue corse e le sue misure. E' il materiale su cui la scelta
+# e' stata fatta, si legge e non si spedisce, e sta qui perche' una campagna che
+# non puo' rileggere le proprie misure le rifa'.
+/RICERCA-VOXEL.md
+/ricerca-demo/
+
+# le cartelle di lavorazione delle sessioni. Ogni unita' apre alla radice la
+# propria cartella di scratch — verbale, ritagli, worktree usa-e-getta — e
+# nulla di tutto cio' fa parte del prodotto: il lavoro entra nel repo solo
+# attraverso src/, tools/, content/ e assets-src/. Le regole sono ancorate
+# alla radice, cosi' una cartella con lo stesso nome piu' in basso resta
+# tracciabile.
+/s[0-9]-*
+/n*-*/
+# e quelle delle unita' di questa campagna, che si numerano per capitolo invece
+# che per sessione: v0-fondazione, v1-suolo, e i worktree che ne escono.
+/v[0-9]-*
+
+# residuo di una riscrittura della storia (git filter-branch/filter-repo)
+/.git-rewrite/
+
+# toolchain binaria: si reinstalla con "npm run setup:tools"
+/tools/bin/
+/tools/blender/
+
+# sorgenti asset: si versionano solo quelli leggeri e riproducibili.
+# I file di authoring pesanti restano fuori dal repo.
+/assets-src/**/*.blend
+/assets-src/**/*.blend1
+/assets-src/**/*.exr
+/assets-src/**/*.hdr
+/assets-src/**/*.tif
+/assets-src/**/*.tiff
+/assets-src/**/*.psd
+# intermedi del terreno: si rigenerano in millisecondi da terrain-field.js
+/assets-src/**/*.bin
+/assets-src/scans/
+/assets-src/hdri/
+
+# i fotogrammi di verifica: li scrivono gli strumenti in tools/, si rifanno
+/shots/
+# e quelli presi a mano durante una camminata, stessa ragione
+/walk-*.png
+
+
+# le cotture grezze: pesanti e riproducibili con "npm run terrain" /
+# "monoliths" / "vegetation". Da S2 ognuna e' una COPPIA — il termine del sole
+# e quello del cielo — e cio' che si traccia e' solo la mappa impacchettata che
+# il gioco legge (tools/lighting/pack-light.mjs).
+/assets-src/**/*-light-bake.png
+/assets-src/**/*-light-sun-bake.png
+/assets-src/**/*-light-sky-bake.png
+
+# cio' che il riferimento CHIEDE al suolo e che la fisica non gli da': e' una
+# misura, non un asset, e si riproduce con
+# "node tools/terrain/ground-shading.mjs". Lo strumento e' il contratto
+# condiviso con S3/S4, non questo file.
+/assets-src/terrain/ground-demand.json
+
+# la cupola dipinta dal fit del cielo: non e' piu' un asset. La cupola in
+# src/core/sky.js e' analitica e non legge alcuna texture; questa immagine
+# resta solo come diagnostica del fit, riproducibile con "npm run sky:bake"
+/assets-src/sky/sky-equirect.png
+
+# I volumi intermedi delle nuvole pesano ~9 MiB l'uno e si rigenerano dai loro
+# semi con "node tools/clouds/bake-volumes.mjs": e' sorgente riproducibile, non
+# un asset. Gli atlanti che il gioco spedisce restano tracciati.
+/assets-src/clouds/volumes/
+
+# bytecode di Python: lo scrive chi importa tools/lighting/sun.py
+__pycache__/

@@ -1,0 +1,54 @@
+{
+  "id": "05",
+  "chiave": "obiettivi",
+  "titolo": "Obiettivi",
+  "icona": "bersaglio",
+  "copertura": 0.25,
+  "incisione": {
+    "titolo": "OBIETTIVI",
+    "parolechiave": ["Crescita", "Libertà", "Progetti significativi", "Un futuro migliore"],
+    "fonte": "inquadratura di riferimento",
+    "stato": "in_attesa_committente",
+    "nota": "quattro voci provvisorie dall'inquadratura di riferimento: nessuna delle due fonti contiene obiettivi personali dichiarati"
+  },
+  "timeline": [
+    {
+      "id": "ruolo-target",
+      "titolo": "Ruolo che sto cercando",
+      "periodo": "oggi",
+      "sottotitolo": "Software / Full Stack Engineer, stack Java/Spring e Angular",
+      "riassunto": "Aperto a nuove opportunità come Software/Full Stack Engineer su stack Java/Spring e Angular, in contesti cloud-native.",
+      "dettaglio": "Interesse particolare per i ruoli che integrano strumenti di AI engineering nello sviluppo quotidiano.",
+      "tecnologie": ["Java", "Spring Boot", "Angular", "Kubernetes"],
+      "fonte": "LinkedIn - Profilo Ottimizzato.md, chiusura della sezione About"
+    },
+    {
+      "id": "modalita-lavoro",
+      "titolo": "Come voglio lavorare",
+      "periodo": "oggi",
+      "sottotitolo": "Napoli, ibrido o remoto",
+      "riassunto": "Preferenza dichiarata per modalità ibrida e da remoto, con base a Napoli.",
+      "dettaglio": null,
+      "tecnologie": [],
+      "fonte": "LinkedIn - Profilo Ottimizzato.md, preferenze Open To Work"
+    },
+    {
+      "id": "obiettivi-questionario",
+      "titolo": "Obiettivi personali",
+      "periodo": null,
+      "sottotitolo": null,
+      "riassunto": null,
+      "dettaglio": null,
+      "tecnologie": [],
+      "stato": "in_attesa_committente",
+      "nota": "il monolite espone quattro obiettivi con il relativo racconto: le fonti coprono solo la ricerca di ruolo, il resto va raccolto dal committente"
+    }
+  ],
+  "stanza": {
+    "chiave": "obiettivi",
+    "ancoraMonolite": "05",
+    "presentazione": "anello-luminoso",
+    "elementi": [],
+    "stato": "da_progettare"
+  }
+}

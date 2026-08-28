@@ -1,0 +1,733 @@
+/* The interface of the hub.
+ *
+ * Every size and offset below was read off the reference framing, which is
+ * 1672 x 941, and is written in rem against a root of 16px: at that framing
+ * 1rem is exactly 16px, so 2.5rem is the 40px margin measured on the left of
+ * the greeting. The root size follows the shorter side of the viewport, so the
+ * whole interface keeps its proportion instead of drifting on other screens.
+ */
+
+@font-face {
+  font-family: 'Farfield Sans';
+  src: url('/fonts/inter-latin.woff2') format('woff2');
+  font-weight: 200 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --ink: #eef6fb;
+  --accent: #7fd4f5;
+  /* The reference was graded before its interface was drawn on it, so the
+     type there carries the same teal cast as the sky. These are the values
+     sampled off it, not neutral whites. */
+  --ui-ink: #d9f8ff;
+  --ui-ink-soft: rgba(190, 232, 253, 0.9);
+  --ui-line: rgba(180, 222, 248, 0.45);
+  --ui-line-strong: rgba(202, 238, 255, 0.68);
+  --ui-mark: #9eecf9;
+  /* The reference sets its type over the sky and over the meadow with no plate
+     behind it, so legibility comes from a shadow the width of a stroke. */
+  --ui-shadow: 0 1px 2px rgba(4, 11, 17, 0.55), 0 0 3px rgba(4, 11, 17, 0.45);
+  /* How long a piece of this interface takes to arrive, and to leave.
+     Long enough that the eye reads it as one thing becoming another and not as
+     two frames; short enough that a walker who asked for the panel is not kept
+     waiting for it. The committente, 2026-08-20: «la UI ... dovrebbe
+     dissolversi (entrata e uscita) dolcemente». One number, so that nothing in
+     here can be softer or harder than the rest by accident. */
+  --ui-fade: 380ms;
+  /* And the longer one, for the two things that cover the whole frame: the way
+     in, and the menu behind it. What they uncover is the world, and a world
+     should not appear the way a tooltip does. */
+  --ui-fade-long: 560ms;
+  /* Soft at BOTH ends, and the arrival veil now uses it too.
+     It replaces cubic-bezier(0.22, 0.61, 0.36, 1), which was chosen for its
+     tail — the last second of the veil moved by less than a level, and that was
+     right — and which paid for that tail at the start: a quarter of the whole
+     dissolve went in the first tenth of it. That is a jolt at the moment the
+     dissolve begins, which is precisely the moment the committente reported as
+     «di scatto», and the deeper the vignette the more of a jolt it is. This
+     curve keeps the flat tail and spends 1.6% in the first tenth instead of
+     27%, so the fade begins the way it ends: without an edge.
+       tempo    5%    10%   20%   30%   50%   70%   85%   95%
+       prima  0.138 0.271 0.501 0.673 0.873 0.963 0.992 0.999
+       ora    0.004 0.016 0.082 0.250 0.747 0.935 0.986 0.999
+     Never linear: a linear opacity has a corner at both ends and the eye finds
+     both of them. */
+  --ui-ease: cubic-bezier(0.5, 0, 0.2, 1);
+  font-size: clamp(11px, min(0.9569vw, 1.7003vh), 22px);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #0f1720;
+  font-family: 'Farfield Sans', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  color: var(--ink);
+}
+
+#stage {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  cursor: pointer;
+}
+
+#ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  font-family: inherit;
+}
+
+/* Instant, and it has to stay instant: this is not something a walker ever
+   sees. It is the switch every comparison against the reference throws before
+   it photographs a frame, and a switch that took a third of a second would put
+   a half-faded greeting into the picture the whole campaign is measured on. */
+#ui.is-hidden { visibility: hidden; }
+
+/* --------------------------------------------------- how the interface arrives
+ *
+ * The greeting, the dial and the command line are on the page from the first
+ * frame and used to be simply THERE — drawn at full strength onto whatever the
+ * sky happened to be doing. They arrive instead, over the same curve and at the
+ * same time as the way in, so the first second of this world is one gesture and
+ * not three things appearing.
+ *
+ * The class is put on by src/ui/hud.js one flush after the elements are in the
+ * page, and never taken off: what these leave by is #ui.is-hidden above, which
+ * belongs to the measuring harness and not to a walker.
+ */
+.hud-welcome,
+.hud-compass,
+.hud-footer {
+  opacity: 0;
+  transition: opacity var(--ui-fade-long) var(--ui-ease);
+}
+
+.hud-welcome.is-up,
+.hud-compass.is-up,
+.hud-footer.is-up { opacity: 1; }
+
+/* The arrival veil: the lens shading of the reference framing, held over the
+   frame while the walker arrives and then let go for good. It sits between the
+   canvas and the interface — under the greeting it is there to set off, over
+   the world it is shading — and it never takes a click, because there is
+   nothing under it that is not the world.
+
+   The curve is the interface's own, soft at both ends: the last second of it
+   still moves by less than a level, and the first tenth of it no longer takes a
+   quarter of the veil with it. See --ui-ease for the two rows of numbers. */
+.sky-veil {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity var(--veil-fade, 2500ms) var(--ui-ease);
+  /* THE ONE LINE THAT MAKES THE DISSOLVE HAPPEN AT ALL.
+     The dissolve runs during the arrival, and during the arrival the main
+     thread is not free: it is decoding textures, cutting six faces of type,
+     planting a meadow and running the three second calibration. Measured on
+     this machine, from the compositor rather than from the page — the frames
+     the screen was actually given during one arrival came 900 ms, 1185 ms and
+     2339 ms apart. An opacity that is interpolated on the main thread advances
+     once per one of those, so the deepest thing on the frame lets go in three
+     steps and the walker calls it "di scatto", which is exactly what they
+     called it. Promoted to its own layer the interpolation belongs to the
+     compositor, which keeps its own clock, and the dissolve is smooth through
+     a stall that freezes everything else. The layer is paid for once and dies
+     with the element: this overlay has no second time. */
+  will-change: opacity;
+}
+
+.sky-veil.is-gone { opacity: 0; }
+
+/* A walker who has asked for no motion still gets the composition the reference
+   drew, and still gets it let go of rather than cut: the length is decided in
+   src/ui/veil.js and arrives on --veil-fade, so there is no second opinion
+   about it here, and no way for the sheet to end the dissolve at a different
+   moment from the clock that takes the element off the page. */
+
+#ui :focus-visible {
+  outline: 1px solid var(--ui-line-strong);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------- keycaps */
+
+.keycap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;      /* 24px; the WASD run measures 102px across */
+  height: 1.625rem;       /* 26px */
+  padding: 0 0.25rem;
+  border: 1px solid var(--ui-line);
+  border-radius: 0.1875rem;
+  font: inherit;
+  font-size: 0.875rem;    /* 14px */
+  font-weight: 320;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  color: var(--ui-ink-soft);
+  text-shadow: var(--ui-shadow);
+  box-shadow: 0 1px 2px rgba(4, 11, 17, 0.35);
+}
+
+/* ---------------------------------------------------------- greeting block */
+
+.hud-welcome {
+  position: absolute;
+  left: 2.5rem;   /* ink starts at x=41 in the reference */
+  top: 2.578rem;  /* cap height of the title starts at y=43 */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin: 0;
+}
+
+.hud-title {
+  margin: 0;
+  font-size: 1.3125rem;    /* 21px; cap height 17px, ink 42..178 */
+  font-weight: 250;
+  line-height: 1;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ui-ink);
+  text-shadow: var(--ui-shadow);
+}
+
+.hud-rule {
+  width: 5.4rem;           /* reads out to x=126, as the reference does */
+  height: 1px;
+  margin-top: 0.5475rem;   /* rule sits on y=71 */
+  background: linear-gradient(90deg, var(--ui-line-strong) 0 82%, rgba(222, 243, 253, 0) 100%);
+}
+
+.hud-lead {
+  margin: 0.3725rem 0 0;   /* first cap top on y=83 */
+  font-size: 1rem;         /* 16px */
+  font-weight: 300;
+  line-height: 1.53125rem; /* 24.5px between baselines */
+  letter-spacing: 0.005em;
+  color: rgba(172, 218, 248, 0.92);
+  text-shadow: var(--ui-shadow);
+}
+
+.hud-diamond {
+  position: relative;
+  width: 1.5rem;           /* 24px box, ink 41..63 by 165..188 */
+  height: 1.5rem;
+  margin-top: 0.84rem;
+}
+
+.hud-diamond::before,
+.hud-diamond::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.hud-diamond::before {
+  width: 0.9375rem;
+  height: 0.9375rem;
+  border: 1px solid var(--ui-line-strong);
+}
+
+.hud-diamond::after {
+  width: 0.5rem;
+  height: 0.5rem;
+  background: var(--ui-mark);
+  box-shadow: 0 0 0.3rem rgba(158, 236, 249, 0.5);
+}
+
+.hud-hints {
+  margin: 0.9rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;             /* rows on y=203 and y=237 */
+}
+
+.hud-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;             /* the words start 9px past the last cap */
+}
+
+.hud-hint-keys {
+  display: flex;
+  gap: 0.125rem;           /* 2px, giving the 26px pitch measured on WASD */
+}
+
+/* The lone cap of the second row is drawn two pixels wider than the four of
+   the first, and the reference keeps that difference. */
+.hud-hint:last-child .keycap { min-width: 1.625rem; }
+
+.hud-hint-label {
+  font-size: 1rem;
+  font-weight: 300;
+  letter-spacing: 0.005em;
+  color: var(--ui-ink-soft);
+  text-shadow: var(--ui-shadow);
+}
+
+/* ------------------------------------------------------- interaction prompt */
+
+.hud-interact {
+  position: absolute;
+  left: 50%;
+  bottom: 2.5625rem;       /* cap bottom on y=900 */
+  display: flex;
+  align-items: center;
+  gap: 0.6875rem;          /* 11px */
+  /* The reference sets this group half a cap right of the exact centre. */
+  transform: translateX(calc(-50% + 0.5rem));
+  opacity: 0;
+  visibility: hidden;
+  /* It used to take 140 ms, which is fast enough to read as a thing switching
+     on rather than a thing appearing. The visibility is held for the length of
+     the fade rather than switched with it, so the prompt is still there to be
+     seen while it leaves. */
+  transition: opacity var(--ui-fade) var(--ui-ease), visibility 0s linear var(--ui-fade);
+}
+
+.hud-interact.is-on {
+  transition: opacity var(--ui-fade) var(--ui-ease), visibility 0s;
+  opacity: 1;
+  visibility: visible;
+}
+
+.hud-interact .keycap {
+  min-width: 1.6875rem;    /* 27px */
+  height: 1.6875rem;
+  font-size: 0.9375rem;    /* 15px */
+  /* The only cap in the reference that is filled: it is the one being offered. */
+  background: rgba(6, 13, 19, 0.6);
+  border-color: var(--ui-line-strong);
+}
+
+.hud-interact-label {
+  font-size: 1rem;
+  font-weight: 300;
+  letter-spacing: 0.01em;
+  color: var(--ui-ink-soft);
+  text-shadow: var(--ui-shadow);
+}
+
+/* ------------------------------------------------------------------ compass */
+
+.hud-compass {
+  position: absolute;
+  left: 1.59rem;           /* circle spans x 36.5..206.5 */
+  bottom: 1.94rem;         /* circle spans y 729..899 */
+  width: 12rem;            /* 192px box around a 170px circle */
+  height: 12rem;
+}
+
+.hud-compass svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.hud-compass-ring {
+  position: absolute;
+  inset: 0;
+  transform: rotate(0deg);
+  will-change: transform;
+}
+
+.hud-compass-rim,
+.hud-compass-arc,
+.hud-compass-ticks path {
+  fill: none;
+  stroke: var(--ui-line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.hud-compass-arc {
+  stroke: var(--ui-line-strong);
+}
+
+/* The three minor ticks are the faintest marks on the dial in the reference:
+   present at the size of the circle, gone at the size of the frame. */
+.hud-compass-ticks path {
+  stroke: rgba(190, 226, 248, 0.18);
+}
+
+/* The angular edges of the wedge are soft in the reference; there is no way
+   to feather a sector in plain SVG, so the shape itself is blurred. */
+.hud-compass-cone { filter: blur(2.5px); }
+
+.hud-compass-needle {
+  fill: #ffffff;
+  filter: drop-shadow(0 0 3px rgba(180, 224, 245, 0.5));
+}
+
+.hud-compass-n {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, 0);
+  font-size: 0.8125rem;    /* 13px, cap height 9px, straddling the rim */
+  font-weight: 300;
+  letter-spacing: 0.04em;
+  color: var(--ui-ink);
+  text-shadow: var(--ui-shadow);
+}
+
+/* ------------------------------------------------------------- command line */
+
+.hud-footer {
+  position: absolute;
+  right: 2.625rem;         /* last word ends on x=1629 */
+  bottom: 2.5625rem;
+  display: flex;
+  align-items: center;
+  gap: 2.3125rem;          /* 37px between the two commands */
+}
+
+.hud-command {
+  display: flex;
+  align-items: center;
+  gap: 0.5625rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.hud-command .keycap {
+  min-width: 1.75rem;      /* 28px, the width of the M cap */
+  height: 1.6875rem;       /* 27px */
+  padding: 0 0.4rem;       /* gives TAB the 41px it measures */
+  background: rgba(7, 15, 22, 0.38);
+}
+
+.hud-command-label {
+  font-size: 1rem;
+  font-weight: 300;
+  letter-spacing: 0.005em;
+  color: var(--ui-ink-soft);
+  text-shadow: var(--ui-shadow);
+}
+
+/* Not dimmed. The map is not built yet and the button says so on hover and to a
+   screen reader, but the reference draws M exactly as bright as TAB, and the
+   picture wins: a command line with one command greyed out is a different
+   picture. */
+.hud-command:disabled { cursor: default; }
+.hud-command:not(:disabled):hover .keycap { border-color: var(--ui-line-strong); }
+
+/* --------------------------------------------------------------------- menu */
+
+.menu {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+  background: rgba(9, 16, 23, 0.34);
+  backdrop-filter: blur(6px);
+  /* Same defect as the way in, same cure: `hidden` is `display: none`, so a
+     scrim and a six millimetre blur over the whole world used to be switched
+     on and off between two frames. src/ui/menu.js holds `hidden` back until
+     this has finished. */
+  opacity: 0;
+  transition: opacity var(--menu-fade, var(--ui-fade-long)) var(--ui-ease);
+}
+
+.menu.is-open { opacity: 1; }
+
+/* And it takes no clicks while it is leaving: for the length of the fade the
+   panel is still drawn, and a walker who has just asked for the world back
+   should not have to click through the ghost of what they closed. */
+.menu:not(.is-open) { pointer-events: none; }
+
+.menu[hidden] { display: none; }
+
+.menu-panel {
+  width: min(26rem, 80vw);
+  padding: 1.75rem 1.75rem 1.375rem;
+  border: 1px solid var(--ui-line);
+  border-radius: 0.375rem;
+  background: rgba(11, 20, 28, 0.42);
+}
+
+.menu-title {
+  margin: 0 0 1.125rem;
+  font-size: 1.125rem;
+  font-weight: 250;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ui-ink);
+}
+
+.menu-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.menu-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  width: 100%;
+  padding: 0.5rem 0;
+  border: 0;
+  border-top: 1px solid rgba(203, 233, 249, 0.16);
+  background: none;
+  font: inherit;
+  color: var(--ui-ink);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.menu-items li:last-child .menu-item { border-bottom: 1px solid rgba(203, 233, 249, 0.16); }
+
+.menu-item-label {
+  font-size: 1rem;
+  font-weight: 300;
+  letter-spacing: 0.02em;
+}
+
+.menu-item-note {
+  font-size: 0.8125rem;
+  font-weight: 300;
+  letter-spacing: 0.01em;
+  color: rgba(227, 244, 253, 0.55);
+}
+
+.menu-item:disabled { cursor: default; }
+.menu-item:disabled .menu-item-label { color: rgba(227, 244, 253, 0.55); }
+.menu-item:not(:disabled):hover .menu-item-label { color: var(--ui-mark); }
+
+.menu-controls {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.375rem 0.75rem;
+  margin: 0.5rem 0 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 300;
+  color: rgba(227, 244, 253, 0.78);
+}
+
+.menu-controls[hidden] { display: none; }
+.menu-controls dt { display: flex; gap: 0.125rem; }
+.menu-controls dd { margin: 0; }
+
+.menu-hint {
+  margin: 1.125rem 0 0;
+  font-size: 0.8125rem;
+  font-weight: 300;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(227, 244, 253, 0.5);
+}
+
+/* ------------------------------------------------------------ start overlay */
+
+.overlay-start {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 0.85rem;
+  justify-items: center;
+  text-align: center;
+  /* As light as it can be and still keep the words legible against the sky:
+     anything heavier and the first thing seen of this world is a wrong colour. */
+  background: rgba(9, 16, 23, 0.26);
+  /* IT USED TO GO IN ONE FRAME, and the transition above it was never run.
+     `hidden` is `display: none`, and a box that stops being generated does not
+     interpolate anything on the way out — the rule sat here reading as if the
+     way in were soft and the way out took the scrim off the frame between two
+     compositor frames. Measured, at the click, from the compositor: the middle
+     of the frame went from 124.6 to 162.6 levels and the corners from 82.6 to
+     104.1 in ONE delivered frame — a quarter of a stop over the whole picture,
+     with the arrival veil still fully up behind it. That is the "di colpo" the
+     committente reported on 2026-08-20. So the opacity is what carries it now,
+     and src/ui/overlay.js holds `hidden` back until the fade is over. */
+  opacity: 0;
+  transition: opacity var(--overlay-fade, var(--ui-fade-long)) var(--ui-ease);
+  /* On its own layer, for the same reason the veil is: this fade happens while
+     the world is still arriving, and during an arrival the main thread hands
+     out frames one and two seconds apart. A fade the main thread interpolates
+     would be eaten whole by one of those stalls, which is how a 560 ms dissolve
+     becomes the single frame the committente reported. The layer exists only
+     while the element is displayed — `hidden` is `display: none`, and a box
+     that is not generated has no layer — so it is held for the seconds the way
+     in is on screen and never afterwards. */
+  will-change: opacity;
+}
+
+.overlay-start.is-on { opacity: 1; }
+.overlay-start[hidden] { display: none; }
+
+/* AND THE TRACKING IS TAKEN BACK OFF THE RIGHT, WITH THE SIGN THE OTHER WAY.
+   `letter-spacing` puts its space AFTER every letter, the last one included, so
+   the box a browser centres is the ink plus one whole 0.42em of nothing on the
+   right, and the name inside it therefore sits half of that to the left. The
+   POSITIVE margin that stood here — with this very comment beside it — does not
+   undo that: it is a second 0.42em on the same side, and it DOUBLES the error.
+   Measured on the ink itself at 1600x900, before this line was corrected,
+   FARFIELD stood 13.0 px left of the axis of the frame, which is one whole
+   tracking at that size to a hundredth of a pixel; after, 0.5 px. The same
+   ghost, at a ninth and a seventh of the measure, is what the two rows under it
+   carry. This is INTRO-B's finding and INTRO-B's cure (see .intro h1 in
+   src/ui/intro.css), brought back to the way in it came from. */
+.overlay-start h1 {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 200;
+  line-height: 1;
+  letter-spacing: 0.42em;
+  margin-right: -0.42em;
+  text-transform: uppercase;
+  color: var(--ui-ink);
+  text-shadow: var(--ui-shadow);
+}
+
+.overlay-start p {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 300;
+  letter-spacing: 0.09em;
+  margin-right: -0.09em;
+  color: var(--ui-ink-soft);
+  text-shadow: var(--ui-shadow);
+}
+
+.overlay-start .overlay-keys {
+  font-size: 0.8125rem;
+  letter-spacing: 0.06em;
+  margin-right: -0.06em;
+  color: rgba(227, 244, 253, 0.6);
+}
+
+/* ------------------------------------------------------- development panels */
+
+.dev-hud,
+.dev-panel {
+  position: absolute;
+  font-family: Consolas, 'SF Mono', monospace;
+  color: var(--accent);
+  background: rgba(10, 16, 22, 0.62);
+  border: 1px solid rgba(127, 212, 245, 0.22);
+  border-radius: 3px;
+}
+
+.dev-panel { pointer-events: auto; }
+
+.dev-hud {
+  top: 12px;
+  right: 12px;
+  padding: 10px 14px;
+  min-width: 190px;
+  font-size: 12px;
+  line-height: 1.55;
+  letter-spacing: 0.02em;
+  white-space: pre;
+}
+
+/* ----------------------------------------------------------------- reticle */
+
+/* The mark at the centre of the frame. It is the same rhombus the world hangs
+   at the foot of every block, at the size of a point: the heart alone while
+   there is nothing to act on, the heart at full with the marker's outline
+   around it as soon as a face is within reach of E.
+   See src/ui/reticle.js for why it is not in the reference framing and how it
+   keeps out of a photographed pose.
+
+   THE FOUR NUMBERS BELOW ARE THE TUNING. They are declared on the mark itself
+   rather than at the root, so changing one changes this and nothing else. */
+.reticle {
+  --reticle-size: 0.375rem;     /* 6px at the reference framing */
+  --reticle-ring: 0.9375rem;    /* 15px: the outline the greeting's rhombus has */
+  --reticle-rest: 0.36;         /* how present it is with nothing within reach */
+  --reticle-grow: 1.16;         /* and how much bigger it gets when there is */
+  /* Set to 0 for the plain point, lit by presence alone and never outlined. */
+  --reticle-ring-lit: 1;
+
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--reticle-size);
+  height: var(--reticle-size);
+  opacity: 0;
+  visibility: hidden;
+  /* The turn is taken here and not on each mark: both rhombuses are squares
+     turned by their parent, which leaves one transform to animate and not two. */
+  transform: translate(-50%, -50%) rotate(45deg);
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+
+.reticle.is-on {
+  opacity: var(--reticle-rest);
+  visibility: visible;
+}
+
+.reticle.is-on.is-live {
+  opacity: 1;
+  transform: translate(-50%, -50%) rotate(45deg) scale(var(--reticle-grow));
+}
+
+.reticle::before,
+.reticle::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* The heart, and the dark edge that is this mark's version of the shadow the
+   rest of the interface sets its type over: six pixels of cyan against a lit
+   cloud would otherwise have nothing to be read against. */
+.reticle::before {
+  width: 100%;
+  height: 100%;
+  background: var(--ui-mark);
+  box-shadow: 0 0 0 1px rgba(4, 11, 17, 0.4), 0 0 0.25rem rgba(158, 236, 249, 0.45);
+}
+
+.reticle::after {
+  width: var(--reticle-ring);
+  height: var(--reticle-ring);
+  border: 1px solid var(--ui-line-strong);
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.reticle.is-live::after { opacity: var(--reticle-ring-lit); }
+
+/* A walker who has asked for less motion keeps the mark and keeps it lighting;
+   what they lose is the pixel of growth that came with it. */
+@media (prefers-reduced-motion: reduce) {
+  .reticle,
+  .reticle.is-on.is-live {
+    transform: translate(-50%, -50%) rotate(45deg);
+  }
+
+  .reticle { transition: opacity 200ms ease; }
+}

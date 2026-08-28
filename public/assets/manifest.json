@@ -1,0 +1,201 @@
+{
+  "budget": {
+    "firstFrameBytes": 6291456,
+    "note": "walkable first frame: sum of the assets marked priority \"critical\", diagnostics excluded",
+    "skyBytes": 4194304,
+    "skyNote": "everything a visitor downloads for the sky, whatever its priority: the sum over the shipped entries whose id begins \"cloud-\". Counted here and not in a verbale because a weight nobody builds is a weight that comes back — two and a third megabytes of generated relighting table were streamed and thrown away by every visitor of the plate delivery, and no first-frame budget could see it, because none of it is critical"
+  },
+  "criticalBytes": 5164093,
+  "assets": [
+    {
+      "id": "cloud-sprites",
+      "type": "texture",
+      "role": "cloud",
+      "priority": "high",
+      "scope": "app",
+      "url": "assets/textures/cloud-sprites.ktx2",
+      "bytes": 1098341,
+      "sourceBytes": 2039856
+    },
+    {
+      "id": "cloud-cover",
+      "type": "texture",
+      "role": "coverage",
+      "priority": "high",
+      "scope": "app",
+      "url": "assets/textures/cloud-cover.ktx2",
+      "bytes": 506351,
+      "sourceBytes": 366460
+    },
+    {
+      "id": "cloud-equirect",
+      "type": "texture",
+      "role": "cloud",
+      "priority": "high",
+      "scope": "app",
+      "url": "assets/textures/cloud-equirect.ktx2",
+      "bytes": 113867,
+      "sourceBytes": 225675
+    },
+    {
+      "id": "terrain-albedo",
+      "type": "texture",
+      "role": "albedo",
+      "priority": "critical",
+      "scope": "app",
+      "url": "assets/textures/terrain-albedo.ktx2",
+      "bytes": 3299416,
+      "sourceBytes": 3252159
+    },
+    {
+      "id": "terrain-detail",
+      "type": "texture",
+      "role": "coverage",
+      "priority": "critical",
+      "scope": "app",
+      "url": "assets/textures/terrain-detail.ktx2",
+      "bytes": 369947,
+      "sourceBytes": 310998
+    },
+    {
+      "id": "terrain-path",
+      "type": "texture",
+      "role": "coverage",
+      "priority": "critical",
+      "scope": "app",
+      "url": "assets/textures/terrain-path.ktx2",
+      "bytes": 361078,
+      "sourceBytes": 220300
+    },
+    {
+      "id": "terrain-light",
+      "type": "texture",
+      "role": "lightmap",
+      "priority": "critical",
+      "scope": "app",
+      "url": "assets/textures/terrain-light.ktx2",
+      "bytes": 326073,
+      "sourceBytes": 2888148
+    },
+    {
+      "id": "stairs-albedo",
+      "type": "texture",
+      "role": "albedo",
+      "priority": "critical",
+      "scope": "app",
+      "url": "assets/textures/stairs-albedo.ktx2",
+      "bytes": 113086,
+      "sourceBytes": 126674
+    },
+    {
+      "id": "stairs-light",
+      "type": "texture",
+      "role": "lightmap",
+      "priority": "critical",
+      "scope": "app",
+      "url": "assets/textures/stairs-light.ktx2",
+      "bytes": 41485,
+      "sourceBytes": 148704
+    },
+    {
+      "id": "monoliths-scene",
+      "type": "model",
+      "role": null,
+      "priority": "critical",
+      "scope": "app",
+      "url": "assets/models/monoliths-scene.glb",
+      "bytes": 83644,
+      "sourceBytes": 236552
+    },
+    {
+      "id": "monolith-albedo",
+      "type": "texture",
+      "role": "albedo",
+      "priority": "critical",
+      "scope": "app",
+      "url": "assets/textures/monolith-albedo.ktx2",
+      "bytes": 206492,
+      "sourceBytes": 150697
+    },
+    {
+      "id": "monolith-relief",
+      "type": "texture",
+      "role": "normal",
+      "priority": "critical",
+      "scope": "app",
+      "url": "assets/textures/monolith-relief.ktx2",
+      "bytes": 170533,
+      "sourceBytes": 129688
+    },
+    {
+      "id": "monolith-light",
+      "type": "texture",
+      "role": "lightmap",
+      "priority": "critical",
+      "scope": "app",
+      "url": "assets/textures/monolith-light.ktx2",
+      "bytes": 192339,
+      "sourceBytes": 1105045
+    },
+    {
+      "id": "rocks-scene",
+      "type": "model",
+      "role": null,
+      "priority": "high",
+      "scope": "app",
+      "url": "assets/models/rocks-scene.glb",
+      "bytes": 140388,
+      "sourceBytes": 389740
+    },
+    {
+      "id": "rock-light",
+      "type": "texture",
+      "role": "lightmap",
+      "priority": "high",
+      "scope": "app",
+      "url": "assets/textures/rock-light.ktx2",
+      "bytes": 266789,
+      "sourceBytes": 1116026
+    },
+    {
+      "id": "grass-atlas",
+      "type": "texture",
+      "role": "albedo",
+      "priority": "high",
+      "scope": "app",
+      "url": "assets/textures/grass-atlas.ktx2",
+      "bytes": 691993,
+      "sourceBytes": 1115461
+    },
+    {
+      "id": "props-atlas",
+      "type": "texture",
+      "role": "albedo",
+      "priority": "high",
+      "scope": "app",
+      "url": "assets/textures/props-atlas.ktx2",
+      "bytes": 150042,
+      "sourceBytes": 180585
+    },
+    {
+      "id": "baketest-scene",
+      "type": "model",
+      "role": null,
+      "priority": "deferred",
+      "scope": "dev",
+      "url": "assets/models/baketest-scene.glb",
+      "bytes": 10400,
+      "sourceBytes": 24204
+    },
+    {
+      "id": "baketest-lightmap",
+      "type": "texture",
+      "role": "lightmap",
+      "priority": "deferred",
+      "scope": "dev",
+      "url": "assets/textures/baketest-lightmap.ktx2",
+      "bytes": 3743,
+      "sourceBytes": 8836
+    }
+  ]
+}
