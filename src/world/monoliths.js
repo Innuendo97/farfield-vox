@@ -2,12 +2,11 @@ import {
   AdditiveBlending, BufferAttribute, BufferGeometry, DoubleSide, Mesh,
   ShaderMaterial, Vector2, Vector3,
 } from 'three';
-import { LIGHT_FILTER, lightFilterGlsl, lightFilterUniforms } from './light-filter.js';
 import {
   SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS, SKY_GLSL, SKY_REFLECTION,
   SKY_REFLECTION_GLSL, SKY_UNIFORMS,
 } from '../core/sky.js';
-import { FOG_GLSL, fogUniforms, LOW_SKY } from './air.js';
+import { BAKED_TERMS_GLSL, FOG_GLSL, fogUniforms, LOW_SKY } from './air.js';
 import { MONOLITHS } from './layout.js';
 import MONOLITH_BAKE from '../../assets-src/monoliths/monoliths.json';
 
@@ -141,7 +140,7 @@ const FRAGMENT = /* glsl */`
   uniform vec3 uInkHalo;
 
   ${SCENE_LIGHT_GLSL}
-  ${lightFilterGlsl(LIGHT_FILTER.BILINEAR)}
+  ${BAKED_TERMS_GLSL}
   ${SKY_GLSL}
   ${SKY_REFLECTION_GLSL}
   ${FOG_GLSL}
@@ -170,7 +169,7 @@ const FRAGMENT = /* glsl */`
 
     vec3 albedo = texture2D(tAlbedo, vStone).rgb;
     // Red is how much of the sun this texel sees, green how much of the sky.
-    vec3 light = bakedLight(lightTerms(tLight, vLight)) * uLightScale;
+    vec3 light = bakedLight(bakedTerms(tLight, vLight)) * uLightScale;
 
     // The part of the direct light the atlas cannot resolve: the ratio of what
     // the perturbed surface catches to what the flat one does. The bias keeps
@@ -410,8 +409,7 @@ export function createMonoliths({
           tLight: { value: light },
           tInk: { value: null },
           uLightScale: { value: lightScale * STONE_EXPOSURE },
-          ...lightFilterUniforms(light),
-          ...SCENE_LIGHT_UNIFORMS,
+              ...SCENE_LIGHT_UNIFORMS,
           ...SKY_UNIFORMS,
           ...SKY_REFLECTION,
           uSkyBlur: { value: SKY_BLUR },

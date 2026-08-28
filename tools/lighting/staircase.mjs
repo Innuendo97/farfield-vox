@@ -54,9 +54,12 @@ function reader(lin, W, H, kind) {
       return bilinear((ix + fx + 0.5) / W, (iy + fy + 0.5) / H);
     };
   }
-  // The four tap cubic B-spline, the same arithmetic src/world/light-filter.js
-  // compiles into the ground material, written here in the language the ruler
-  // is written in so the two can be held to each other.
+  // The four tap cubic B-spline. The ground material no longer compiles it —
+  // it reads one tap, because the atlas whose grid it hid is going — so this is
+  // now the third column of a comparison rather than a copy of what the frame
+  // does. It stays because the comparison IS the measurement: what the wobble
+  // costs under each reconstruction is what says whether an atlas can carry a
+  // shadow edge at all, and that question outlives this atlas.
   return (u, v) => {
     const tx = u * W + 0.5; const tyy = v * H + 0.5;
     const ix = Math.floor(tx); const iy = Math.floor(tyy);

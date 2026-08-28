@@ -27,8 +27,8 @@ export function voxelSettings() {
     // The meadow's own colour, flat, in linear light. Flat is not a saving: the
     // reference was measured flat to within three per cent across a face, and a
     // face IS constant under an analytic term on a constant normal — where a
-    // baked atlas would carry the texel noise that light-filter.js had to exist
-    // to fight.
+    // baked atlas would carry the texel noise that a four tap reconstruction
+    // filter had to exist to fight.
     //
     // FITTED ON THE RENDER against the target's own meadow, not chosen: swept
     // in level and in hue with the delivered cards taken off, until a top face

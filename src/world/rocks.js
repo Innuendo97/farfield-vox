@@ -1,12 +1,13 @@
 import {
   BufferAttribute, BufferGeometry, Matrix3, Matrix4, Mesh, ShaderMaterial, Vector3,
 } from 'three';
-import { LIGHT_FILTER, lightFilterGlsl, lightFilterUniforms } from './light-filter.js';
 import {
   SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS, SKY_GLSL, SKY_REFLECTION,
   SKY_REFLECTION_GLSL, SKY_UNIFORMS,
 } from '../core/sky.js';
-import { FOG_GLSL, fogUniforms, GROUND_EXPOSURE, LOW_SKY } from './air.js';
+import {
+  BAKED_TERMS_GLSL, FOG_GLSL, fogUniforms, GROUND_EXPOSURE, LOW_SKY,
+} from './air.js';
 import PLAN from '../../assets-src/rocks/rocks.json';
 import BAKE from '../../assets-src/rocks/rocks-bake.json';
 import PALETTE from '../../assets-src/vegetation/palette.json';
@@ -121,7 +122,7 @@ const FRAGMENT = /* glsl */`
   uniform vec3 uLowSky;
 
   ${SCENE_LIGHT_GLSL}
-  ${lightFilterGlsl(LIGHT_FILTER.BILINEAR)}
+  ${BAKED_TERMS_GLSL}
   ${SKY_GLSL}
   ${SKY_REFLECTION_GLSL}
   ${FOG_GLSL}
@@ -181,7 +182,7 @@ const FRAGMENT = /* glsl */`
     // while a painted cloud darkened the ground around them. Both halves of
     // that are gone: the cloud was never over this hub — the sky in the sun's
     // direction is 0.000 covered — and the ground no longer carries it either.
-    vec3 light = bakedLight(lightTerms(tLight, vLight)) * uLightScale;
+    vec3 light = bakedLight(bakedTerms(tLight, vLight)) * uLightScale;
     vec3 colour = albedo * light;
 
     // The sky in it. One blurred tap, weighted towards the grazing angles, and
@@ -305,7 +306,6 @@ export function createRocks({
     uniforms: {
       tLight: { value: light },
       uLightScale: { value: lightScale * GROUND_EXPOSURE },
-      ...lightFilterUniforms(light),
       ...SCENE_LIGHT_UNIFORMS,
       ...SKY_UNIFORMS,
       ...SKY_REFLECTION,

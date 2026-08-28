@@ -594,7 +594,7 @@ Promise.all(WANTED.map((id) => assets.load(id).catch((error) => {
  *
  * THE BRIDGE, AND IT IS THE CONTRACT AND NOT A CHANGE TO IT.
  * src/world/vegetation.js reads the ground's light at the foot of every card
- * through lightTerms(), which is R for the sun and the square of alpha for the
+ * through bakedTerms(), which is R for the sun and the square of alpha for the
  * sky. Handed the DELIVERED atlas it lights the grass off a Cycles bake while
  * the cubes beside it are lit analytically, and the two disagree by enough that
  * the cards were the brightest population in the frame — pale blades standing

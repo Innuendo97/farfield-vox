@@ -2,7 +2,6 @@ import { ShaderMaterial, Vector2, Vector3 } from 'three';
 import {
   HEIGHT_FOG, SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS, SKY_UNIFORMS,
 } from '../core/sky.js';
-import { lightFilterGlsl, lightFilterUniforms } from './light-filter.js';
 import { STRIP_REACH } from './path-strip.js';
 
 // THE SEAT OF THE AIR, and of the surface that stands in it.
@@ -94,6 +93,37 @@ export const FOG_GLSL = /* glsl */`
     float mean = abs(dy) < 0.01 ? a : (a - b) * uFogHeight / dy;
     float depth = distance * uFogDensity * mean;
     return 1.0 - exp(-depth * depth);
+  }
+`;
+
+// HOW A TEXEL OF A BAKED ATLAS IS UNPACKED. Part two, and it dies with the
+// atlases: what is stored is a bake, and a face of the voxel world computes its
+// two terms instead of fetching them.
+//
+// It is one seat and not one copy per material because it is a STORAGE FORMAT
+// and not a taste. The sun term is grey in rgb, which the sampler brings back
+// to linear light on its own; the sky term is in ALPHA, which carries no
+// transfer at all, as the square root of its linear value — tools that no
+// longer exist put it there because an ETC1S block holds one coarse chroma and
+// a shadow edge is exactly where the two terms disagree, so the old
+// red-and-green pair cost 16.67 levels on every edge against 4.14 this way.
+// Four materials read these atlases and all four have to unpack them the same
+// way; bakedLight() in src/core/sky.js is what says what the pair MEANS, and
+// this only says how one is fetched.
+//
+// AND IT IS ONE TAP. There used to be a cubic B-spline over four bilinear taps
+// here, and it existed for one measured defect: a shadow edge in the delivered
+// ground atlas is 1.65 texels wide at the median, so bilinear rebuilt it as a
+// staircase on the texel grid, and at the near ground one of those steps
+// covered tens of screen pixels. That defect belongs to the atlas, and the
+// atlas is going: a face of the voxel world is lit by an analytic term on a
+// constant normal, which has no texel grid to show through and nothing to
+// reconstruct between samples. Keeping a four tap filter for a picture with no
+// texels in it would be paying the fill for a defect that cannot occur.
+export const BAKED_TERMS_GLSL = /* glsl */`
+  vec3 bakedTerms(sampler2D tex, vec2 uv) {
+    vec4 s = texture2D(tex, uv);
+    return vec3(s.r, s.a * s.a, s.a * s.a);
   }
 `;
 
@@ -488,7 +518,7 @@ ${detail ? /* glsl */`
   uniform vec3 uSunDir;
 ` : ''}
   ${SCENE_LIGHT_GLSL}
-  ${lightFilterGlsl()}
+  ${BAKED_TERMS_GLSL}
   ${FOG_GLSL}
 
   void main() {
@@ -499,16 +529,14 @@ ${detail ? /* glsl */`
     // Red is how much of the sun this texel sees, green how much of the sky,
     // each stored divided down to fit eight bits.
     //
-    // lightTerms() and not texture2D(): a cubic B-spline over four bilinear
-    // taps, because a shadow edge is one and a half texels wide on this atlas
-    // and bilinear rebuilds it as a staircase on the texel grid. See
-    // src/world/light-filter.js for the measurement that says so.
+    // ONE TAP, and it used to be four: see the note over BAKED_TERMS_GLSL for
+    // why the cubic reconstruction went with the atlas it was reconstructing.
     //
     // Fetched HERE, before the near material, because the little shade below
     // bends the SUN term of this pair and nothing else — not the sky term, not
     // the albedo, not the fog. A stone's shaded flank in this world is a flank
     // that has lost its sun and kept its sky, which is what a shaded flank is.
-    vec3 terms = lightTerms(tLight, vUv);
+    vec3 terms = bakedTerms(tLight, vUv);
 ${detail || strip ? /* glsl */`
     // The grit and the bedded stones of the near paving, and the joints of it:
     // see the notes over DETAIL and STRIP above for why neither can live in the
@@ -671,7 +699,6 @@ export function createBakedMaterial({
         // step and nothing that can fall out of it.
         uSunDir: SKY_UNIFORMS.uSunDir,
       } : {}),
-      ...lightFilterUniforms(light),
       ...SCENE_LIGHT_UNIFORMS,
       ...fogUniforms(),
     },

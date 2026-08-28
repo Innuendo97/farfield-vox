@@ -3,8 +3,7 @@ import {
   InstancedBufferGeometry, Mesh, ShaderMaterial, Sphere, Vector2, Vector3,
 } from 'three';
 import { SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS } from '../core/sky.js';
-import { LIGHT_FILTER, lightFilterGlsl, lightFilterUniforms } from './light-filter.js';
-import { FOG_GLSL, fogUniforms, GROUND_EXPOSURE } from './air.js';
+import { BAKED_TERMS_GLSL, FOG_GLSL, fogUniforms, GROUND_EXPOSURE } from './air.js';
 import {
   clamp01, GRID, pathCoord, pathRun, smoothstep,
 } from './terrain-field.js';
@@ -210,7 +209,7 @@ const VERTEX = /* glsl */`
   // shader, once per card, and four taps a vertex would buy a card that covers
   // far more texels than it has vertices nothing at all. What it DOES need is
   // the unpacking — the sky term lives in alpha now.
-  ${lightFilterGlsl(LIGHT_FILTER.BILINEAR)}
+  ${BAKED_TERMS_GLSL}
   ${FOG_GLSL}
 
   // Where a world position lands in the ground atlas. The grid the meadow is
@@ -257,7 +256,7 @@ const VERTEX = /* glsl */`
     // terms in it recomposed here. Taken in the vertex shader and not in the
     // fragment one: a card is eighteen vertices and covers far more texels
     // than that, so the whole two term world costs the grass nothing.
-    vec3 light = bakedLight(lightTerms(tLight, groundUv(base.xz))) * uLightScale;
+    vec3 light = bakedLight(bakedTerms(tLight, groundUv(base.xz))) * uLightScale;
 
     vec2 cell = vec2(mod(aParams.z, uColumns), floor(aParams.z / uColumns));
     vUv = (cell + uv) * uCellSize;
@@ -489,7 +488,6 @@ function makeMaterial({ atlas, light, lightScale, columns, rows, radius, fade: b
       tAtlas: { value: atlas },
       tLight: { value: light },
       uLightScale: { value: lightScale * GROUND_EXPOSURE },
-      ...lightFilterUniforms(light),
       ...SCENE_LIGHT_UNIFORMS,
       uCentre: { value: new Vector2() },
       uRadius: { value: radius },
