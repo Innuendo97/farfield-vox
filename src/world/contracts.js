@@ -188,3 +188,35 @@ export function groundHoleAt() {
 export function groundLightAt() {
   return null;
 }
+
+// ------------------------------------------------------- the lamps and the field
+
+/**
+ * Where the flowers of the meadow stand, for whatever wants to hang a light on
+ * one.
+ *
+ * V4 FILLS THIS AND V7 EATS IT, and the direction of that arrow is the whole
+ * contract. The night target lights its meadow with small warm points, and the
+ * only place they can honestly stand is where the flowers already are — a lamp
+ * floating over bare grass reads as a lamp, and a lamp in a flower reads as the
+ * flower. So V7 does not choose those positions and does not scatter a field of
+ * its own beside V4's: it asks for the one that is already drawn.
+ *
+ * AND V4 KNOWS NOTHING ABOUT THE NIGHT. It publishes where its flowers are,
+ * which is a fact about the meadow. If the coupling ran the other way — the
+ * lamps telling the meadow where to put flowers — the day would be arranged by
+ * a session that only ever looks at the night target, and the two pictures the
+ * campaign is judged on would be fitted against each other.
+ *
+ * IT IS EMPTY TODAY AND THAT IS THE TRUTH. There is no flower field yet, so
+ * there is nowhere for a lamp to stand, and an invented point would be a lamp
+ * placed by the foundation. What this seat buys now is that V7 can be written
+ * against a name instead of against V4's internals, and that the day the field
+ * lands the night gets it without either session opening the other's file.
+ *
+ * @returns {{x: number, z: number, y: number}[]} in world metres, y at the head
+ *          of the flower rather than at the ground under it
+ */
+export function flowerLightPoints() {
+  return [];
+}

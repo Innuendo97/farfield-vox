@@ -83,6 +83,18 @@ export const SKY_UNIFORMS = {
 /**
  * Hands the sky its numbers.
  *
+ * THE DOOR, AND THE CONTRACT BETWEEN THE TWO SESSIONS EITHER SIDE OF IT. The
+ * OPTICS — what a bearing is worth, how the air scatters, how the disc and its
+ * aureole are drawn — are V6's, and they live below in SKY_GLSL and in the
+ * model that fitted them. The VALUES of a preset are V7's, because a night is
+ * this function called with another entry of the same shape and nothing else in
+ * this file, in the materials or in the weather has to know it happened.
+ *
+ * So this is the only place the six uniforms are WRITTEN. Reading them is
+ * anybody's; a second writer is two hands on one sky, and the two would drift
+ * into a frame as a halo or a wrong blue rather than as an error anything could
+ * catch. tools/guards/guard-luce-sigillo.mjs holds the door shut.
+ *
  * @param {object} preset as tools/grade/lib/sky-model.mjs dayPreset writes it
  */
 export function setSkyPreset(preset) {
