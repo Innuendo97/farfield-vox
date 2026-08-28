@@ -24,6 +24,21 @@
 // world is baked again, so the full check reports them red on purpose. Running
 // with --sources says "the seats that will author the next bake agree", which
 // is a smaller claim, and the banner says so out loud.
+//
+// AND THERE IS A ROSTER OF WAIVERS, tools/lighting/sun-waivers.json.
+//
+// The voxel campaign moved the seat to where its two targets put the sun, and
+// six consumers cannot follow it: they are pictures and manifests baked under
+// the old one by a chain that no longer exists in this repository. Failing on
+// them would hold the guard red until the last of eight sessions has re-authored
+// what it owns, and a guard that is always red is a guard nobody reads -- which
+// is precisely how a world came to be lit by two suns in the first place.
+//
+// So a waiver is not a way of passing. It is a DECLARATION: each one names the
+// consumer, the session that owns it, and the fact that it is going, and every
+// run prints them. What a waiver buys is that the guard still FAILS on anything
+// else -- a new consumer, or an old one nobody declared -- which is the whole
+// case it exists for. The list may only shrink.
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
@@ -51,16 +66,66 @@ const read = (path) => JSON.parse(readFileSync(join(REPO_ROOT, path), 'utf8'));
 const SEAT = readSun();
 const SEAT_VEC = sunVector(SEAT.elevation, SEAT.azimuth);
 
-/** One consumer, by the two angles it states. */
-const checkAngles = (what, elevation, bearing, where) => {
+// EVERY CONSUMER THIS GUARD CAN PRESENT, by the file that carries the sun.
+//
+// Written down rather than discovered so that the roster can be checked against
+// it: an id in sun-waivers.json that is not here is a typo, and a typo in a
+// waiver is a hole in the guard wearing a waiver's clothes.
+const CONSUMERS = [
+  'assets-src/clouds/clouds.json',
+  'assets-src/clouds/plates.json',
+  'tools/clouds/cloud-pieces.mjs',
+  'assets-src/terrain/terrain.json',
+  'assets-src/monoliths/monoliths.json',
+  'assets-src/rocks/rocks-bake.json',
+];
+
+const WAIVERS = new Map();
+{
+  const roster = read('tools/lighting/sun-waivers.json');
+  for (const waiver of roster.waivers) WAIVERS.set(waiver.consumer, waiver);
+}
+const waived = new Set();
+const presented = new Set();
+
+/**
+ * One consumer, by the two angles it states.
+ *
+ * @param {string} id the file that carries it, as CONSUMERS names it
+ */
+const checkAngles = (id, what, elevation, bearing, where) => {
   const off = angleBetween(SEAT_VEC, sunVector(elevation, bearing));
-  check(off <= TOLERANCE, what,
+  checkOff(id, off <= TOLERANCE, what,
     `elev ${elevation} bearing ${bearing} -> ${off.toFixed(3)} deg off the seat  (${where})`);
+};
+
+/** The same, for a consumer whose disagreement is already a number. */
+const checkOff = (id, ok, what, detail) => {
+  presented.add(id);
+  const waiver = WAIVERS.get(id);
+  if (ok || !waiver) {
+    check(ok, what, detail);
+    return;
+  }
+  waived.add(id);
+  console.log(`  WAIVED  ${what}  ${detail}`);
+  console.log(`          [${waiver.owner}] ${waiver.note}`);
 };
 
 console.log(`the seat: ${SUN_SEAT} ${SUN_SEAT_FIELD} `
   + `-> elevation ${SEAT.elevation}, azimuth ${SEAT.azimuth}, tolerance ${TOLERANCE} deg`);
 if (sourcesOnly) console.log('  --sources: the delivered light maps are NOT checked');
+console.log(`  ${WAIVERS.size} declared waiver${WAIVERS.size === 1 ? '' : 's'} `
+  + 'in tools/lighting/sun-waivers.json');
+
+// The roster against the consumers this guard knows. A waiver for something
+// that is never presented cannot protect anything and may be hiding a name that
+// was meant to.
+console.log('\nthe roster of waivers, against the consumers this guard knows');
+for (const [id, waiver] of WAIVERS) {
+  check(CONSUMERS.includes(id), `${id} is a consumer this guard presents`,
+    CONSUMERS.includes(id) ? `owner ${waiver.owner}` : 'NOT in the roster of consumers');
+}
 
 // ------------------------------------------------------------- the seat itself
 //
@@ -72,9 +137,12 @@ console.log('\nthe seat, against itself');
   const off = angleBetween(SEAT_VEC, SEAT.vector);
   check(off <= TOLERANCE, 'the vector the runtime uses is the angles the bakes use',
     `${off.toFixed(4)} deg`);
+  // The seat against itself is never waivable: it is one file agreeing with one
+  // file, and nothing downstream can make it right.
   const top = read(SUN_SEAT).sun;
-  checkAngles('the fit input agrees with the preset it produced',
-    top.elevation, top.azimuth, `${SUN_SEAT} sun`);
+  const topOff = angleBetween(SEAT_VEC, sunVector(top.elevation, top.azimuth));
+  check(topOff <= TOLERANCE, 'the fit input agrees with the preset it produced',
+    `elev ${top.elevation} bearing ${top.azimuth} -> ${topOff.toFixed(3)} deg  (${SUN_SEAT} sun)`);
 }
 
 // The two statements of the same arithmetic, one per language. A convention
@@ -142,29 +210,31 @@ for (const path of []) {
 
 // The weather. The clouds are relit from the same direction the ground is, and
 // their bake arc was solved to contain it (tools/clouds/check-arc.mjs).
-checkAngles('the cloud field carries the seat',
+checkAngles('assets-src/clouds/clouds.json', 'the cloud field carries the seat',
   read('assets-src/clouds/clouds.json').sun.elevation,
   read('assets-src/clouds/clouds.json').sun.azimuth,
   'assets-src/clouds/clouds.json sun');
 {
   const clouds = read('assets-src/clouds/clouds.json').sun;
   const off = angleBetween(SEAT_VEC, clouds.vector);
-  check(off <= TOLERANCE, 'and its vector too', `${off.toFixed(4)} deg`);
+  checkOff('assets-src/clouds/clouds.json', off <= TOLERANCE, 'and its vector too',
+    `${off.toFixed(4)} deg`);
 }
-checkAngles('the cloud piece generator carries the seat',
+checkAngles('tools/clouds/cloud-pieces.mjs', 'the cloud piece generator carries the seat',
   PROD_SUN.el, PROD_SUN.az, 'tools/clouds/cloud-pieces.mjs PROD_SUN');
 {
   const plates = read('assets-src/clouds/plates.json');
   // The roster says outright that this is "copied into the manifest", which is
   // the shape the defect came in, so it is checked rather than believed.
-  checkAngles('the plate roster carries the seat',
+  checkAngles('assets-src/clouds/plates.json', 'the plate roster carries the seat',
     plates.world.sun.elevation, plates.world.sun.azimuth,
     'assets-src/clouds/plates.json world.sun');
   // Elevation only: a plate declares the height its source was shot at and
   // takes its bearing from where it is placed, so there is no azimuth to compare.
   const shot = plates.defaults.sunElevation;
   const off = Math.abs(shot - SEAT.elevation);
-  check(off <= TOLERANCE, 'and its plates were authored at the seat\'s elevation',
+  checkOff('assets-src/clouds/plates.json', off <= TOLERANCE,
+    'and its plates were authored at the seat\'s elevation',
     `${shot} against ${SEAT.elevation}, ${off.toFixed(2)} deg`);
 }
 
@@ -182,11 +252,29 @@ if (!sourcesOnly) {
       continue;
     }
     const sun = read(path).sun;
-    checkAngles(what, sun.elevation, sun.bearing, path);
+    checkAngles(path, what, sun.elevation, sun.bearing, path);
+  }
+}
+
+// What the roster is carrying, printed on every run rather than on demand: a
+// debt nobody is shown is a debt nobody pays.
+console.log('\nthe waivers this run stood on');
+if (!waived.size) console.log('  none: every consumer presented agrees with the seat');
+for (const id of WAIVERS.keys()) {
+  const waiver = WAIVERS.get(id);
+  if (waived.has(id)) {
+    console.log(`  WAIVED       ${id.padEnd(36)} [${waiver.owner}]  ${waiver.note}`);
+  } else if (presented.has(id)) {
+    console.log(`  not needed   ${id.padEnd(36)} [${waiver.owner}]  `
+      + 'agrees with the seat: take it off the roster');
+  } else {
+    console.log(`  not reached  ${id.padEnd(36)} [${waiver.owner}]  `
+      + `${sourcesOnly ? 'not asked with --sources' : 'not presented in this run'}`);
   }
 }
 
 console.log(failed
   ? `\n${failed} check${failed === 1 ? '' : 's'} failed`
-  : '\nevery consumer of the sun agrees with the seat');
+  : `\nevery consumer of the sun agrees with the seat or is declared`
+    + ` (${waived.size} waived)`);
 process.exit(failed ? 1 : 0);

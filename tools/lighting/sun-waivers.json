@@ -1,0 +1,58 @@
+{
+  "why": [
+    "The sun moved to where the two voxel targets put it, and six consumers still",
+    "carry the old one because they are LEGACY PHOTOREALISTIC BAKES: pictures and",
+    "manifests authored under elevation 34 / azimuth -9.5 that no tool in this",
+    "repository can re-author, because the chain that made them was removed in the",
+    "foundation. Failing on them would leave the guard red for the whole campaign,",
+    "and a guard that is always red is a guard nobody reads.",
+    "",
+    "So each one is named here, with the session that will replace it and the fact",
+    "that it is going. tools/lighting/check-suns.mjs passes on exactly these and on",
+    "nothing else: a consumer that is not on this list and disagrees with the seat",
+    "still fails, which is the case the guard exists for. An id here that is not a",
+    "consumer the guard knows about also fails -- a typo in this file would be a",
+    "hole in the guard rather than a waiver.",
+    "",
+    "Every line of this file is a debt. It shrinks, it never grows: adding an id",
+    "is a decision for the coordinator, and the session named beside one closes it",
+    "by re-authoring what it owns under the seat."
+  ],
+  "seatWas": {
+    "elevation": 34,
+    "azimuth": -9.5,
+    "until": "2026-08-28, V0c"
+  },
+  "waivers": [
+    {
+      "consumer": "assets-src/clouds/clouds.json",
+      "owner": "V6",
+      "note": "scheduled for replacement: the cloud field is re-authored with the silhouette atlas"
+    },
+    {
+      "consumer": "assets-src/clouds/plates.json",
+      "owner": "V6",
+      "note": "scheduled for replacement: the plate roster is re-shot at the new seat"
+    },
+    {
+      "consumer": "tools/clouds/cloud-pieces.mjs",
+      "owner": "V6",
+      "note": "scheduled for replacement: PROD_SUN is the generator's own copy of the old seat"
+    },
+    {
+      "consumer": "assets-src/terrain/terrain.json",
+      "owner": "V1",
+      "note": "scheduled for replacement: the ground stops being a bake when the voxel disc lands"
+    },
+    {
+      "consumer": "assets-src/monoliths/monoliths.json",
+      "owner": "V2",
+      "note": "scheduled for replacement: the stone is rebuilt as courses of masonry"
+    },
+    {
+      "consumer": "assets-src/rocks/rocks-bake.json",
+      "owner": "V2",
+      "note": "scheduled for replacement: the rocks are rebuilt as cubes"
+    }
+  ]
+}

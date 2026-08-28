@@ -8,8 +8,8 @@
   "zenith": "#174c7d",
   "fog": "#84a9c8",
   "sun": {
-    "elevation": 34,
-    "azimuth": -9.5,
+    "elevation": 47,
+    "azimuth": 280,
     "elevationRange": [
       34,
       62
@@ -18,12 +18,12 @@
   },
   "day": {
     "sun": {
-      "elevation": 34,
-      "azimuth": -9.5,
+      "elevation": 47,
+      "azimuth": 280,
       "vector": [
-        -0.136831,
-        0.559193,
-        -0.817668
+        -0.671636,
+        0.731354,
+        -0.118423
       ]
     },
     "tauRayleigh": [
