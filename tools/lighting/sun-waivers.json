@@ -41,8 +41,8 @@
     },
     {
       "consumer": "assets-src/terrain/terrain.json",
-      "owner": "V1",
-      "note": "scheduled for replacement: the ground stops being a bake when the voxel disc lands"
+      "owner": "V1+V3",
+      "note": "shared atlas (ground+path): cleared jointly at the second delivery"
     },
     {
       "consumer": "assets-src/monoliths/monoliths.json",
