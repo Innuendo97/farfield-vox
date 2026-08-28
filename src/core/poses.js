@@ -89,20 +89,46 @@ export const POSE_RIM_BACK = {
   fov: POSE_TARGET.fov,
 };
 
-// THE TWO THE LIGHT WILL BE FITTED AT ARE NOT HERE YET.
+// THE TWO THE CAMPAIGN IS JUDGED AT: the framings of the two target pictures.
 //
-// POSE_VOX_DAY and POSE_VOX_NIGHT are the framings of the two target images,
-// and they come out of fitting a camera to each picture rather than out of a
-// preference. That fit belongs to the unit that refits the light, because the
-// same measurement produces both -- a sun angle read off a shadow is read off a
-// frame whose camera you have already had to solve.
+// FITTED, NOT CHOSEN. Six numbers -- where the eye is, where it looks, how wide
+// it sees -- were solved against the SILHOUETTES of the five blocks in each
+// picture. The blocks themselves did not move: they are the least squares
+// reconstruction layout.js already carried, and letting them move would have
+// been fitting the world to the camera instead of the camera to the world.
 //
-// Left as a written gap rather than as a guess. A placeholder pose with plausible
-// numbers in it is worse than none: it would be photographed, compared, and
-// believed.
+// The residual is part of the pose and is written down with it. It is not small
+// because these pictures are not renders of this world: block 04 is drawn
+// narrower than it is built and block 02 is drawn wider, so a few points on
+// each carry twenty pixels that no camera can take out. What the fit reproduces
+// is the FRAMING -- which block stands where, how big, how far apart -- and that
+// is what these two poses are for. The CONTENT will differ; that is the
+// campaign's work and not the pose's.
 //
-//   export const POSE_VOX_DAY = { ... };    // from the fit on the day target
-//   export const POSE_VOX_NIGHT = { ... };  // from the fit on the night target
+// Neither is at EYE_HEIGHT, and that is the pictures talking: both were drawn
+// from about 2.75 m with an avatar in front of the eye, which is the third
+// person the committente chose. A first person walk at these framings is the
+// same numbers with the height brought back down.
+
+export const POSE_VOX_DAY = {
+  name: 'vox-giorno',
+  // rms 7.78 px, median 4.5 px, over 92 silhouette points on the five blocks
+  position: { x: 0.915, y: 2.733, z: 11.357 },
+  yaw: 2.506,
+  pitch: 1.009,
+  fov: 51.342,
+};
+
+export const POSE_VOX_NIGHT = {
+  name: 'vox-notte',
+  // rms 8.38 px, median 5.7 px, over 84 points. Fitted with its own thresholds:
+  // the night target's sky reads 10 to 30 where the day's reads 70 to 200, so a
+  // silhouette there is a step of a dozen levels and not of a hundred.
+  position: { x: -0.732, y: 2.772, z: 11.697 },
+  yaw: -0.819,
+  pitch: 1.047,
+  fov: 52.710,
+};
 
 /**
  * Every pose that has a name, by that name.
@@ -114,6 +140,7 @@ export const POSE_RIM_BACK = {
  */
 export const POSES = Object.fromEntries([
   POSE_TARGET, POSE_SPAWN, POSE_STEEP_60, POSE_HAND_15, POSE_PEAK_85, POSE_RIM_BACK,
+  POSE_VOX_DAY, POSE_VOX_NIGHT,
 ].map((pose) => [pose.name, pose]));
 
 export const DEFAULT_FOV = POSE_TARGET.fov;
