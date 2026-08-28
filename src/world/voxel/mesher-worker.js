@@ -1,6 +1,6 @@
 import { chunkList, meshChunk } from './mesher.js';
 import { buildMasonry, stoneTileData } from './courses.js';
-import { MONOLITHS } from '../../world/layout.js';
+import { MONOLITHS } from '../layout.js';
 
 // Everything this demo builds by arithmetic, built off the thread the walker is
 // on. Three jobs, in the order the picture wants them.

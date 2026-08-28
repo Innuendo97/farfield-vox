@@ -1,5 +1,5 @@
-import { heightAt, pathCoord, pathRun } from '../../world/terrain-field.js';
-import { AREA_CENTER, MONOLITHS } from '../../world/layout.js';
+import { heightAt, pathCoord, pathRun } from '../terrain-field.js';
+import { AREA_CENTER, MONOLITHS } from '../layout.js';
 
 // The voxel field and the greedy mesher over it.
 //
@@ -9,11 +9,38 @@ import { AREA_CENTER, MONOLITHS } from '../../world/layout.js';
 // render reports. Two implementations of this would be two answers to the one
 // question the whole pivot rests on.
 //
-// ONE SIZE, AND NO RING OF SIZES. A ladder of steps anchored to the world is
-// only ever the right step in one place — the walker wanders over a disc twenty
-// one metres across, so a ring measured for the middle of the hub is wrong by
-// an order of magnitude under their own feet at the rim. So there is one step
-// here and the shell beyond it is the bent grid that already exists.
+// ===========================================================================
+// THE TWO RULES THAT ARE NOT NEGOTIABLE, AND WHAT BREAKING EITHER COSTS.
+//
+// They are written here, at the top of the file that would break them, because
+// both are ONE LINE either way. Neither shows up in a review as a change to the
+// budget, and both were measured rather than reasoned.
+//
+// 1. NEVER A PER-VOXEL PROPERTY IN A VERTEX ATTRIBUTE.
+//
+//    The tint, the joint and the lightened arris are rebuilt in the fragment
+//    out of the fragment's own position, relative to the chunk. The moment any
+//    of them has to be handed over per vertex, a merged rectangle can no longer
+//    stand for a hundred cubes -- the merge dies, and the geometry of the whole
+//    world goes up by THREE TIMES. Measured, not feared.
+//
+//    It is also why the position stays in the chunk's own frame all the way to
+//    the fragment: a few metres of range instead of a few hundred, which is
+//    what the arithmetic needs to stay exact at medium precision.
+//
+// 2. ONE STEP, AND NO RING OF STEPS.
+//
+//    Ten centimetres, everywhere the hand can reach. A ladder of sizes anchored
+//    to the world is only ever the right size in ONE PLACE: the walker wanders
+//    over a disc twenty one metres across, so a ring measured for the middle of
+//    the hub is wrong by an order of magnitude under their own feet at the rim.
+//    Measured on the shape that tried it, the ground under the walker read 134
+//    pixels a cube against the target's 12 -- wrong by eleven times.
+//
+//    So there is one step here, and the shell beyond it is the bent grid that
+//    already exists, with its heights quantised. Anything that reintroduces a
+//    second step reintroduces that defect, however it is dressed up.
+// ===========================================================================
 
 /** The one step, in metres. */
 export const VOXEL = 0.10;

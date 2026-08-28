@@ -1,7 +1,7 @@
 import { ShaderMaterial, Vector2, Vector3 } from 'three';
 import { SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS } from '../../core/sky.js';
-import { FACE_LIGHT_GLSL, faceLightUniforms } from '../../world/face-light.js';
-import { FOG_GLSL, GROUND_EXPOSURE, fogUniforms } from '../../world/air.js';
+import { FACE_LIGHT_GLSL, faceLightUniforms } from '../face-light.js';
+import { FOG_GLSL, GROUND_EXPOSURE, fogUniforms } from '../air.js';
 import TERRAIN from '../../../assets-src/terrain/terrain.json';
 
 // The material of a cube, and the five things the reference was measured to be
@@ -232,7 +232,7 @@ const FRAGMENT = /* glsl */`
  * @param {object} settings from voxelSettings(), held by reference so a sweep
  *                          on the page moves the frame without a rebuild
  */
-export function createVoxelMaterial(voxel, settings) {
+export function voxelMaterial(voxel, settings) {
   const material = new ShaderMaterial({
     uniforms: {
       uVoxel: { value: voxel },

@@ -6,9 +6,9 @@ import {
   SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS, SKY_GLSL, SKY_REFLECTION,
   SKY_REFLECTION_GLSL, SKY_UNIFORMS,
 } from '../../core/sky.js';
-import { FOG_GLSL, LOW_SKY, fogUniforms } from '../../world/air.js';
-import { faceLightGlsl, faceLightUniforms } from '../../world/face-light.js';
-import { MONOLITHS } from '../../world/layout.js';
+import { FOG_GLSL, LOW_SKY, fogUniforms } from '../air.js';
+import { faceLightGlsl, faceLightUniforms } from '../face-light.js';
+import { MONOLITHS } from '../layout.js';
 import { STONE_METRES, buildMasonry } from './courses.js';
 import MONOLITH_BAKE from '../../../assets-src/monoliths/monoliths.json';
 

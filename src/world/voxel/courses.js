@@ -1,4 +1,4 @@
-import { MONOLITHS } from '../../world/layout.js';
+import { MONOLITHS } from '../layout.js';
 
 // The masonry and the stone tile, as arithmetic.
 //

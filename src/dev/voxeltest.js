@@ -22,11 +22,14 @@ import { engrave, loadEngravingFont } from '../world/engraving.js';
 import { AREA_CENTER, MONOLITHS } from '../world/layout.js';
 import { heightAt } from '../world/terrain-field.js';
 import { createDevHud } from '../ui/devhud.js';
+// THE ENGINE THROUGH ITS OWN DOOR. This bench used to reach into three files
+// of it by name; the engine is now src/world/voxel/ and everything comes
+// through the one surface that is frozen in the foundation, which is what makes
+// this bench a test OF that surface rather than a second user of the insides.
 import {
   CHUNK, DISC_RADIUS, NO_COLUMN, VOXEL,
-} from './voxel/mesher.js';
-import { createVoxelMaterial, voxelSettings } from './voxel/material.js';
-import { createMasonry, stoneTile } from './voxel/masonry.js';
+  createMasonry, runInWorker, stoneTile, voxelMaterial, voxelSettings,
+} from '../world/voxel/index.js';
 import SKY from '../../assets-src/sky/sky.json';
 import SCENE_LIGHT from '../../assets-src/sky/scene-light.json';
 import TERRAIN from '../../assets-src/terrain/terrain.json';
@@ -79,10 +82,8 @@ applySky(scene);
 // thread the walker is on. It goes out now so it runs down the same wire time
 // the textures are using.
 
-const worker = new Worker(new URL('./voxel/mesher-worker.js', import.meta.url), { type: 'module' });
-
 const settings = voxelSettings();
-const voxelMaterial = createVoxelMaterial(VOXEL, settings);
+const material = voxelMaterial(VOXEL, settings);
 
 // What the worker cuts besides the disc, and how long each of the three took
 // where it now runs. They are timed one by one because the eight millisecond
@@ -168,7 +169,7 @@ function addChunk(chunk) {
   }
   geometry.index.onUpload(function drop() { this.array = null; });
 
-  const mesh = new Mesh(geometry, voxelMaterial);
+  const mesh = new Mesh(geometry, material);
   mesh.name = `voxel-${chunk.cx},${chunk.cz}`;
   // Where the chunk stands, as a whole number of voxels. The material reads it
   // straight off this matrix, which is why nothing per chunk has to be a
@@ -181,11 +182,12 @@ function addChunk(chunk) {
     + chunk.indices.byteLength;
 }
 
-worker.onmessage = (event) => {
+// The engine's own arithmetic, off the thread the walker is on, through the
+// one seat that knows where the worker file is.
+runInWorker({ tuft: query.get('ciuffo') !== '0' }, (message) => {
   // Timed from the first statement, because this handler IS the main thread's
   // share of the work and the gate is about how long it holds the frame.
   const started = performance.now();
-  const message = event.data;
   if (message.kind === 'tile') {
     stone = stoneTile(message.data, message.side);
     boot.tileMs = message.elapsedMs;
@@ -218,9 +220,7 @@ worker.onmessage = (event) => {
     build.worstTaskKind = message.kind;
   }
   if (message.kind === 'chunk' && spent > build.worstChunkMs) build.worstChunkMs = spent;
-};
-
-worker.postMessage({ tuft: query.get('ciuffo') !== '0' });
+});
 
 // -------------------------------------------------------------- the walker
 
@@ -817,7 +817,7 @@ window.vox = {
   apply(patch) {
     Object.assign(settings, patch);
     if (patch.albedo) settings.albedo = new Vector3(...patch.albedo);
-    voxelMaterial.userData.refresh();
+    material.userData.refresh();
   },
   /** What the engraving is burning at, so the night discipline can be checked. */
   inkGain: () => (masonry ? masonry.material.uniforms.uInk.value : null),
