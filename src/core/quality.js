@@ -23,6 +23,29 @@
 // no level of detail to drop on the rocks or the bushes, because there is no
 // chain to drop it from: they are baked stone and single cards, and the frame
 // spends its time filling the meadow, not submitting them.
+//
+// ------------------------------------------------------------------------
+// THE LEVERS THE SESSIONS WILL PULL, DECLARED NOW AND NEUTRAL TODAY.
+//
+// Every field below carries the same value on all four tiers, so no tier
+// behaves differently from any other, and NOTHING READS THEM YET. They are here
+// so that adding a lever is not an edit to this file by whichever session gets
+// there first — a governor is exactly the sort of shared file where two
+// sessions each add a field, each rebase, and the second one silently wins.
+//
+//   voxelDiscRadius   V1   how far the ten centimetre ground reaches, in metres
+//   grassDensity      V4   already here, as grass.density; named for the record
+//   cloudsDetail      V6   how much of the weather is drawn
+//   nightGlow         V7   how much of the night's halo is afforded
+//
+// WHERE THEY SIT IN THE ORDER is the session's to argue and the coordinator's
+// to settle, and it is NOT arbitrary — the rule at the top of this file is that
+// the first thing to go is the least visible thing left. A voxel disc that
+// shrinks with the tier changes what the ground under the walker IS, so it
+// stands below the grass and not above it; a night that dims changes the
+// picture itself, so on the face of it it does not belong in this list at all.
+// Both are for the sessions that own them to measure. What is settled here is
+// only that they exist in one place.
 
 export const TIERS = [
   {
@@ -36,6 +59,11 @@ export const TIERS = [
     samples: 4,
     bloom: 'half',
     grass: { density: 1.3, radius: 16 },
+    // Neutral on every tier: see the note over the levers above. Owners in
+    // brackets, so a reader knows whose number this is before touching it.
+    voxelDiscRadius: 35,   // [V1] metres of ten centimetre ground from the centre
+    cloudsDetail: 1,       // [V6] how much of the weather is drawn
+    nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
   {
     id: 'alto',
@@ -44,6 +72,11 @@ export const TIERS = [
     samples: 4,
     bloom: 'half',
     grass: { density: 1, radius: 12 },
+    // Neutral on every tier: see the note over the levers above. Owners in
+    // brackets, so a reader knows whose number this is before touching it.
+    voxelDiscRadius: 35,   // [V1] metres of ten centimetre ground from the centre
+    cloudsDetail: 1,       // [V6] how much of the weather is drawn
+    nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
   {
     id: 'medio',
@@ -52,6 +85,11 @@ export const TIERS = [
     samples: 4,
     bloom: 'quarter',
     grass: { density: 0.7, radius: 12 },
+    // Neutral on every tier: see the note over the levers above. Owners in
+    // brackets, so a reader knows whose number this is before touching it.
+    voxelDiscRadius: 35,   // [V1] metres of ten centimetre ground from the centre
+    cloudsDetail: 1,       // [V6] how much of the weather is drawn
+    nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
   {
     id: 'basso',
@@ -60,6 +98,11 @@ export const TIERS = [
     samples: 2,
     bloom: 'quarter',
     grass: { density: 0.4, radius: 12 },
+    // Neutral on every tier: see the note over the levers above. Owners in
+    // brackets, so a reader knows whose number this is before touching it.
+    voxelDiscRadius: 35,   // [V1] metres of ten centimetre ground from the centre
+    cloudsDetail: 1,       // [V6] how much of the weather is drawn
+    nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
 ];
 
