@@ -1,99 +1,25 @@
-import {
-  BufferAttribute, BufferGeometry, Color, Mesh, Scene, ShaderMaterial,
-} from 'three';
-import {
-  applySky, setCloudDrift, setCloudSky,
-} from '../core/sky.js';
-import { createBakedMaterial, setAir } from './air.js';
-import { createHeightSampler, createTerrain } from './terrain.js';
-import { CLOUD_LEVEL, createClouds } from './clouds.js';
-import { createDistance } from './distant.js';
-import { createMonoliths, STAIR_GLOW } from './monoliths.js';
-import { createRocks, ROCK_BLOCKERS } from './rocks.js';
-import { createVegetation } from './vegetation.js';
-import { glowMesh, stairHeightAt, stairMesh } from './stairs.js';
+import { Scene } from 'three';
+import { applySky } from '../core/sky.js';
+import { setAir } from './air.js';
+import { createHeightSampler } from './terrain.js';
+import { ROCK_BLOCKERS } from './rocks.js';
+import { stairHeightAt } from './stairs.js';
 import { MONOLITHS, PLATFORM } from './layout.js';
-import TERRAIN from '../../assets-src/terrain/terrain.json';
+import { LAYERS, layer, layersAt } from './layers/registry.js';
 
 const DEG = Math.PI / 180;
 
-// Colour of the under glow on the risers, from the engraved cyan of the
-// reference. It lives here rather than in layout.js because it is a property of
-// this surface, not of the plan of the hub.
-const GLOW_COLOUR = 0x7fd4f5;
-
-// How much brighter the risers burn with a walker at the foot of the stair.
-// Held well under the engraving's own answer: the reference lights the strip
-// very gently, and what has to read at the top of the ramp is still a line
-// under each nosing rather than a lit staircase.
-const STAIR_FOCUS = 0.8;
-
-// The strip on the risers. It carries a flat colour and an intensity, and it
-// is drawn at intensity zero: the geometry is here so that lighting it later is
-// a uniform rather than a change of scene.
-const GLOW_VERTEX = /* glsl */`
-  void main() {
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
-
-const GLOW_FRAGMENT = /* glsl */`
-  precision highp float;
-  uniform vec3 uColour;
-  uniform float uIntensity;
-  void main() {
-    gl_FragColor = vec4(uColour * uIntensity, 1.0);
-  }
-`;
-
-/**
- * The stair, the platform and the dark strips on the risers.
- *
- * Hung with the ground rather than with the blocks, because it is the same kind
- * of surface: painted albedo times baked light, in the same air. Before the
- * textures arrive there is no stair, exactly as there is no meadow.
- */
-function buildStairs({ stairsAlbedo, stairsLight, lightScale = TERRAIN.lightScale }) {
-  const meshes = [];
-  const glowMaterial = new ShaderMaterial({
-    uniforms: {
-      uColour: { value: new Color(GLOW_COLOUR).convertSRGBToLinear() },
-      uIntensity: { value: 0 },
-    },
-    vertexShader: GLOW_VERTEX,
-    fragmentShader: GLOW_FRAGMENT,
-    fog: false,
-  });
-
-  if (stairsAlbedo && stairsLight) {
-    const built = stairMesh();
-    const geometry = new BufferGeometry();
-    geometry.setAttribute('position', new BufferAttribute(built.positions, 3));
-    geometry.setAttribute('uv', new BufferAttribute(built.uvs, 2));
-    geometry.setIndex(new BufferAttribute(built.indices, 1));
-    geometry.computeBoundingSphere();
-
-    const mesh = new Mesh(geometry, createBakedMaterial({
-      albedo: stairsAlbedo, light: stairsLight, lightScale,
-    }));
-    mesh.name = 'stairs';
-    meshes.push(mesh);
-
-    const glow = glowMesh();
-    const glowGeometry = new BufferGeometry();
-    glowGeometry.setAttribute('position', new BufferAttribute(glow.positions, 3));
-    glowGeometry.setIndex(new BufferAttribute(glow.indices, 1));
-    glowGeometry.computeBoundingSphere();
-    const strips = new Mesh(glowGeometry, glowMaterial);
-    strips.name = 'stair-glow';
-    meshes.push(strips);
-  }
-
-  return {
-    meshes,
-    setGlow(intensity) { glowMaterial.uniforms.uIntensity.value = intensity; },
-  };
-}
+// THE HUB, WHICH NO LONGER KNOWS WHAT THE WORLD IS MADE OF.
+//
+// It used to name every piece twice: once to build it and once to hang it, with
+// the asset each piece eats spelled out beside the call. Eight sessions are
+// about to work on eight pieces at the same time, and a file that names all
+// eight is a file all eight have to edit.
+//
+// So what is left here is only what belongs to nobody: the scene, the sky above
+// it, what a body may walk through, and the two arrivals. The pieces come from
+// src/world/layers/registry.js, and each of them states its own needs beside the
+// code that eats them.
 
 /**
  * Height of the built stone under a point, or -Infinity where there is none.
@@ -159,12 +85,34 @@ export function buildHub() {
   // plan, not of whether a download has finished.
   blockers.push(...ROCK_BLOCKERS);
 
-  let dressed = null;
-  let planted = null;
+  const arrived = { dress: false, plant: false };
   // What the quality tier has asked for. It is held here rather than pushed
   // straight through because the tier is chosen before the meadow exists, and a
   // lever set on nothing has to survive until there is something to set it on.
   const wanted = { grass: null };
+
+  /**
+   * Builds every layer that has something to build at this arrival and hangs
+   * what it built.
+   *
+   * The two things no delivery can carry travel in the same bag as the assets:
+   * where the ground is, and what a body may walk through. Both are known here
+   * and nowhere else, and a layer that wants either asks for it by name the way
+   * it asks for a texture.
+   */
+  function raise(arrival, assets) {
+    if (arrived[arrival]) return;
+    arrived[arrival] = true;
+    const bag = { ...assets, height: meadowHeightAt, blockers };
+    for (const l of layersAt(arrival)) {
+      l[arrival].build(bag);
+      for (const mesh of l.meshes) if (!mesh.parent) scene.add(mesh);
+    }
+  }
+
+  const green = layer('v4-verde');
+  const stone = layer('v2-pietra');
+  const weather = layer('v6-cielo-nuvole');
 
   return {
     scene,
@@ -172,31 +120,14 @@ export function buildHub() {
     groundHeightAt,
 
     /**
-     * Hangs the baked ground and the distances on the scene, once their
-     * textures have arrived. Called at most once; before it the world is the
-     * blocks and the sky, which is already walkable.
+     * Hangs the ground, the built stone and the distances on the scene, once
+     * their textures have arrived. Called at most once; before it the world is
+     * the blocks and the sky, which is already walkable.
      */
-    dress(assets) {
-      if (dressed) return dressed;
-      const stairs = buildStairs(assets);
-      dressed = {
-        terrain: createTerrain(assets),
-        distance: createDistance(assets),
-        monoliths: createMonoliths(assets),
-        stairs,
-      };
-      for (const mesh of [
-        ...dressed.terrain.meshes, ...dressed.distance.meshes,
-        ...dressed.monoliths.meshes, ...stairs.meshes,
-      ]) {
-        scene.add(mesh);
-      }
-      stairs.setGlow(STAIR_GLOW);
-      return dressed;
-    },
+    dress(assets) { raise('dress', assets); },
 
     /**
-     * The rocks and the vegetation, once their sheets have arrived.
+     * The rocks, the vegetation and the weather, once their sheets are down.
      *
      * Kept apart from dress() because they are not part of the first walkable
      * frame: the ground, the sky and the blocks are what the walker must see
@@ -204,76 +135,42 @@ export function buildHub() {
      * without anybody waiting on it.
      */
     plant(assets) {
-      if (planted) return planted;
-      planted = {
-        rocks: createRocks(assets),
-        vegetation: createVegetation({ ...assets, height: meadowHeightAt }),
-        // The weather arrives with the meadow rather than with the sky: the
-        // dome is what the first walkable frame needs behind it, and the cloud
-        // is bodies standing in front of that dome, which can be hung a moment
-        // later without the walker ever waiting on a sky.
-        clouds: createClouds({ ...assets, blockers }),
-      };
-      for (const mesh of [
-        ...planted.rocks.meshes, ...planted.vegetation.meshes, ...planted.clouds.meshes,
-      ]) {
-        scene.add(mesh);
-      }
-      // The same weather, for everything that reflects the sky rather than
-      // stands in front of it. It arrives with the atlas because it is the
-      // same bake, and until it does those surfaces reflect an empty sky.
-      setCloudSky(assets.cloudSky, CLOUD_LEVEL);
-      if (wanted.grass) planted.vegetation.setQuality(wanted.grass);
-      return planted;
+      raise('plant', assets);
+      if (wanted.grass) green.setQuality(wanted.grass);
     },
 
     /** How much meadow the machine can afford. */
     setGrassQuality(grass) {
       wanted.grass = grass;
-      if (planted) planted.vegetation.setQuality(grass);
+      green.setQuality(grass);
     },
 
     /** Development handle: the grass alone, so its cost can be measured. */
-    setGrassVisible(visible) {
-      if (planted) planted.vegetation.setGrassVisible(visible);
-    },
+    setGrassVisible(visible) { green.setVisible(visible); },
 
     /** And the same for the weather, which is the other thing that fills. */
-    setCloudsVisible(visible) {
-      if (planted) planted.clouds.setVisible(visible);
-    },
+    setCloudsVisible(visible) { weather.setVisible(visible); },
 
     /** And one layer of it at a time, because the whole field is one draw. */
-    setCloudLayers(kinds) {
-      if (planted) planted.clouds.setLayers(kinds);
-    },
+    setCloudLayers(kinds) { weather.setLayers(kinds); },
 
     /** The air in front of the weather, for the fit and for a day and night. */
-    setCloudAerial(...values) {
-      return planted ? planted.clouds.setAerial(...values) : null;
-    },
+    setCloudAerial(...values) { return weather.setAerial(...values); },
 
     /** How much of that air this delivery has not already got baked into it. */
-    setCloudAerialOwed(owed) {
-      return planted ? planted.clouds.setAerialOwed(owed) : null;
-    },
+    setCloudAerialOwed(owed) { return weather.setAerialOwed(owed); },
 
     /** The level the weather is read at, for the sweep that settles the gain. */
-    setCloudLevel(scale) {
-      return planted ? planted.clouds.setLevel(scale) : null;
-    },
+    setCloudLevel(scale) { return weather.setLevel(scale); },
 
     /** What the vegetation is currently costing, for the development panel. */
     vegetationStats() {
-      return planted
-        ? { ...planted.vegetation.stats(), rockTriangles: planted.rocks.triangles }
-        : null;
+      const stats = green.stats();
+      return stats ? { ...stats, rockTriangles: stone.rockTriangles } : null;
     },
 
     /** The engraving of one section, once its text has been drawn. */
-    setEngraving(id, texture) {
-      if (dressed) dressed.monoliths.setEngraving(id, texture);
-    },
+    setEngraving(id, texture) { stone.setEngraving(id, texture); },
 
     /**
      * Intensity of the strip on the risers, in light units.
@@ -281,45 +178,27 @@ export function buildHub() {
      * Built dark. The emissive pass that lights it belongs with the monoliths,
      * and this is the handle it will pull.
      */
-    setStairGlow(intensity) {
-      if (dressed) dressed.stairs.setGlow(intensity);
-    },
+    setStairGlow(intensity) { stone.setStairGlow(intensity); },
 
-    /**
-     * How lit one block is, nought to one, as the walker comes and goes.
-     *
-     * The stair answers with the third block because it is part of it: it is
-     * the way up onto its platform and nothing else in the hub uses it, so
-     * lighting the writing while leaving the risers where they were would split
-     * one structure into two.
-     */
-    setMonolithFocus(id, amount, opened = 0) {
-      if (!dressed) return;
-      dressed.monoliths.setFocus(id, amount, opened);
-      if (id === '03') dressed.stairs.setGlow(STAIR_GLOW * (1 + STAIR_FOCUS * amount));
-    },
+    /** How lit one block is, nought to one, as the walker comes and goes. */
+    setMonolithFocus(id, amount, opened = 0) { stone.setFocus(id, amount, opened); },
 
     /** Development handle: what the weather's own clock reads, in seconds. */
-    cloudSeconds() {
-      return planted ? planted.clouds.seconds() : 0;
-    },
+    cloudSeconds() { return weather.seconds(); },
 
     update(elapsed, eye, delta = 0, pitchDegrees) {
       // The air, before anything that stands in it is drawn: where the eye is,
       // which the height integral of the fog needs and which used to be the
       // literal 1.70 whatever the walker was standing on, and what colour the
-      // sky is making it this hour.
+      // sky is making it this hour. It is not a layer — it is what the layers
+      // stand in — so it is done here and first.
       if (eye) setAir(eye.y);
-      if (planted && eye) planted.vegetation.update(eye, delta, pitchDegrees);
-      if (planted) {
-        planted.clouds.update(elapsed);
-        // The drift is a rigid turn of the whole field, so everything that
-        // reflects the sky is handed the one number that describes it rather
-        // than the field itself.
-        setCloudDrift(planted.clouds.turns());
-      }
-      if (!dressed) return;
-      dressed.monoliths.update(elapsed);
+      // Every layer, once, in the register's own order. Not "those that built
+      // at this arrival": a layer with a foot in both arrivals would be updated
+      // twice, and a layer that builds nothing may still have a frame's worth of
+      // work to do.
+      const frame = { elapsed, eye, delta, pitchDegrees };
+      for (const l of LAYERS) l.update(frame);
     },
   };
 }

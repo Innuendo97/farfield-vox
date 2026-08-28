@@ -18,6 +18,7 @@ import { loadLut } from './core/post.js';
 import { createQuality, forgetStored, needsBenchmark } from './core/quality.js';
 import { createBenchmark, tierOf } from './core/bench.js';
 import { buildHub } from './world/hub.js';
+import { needsAt } from './world/layers/registry.js';
 import { PLATE_FIELD } from './world/clouds.js';
 import { createStartOverlay } from './ui/overlay.js';
 import { createSkyVeil } from './ui/veil.js';
@@ -459,6 +460,19 @@ if (dev) {
 
 let worldSeconds = 0;
 
+/**
+ * Everything one arrival asks for, under the ids it asked for them by.
+ *
+ * The register is the seat for WHICH assets an arrival wants; this only fetches
+ * what it named. An asset that has not landed comes back undefined, which is
+ * what every layer already checks for.
+ */
+function bagFor(arrival) {
+  const bag = {};
+  for (const id of needsAt(arrival)) bag[id] = assets.get(id);
+  return bag;
+}
+
 setContentBase(import.meta.env.BASE_URL);
 
 const assets = new Assets(import.meta.env.BASE_URL).setRenderer(renderer);
@@ -480,25 +494,13 @@ assets.loadCritical(onCriticalByte)
     introBus?.report('dress', 1);
     // The ground and the distances are dressed together: they share the fog and
     // the sky reflection, and a frame with one but not the other reads wrong.
-    hub.dress({
-      albedo: assets.get('terrain-albedo'),
-      light: assets.get('terrain-light'),
-      // The material of the paving under the walker's feet, which the bent atlas
-      // cannot hold at that size: see the note over DETAIL in
-      // src/world/air.js. It goes to the ground alone and not to the stair.
-      detail: assets.get('terrain-detail'),
-      // And where the joints of that paving are, as a distance rather than as a
-      // picture of one: the same atlas cannot draw a joint finer than its own
-      // texel, but it can say where one is. See the note over STRIP in
-      // src/world/air.js. It goes to the ground alone and not to the stair.
-      strip: assets.get('terrain-path'),
-      stairsAlbedo: assets.get('stairs-albedo'),
-      stairsLight: assets.get('stairs-light'),
-      scene: assets.get('monoliths-scene'),
-      stone: assets.get('monolith-albedo'),
-      relief: assets.get('monolith-relief'),
-      stoneLight: assets.get('monolith-light'),
-    });
+    // WHAT TO HAND OVER IS THE REGISTER'S ANSWER AND NOT THIS FILE'S. It used
+    // to be a list here, and a second list of what each texture is called
+    // inside the module that eats it — so this file knew both which assets the
+    // world wants and what every layer means by them. Now every id the register
+    // asks for is handed over under its own name, and the layer that eats it
+    // does its own naming beside the code that does the eating.
+    hub.dress(bagFor('dress'));
     engraveAll();
     plantWhenReady();
     return assets.stream();
@@ -514,10 +516,13 @@ assets.loadCritical(onCriticalByte)
  * arrive before the meadow grows.
  */
 function plantWhenReady() {
-  const wanted = [
-    'rocks-scene', 'rock-light', 'grass-atlas', 'props-atlas',
-    'cloud-sprites', 'cloud-cover', 'cloud-equirect',
-  ];
+  // What this arrival has to WAIT for, which is not the same as what it eats.
+  // A layer planted late may still read a sheet the first walkable frame
+  // already brought down — the grass reads the ground's own light at the foot
+  // of every card — and waiting for it a second time would put weight the
+  // walker has already paid for into the bar that measures what is left.
+  const dressed = needsAt('dress');
+  const wanted = needsAt('plant').filter((id) => !dressed.includes(id));
   // The generated weather, asked for by name and allowed not to be there.
   //
   // THIS IS THE SWITCH. The pieces are a bake of hours and they arrive all at
@@ -581,17 +586,11 @@ function plantWhenReady() {
   Promise.all(wanted.map(ask))
     .then(() => generated())
     .then((relit) => hub.plant({
-      rocks: assets.get('rocks-scene'),
-      rockLight: assets.get('rock-light'),
-      grassAtlas: assets.get('grass-atlas'),
-      propsAtlas: assets.get('props-atlas'),
-      clouds: assets.get('cloud-sprites'),
-      // The silhouette, on its own: see the note over the coverage profile in
-      // tools/build-assets.mjs for why it does not travel in the colour atlas.
-      cover: assets.get('cloud-cover'),
-      cloudSky: assets.get('cloud-equirect'),
+      ...bagFor('plant'),
+      // The one asset the register cannot describe: it is asked for by name,
+      // allowed not to be there, and its own table says how many textures
+      // follow it. See generated() above.
       relit,
-      light: assets.get('terrain-light'),
       frozen: isClockFrozen(),
     }))
     .then(() => calibrate())
