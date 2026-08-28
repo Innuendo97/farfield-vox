@@ -4,6 +4,39 @@
 
 const WINDOW = 60;
 
+// WHAT ELSE GOES ON THE PANEL, AND WHO PUTS IT THERE.
+//
+// Every session is going to want a line of its own -- how many chunks the disc
+// has landed, how many courses the masonry cut, how many lamps the night is
+// drawing -- and the panel is one file. Eight sessions each adding a line to
+// one render function is eight conflicts in a file none of them owns, resolved
+// by whoever rebases last.
+//
+// So a layer registers instead. It hands over a name and a function; the
+// function is given the same `extra` the panel is given and answers with a line,
+// or with nothing at all when it has nothing to say. Registering twice under one
+// name replaces rather than duplicates, so a module reloaded by the dev server
+// cannot stack copies of its own row.
+//
+// The keys are the same problem and get the same answer: the legend at the foot
+// of the panel is one string that every session wants to append to.
+const ROWS = new Map();
+const KEYS = new Map();
+
+/**
+ * @param {string} id      the layer's own id, so a reader knows whose row it is
+ * @param {Function} render given `extra`, answers with a string, an array of
+ *                          strings, or null for "nothing to say this frame"
+ */
+export function addHudRow(id, render) {
+  ROWS.set(id, render);
+}
+
+/** One entry in the legend at the foot of the panel, e.g. "[N] notte". */
+export function addHudKey(id, legend) {
+  KEYS.set(id, legend);
+}
+
 export function isDevMode() {
   return new URLSearchParams(window.location.search).has('dev');
 }
@@ -98,11 +131,25 @@ export function createDevHud(root) {
         );
       }
 
+      // What the layers have to say, in the order they registered. A row that
+      // throws is a row that would take the whole panel down with it, and a
+      // panel is a diagnostic: it must never be the reason a session cannot see
+      // what is wrong.
+      for (const [id, render] of ROWS) {
+        let out = null;
+        try {
+          out = render(extra);
+        } catch (error) {
+          out = `${id.padEnd(8)} ${error.message}`;
+        }
+        if (out) lines.push(...(Array.isArray(out) ? out : [out]));
+      }
+
       lines.push(
         `pos      ${extra.position ?? ''}`,
         `speed    ${extra.speed ?? ''}`,
         `buffer   ${extra.buffer ?? ''}`,
-        '[P] posa  [G] stadi  [V] erba  [B] calibra',
+        ['[P] posa  [G] stadi  [V] erba  [B] calibra', ...KEYS.values()].join('  '),
       );
 
       el.textContent = lines.join('\n');

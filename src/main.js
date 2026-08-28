@@ -13,7 +13,9 @@ import {
 import { engrave, loadEngravingFont } from './world/engraving.js';
 import { createInteraction } from './world/interact.js';
 import { MONOLITHS } from './world/layout.js';
-import { DEFAULT_FOV, POSE_SPAWN, POSE_TARGET } from './core/poses.js';
+import {
+  DEFAULT_FOV, POSE_SPAWN, POSE_TARGET, POSES,
+} from './core/poses.js';
 import { loadLut } from './core/post.js';
 import { createQuality, forgetStored, needsBenchmark } from './core/quality.js';
 import { createBenchmark, tierOf } from './core/bench.js';
@@ -417,9 +419,17 @@ if (dev) {
   // panorama — reachable by a driver that takes the shot as well.
   //
   // It is behind isDevMode, so a visitor's page never defines it.
-  window.setDevPose = (p) => {
+  // BY NAME OR BY NUMBERS. A harness that asks for 'bordo-indietro' and a
+  // verbale that calls it 'bordo-indietro' cannot drift apart; a harness
+  // carrying its own copy of x, z, yaw and pitch drifts the first time one of
+  // them is refitted. The numbers are still accepted, for a pose being swept
+  // rather than one that has a name.
+  window.setDevPose = (asked) => {
+    const p = typeof asked === 'string' ? POSES[asked] : asked;
+    if (!p) throw new Error(`no pose "${asked}" in src/core/poses.js`);
+    const at = p.position || p;
     player.setPose({
-      position: { x: p.x, y: POSE_TARGET.position.y, z: p.z },
+      position: { x: at.x, y: at.y ?? POSE_TARGET.position.y, z: at.z },
       yaw: p.yaw,
       pitch: p.pitch,
     });
