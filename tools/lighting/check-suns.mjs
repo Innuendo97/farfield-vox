@@ -124,9 +124,14 @@ console.log('\nthe seats that author a bake');
 // will shrink again: a seat that is no longer on disk is a seat that can no
 // longer disagree with the others, so it is skipped instead of throwing and
 // taking the rest of the guard down with it.
-for (const path of [
-  'tools/terrain/build-terrain.py',
-]) {
+//
+// AND IT IS NOW EMPTY, which is the shrinking finished rather than the guard
+// lapsed. There is no renderer outside this repository authoring light any
+// more: the two terms of a face are arithmetic in the fragment, over the one
+// direction src/core/sky.js carries. The roster stays because it is the shape
+// the defect would come back in — a new authoring seat with a sun written into
+// it — and an empty list is where such a seat gets added.
+for (const path of []) {
   if (!existsSync(join(REPO_ROOT, path))) continue;
   const source = readFileSync(join(REPO_ROOT, path), 'utf8');
   const literal = /^SUN_(ELEVATION|BEARING)\s*=\s*[-\d.]/m.exec(source);

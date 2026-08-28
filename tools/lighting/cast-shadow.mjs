@@ -3,12 +3,17 @@ import { readSun, sunVector } from './sun.mjs';
 
 // WHERE THE SEALED SUN THROWS A SHADOW, as arithmetic.
 //
-// Three tools need this same answer and were each about to work it out for
-// themselves: the guard that asks which way up a light map is
-// (tools/terrain/check-ground-light.mjs), the fit of the canopy
-// (tools/terrain/fit-canopy.mjs), and the mask of the ground the reference does
-// not contradict. Three copies of one geometry is how this project ended up with
-// three suns, so there is one here instead.
+// Three tools needed this same answer and were each about to work it out for
+// themselves: the guard that asked which way up a light map is, the fit of the
+// canopy (tools/terrain/fit-canopy.mjs), and the mask of the ground the
+// reference does not contradict. Three copies of one geometry is how this
+// project ended up with three suns, so there is one here instead.
+//
+// The first of the three has gone with the bake it guarded — there is no atlas
+// of ground light left to be wound the wrong way round, because the voxel
+// engine writes both terms in the fragment. The seat stays: the geometry is
+// about where the sealed sun throws, which is a fact about the world and not
+// about how the world was baked.
 //
 // It needs no bake: the bodies that cast are boxes, the sun is a direction, and
 // a ray-box against each box in its own frame is the whole calculation. That is

@@ -162,10 +162,10 @@ const META = {
  *
  * A module rather than a JSON import for a second reason, which is measured
  * rather than feared: terrain-field.js reads this field, and terrain-field.js is
- * imported by tools/terrain/build-mesh.mjs, tools/terrain/probe.mjs,
- * tools/vegetation/plan-rocks.mjs and tools/terrain/check-ground-light.mjs under
- * plain node, where a bare JSON import is a syntax error. One artefact both
- * sides can read costs nothing; two would be two fields.
+ * imported by tools/terrain/build-mesh.mjs, tools/terrain/probe.mjs and
+ * tools/vegetation/plan-rocks.mjs under plain node, where a bare JSON import is
+ * a syntax error. One artefact both sides can read costs nothing; two would be
+ * two fields.
  *
  * The cost: 165 888 raw bytes, 221 184 of base64, which the wire compresses back
  * down (see the report the build prints). atob is in both runtimes.

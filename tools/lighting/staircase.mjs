@@ -6,8 +6,8 @@ import { worldToUv, heightAt } from '../../src/world/terrain-field.js';
 import { castShadowTest } from './cast-shadow.mjs';
 import { REPO_ROOT } from './sun.mjs';
 
-// THE STAIRCASE, MEASURED. Not how WIDE a shadow edge is — that is
-// tools/lighting/penumbra.mjs — but how STRAIGHT it is.
+// THE STAIRCASE, MEASURED. Not how WIDE a shadow edge is — the ruler that read
+// that width has gone with the bake it was reading — but how STRAIGHT it is.
 //
 // This is the number the complaint was actually about. A shadow boundary in
 // this world is a straight line on the ground; the atlas samples it on a square
