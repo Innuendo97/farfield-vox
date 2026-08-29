@@ -1,0 +1,257 @@
+{
+  "why": [
+    "WHAT THE MASONRY OF THE TWO TARGETS ACTUALLY IS, AS NUMBERS.",
+    "",
+    "The engine cuts a block into courses from three constants -- a rise, three",
+    "block lengths and a chamfer -- and those three were chosen before anybody",
+    "measured the targets. This file is the measurement. It is spec and not",
+    "mechanism: it says what the wall IS, and src/world/voxel/ says how a wall is",
+    "cut. The two are separate on purpose, because the second is the engine every",
+    "session builds on and the first is one session's reading of one picture.",
+    "",
+    "EVERY NUMBER NAMES THE FILE IT WAS READ IN. Nothing here is a preference and",
+    "nothing here is rounded to look tidy: where the reading has a band, the band",
+    "is written down beside the value, and where two faces disagree both are kept.",
+    "A spec whose numbers cannot be traced back to a window of a target is a taste",
+    "with a schema on it.",
+    "",
+    "AND IT IS NOT ALL CONSUMED YET. tools/monoliths/spec.mjs reports, line by",
+    "line, which of these the frozen engine door can express and which it cannot;",
+    "the ones it cannot are an escalation and not a silence."
+  ],
+
+  "measuredBy": {
+    "session": "V2-AN",
+    "date": "2026-08-29",
+    "targets": [
+      "farfield-day-voxel-target.png",
+      "farfield-night-voxel-target.png"
+    ],
+    "camera": [
+      "The fitted camera published in assets-src/materia/ricetta.json under",
+      "measuredBy.camera -- the V0c fit off the monolith silhouettes, NOT",
+      "POSE_VOX_DAY. That distinction carries weight after E-V8f: the two vox",
+      "poses were refitted to a walker of 1.80 m and moved by 66 to 74 px of",
+      "horizon, and nothing measured at them survives. This camera is a separate",
+      "fit against the target's own stone and did not move, so the readings below",
+      "stand as they were taken."
+    ],
+    "residual": "2.4 px rms, 0.5 px median, over 96 silhouette points on the five blocks"
+  },
+
+  "course": {
+    "why": [
+      "A course is 0.215 m and the honest bar is the window spread, 0.203 to",
+      "0.227. The engine's COURSE 0.22 sits inside it, so this reading does not",
+      "contradict the constant -- and the argument about 0.21 against 0.22 is an",
+      "order of magnitude smaller than the thing that does matter, which is that",
+      "the courses of these walls are NOT ALL THE SAME HEIGHT and do not run",
+      "straight. A ruled grid is what these targets are not."
+    ],
+    "rise": 0.215,
+    "band": [0.203, 0.227],
+    "scatterSd": 0.044,
+    "scatterFraction": 0.21,
+    "runsFrom": 0.16,
+    "runsTo": 0.26,
+    "wanderMedian": 0.030,
+    "wanderP90": 0.035,
+    "nightIndependent": [0.1960, 0.2061, 0.1988],
+    "n": 1546,
+    "source": "v2-pietra/an/out/corso.txt"
+  },
+
+  "block": {
+    "why": [
+      "THE BLOCK OF THIS WALL IS ABOUT SQUARE, and that is the single largest",
+      "divergence between the targets and the engine's defaults. The engine cuts",
+      "0.22 / 0.44 / 0.66 on a 0.22 course, so its mean block is a course and a",
+      "half wide; the targets' mean block is one course wide. Doubles and triples",
+      "exist and are a minority, which is the tail past 0.30 m and not the body of",
+      "the distribution.",
+      "",
+      "TWO MEANS ARE GIVEN AND NEITHER IS WRONG. inWindow is the mean over the",
+      "same window the course was pooled on, which is the number the aspect ratio",
+      "was formed from; overAll is the mean of the whole histogram including the",
+      "tail. Anything that counts blocks has to say which one it used, because the",
+      "two differ by a fifth and a count is linear in it."
+    ],
+    "aspectToCourse": 0.92,
+    "meanWidth": { "inWindow": 0.1888, "window": [0.13, 0.31], "n": 484 },
+    "perFaceMedian": { "01-front": 0.1787, "04-front": 0.1724, "05-front": 0.1690 },
+    "spreadOverMedian": [0.60, 0.67],
+    "doubles": { "over": 0.30, "fraction": 0.17 },
+    "triples": { "over": 0.55, "fraction": 0.04 },
+    "histogram": {
+      "binWidth": 0.03,
+      "why": "counts by lower edge, pooled over 01-front, 04-front and 05-front",
+      "counts": {
+        "0.09": 26, "0.12": 192, "0.15": 132, "0.18": 127, "0.21": 85,
+        "0.24": 59, "0.27": 32, "0.30": 20, "0.33": 26, "0.36": 14,
+        "0.39": 14, "0.42": 14, "0.45": 8, "0.48": 6, "0.51": 5,
+        "0.57": 6, "0.60": 3, "0.63": 4, "0.66": 5, "0.69": 3, "0.72": 3
+      }
+    },
+    "source": "v2-pietra/an/out/blocchi.txt"
+  },
+
+  "joint": {
+    "why": [
+      "The joint of the recipe holds on stone without a change. It was fitted on",
+      "grass and the worry was that stone would want a darker or a wider one;",
+      "measured on five windows of stone with the campaign's own estimator",
+      "imported unchanged, it does not."
+    ],
+    "darken": [0.949, 0.959],
+    "widthPx": [2, 3],
+    "recipeOnGrass": { "darken": [0.948, 0.958], "widthPx": 2 },
+    "source": "v2-pietra/an/out/blocchi.txt"
+  },
+
+  "chamfer": {
+    "why": [
+      "The arris is the same BRIGHTNESS as the recipe's and a different COLOUR.",
+      "The mandate expected stone to read a stronger chamfer than grass and it",
+      "does not: four windows give 1.072 to 1.091 against the recipe's 1.07-1.09.",
+      "What changes is the blue in it -- about twice the recipe's -- and that is a",
+      "material's number, so it belongs to whoever fits the stone and not to",
+      "whoever cuts it."
+    ],
+    "lighten": [1.072, 1.091],
+    "recipeOnGrass": [1.07, 1.09],
+    "blueOverRed": { "range": [0.379, 1.604], "median": 0.84, "recipeOnGrass": 0.43 },
+    "source": "v2-pietra/an/out/blocchi.txt"
+  },
+
+  "head": {
+    "why": [
+      "THE HEADS ARE STEPPED, NOT CRENELLATED. FASE 0 read them as a top course",
+      "with blocks missing; measured column by column they are two to four LEVELS",
+      "that drop over part of the width, which is a different shape and a",
+      "different generator. No upper face of any block is in frame -- the eye is",
+      "at 2.733 m and the lowest head is 4.84 -- so what FASE 0 read as tops were",
+      "the high courses seen from below.",
+      "",
+      "THE LEVELS BELOW ARE RAW AND THE SUMMARY IS DERIVED FROM THEM, which is why",
+      "both are here. Two levels closer together than the merge distance are one",
+      "level, and that distance is DERIVED: a step of one course has to be told",
+      "apart from the WANDER of a course, which is 30 mm at the median and 35 at",
+      "p90, so three times the p90 -- 0.105 m, half a course -- is the separation,",
+      "by the same rule the campaign derives every other tolerance.",
+      "",
+      "MERGING AT ONE WHOLE COURSE WAS TRIED FIRST AND IT WAS WRONG. It swallowed",
+      "01's 0.19 m drop, which is nearly a whole course read on 44% of the width,",
+      "and reported a head with one level on it. The rule that hides the finding",
+      "is worth writing down beside the one that does not.",
+      "",
+      "SO: 1 to 4 levels at a tenth of the width, dropping 0.9 to 6.5 courses --",
+      "which CONFIRMS the coordinator's 1 to 6.5 courses and widens his 2-to-4",
+      "levels at the bottom end. 05 is the block that widens it: it carries one",
+      "level over half its width and a second notch at 9.7%, one tenth of a point",
+      "under the filter. Unmerged and unfiltered the same heads read 4 to 13",
+      "levels, which is the same wall counted without a rule.",
+      "",
+      "metresUp is up the block from ITS OWN foot, so 03 is measured off the",
+      "platform it stands on and not off the meadow."
+    ],
+    "mergeWithin": 0.105,
+    "keepWiderThan": 0.10,
+    "levelsPerHead": [1, 4],
+    "stepDepthCourses": [0.9, 6.5],
+    "levels": {
+      "01-front": { "columns": 111, "peak": 5.60, "metresUp": [[5.60, 23], [4.46, 3], [4.15, 4], [4.25, 4], [4.61, 3], [5.59, 5], [5.41, 49], [5.23, 7]] },
+      "01-left":  { "columns": 42,  "peak": 6.12, "metresUp": [[6.07, 15], [6.08, 6], [6.03, 7], [5.16, 3]] },
+      "02-front": { "columns": 112, "peak": 7.14, "metresUp": [[7.14, 20], [5.80, 3], [5.92, 6], [5.91, 11], [7.10, 16], [6.90, 27], [6.71, 21]] },
+      "03-front": { "columns": 183, "peak": 11.99, "metresUp": [[11.89, 33], [10.15, 4], [10.29, 4], [10.41, 3], [10.52, 4], [11.92, 11], [10.45, 3], [10.56, 3], [10.45, 4], [10.15, 7], [11.98, 48], [11.70, 42], [11.32, 3]] },
+      "04-front": { "columns": 96,  "peak": 5.91, "metresUp": [[5.73, 6], [5.91, 17], [4.49, 6], [4.80, 3], [4.50, 9], [5.88, 42]] },
+      "05-front": { "columns": 93,  "peak": 4.86, "metresUp": [[3.34, 6], [4.68, 6], [4.84, 13], [3.10, 3], [3.70, 3], [4.07, 3], [4.86, 5], [4.86, 8], [4.86, 6], [4.85, 17]] }
+    },
+    "paleTopCourse": {
+      "why": "the top course against the courses three down, on the same face",
+      "ratio": { "01-front": 1.072, "01-left": 1.157, "02-front": 1.303, "03-front": 1.192, "04-front": 2.370, "05-front": 1.002 },
+      "band": [1.00, 2.37]
+    },
+    "missingBlock": {
+      "why": "01 shows one, as a dark recess on its west flank at 5.16 m, three columns wide",
+      "count": 1,
+      "block": "01"
+    },
+    "source": "v2-pietra/an/out/muschio.txt"
+  },
+
+  "quoins": {
+    "why": [
+      "DECLARED BY FASE 0 AND NOT MEASURED, and it is written down rather than",
+      "carried as if it were a reading. The corner is a toothing of blocks and not",
+      "a straight line, which is what FASE 0 saw on the crops; V2-AN did not put a",
+      "number on it, because the two flanks that would show it best are 9 and 10",
+      "px wide. Whoever fits it measures it first."
+    ],
+    "measured": false,
+    "source": "FASE 0, v2-pietra/VERBALE.md"
+  },
+
+  "heads": {
+    "why": [
+      "WHERE THE STONE ACTUALLY STOPS, PER BLOCK, AGAINST THE BOX layout.js",
+      "DECLARES. The boxes are the input to the generator and they stay; what",
+      "changes is that the courses stop where the target's widest head level is,",
+      "not where the box's lid is. Read at the widest level on purpose, so a step",
+      "in the head is not mistaken for the head.",
+      "",
+      "targetHead is metres up the block from its own foot. courses is that height",
+      "in whole courses of 0.215 m, which is the number a generator needs; the",
+      "residual of that rounding is stated because it is not free -- 05's box is",
+      "already right to a centimetre and quantising costs it 9.5 cm, which buys",
+      "04's 35 and 02's 13. The worst block goes from 0.35 m out to 0.10 m out."
+    ],
+    "rise": 0.215,
+    "perBlock": {
+      "01": { "boxHeight": 5.44, "targetHead": 5.41, "courses": 25, "builtHead": 5.375 },
+      "02": { "boxHeight": 7.03, "targetHead": 6.90, "courses": 32, "builtHead": 6.880 },
+      "03": { "boxHeight": 11.84, "targetHead": 11.71, "courses": 54, "builtHead": 11.610 },
+      "04": { "boxHeight": 6.24, "targetHead": 5.89, "courses": 27, "builtHead": 5.805 },
+      "05": { "boxHeight": 4.84, "targetHead": 4.85, "courses": 23, "builtHead": 4.945 },
+      "06": { "boxHeight": 5.20, "targetHead": null, "courses": 24, "builtHead": 5.160 }
+    },
+    "notInFrame": ["06"],
+    "source": "v2-pietra/an/out/scalinata.txt"
+  },
+
+  "stairs": {
+    "why": [
+      "The run layout.js declares is the run the target draws, and this is the one",
+      "line of the plan the measurement CONFIRMS rather than corrects: six steps,",
+      "a tread of 0.36 m, and a rise of 0.2167 m which is one course. Five nosings",
+      "were found at a spacing of 1.04 modelled steps.",
+      "",
+      "AND THERE IS NO CYAN STRIP ON IT, by day or by night. The treads read blue",
+      "and green level with each other -- grey stone under a blue sky, the same",
+      "balance every shaded face in the picture carries -- while the marker beside",
+      "them reads B/G 1.14 and the engraved wall behind them 1.20. What does read",
+      "on a tread is the pale nosing, which is an arris and not a light."
+    ],
+    "steps": 6,
+    "tread": 0.36,
+    "rise": 0.21667,
+    "nosingsFound": 5,
+    "nosingsPerModelledStep": 0.96,
+    "cyanStrip": false,
+    "treadsDay": { "r": 41.5, "g": 53.8, "b": 54.8, "blueOverGreen": 1.018 },
+    "treadsNight": { "r": 11.4, "g": 24.9, "b": 36.8, "blueOverGreen": 1.479 },
+    "source": "v2-pietra/an/out/scalinata.txt"
+  },
+
+  "referenceCounts": {
+    "why": [
+      "The band the chapter declares, from the agreement of two independent",
+      "implementations -- and it was formed on 0.22 / 0.44 / 0.66 masonry. It is",
+      "kept here because a spec that halves the block width has to be counted",
+      "against it rather than beside it: tools/monoliths/spec.mjs does that",
+      "arithmetic and it does not come out inside the band."
+    ],
+    "blockOn05": [506, 512],
+    "allSix": [4801, 5002],
+    "source": "SESSIONI-VOX.md, chapter V2, residue 2"
+  }
+}
