@@ -33,20 +33,40 @@ import { STRIP_REACH } from './path-strip.js';
 // the first session that rewrites the ground material takes it out of here.
 // Said out loud so that nobody reads "frozen" over the whole file and stops.
 
-// Colour the ground fades into, measured on the reference where the meadow
-// meets the standing water at the horizon, and carried as radiance because that
-// is what the frame is built in.
+// Colour the ground fades into, carried as radiance because that is what the
+// frame is built in.
 //
 // It is the air the distance in distant.js is drawn in, and for the same
 // reason: the meadow has to arrive at the horizon as the identical colour the
-// distance already carries, or the join between them is a line. Solved off the
-// reference by tools/terrain/probe.mjs rather than read off it, so the number
-// is what the surface must carry rather than what the frame shows.
+// distance already carries, or the join between them is a line.
 //
-// It is not read from sky.json either, though the two now agree to within a
-// tenth: that one is the air the sky bake fades into over the whole turn, and
-// this is the air the ground fades into in the sector the reference frames.
-export const FOG_RADIANCE = [0.165, 0.339, 0.551];
+// REFITTED AGAINST THE TARGETS' OWN AIR, AND THE OLD NUMBER WAS FIFTEEN LEVELS
+// TOO RED AND TWENTY-TWO TOO LITTLE BLUE. What was measured is a PIXEL and not
+// a radiance: 499 px of clear sky within half a degree of the horizon of the
+// day target, with the frame's corner shading divided out of every sample,
+// reading 115.1 / 169.7 / 204.2 in eight bits. So the constant is not that
+// reading -- it is the radiance that DEVELOPS to that reading through the same
+// chain the frame develops everything through, and it was solved by driving
+// tools/lighting/render-chain.mjs, which is the chain the guards already judge
+// the light with, until the developed air landed on those three numbers.
+//
+// THE RESIDUAL, DECLARED. Rounded to the four decimals this file carries, the
+// constant develops to 115.11 / 169.70 / 204.20: a hundredth of a level on red
+// and under a thousandth on the other two. The measurement it is being fitted
+// to is worth far less than that, and the honest error bar is the one on the
+// two chains rather than on the solve -- the analysis read its pixels through
+// the FITTED POLYNOMIAL of the grade and this reads them through the DELIVERED
+// cube, and on the constants they both had in hand the two disagree by 0.01 to
+// 0.40 of a level. That is the real precision here.
+//
+// AND IT LANDS NEAR A NUMBER NOBODY FITTED IT TO. The sky bake records the
+// dome's own air a degree and a half above the horizon opposite the sun --
+// fogRadiance in assets-src/sky/sky.json, 0.14509 / 0.39725 / 0.85856 -- and
+// this agrees with it to 2% on green and 4% on blue while standing at 45% of
+// its red. The ground's air and the sky's air were a level and a tint apart on
+// two channels of three; they are now apart on one, and the one they are apart
+// on is the one the targets are emphatic about.
+export const FOG_RADIANCE = [0.0648, 0.3903, 0.8946];
 
 // The pale air the stone and the rocks hand back where they are seen almost
 // edge on. Solved off the brightest stretch of the reference's path, which is
@@ -55,6 +75,19 @@ export const FOG_RADIANCE = [0.165, 0.339, 0.551];
 // It lives on here for the stone alone: the grazing gain in monoliths.js was
 // fitted against the five flanks of the reference with this colour behind it,
 // and the two cannot be separated without re-solving the fit.
+//
+// AND THAT IS WHY IT DID NOT MOVE WITH THE AIR ABOVE, WITH THE NUMBER SAID OUT
+// LOUD. Driven through the same chain it develops to 142.4 / 167.3 / 186.6,
+// against the targets' air at 115.1 / 169.7 / 204.2 -- twenty-seven levels too
+// red and eighteen too little blue, a wider gap than the one just closed. The
+// reason it stays is not that the gap is small. It is that this is not the air:
+// it is a grazing return, and in the fragment it stands MULTIPLIED by a gain
+// fitted against five flanks with this very colour behind it. Refitting one
+// half of a product against a measurement of something else is how a fit gets
+// lost, and the other half is already spoken for -- the grazing term's own
+// refit is assigned to the stone session, with its night half waiting on the
+// night session. So this moves when that fit is re-solved, by whoever re-solves
+// it, and until then it is a declared debt and not an oversight.
 export const LOW_SKY = [0.22, 0.40, 0.63];
 
 // Exposure of the ground.
