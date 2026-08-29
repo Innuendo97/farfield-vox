@@ -1518,39 +1518,80 @@ export function planStones({ w, h, y }, slab, cut = PEB) {
   };
 }
 
-// How far each of the five may sit from the reference's own.
+// How far each of the six may sit from the reference's own.
 //
-// SAME RULE AS EVERY TOLERANCE IN THIS FILE: three times what one paving costs
-// when it is measured against itself. The null here is the four corner windows of
-// the reference, each the same 600 pixels the render is read in — the same size
-// matters, because the distance to the nearest joint is shortened by a border and
-// a smaller crop therefore reads a smaller piece. Measured, the four scatter by
-// 4.4 points of slab, 1.0 cm of piece, 0.29 of vary, 4.9 stones a square metre and
-// 1.9 points of shoulder.
-// AND `peb` IS HELD AS A RATIO AND NOT AS A DIFFERENCE, for the reason `pitch`
-// above is. It is a COUNT with a small mean, so three times the scatter of it is
-// 14.7 stones a square metre against a reference of 13.3 — a slack that admits
-// NONE AT ALL, which is not a tolerance, it is an absence of one. Measured the
-// first paving that dismantled the carpet answered exactly that: nought stones,
-// and passed. As a ratio the four windows run 11.4 to 16.4, a factor of 1.44
-// between the extremes, and three times that in the only sense a factor has —
-// 1.44 cubed — is very nearly three. A paving with no stones in it fails, and so
-// does one made of them.
+// SAME RULE AS EVERY TOLERANCE IN THIS FILE — three times what one paving costs
+// when it is measured against itself — AND THE NULL HAS MOVED, because the one it
+// was taken on is not the one this gate makes.
+//
+// WHAT IT WAS. Three times the RANGE of four corner windows of the reference at
+// 600 px: the four scattered by 4.4 points of slab, 1.0 cm of piece, 0.29 of
+// vary, 4.9 stones a square metre and 1.9 points of shoulder, which is where
+// 0.132 / 3.0 / 0.87 / 3.0 / 0.057 came from.
+//
+// WHY IT COULD NOT STAY. The reference is not averaged on four windows of 600 px.
+// planReferenceWindows() takes NINE of 400, and that is the number every render
+// is weighed against — so the tolerance was derived on one reading of the
+// reference and spent on another. On the nine, the same paving disperses two to
+// four times as widely: slab 0.552 to 0.680, piece 4.03 to 6.46 cm, vary 2.63 to
+// 3.11, shoulder 0.140 to 0.191, peb 4.9 to 18.8 a square metre. Three times the
+// range of THOSE is 0.385 / 7.31 / 1.46 / 0.154, against the numbers above — the
+// gate was between two and three times tighter than the reference agrees with
+// itself, and a render could fail it for being exactly as varied as the
+// photograph it copies.
+//
+// AND THREE TIMES THE NINE-WINDOW RANGE IS NOT THE ANSWER EITHER, which is the
+// half of this that a straight application of the rule would have missed. At that
+// slack the injected carpet — a lattice of same-sized cobbles with a crease round
+// every one of them, which is the thing this reading was built to refuse — passes
+// EVERY key: slab, piece, vary, peb, shoulder and cross. A measure that admits
+// the defect it exists for is not a measure, and the self test says so out loud.
+//
+// SO THE NULL IS THE COMPARISON THE GATE REALLY MAKES. It never weighs one window
+// against another. It weighs ONE window of a render against the MEAN OF NINE of
+// the reference — so what a paving costs when it is measured against itself is
+// the deviation of one window FROM THAT MEAN, and three times that is the house
+// rule applied to the reading that is taken instead of to one nobody takes. The
+// worst of the nine deviates by 0.085 of slab, 1.29 cm of piece, 0.287 of vary,
+// 0.027 of shoulder, a factor 2.92 of peb and a factor 1.48 of cross.
+//
+// BOTH DIRECTIONS, MEASURED (v3-sentiero/dev1/e-v3f-riderivata.mjs):
+//
+//   the reference split in two and measured apart  passes on all six
+//   an injected sheet                              fails on all six
+//   an injected carpet                             fails on slab and on shoulder
+//
+// A DIFFERENCE IS TRIPLED AND A RATIO IS CUBED, which is the only sense in which
+// a factor can be multiplied by three. `peb` and `cross` are ratios because both
+// are counts or jumps with small means, and a difference on either admits a
+// paving with none at all.
 export const TOLERANCE_PLAN = {
-  slab: 0.132, piece: 3.0, vary: 0.87, peb: 3.0, shoulder: 0.057, cross: 3.8,
+  slab: 0.255, piece: 3.875, vary: 0.861, peb: 24.913, shoulder: 0.081, cross: 3.235,
 };
-// AND `cross` IS A WITNESS RATHER THAN A GATE, WHICH IS DECLARED AND NOT HIDDEN.
+// AND TWO OF THE SIX ARE WITNESSES RATHER THAN GATES, WHICH IS DECLARED AND NOT
+// HIDDEN.
 //
-// Its tolerance is the house rule applied honestly: the nine windows answer 0.62
-// to 0.97, a factor of 1.56 between the extremes, and three times a factor in the
-// only sense a factor has is 1.56 cubed — 3.8. At that slack it admits a pavement
-// AND a film, so passing it proves little. It is held at that number anyway,
+// `cross` was one already and stays one: at a factor of 3.2 it admits a pavement
+// AND a film, so passing it proves little. It is held at its honest number anyway,
 // because a number nobody may spend is a number nobody reads, and because the
-// EVIDENCE it exists for is on the record either way: this ground read 0.56 while
-// its wear was painted per point, and reads 0.88 against the reference's 0.87
-// with the wear quantised per slab. What would make it a gate is a bigger window
-// — the reading is starved of joints at 400 px — and that is a straight swap for
-// whoever wants it: a plan pose further up the run, where the path is 2.5 m wide.
+// EVIDENCE it exists for is on the record either way — this ground read 0.56 while
+// its wear was painted per point, and 0.88 against the reference's 0.87 with the
+// wear quantised per slab.
+//
+// `peb` JOINS IT, and the reason is the move above. Held as a difference its slack
+// admitted no stones at all; held as a ratio on four corner windows it was 3.0 and
+// bit; held as a ratio on the nine the reference is actually averaged on it is
+// 24.9, because one of those nine windows carries 4.9 stones a square metre where
+// another carries 18.8 — a factor of 3.9 inside one photograph. At 24.9 it still
+// refuses a paving with NO stones, which is the failure that mattered, and it no
+// longer refuses much else. The reading that has to be looked at instead is the
+// LADDER --self prints: the reference goes 480 a square metre at 8 mm to 14.0 at
+// the cut to 1.6 at 35, and a paving made of cobbles does not.
+//
+// What would make either of them a gate is a bigger window — both are starved at
+// 400 px — and that is a straight swap for whoever wants it: a plan pose further
+// up the run, where the paving is wider. It is not a swap this session may make,
+// because moving PLAN_Z moves what every other reading in this block is taken on.
 
 /** A picture as linear luminance, whatever its size. */
 export async function readPlanImage(path) {
