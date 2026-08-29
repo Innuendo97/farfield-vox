@@ -1,4 +1,4 @@
-import SKY from '../../assets-src/sky/sky.json';
+import SKY from '../../assets-src/sky/sky.json' with { type: 'json' };
 import { isClockFrozen } from './devhud.js';
 
 // The shading the reference framing carries, drawn at the front of the frame

@@ -2,7 +2,7 @@ import { ShaderMaterial, Vector2, Vector3 } from 'three';
 import { SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS } from '../../core/sky.js';
 import { FACE_LIGHT_GLSL, faceLightUniforms } from '../face-light.js';
 import { FOG_GLSL, GROUND_EXPOSURE, fogUniforms } from '../air.js';
-import TERRAIN from '../../../assets-src/terrain/terrain.json';
+import TERRAIN from '../../../assets-src/terrain/terrain.json' with { type: 'json' };
 
 // The material of a cube, and the five things the reference was measured to be
 // made of. None of them is a texture and none of them is a byte on the wire.

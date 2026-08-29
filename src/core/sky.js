@@ -2,8 +2,8 @@ import {
   BackSide, BoxGeometry, DataTexture, Mesh, RepeatWrapping,
   ShaderMaterial, Vector2, Vector3, Vector4,
 } from 'three';
-import SKY from '../../assets-src/sky/sky.json';
-import SCENE_LIGHT from '../../assets-src/sky/scene-light.json';
+import SKY from '../../assets-src/sky/sky.json' with { type: 'json' };
+import SCENE_LIGHT from '../../assets-src/sky/scene-light.json' with { type: 'json' };
 
 // The sky, and everything the scene takes from it.
 //

@@ -10,7 +10,7 @@ import { FOG_GLSL, LOW_SKY, fogUniforms } from '../air.js';
 import { faceLightGlsl, faceLightUniforms } from '../face-light.js';
 import { MONOLITHS } from '../layout.js';
 import { STONE_METRES, buildMasonry } from './courses.js';
-import MONOLITH_BAKE from '../../../assets-src/monoliths/monoliths.json';
+import MONOLITH_BAKE from '../../../assets-src/monoliths/monoliths.json' with { type: 'json' };
 
 // The block, built as masonry instead of delivered as a mesh.
 //

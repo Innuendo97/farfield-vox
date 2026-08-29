@@ -8,7 +8,7 @@ import {
 } from '../core/sky.js';
 import { BAKED_TERMS_GLSL, FOG_GLSL, fogUniforms, LOW_SKY } from './air.js';
 import { MONOLITHS } from './layout.js';
-import MONOLITH_BAKE from '../../assets-src/monoliths/monoliths.json';
+import MONOLITH_BAKE from '../../assets-src/monoliths/monoliths.json' with { type: 'json' };
 
 // The six blocks.
 //

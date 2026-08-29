@@ -9,9 +9,9 @@ import {
 } from './terrain-field.js';
 import { MONOLITHS, PLATFORM, STAIRS } from './layout.js';
 import { ROCKS } from './rocks.js';
-import TERRAIN from '../../assets-src/terrain/terrain.json';
-import GRASS from '../../assets-src/vegetation/grass.json';
-import PROPS from '../../assets-src/vegetation/props.json';
+import TERRAIN from '../../assets-src/terrain/terrain.json' with { type: 'json' };
+import GRASS from '../../assets-src/vegetation/grass.json' with { type: 'json' };
+import PROPS from '../../assets-src/vegetation/props.json' with { type: 'json' };
 
 // The grass, the flowers and the bushes.
 //

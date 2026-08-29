@@ -5,7 +5,7 @@ import { createBakedMaterial } from '../air.js';
 import { createMonoliths, STAIR_GLOW } from '../monoliths.js';
 import { createRocks } from '../rocks.js';
 import { glowMesh, stairMesh } from '../stairs.js';
-import TERRAIN from '../../../assets-src/terrain/terrain.json';
+import TERRAIN from '../../../assets-src/terrain/terrain.json' with { type: 'json' };
 
 // THE BUILT STONE. Owned by V2.
 //

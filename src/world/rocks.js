@@ -8,9 +8,9 @@ import {
 import {
   BAKED_TERMS_GLSL, FOG_GLSL, fogUniforms, GROUND_EXPOSURE, LOW_SKY,
 } from './air.js';
-import PLAN from '../../assets-src/rocks/rocks.json';
-import BAKE from '../../assets-src/rocks/rocks-bake.json';
-import PALETTE from '../../assets-src/vegetation/palette.json';
+import PLAN from '../../assets-src/rocks/rocks.json' with { type: 'json' };
+import BAKE from '../../assets-src/rocks/rocks-bake.json' with { type: 'json' };
+import PALETTE from '../../assets-src/vegetation/palette.json' with { type: 'json' };
 
 // The rocks.
 //

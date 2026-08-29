@@ -5,7 +5,7 @@ import {
 import { SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS } from '../../core/sky.js';
 import { FACE_LIGHT_GLSL, faceLightUniforms } from '../face-light.js';
 import { FOG_GLSL, GROUND_EXPOSURE, fogUniforms } from '../air.js';
-import TERRAIN from '../../../assets-src/terrain/terrain.json';
+import TERRAIN from '../../../assets-src/terrain/terrain.json' with { type: 'json' };
 import {
   APRON, EARTH, FOOT, GRAIN, JOINT_DARK, JOINT_LIP, JOINT_SOFT, PATH_BUDGET,
   PEB_EDGE, PEB_LEVEL, PEB_MIX, SKIN_REACH, STONE, STONE_PALE, TUNING,

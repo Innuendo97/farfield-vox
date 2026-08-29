@@ -30,9 +30,9 @@ import {
   CHUNK, DISC_RADIUS, NO_COLUMN, VOXEL,
   createMasonry, runInWorker, stoneTile, voxelMaterial, voxelSettings,
 } from '../world/voxel/index.js';
-import SKY from '../../assets-src/sky/sky.json';
-import SCENE_LIGHT from '../../assets-src/sky/scene-light.json';
-import TERRAIN from '../../assets-src/terrain/terrain.json';
+import SKY from '../../assets-src/sky/sky.json' with { type: 'json' };
+import SCENE_LIGHT from '../../assets-src/sky/scene-light.json' with { type: 'json' };
+import TERRAIN from '../../assets-src/terrain/terrain.json' with { type: 'json' };
 
 // THE MINI-DEMO: one corner of the hub, built the way the recommended lane
 // would build the whole world.

@@ -85,35 +85,39 @@ export function groundHeightAt(x, z) {
 //
 // HOW FAR THE GROUND HAS FALLEN, r METRES FROM THE MIDDLE OF THE WORLD.
 //
-// WHY THERE IS ONE AT ALL. The two targets put standing water seven degrees
-// below the eye and the feet of three rings of ridge with it, and no plane at
-// height nought can be read that way from either pose: for the water to be
-// where it is drawn, the ground beyond the walkable disc has to DESCEND, by
-// 4.6 m at sixty metres, 9.6 at a hundred, 15.8 at a hundred and fifty and 29.4
-// at two hundred and sixty. That is a fact about the shape of the world and not
-// about anybody's material, which is why it is a contract: V1 models the shell
-// from 35 to 100 m against it and V5 carries it out past that, and if the two
-// answered it separately the seam between them would be six degrees of ground.
+// WHY THERE IS ONE AT ALL. The two targets put standing water about three
+// degrees below the eye and the feet of three rings of ridge with it, and no
+// plane at height nought can be read that way from either pose: for the water
+// to be where it is drawn, the ground beyond the walkable disc has to DESCEND.
+// That is a fact about the shape of the world and not about anybody's
+// material, which is why it is a contract: V1 models the shell from 35 to
+// 100 m against it and V5 carries it out past that, and if the two answered
+// it separately the seam between them would be degrees of ground.
 //
-// IT IS A CONE, AND THAT IS A READING AND NOT A CHOICE OF CURVE. Fitted with a
-// straight line, the four measured depths come back within two and a half
-// centimetres over twenty-nine metres of drop, and dropping the innermost of
-// them moves the slope by two ten-thousandths. So the far basin is a plane
-// falling at 0.1239 m per metre -- just over seven degrees -- and no smooth
-// curve is needed to carry it.
+// IT IS A CONE, AND THAT IS A READING AND NOT A CHOICE OF CURVE -- READ TWICE.
+// The first fit (0.1239 m per metre) was taken through the camera the campaign
+// has since refit away from: at the poses the register carries today the two
+// arms of standing water sit at -2.92 and -3.66 degrees, and the old cone put
+// them at -8.00 -- eighty-seven pixels of world too low. Re-read against the
+// true radii of both arms (110.4 and 108.9 m), the left asks 0.0462 and the
+// right 0.0624, AND NO SINGLE CONE SATISFIES BOTH: the 0.74 degrees between
+// them is the floor of the model, not a defect of any session. The slope
+// carried here is the minimax between the two in pixels, with the apex held
+// where the first fit put it, and it leaves a BALANCED RESIDUAL OF +/-6.8 px
+// PER ARM. That residual is part of this contract: a gate that reads the water
+// a few pixels from either target is reading the model, not a mistake.
 //
 // WHAT IS NOT MEASURED IS THE SHOULDER, AND IT IS SAID HERE RATHER THAN HIDDEN
-// IN AN INTERPOLATION. That cone, run back inwards, crosses zero at r = 22.7 --
-// INSIDE the walkable disc -- so it already stands a metre and a half below the
-// rim at r = 35 and cannot both pass through the measurements and meet the disc
-// at its own level. Something has to roll over between the two, the targets say
-// nothing about its shape, and the only honest answer is the tamest curve that
-// leaves the disc flat and joins the cone at the first place anybody measured:
-// a Hermite from (35, nought, level) to (60, the cone, the cone's slope). It
-// stays monotone -- checked, not assumed -- and its steepest point is 25%, at
-// r = 49.6, which makes the rim of the basin twice as steep as its flank. If
-// that reads wrong in a picture, it is this stretch that is wrong and not the
-// cone, and it is twenty-five metres of ground wide.
+// IN AN INTERPOLATION. The cone, run back inwards, crosses zero at r = 22.7 --
+// INSIDE the walkable disc -- so it cannot both pass through the readings and
+// meet the disc at its own level. Something has to roll over between the two,
+// the targets say nothing about its shape, and the only honest answer is the
+// tamest curve that leaves the disc flat and joins the cone at the first place
+// anybody measured: a Hermite from (35, nought, level) to (60, the cone, the
+// cone's slope). It stays monotone -- the form is unchanged by the refit and
+// scales linearly in the slope -- and its steepest point is now 10.9%, at
+// r = 49.6. If that stretch reads wrong in a picture, it is this stretch that
+// is wrong and not the cone, and it is twenty-five metres of ground wide.
 //
 // AND IT DOES NOT REACH heightAt. This is stated here rather than in
 // terrain-field.js on purpose: that file IS the walkable floor, and the basin
@@ -125,9 +129,13 @@ export function groundHeightAt(x, z) {
 const BASIN_SHELL_R = 35;
 /** The innermost radius anybody measured, and where the shoulder lets go. */
 const BASIN_JOIN_R = 60;
-/** Metres of fall per metre of radius, fitted on all four measured depths. */
-const BASIN_SLOPE = 0.123938;
-/** Where that fitted cone would reach height nought, in metres. */
+/**
+ * Metres of fall per metre of radius: the minimax between the two arms of
+ * water read at the register's poses (0.0462 left, 0.0624 right), residual
+ * +/-6.8 px per arm declared above as the model's own floor.
+ */
+const BASIN_SLOPE = 0.0543;
+/** Where the first fit's cone reached height nought; held through the refit. */
 const BASIN_APEX_R = 22.682;
 
 /**
@@ -317,3 +325,8 @@ export function groundLightAt() {
 export function flowerLightPoints() {
   return [];
 }
+
+// The seats a lamp could take along the distant ridges arrive with the
+// cornice session: V5 wires `ridgeLampSeats` here on its own branch, the way
+// the path wired the ground's one hole, and it reaches this file at
+// integration. Until then the name is only a promise written down.

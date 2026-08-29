@@ -6,7 +6,7 @@ import { EYE_HEIGHT, SPAWN } from './layout.js';
 import {
   arcOf, atlasLayout, coeffsFor, relightGlsl, textureLetter,
 } from './cloud-relight.js';
-import CLOUDS from '../../assets-src/clouds/clouds.json';
+import CLOUDS from '../../assets-src/clouds/clouds.json' with { type: 'json' };
 
 // The weather, drawn as bodies.
 //

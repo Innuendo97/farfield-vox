@@ -2,7 +2,7 @@ import {
   BufferAttribute, BufferGeometry, ClampToEdgeWrapping, Mesh, RepeatWrapping,
 } from 'three';
 import { DETAIL, createBakedMaterial } from './air.js';
-import TERRAIN from '../../assets-src/terrain/terrain.json';
+import TERRAIN from '../../assets-src/terrain/terrain.json' with { type: 'json' };
 import {
   GRID, gridToOffset, heightAt, pathCoord,
 } from './terrain-field.js';
