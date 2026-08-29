@@ -123,11 +123,18 @@ export function createDevHud(root) {
       if (buffer) {
         lines.push(`scala    ${renderer.renderScale.toFixed(2)}  ${buffer.width}x${buffer.height}`);
       }
-      if (grass) {
+      // READ DEFENSIVELY, for the reason the layer rows below are wrapped in a
+      // try: this block used to name four fields of the vegetation's stats
+      // outright, and when V4 retired the far ring and the horizon lever with
+      // the mass they were thinning, it threw here once a frame and took the
+      // whole panel down -- in the one place a session goes to find out what is
+      // wrong. A diagnostic may report a missing number; it may not die of one.
+      if (grass && grass.grass) {
+        const flowers = grass.flowers ? ` + ${grass.flowers.placed} fiori` : '';
         lines.push(
-          `erba     ${grass.grass.placed}+${grass.far.placed} carte`,
+          `verde    ${grass.grass.placed} ciuffi${flowers}`,
           `         densita ${grass.density.toFixed(2)} raggio ${grass.radius.toFixed(0)} m`
-            + ` orizz ${grass.horizon.toFixed(2)}`,
+            + (grass.perSquareMetre == null ? '' : `  ${grass.perSquareMetre.toFixed(3)}/m2`),
         );
       }
 
