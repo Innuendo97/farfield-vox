@@ -301,8 +301,8 @@ export function groundHoleAt(x, z) {
 }
 
 /**
- * The two terms of the ground's own light at a point, or null where nobody can
- * yet say.
+ * The two terms of the ground's own light at a point, or null where the ground
+ * is not what is drawn there.
  *
  * V1 FILLS THIS AND V4 EATS IT. A card of grass has to be lit by the ground it
  * stands on, or the meadow separates into blades of one brightness standing in
@@ -310,16 +310,47 @@ export function groundHoleAt(x, z) {
  * bake while the cubes beside them were lit analytically, the cards were the
  * brightest population in the frame.
  *
- * IT IS NULL TODAY AND THAT IS HONEST. The bridge exists, but it is in the
- * vertex shader: src/world/vegetation.js reads the delivered ground atlas at the
- * foot of every card, through the same unpacking every other baked surface uses.
- * There is no CPU-side answer to hand back, because there is no CPU-side copy of
- * that atlas -- and inventing one would be a second opinion about the light.
- * What this seat buys today is the DECLARATION: the coupling is written down,
- * with both owners on it, instead of being discovered when the atlas goes away.
+ * IT ANSWERED NULL, AND NULL HAS STOPPED BEING THE TRUE ANSWER. The reason
+ * written here was that the bridge lived in a vertex shader reading a delivered
+ * atlas, so there was no CPU-side copy to hand back. There is no atlas: the
+ * meadow the disc draws is lit ANALYTICALLY, by faceTerms() in
+ * src/world/face-light.js, out of the face's normal and nothing else. What was
+ * unanswerable is now one line of arithmetic, and a seat that still said null
+ * would be hiding a number it has.
+ *
+ * AND E-V4f.2 ASKED WHETHER IT VARIES ACROSS THE DISC. It does not, and this is
+ * the MEASUREMENT rather than the argument (v1-suolo/analisi/d4-luce.json):
+ *
+ *   * the pair is a function of the NORMAL alone -- the JS re-declaration in
+ *     that tool is checked character for character against the GLSL, so the day
+ *     somebody gives the light a term in position, the tool goes red before this
+ *     comment becomes a lie;
+ *   * meshing the whole disc the way the worker meshes it, all 354 328 normals
+ *     fall in FIVE axis families and not one is off-axis; every top face is
+ *     exactly (0, +1, 0), and tops are 33.11% of them;
+ *   * asked at 6 446 columns spread over the disc, the spread of both terms is
+ *     EXACTLY NOUGHT -- sun 0.7313548788181253, sky 1, at the shipped day sun.
+ *
+ * So V4 may hold the pair constant over the whole meadow and be right, and the
+ * day an occlusion term lands it is this seat that stops being constant, with
+ * V4's own code unchanged.
+ *
+ * NULL WHERE THE GROUND IS CUT AWAY, which is the one place the answer is not
+ * the meadow's: over the corridor V3 draws its own surface with its own tilt,
+ * and handing back a flat top face there would light a blade on the paving by a
+ * ground that is not under it. src/world/path.js answers for that footprint,
+ * with the same three fields, and its own fallback is what runs there.
+ *
+ * @param {number[]} sun  the sun's direction, from the one seat that holds it;
+ *                        the sun term is null without it rather than invented
+ * @returns {{sun: number|null, sky: number, normal: number[]}|null}
  */
-export function groundLightAt() {
-  return null;
+export function groundLightAt(x, z, sun = null) {
+  if (groundHoleAt(x, z)) return null;
+  // n = (0, 1, 0), so the cosine to the beam IS the sun's own vertical and the
+  // sky share is exactly one. Written out rather than dotted, because a dot
+  // product against a constant normal is a way of hiding which number it is.
+  return { sun: sun ? Math.max(0, sun[1]) : null, sky: 1, normal: [0, 1, 0] };
 }
 
 // ------------------------------------------------------- the lamps and the field
