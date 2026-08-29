@@ -225,7 +225,18 @@ export const TUNING = {
     cuts: [0.10, 0.26, 0.64],
     bare: [0.05, 0.12, 0.17],
     gape: 1.05,
-    warm: 0.135,
+    // THE WARM, AND IT IS THE PIGMENT'S ROTATION AND NOT THE MEASUREMENT.
+    //
+    // What was measured is +0.135 of (r-b)/(r+b) between the two stretches IN
+    // THE DEVELOPED FRAME, and a rotation of the pigment does not arrive there
+    // unchanged: the ramp between the two tunings is not finished inside either
+    // band the difference was read on -- at the middle of the near band it is
+    // eight tenths of the way over -- and the light, the air and the tone curve
+    // between the pigment and the pixel compress what is left. Written at 0.135
+    // the frame answered +0.085 across those two bands. It is solved through the
+    // chain instead, on a real render at the fitted camera, which is where the
+    // number has to land.
+    warm: 0.215,
     level: 0.86,
   },
 };
