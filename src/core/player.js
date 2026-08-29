@@ -4,6 +4,7 @@ import {
   EYE_HEIGHT, RUN_SPEED, SPAWN, WALK_SPEED,
 } from '../world/layout.js';
 import { criticalStep, TUNING } from './presence.js';
+import { AVATAR, thirdPersonEye } from './avatar.js';
 
 // THE LOOK IS TWO ANGLES, NOT ONE.
 //
@@ -99,6 +100,10 @@ export class Player {
   // is the one in force. See setPose, which is the only thing that sets it, and
   // update, which is the only thing that hands it back.
   #placedEye = null;
+  // Which person the frame is drawn in, and where the boom put the camera last
+  // time it was asked. 'prima' | 'terza'.
+  #person = 'prima';
+  #rigEye = { x: 0, y: 0, z: 0, arm: 0 };
   #lookRate = 0;
   // Which way the eye is turning and how fast, in degrees a second. lookRate
   // above is unsigned and includes the pitch, because what reads it is a
@@ -385,8 +390,52 @@ export class Player {
     }
   }
 
+  /**
+   * First person or third, and it is one door rather than two.
+   *
+   * The walker does not change: this.position stays the AVATAR's eye in both,
+   * which is what lets the switch be continuous and what keeps every pose, the
+   * survey and the measuring harness meaning the same thing in either. What
+   * changes is where applyTo puts the camera.
+   *
+   * THE FIELD OF VIEW IS THE CALLER'S, as it already is for every pose: third
+   * person asks for RIG.fov, and whoever owns the camera applies it the same
+   * way src/main.js applies a pose's own fov today.
+   *
+   * AND THE TWO FITTED FRAMINGS STAY FIRST PERSON. Their y is where the CAMERA
+   * stood in the reference pictures, not where the avatar stood; placing one of
+   * them in third person would stand the avatar at the camera's altitude and
+   * swing the boom back from there, which is a different picture. They are
+   * camera placements and they are photographed as camera placements.
+   */
+  setPerson(which) {
+    this.#person = which === 'terza' ? 'terza' : 'prima';
+    return this;
+  }
+
+  get person() { return this.#person; }
+
+  /** Where the boom put the camera last frame, for anything that draws a body. */
+  get rigEye() { return this.#rigEye; }
+
   applyTo(camera) {
-    camera.position.copy(this.position);
+    if (this.#person === 'terza') {
+      const stance = this.#stance === null
+        ? this.position.y - EYE_HEIGHT
+        : this.#stance;
+      thirdPersonEye(
+        this.#rigEye,
+        { x: this.position.x, z: this.position.z, stance, yaw: this.#yawF.x },
+        this.#pitchF.x, PITCH_LIMIT, this.#groundHeight, AVATAR.height,
+      );
+      camera.position.set(this.#rigEye.x, this.#rigEye.y, this.#rigEye.z);
+    } else {
+      camera.position.copy(this.position);
+    }
+    // THE AIM IS THE WALKER'S IN BOTH, and in third person that is the whole
+    // of the framing: the camera does not look AT the avatar, it looks where
+    // the walker looks and the boom's offset puts him low and to the left of
+    // the middle, which is where both reference pictures draw him.
     this.#euler.set(this.#pitchF.x, this.#yawF.x, 0);
     camera.quaternion.setFromEuler(this.#euler);
   }
