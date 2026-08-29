@@ -289,16 +289,29 @@ export function groundLightAt() {
  * against a name instead of against V4's internals, and that the day the field
  * lands the night gets it without either session opening the other's file.
  *
- * THE SIGNATURE CARRIES FOUR FIELDS AND NOT THREE. This seat documented
- * {x, z, y} and the ratified contract said {x, z, size}, which is one contract
- * written down twice: the night needs the head of the flower to hang the lamp
- * at AND how big the flower is to size the core and the halo against. The union
- * is what both halves were always asking for, so it is the union that is
- * written here.
+ * THE SIGNATURE CARRIES FIVE FIELDS. This seat documented {x, z, y} and the
+ * ratified contract said {x, z, size}, which was one contract written down
+ * twice: the night needs the head of the flower to hang the lamp at AND how big
+ * the flower is to size the core and the halo against. `kind` is the fifth,
+ * and it is what lets the selection below be made on a fact about the meadow
+ * rather than on an index.
  *
- * @returns {{x: number, y: number, z: number, size: number}[]} in world metres,
- *          y at the head of the flower rather than at the ground under it,
- *          size the width of the flower a lamp is being hung in
+ * AND THE SELECTION IS V7'S, NOT V4'S — WHICH IS THE WHOLE REASON THE LIST IS
+ * LONGER THAN THE ANSWER. V4 publishes EVERY flower it drew: that is a fact
+ * about the day, it is the same list at every hour, and a session that filtered
+ * it would be deciding the night inside the file that owns the meadow. V7 then
+ * lights a SUBSET, under a cap and a radius of its own. The gap is not small
+ * and nobody should discover it at integration: the night target burns 150 to
+ * 250 points where a meadow of this density offers on the order of 8500, so
+ * roughly one flower in forty is lit, and the ones that are lit are near and
+ * clustered rather than sampled evenly. Which forty is the night's taste and
+ * the night's budget, and it is stated here so that neither session mistakes
+ * the length of this array for the number of lamps.
+ *
+ * @returns {{x: number, y: number, z: number, size: number, kind: string}[]} in
+ *          world metres, y at the head of the flower rather than at the ground
+ *          under it, size the width of the flower a lamp is being hung in, kind
+ *          which flower it is — the handle V7 selects on
  */
 export function flowerLightPoints() {
   return [];
