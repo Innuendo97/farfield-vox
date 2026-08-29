@@ -1,9 +1,26 @@
 // The panel behind TAB. It is deliberately thin: a way out to the readable
-// edition of the same material, the list of keys, and the quality setting.
+// edition of the same material, the list of keys, the quality setting — and now
+// the figure, which is the one row here that changes what the world LOOKS like
+// rather than how it runs.
+//
+// THE FIGURE'S ROWS ARE BUILT FROM look.js AND NOT LISTED HERE, which is the
+// difference between a menu and a second copy of the answer. Which bodies exist,
+// which garments can be varied and what each variant is called all live in
+// src/world/avatar/look.js next to the pigments they are made of; this file asks
+// it and lays out what it gets back. Adding a variant is one line there and none
+// here, and a variant that was removed cannot go on being offered.
+import { CORPI, VARIANTS } from '../world/avatar/look.js';
+
+const CAPI = [
+  ['giacca', 'Giacca'],
+  ['jeans', 'Jeans'],
+  ['capelli', 'Capelli'],
+];
 
 const ITEMS = [
   { id: 'contenuti', label: 'Contenuti (edizione testuale)', note: 'Tutto il materiale, in una pagina da leggere' },
   { id: 'comandi', label: 'Comandi', note: 'Tasti e movimento' },
+  { id: 'figura', label: 'Figura', note: 'Chi si vede, e come' },
   { id: 'qualita', label: 'Qualità', note: 'Regolata sulla macchina' },
   { id: 'movimento', label: 'Riduci movimento', note: 'Respiro e passo della camera' },
   { id: 'suono', label: 'Suoni del mondo', note: 'Passi e aria' },
@@ -88,9 +105,30 @@ const CONTROLS = [
   ['Mouse', 'guardarsi intorno'],
   ['E', 'aprire il monolite vicino, poi la voce scelta'],
   ['W S', 'scorrere le voci a pannelli aperti'],
+  ['V', 'passare dalla prima alla terza persona'],
   ['Esc', 'tornare indietro di un passo'],
   ['TAB', 'aprire e chiudere questo menu'],
 ];
+
+/**
+ * A sub-row inside the figure block: a small label and the choices under it.
+ *
+ * The garment rows are indented against the body row because they are subordinate
+ * to it in fact and not only in layout — a variant is a variant OF whoever is
+ * standing there.
+ */
+function subRow(label, list, onChoose) {
+  const wrap = document.createElement('div');
+  wrap.setAttribute('style', 'padding-left:0.125rem;');
+  const name = document.createElement('span');
+  name.className = 'menu-item-note';
+  name.setAttribute('style', 'display:block;padding-bottom:0.25rem;');
+  name.textContent = label;
+  const { row, buttons } = choiceRow(list, onChoose);
+  row.setAttribute('style', `${CHOICE_ROW_STYLE}flex-wrap:wrap;`);
+  wrap.append(name, row);
+  return { wrap, buttons };
+}
 
 function controlList() {
   const list = document.createElement('dl');
@@ -119,6 +157,7 @@ function controlList() {
  */
 export function createMenu(root, {
   contentUrl = 'cv/', onOpen, onClose, quality = {}, motion = {}, sound = {}, music = {},
+  figura = {},
 } = {}) {
   const el = document.createElement('div');
   el.className = 'menu';
@@ -156,6 +195,10 @@ export function createMenu(root, {
   let soundNote = null;
   let musicChoices = null;
   let musicNote = null;
+  let corpoChoices = null;
+  let vistaChoices = null;
+  let figuraNote = null;
+  const capoChoices = new Map();
 
   for (const item of ITEMS) {
     const row = document.createElement('li');
@@ -165,6 +208,42 @@ export function createMenu(root, {
     const note = document.createElement('span');
     note.className = 'menu-item-note';
     note.textContent = item.note;
+
+    if (item.id === 'figura') {
+      figuraNote = note;
+      const head = document.createElement('div');
+      head.className = 'menu-item';
+      head.append(label, note);
+      row.appendChild(head);
+      // THE VIEW FIRST, THEN THE BODY, THEN WHAT IT WEARS, and the order is the
+      // dependency: none of the rest is visible from inside the walker's own
+      // eyes, so offering a body above the switch that shows it would be
+      // offering a choice nobody could see the result of.
+      vistaChoices = subRow(
+        'Vista',
+        [['prima', 'Prima persona'], ['terza', 'Terza persona']],
+        (id) => figura.onChoose?.('vista', id),
+      );
+      row.appendChild(vistaChoices.wrap);
+      corpoChoices = subRow(
+        'Corpo',
+        CORPI.map((c) => [c.id, c.label]),
+        (id) => figura.onChoose?.('corpo', id),
+      );
+      row.appendChild(corpoChoices.wrap);
+      for (const [id, name] of CAPI) {
+        if (!VARIANTS[id]) continue;
+        const sub = subRow(
+          name,
+          VARIANTS[id].map((v) => [v.id, v.label]),
+          (choice) => figura.onChoose?.(id, choice),
+        );
+        capoChoices.set(id, sub.buttons);
+        row.appendChild(sub.wrap);
+      }
+      list.appendChild(row);
+      continue;
+    }
 
     if (item.id === 'qualita') {
       qualityLabel = label;
@@ -307,6 +386,28 @@ export function createMenu(root, {
         return;
       }
       musicNote.textContent = choice === 'muto' ? 'Silenzio' : 'Rada, e presente';
+    },
+
+    /**
+     * Who is standing there and what they are wearing.
+     *
+     * Takes the whole of LOOK rather than one field: the panel has four rows that
+     * are one choice between them, and marking them from a single object is what
+     * makes it impossible for the panel to show a body it is not showing.
+     */
+    setFigura(look, persona = 'prima') {
+      if (!corpoChoices) return;
+      mark(vistaChoices.buttons, persona);
+      mark(corpoChoices.buttons, look.corpo);
+      for (const [id, buttons] of capoChoices) mark(buttons, look[id]);
+      const varied = [...capoChoices.keys()].filter((id) => look[id] !== 'misurata').length;
+      const chi = CORPI.find((c) => c.id === look.corpo)?.label ?? '';
+      const dressed = varied === 0
+        ? 'come nelle immagini'
+        : `${varied} ${varied === 1 ? 'variante' : 'varianti'}`;
+      figuraNote.textContent = persona === 'terza'
+        ? `${chi} — ${dressed}`
+        : `Prima persona — ${chi}, ${dressed}`;
     },
 
     setOpen(next) {

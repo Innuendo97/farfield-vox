@@ -26,6 +26,7 @@ import { createStartOverlay } from './ui/overlay.js';
 import { createSkyVeil } from './ui/veil.js';
 import { createHud } from './ui/hud.js';
 import { createReticle } from './ui/reticle.js';
+import { LOOK, choose } from './world/avatar/look.js';
 import {
   createDevHud, createGradePanel, isClockFrozen, isDevMode,
 } from './ui/devhud.js';
@@ -355,6 +356,25 @@ const hud = createHud(ui, {
   music: {
     onChoose: (next) => hud.menu.setMusic(audio.setMusic(next), audio.available),
   },
+  // THE FIGURE. Two things behind one row, because to a walker they are one
+  // question: who is standing there, and what are they wearing.
+  //
+  // THE VIEW GOES THROUGH V8a's OWN DOOR AND NOT ROUND IT. `player.setPerson` is
+  // the single entrance the third person was delivered with, and it stays the
+  // single entrance: this row calls it and nothing here knows what a boom is.
+  // Until now nothing on the page called it at all — the door existed and had no
+  // handle — so a walker could not see the body the row below dresses.
+  //
+  // THE PERSONALISATION GOES THROUGH look.js AND THE LAYER READS IT. Nothing is
+  // rebuilt, nothing is downloaded and no draw is added; see
+  // src/world/layers/v8-avatar.js.
+  figura: {
+    onChoose: (what, id) => {
+      if (what === 'vista') player.setPerson(id);
+      else choose(what, id);
+      hud.menu.setFigura(LOOK, player.person);
+    },
+  },
 });
 const reticle = createReticle(ui);
 hud.menu.setSound(audio.worldChoice, audio.available);
@@ -362,6 +382,7 @@ hud.menu.setMusic(audio.musicChoice, audio.available);
 quality.onChange((tier, choice) => hud.menu.setQuality(choice, tier.label));
 hud.menu.setQuality(quality.choice, quality.tier.label);
 hud.menu.setMotion(presence.choice, presence.reduced);
+hud.menu.setFigura(LOOK, player.person);
 const menuOpen = () => hud.menu.isOpen;
 
 // The whole cycle of the concept: coming close, the face lighting, the panels
