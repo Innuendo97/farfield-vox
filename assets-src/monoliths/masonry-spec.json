@@ -167,9 +167,42 @@
       "05-front": { "columns": 93,  "peak": 4.86, "metresUp": [[3.34, 6], [4.68, 6], [4.84, 13], [3.10, 3], [3.70, 3], [4.07, 3], [4.86, 5], [4.86, 8], [4.86, 6], [4.85, 17]] }
     },
     "paleTopCourse": {
-      "why": "the top course against the courses three down, on the same face",
-      "ratio": { "01-front": 1.072, "01-left": 1.157, "02-front": 1.303, "03-front": 1.192, "04-front": 2.370, "05-front": 1.002 },
-      "band": [1.00, 2.37]
+      "why": [
+        "ERRATA. The six readings below are NOT the ones this file first carried,",
+        "and the correction is a change of WHERE THE BAND IS TAKEN and not of how",
+        "it is estimated. The line is still V2-AN's own (v2-pietra/an/muschio.mjs",
+        "section 5b: the median luminance of a band one course high under the top,",
+        "against the band two to four courses further down, with the campaign's",
+        "moss detector cutting the green out). What moved is the top.",
+        "",
+        "The first reading put the band under the lid of the BOX layout.js",
+        "declares, because on a target a rectifier knows no other top. But the",
+        "stone the picture DRAWS stops lower than the box -- this same file states",
+        "both numbers in heads.perBlock, and on 04 they differ by 0.435 m -- so on",
+        "that block a third of the band was SKY, and sky over stone reads as a very",
+        "pale top course. That is the whole of the 2.370.",
+        "",
+        "Taken under the drawn stone (targetHead, the same height heads.perBlock",
+        "publishes) the six come back 1.051, 1.161, 1.119, 1.103, 1.096, 1.008:",
+        "median 1.103, and a band a fifth as wide. The finding survives -- the top",
+        "course IS paler than the stone three down, on all six faces -- and what",
+        "does not survive is the claim that one face is nearly two and a half times",
+        "its own body.",
+        "",
+        "The band stays declared rather than averaged away, for the same reason it",
+        "always was: 01-left is 1.161 and 05-front is 1.008, and one law over one",
+        "wall cannot be both."
+      ],
+      "takenUnder": "targetHead, the drawn stone, per heads.perBlock",
+      "ratio": { "01-front": 1.051, "01-left": 1.161, "02-front": 1.119, "03-front": 1.103, "04-front": 1.096, "05-front": 1.008 },
+      "median": 1.103,
+      "band": [1.008, 1.161],
+      "wasTakenUnderTheBox": {
+        "why": "kept, because a correction that erases what it corrected cannot be checked",
+        "ratio": { "01-front": 1.072, "01-left": 1.157, "02-front": 1.303, "03-front": 1.192, "04-front": 2.370, "05-front": 1.002 },
+        "band": [1.00, 2.37]
+      },
+      "source": "v2-pietra/dev2t/pallido.mjs on the day target, v2-pietra/dev3/out/pallido-bersaglio.txt"
     },
     "missingBlock": {
       "why": "01 shows one, as a dark recess on its west flank at 5.16 m, three columns wide",

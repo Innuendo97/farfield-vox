@@ -168,26 +168,28 @@ const STONE_ARRIS_PIGMENT = 0.70;
 //
 // A weathering fact and a reading, not a taste: assets-src/monoliths/
 // masonry-spec.json carries head.paleTopCourse, which is the top course against
-// the courses three down ON THE SAME FACE, over six faces — 1.072, 1.157,
-// 1.303, 1.192, 2.370 and 1.002. The median of those six is what is used, and
-// the band [1.00, 2.37] is declared rather than averaged away: 04 is nearly
-// two and a half times and 05 is flat, and one law over one wall cannot be both.
-// The fade is the measurement's own baseline and not a shape chosen to look
-// right — the reading compares the top course TO THE COURSES THREE DOWN, so
-// three courses is where it has to be back to one.
+// the courses three down ON THE SAME FACE, over six faces. The median of those
+// six is what is used, and the band is declared rather than averaged away,
+// because one law over one wall cannot be both ends of it. The fade is the
+// measurement's own baseline and not a shape chosen to look right — the reading
+// compares the top course TO THE COURSES THREE DOWN, so three courses is where
+// it has to be back to one.
 //
-// AND THE SPEC'S OWN BAND IS RE-READ HERE WITHOUT BEING RE-CUT, because the
-// spec is V2-AN's seat and not this file's. Run again with the same line but
-// the band taken under the stone the picture actually DRAWS rather than under
-// the box layout.js declares — the two differ by up to 0.435 m, and the spec
-// prints both numbers itself — the six come back 1.051, 1.161, 1.119, 1.103,
-// 1.096 and 1.008, median 1.103. The 2.370 on 04 was a band 0.35 m above where
-// that block's stone stops, so a third of it was sky. The value below stays the
-// published median; the re-reading is in the verbale for whoever owns the spec,
-// and the difference between the two is 7% of an effect this estimator cannot
-// separate from face to face at the seat anyway (the render moves 0.028 over
-// the whole sweep against a face-to-face scatter of 0.15).
-const STONE_PALE_TOP = 1.175;
+// AND THE MEDIAN BELOW IS THE ERRATA'S AND NOT THE FIRST READING'S. The spec
+// used to take its band under the lid of the BOX layout.js declares and now
+// takes it under the stone the picture actually DRAWS — the two differ by up to
+// 0.435 m, and on 04 a third of the old band was sky, which is the whole of the
+// 2.370 it used to publish. The six are 1.051, 1.161, 1.119, 1.103, 1.096 and
+// 1.008: median 1.103, band [1.008, 1.161]. The old median was 1.175 and this
+// file shipped it.
+//
+// THE RETUNE IS SMALL AND IS STATED RATHER THAN QUIETLY TAKEN: 1.175 to 1.103
+// is 6% of an effect this estimator cannot separate from face to face at the
+// seat anyway — the render moves 0.028 over the whole sweep against a
+// face-to-face scatter of 0.15 — so what changes on screen is under the noise
+// of the reading. What changes in the ledger is that the constant and the spec
+// state the same number again.
+const STONE_PALE_TOP = 1.103;
 const STONE_PALE_COURSES = 3.0;
 
 // The most head levels this world's masonry is cut into, which is the stair's
