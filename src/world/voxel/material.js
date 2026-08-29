@@ -75,38 +75,35 @@ export function voxelSettings() {
     // and reading the two as the same thing is what makes people ask for an
     // atlas the picture does not contain.
     //
-    // 1.30 IS A CEILING AND NOT A PREFERENCE. Past about this the multiplier on
-    // the albedo reaches through nought at one end while the tone curve flattens
-    // the other, and the measured spread stops moving: swept, it goes 7.8% at
-    // 1.30 and 9.2% at 1.80 and then no further, against the 18.7% the target
-    // reads under the same estimator. The rest of that gap is not here.
+    // 1.80 IS A CEILING AND NOT A PREFERENCE, AND IT IS THE CEILING OF FOUR
+    // READINGS AT ONCE. Swept on the page against the target read the same way,
+    // at the shape and the lean this file now ships:
     //
-    // AND THE CEILING HAS A THIRD CAUSE, MEASURED SINCE: the LADDER. Carried
-    // through this frame's own chain at every point of the sweep, the estimator's
-    // brightest family does keep widening past 1.60 -- but only because the
-    // k-means has stopped cutting by orientation and started cutting by
-    // brightness, and the bottom rung falls out of guard-scala's gate as it does
-    // it. v1-suolo/misure/tinta.mjs section 3 is the table.
+    //     tint    family sd   bottom rung   p90/p10 of a cube   in the middle
+    //     target      18.7%          0.36                3.10           37.9%
+    //     1.30         7.7%          0.30                5.67           21.1%
+    //     1.80         8.9%          0.30                5.20           26.7%
+    //     2.00         9.2%          0.29                5.56           25.1%
+    //     2.40        10.5%          0.26                6.68           24.4%
     //
-    // 1.60 IS REACHABLE AND IS NOT TAKEN, AND THAT IS A DECISION SOMEBODY ELSE'S.
-    // Swept on the page it reads 9.5% of family sd at the demo window against
-    // this setting's 8.1%, with the ladder's bottom rung unmoved -- so the 9.2%
-    // the campaign has been calling a ceiling is beaten. But the OTHER reading of
-    // the same meadow goes the other way, and it is the one that can be taken off
-    // the target directly instead of through a k-means:
+    // 1.80 is the last row where every column moves the right way together. Past
+    // it the family sd keeps rising and NOTHING ELSE DOES: the k-means has
+    // stopped cutting by orientation and started cutting by brightness, the
+    // bottom rung goes with it, and the spread a cube actually has against its
+    // neighbours -- which is read off the target directly and not through any
+    // clustering -- turns round and runs away. Every point of sd past here is
+    // bought from the ladder.
     //
-    //                          family sd    p90/p10 of a cube    sd/mean
-    //     the day target           18.7%                 3.10      40.5%
-    //     tint 1.30                 8.1%                 5.77      54.5%
-    //     tint 1.60                 9.5%                 6.54      61.5%
-    //
-    // This meadow is already spread WIDER cube to cube than the target's, not
-    // narrower; what the family sd is short of is a bright minority, which a
-    // wider uniform draw does not make. Buying the clustered number by moving
-    // further from the unclustered one is a trade about which reading the
-    // campaign is judged on, so it is raised with both numbers and a pair of
-    // crops rather than taken here.
-    tint: 1.30,
+    // AND THE 18.7% IS NOT REACHABLE BY A WIDER DRAW AT ALL, which is the part
+    // worth writing down rather than discovering again. The target's brightest
+    // family is 95 faces out of 944; ours is about 230 out of 615. The target has
+    // a bright MINORITY with a wide spread inside it, and a draw that is
+    // symmetric about its middle cannot make a minority however wide it is made.
+    // That is a statement about the SHAPE of the population and not its width,
+    // and the setting below moves the shape the other way -- toward the middle,
+    // which is what the chequer needed. A bright tail is a third thing, and it is
+    // not in this file yet.
+    tint: 1.80,
     // THE SHAPE OF THE DRAW, WHICH IS THE HALF NOBODY HAD SWEPT.
     //
     // Every number above moves the WIDTH of the tint and none of them moves its
