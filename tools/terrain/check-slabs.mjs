@@ -1089,9 +1089,9 @@ const RETIRED_CLOSE = ['peb-pan', 'peb-verge', 'big'];
 // (`peb`). The two readings this replaces asked the opposite question and got an
 // answer that drove three units into a carpet — see the note over PEB below.
 //
-// AND IT IS READ ON A REAL RENDER, NOT ON A MODEL OF ONE. A camera at PLAN_POSE
-// looks straight down from five and a quarter metres, which lands the ground at
-// exactly PLAN_MM_PER_PX and inside the near material's own fade — so what is
+// AND IT IS READ ON A REAL RENDER, NOT ON A MODEL OF ONE. A plan camera looks
+// straight down from five and a quarter metres, which lands the ground at exactly
+// PLAN_MM_PER_PX and inside the near material's own fade — so what is
 // measured is the paving as the shader actually draws it, atlas and tile and all,
 // with no second implementation of anything.
 //
@@ -1151,21 +1151,59 @@ export const PLAN_MM_PER_PX = 3.0;
 // It is also offset UP the frame to clear the interface: the game's own HUD is
 // not hidden when a frame is shot, because target.png carries it.
 export const PLAN_HEIGHT = 5.268;
-export const PLAN_Z = 5;
-export const PLAN_POSE = {
-  x: pathCentreX(PLAN_Z),
-  y: heightAt(pathCentreX(PLAN_Z), PLAN_Z) + PLAN_HEIGHT,
-  z: PLAN_Z,
+
+// AND THE PLAN IS TWO PLACES, BECAUSE THE PAVING IS TWO TUNINGS.
+//
+// The corridor is one mechanism with two tunings — apron near the walker, the
+// pale middle stretch north of the crossing — and apronAt() puts the whole of
+// the first at z >= 4 and the whole of the second at z <= 0. A plan camera at
+// z = 5 therefore stands in pure APRON: everything it reports is the near
+// tuning, and the middle stretch, which is most of the corridor and the thing
+// both targets are mostly a picture of, was never measured from above at all.
+// That was declared as a residual and not a defect, because ONE pose cannot
+// stand in two tunings; the answer is not to move the pose but to have two.
+//
+// SO THE PLAN DOES NOT MOVE, IT DOUBLES. The apron plan is exactly what it was,
+// to the pixel, so that nothing already taken on it has to be taken again; the
+// middle plan is new, and its window is smaller for a reason that is measured
+// rather than chosen.
+export const PLAN_APRON_Z = 5;
+export const PLAN_MEDIO_Z = -1;
+
+const planPose = (z) => ({
+  x: pathCentreX(z),
+  y: heightAt(pathCentreX(z), z) + PLAN_HEIGHT,
+  z,
   yaw: 0,
   pitch: -90,
   fov: 30,
-};
-// Where it sits is not a taste either: it is centred on the STONE and not on the
-// frame, because the path bends and the camera stands on its middle at one
-// northing only. Measured on the delivered render (s3-dev7/finestra.mjs), stone
-// runs unbroken from x 552 to x 1171 on every row of the window's own rows, and
-// the window is laid inside that with its middle on the stone's.
-export const PLAN_WINDOW = { x: 661, y: 250, side: 400 };
+});
+export const PLAN_POSE_APRON = planPose(PLAN_APRON_Z);
+export const PLAN_POSE_MEDIO = planPose(PLAN_MEDIO_Z);
+
+// Where each window sits is not a taste either: it is centred on the STONE and
+// not on the frame, because the path bends and the camera stands on its middle
+// at one northing only. Measured on the delivered render (s3-dev7/finestra.mjs),
+// stone runs unbroken from x 552 to x 1171 on every row of the apron window's
+// own rows, and the window is laid inside that with its middle on the stone's.
+export const PLAN_WINDOW_APRON = { x: 661, y: 250, side: 400 };
+
+// AND THE MIDDLE WINDOW IS 300 PX = 0.90 M BECAUSE 400 DOES NOT FIT THERE.
+//
+// The corridor narrows going north: 1.243 m across at z = 5 and 1.076 m at
+// z = −1. Asked the stricter question — not what READS as stone in a render,
+// where a slab standing out in the grass is opaque too, but what the corridor's
+// own coverage fills on EVERY row a window would use — the apron window has
+// 1.296 m to sit in and the middle northing has 1.155 m. A 400 px window is
+// 1.200 m and does not fit; at 400 px the stone the rows share is only 374 px.
+// That is the whole reason the plan had settled on the apron, and it is answered
+// by taking a smaller square rather than by standing somewhere the tuning is
+// mixed. Measured: v3-sentiero/fix1/finestra-medio.mjs.
+//
+// Its rows sit 20.5 px above the camera's own row, which is where the apron
+// window's sit, so both clear the interface by the same margin; its middle
+// column is 834, and it leaves 42 px of stone to the left and 43 to the right.
+export const PLAN_WINDOW_MEDIO = { x: 684, y: 300, side: 300 };
 
 // Where the joint is: below this much of the level around it, over a window wider
 // than any slab. Read on a level smoothed at LEVEL_BLUR — a slab is full of grain
@@ -1555,7 +1593,8 @@ export function planStones({ w, h, y }, slab, cut = PEB) {
 // worst of the nine deviates by 0.085 of slab, 1.29 cm of piece, 0.287 of vary,
 // 0.027 of shoulder, a factor 2.92 of peb and a factor 1.48 of cross.
 //
-// BOTH DIRECTIONS, MEASURED (v3-sentiero/dev1/e-v3f-riderivata.mjs):
+// BOTH DIRECTIONS, MEASURED (v3-sentiero/fix1/e-v3f-sdoppiata.mjs, which is the
+// driver of v3-sentiero/dev1/e-v3f-riderivata.mjs relaunched at both sizes):
 //
 //   the reference split in two and measured apart  passes on all six
 //   an injected sheet                              fails on all six
@@ -1565,8 +1604,45 @@ export function planStones({ w, h, y }, slab, cut = PEB) {
 // a factor can be multiplied by three. `peb` and `cross` are ratios because both
 // are counts or jumps with small means, and a difference on either admits a
 // paving with none at all.
-export const TOLERANCE_PLAN = {
+export const TOLERANCE_PLAN_APRON = {
   slab: 0.255, piece: 3.875, vary: 0.861, peb: 24.913, shoulder: 0.081, cross: 3.235,
+};
+
+// AND THE MIDDLE PLAN CARRIES ITS OWN SET, DERIVED THE SAME WAY ON ITS OWN
+// WINDOW, BECAUSE A TOLERANCE BELONGS TO A WINDOW AND NOT TO A FILE.
+//
+// This is the whole of E-V3f said a second time and it is not a formality: the
+// numbers move, and they move because the reading does. planStatistic() takes
+// its base level over a box a quarter of the window across — 100 px at 400 and
+// 75 at 300 — and caps a piece at the window, so nine squares of 300 are a
+// different reading of the same photograph, not the same reading of less of it.
+//
+// ON THE NINE OF 300 the same paving disperses slab 0.564 to 0.676, piece 3.60
+// to 7.20 cm, vary 2.37 to 2.86, shoulder 0.122 to 0.174 and peb 6.2 to 22.2 a
+// square metre, about a mean of slab 0.614, piece 4.94 cm, vary 2.59, shoulder
+// 0.152, peb 12.3. The worst of the nine deviates from that mean by 0.062 of
+// slab, 2.26 cm of piece, 0.268 of vary, 0.030 of shoulder, a factor 2.00 of peb
+// and a factor 1.37 of cross, and three times each of those is the set below.
+//
+// WHICH WAY EACH ONE MOVED, AND IT IS NOT ALL ONE WAY. `slab`, `vary` and
+// `cross` come in TIGHTER than the apron's, and `peb` far tighter — 8.0 against
+// 24.9, because the 3.9-fold split between two of the nine windows of 400 is not
+// there at 300, which brings the stone count most of the way back to being a
+// gate rather than a witness. `piece` goes the other way, 6.78 against 3.88: a
+// piece is capped at the window, and a smaller window is a coarser ruler for the
+// biggest slabs. That is the price of the smaller square and it is paid where it
+// falls rather than averaged away.
+//
+// BOTH DIRECTIONS, MEASURED at 300 (same driver, same subjects):
+//
+//   the reference split in two and measured apart  passes on all six
+//   an injected sheet                              fails on all six
+//   an injected carpet                             fails on slab and on shoulder
+//
+// — the same signature the apron set answers with, which is what says the two
+// sets are one rule applied twice and not two rules.
+export const TOLERANCE_PLAN_MEDIO = {
+  slab: 0.186, piece: 6.779, vary: 0.803, peb: 8.000, shoulder: 0.091, cross: 2.559,
 };
 // AND TWO OF THE SIX ARE WITNESSES RATHER THAN GATES, WHICH IS DECLARED AND NOT
 // HIDDEN.
@@ -1578,20 +1654,66 @@ export const TOLERANCE_PLAN = {
 // its wear was painted per point, and 0.88 against the reference's 0.87 with the
 // wear quantised per slab.
 //
-// `peb` JOINS IT, and the reason is the move above. Held as a difference its slack
-// admitted no stones at all; held as a ratio on four corner windows it was 3.0 and
-// bit; held as a ratio on the nine the reference is actually averaged on it is
-// 24.9, because one of those nine windows carries 4.9 stones a square metre where
-// another carries 18.8 — a factor of 3.9 inside one photograph. At 24.9 it still
-// refuses a paving with NO stones, which is the failure that mattered, and it no
-// longer refuses much else. The reading that has to be looked at instead is the
-// LADDER --self prints: the reference goes 480 a square metre at 8 mm to 14.0 at
-// the cut to 1.6 at 35, and a paving made of cobbles does not.
+// `peb` JOINS IT ON THE APRON PLAN, and the reason is the move above. Held as a
+// difference its slack admitted no stones at all; held as a ratio on four corner
+// windows it was 3.0 and a bit; held as a ratio on the nine of 400 the reference
+// is actually averaged on it is 24.9, because one of those nine windows carries
+// 4.9 stones a square metre where another carries 18.8 — a factor of 3.9 inside
+// one photograph. At 24.9 it still refuses a paving with NO stones, which is the
+// failure that mattered, and it no longer refuses much else. The reading that has
+// to be looked at instead is the LADDER --self prints: the reference goes 480 a
+// square metre at 8 mm to 14.0 at the cut to 1.6 at 35, and a paving made of
+// cobbles does not.
 //
-// What would make either of them a gate is a bigger window — both are starved at
-// 400 px — and that is a straight swap for whoever wants it: a plan pose further
-// up the run, where the paving is wider. It is not a swap this session may make,
-// because moving PLAN_Z moves what every other reading in this block is taken on.
+// ON THE MIDDLE PLAN `peb` IS VERY NEARLY A GATE AGAIN, at 8.0, and that is a
+// measurement and not a hope: the two windows of 400 that were 3.9 apart do not
+// fall that way at 300. `cross` stays a witness at either size.
+
+/**
+ * THE TWO PLANS, EACH AS ONE RECORD.
+ *
+ * A northing, a pose, a window and a tolerance are not four independent choices:
+ * the window is the size that fits the stone at that northing, and the tolerance
+ * is the one derived on nine windows of that size. Handing them round together
+ * is what makes it impossible to weigh a middle-stretch render against the
+ * apron's slack, which is the mistake this record exists to prevent.
+ *
+ * IT IS ALSO WHAT EVERY READING PRINTS. A plan number without the tuning it was
+ * taken in is the thing that went wrong here in the first place.
+ */
+export const PLANS = {
+  apron: {
+    name: 'apron',
+    what: 'the near tuning, under and behind the walker',
+    z: PLAN_APRON_Z,
+    pose: PLAN_POSE_APRON,
+    window: PLAN_WINDOW_APRON,
+    tolerance: TOLERANCE_PLAN_APRON,
+  },
+  medio: {
+    name: 'medio',
+    what: 'the pale middle stretch, north of the crossing',
+    z: PLAN_MEDIO_Z,
+    pose: PLAN_POSE_MEDIO,
+    window: PLAN_WINDOW_MEDIO,
+    tolerance: TOLERANCE_PLAN_MEDIO,
+  },
+};
+
+/** Which of the two plans a run of the tool is about. Apron unless told. */
+export function planTuning(argv = process.argv) {
+  const hit = argv.find((a) => a.startsWith('--tuning='));
+  const name = hit ? hit.slice(9) : 'apron';
+  if (!PLANS[name]) {
+    throw new Error(`--tuning wants ${Object.keys(PLANS).join(' or ')}, not ${name}`);
+  }
+  return PLANS[name];
+}
+
+/** A plan's window in one line, so no reading is printed without its tuning. */
+const planTitle = (p) => `the ${p.name} plan — ${p.what} — camera at z=${p.z}, `
+  + `window ${p.window.side} px = ${(p.window.side * PLAN_MM_PER_PX / 1000).toFixed(2)} m `
+  + `at (${p.window.x}, ${p.window.y})`;
 
 /** A picture as linear luminance, whatever its size. */
 export async function readPlanImage(path) {
@@ -1607,7 +1729,7 @@ export async function readPlanImage(path) {
 }
 
 /** One square window of a plan picture. */
-export function planWindow(img, x0, y0, side = PLAN_WINDOW.side) {
+export function planWindow(img, x0, y0, side) {
   const y = new Float64Array(side * side);
   for (let j = 0; j < side; j++) {
     for (let i = 0; i < side; i++) y[j * side + i] = img.y[(j + y0) * img.w + (i + x0)];
@@ -1616,18 +1738,23 @@ export function planWindow(img, x0, y0, side = PLAN_WINDOW.side) {
 }
 
 /**
- * The four corner windows of the plan reference.
+ * The nine windows of the plan reference, at the size of the reading being made.
  *
- * FOUR AND NOT ONE, because the reference is a picture of a paving and not of one
+ * NINE AND NOT ONE, because the reference is a picture of a paving and not of one
  * slab: its corners hold different amounts of broken ground, and what the render
  * is held to is the average of them with three times their own scatter allowed.
+ *
+ * AND THE SIZE IS AN ARGUMENT AND NOT A DEFAULT, because the reference has to be
+ * averaged on the SAME square the render is read on: planStatistic() takes its
+ * base level over a box a quarter of the window wide and caps a piece at the
+ * window, so nine windows of 400 and nine of 300 are two different readings of
+ * one photograph, and a tolerance derived on either is spendable only on its own.
  */
-export function planReferenceWindows(img) {
-  const s = PLAN_WINDOW.side;
-  const at = [0, Math.round((img.w - s) / 2), img.w - s];
-  const down = [0, Math.round((img.h - s) / 2), img.h - s];
+export function planReferenceWindows(img, side) {
+  const at = [0, Math.round((img.w - side) / 2), img.w - side];
+  const down = [0, Math.round((img.h - side) / 2), img.h - side];
   const out = [];
-  for (const y of down) for (const x of at) out.push(planStatistic(planWindow(img, x, y)));
+  for (const y of down) for (const x of at) out.push(planStatistic(planWindow(img, x, y, side)));
   return out;
 }
 
@@ -1648,7 +1775,7 @@ export const planMean = (list) => {
  * A measure that passes either of these is not measuring what the committente
  * read off his picture.
  */
-export function planDegenerate(kind, side = PLAN_WINDOW.side) {
+export function planDegenerate(kind, side) {
   const y = new Float64Array(side * side);
   const hash = (a, b) => {
     let x = (Math.imul(a, 374761393) + Math.imul(b, 668265263)) >>> 0;
@@ -1801,7 +1928,7 @@ function planArgument() {
   if (i < 0) return null;
   const frame = process.argv[i + 1];
   if (!frame || frame.startsWith('--')) {
-    throw new Error('--plan wants the render of PLAN_POSE that follows it');
+    throw new Error('--plan wants the render of a plan pose that follows it');
   }
   return frame;
 }
@@ -1817,7 +1944,9 @@ const planLine = (label, s) => `  ${label.padEnd(32)}${(s.slab * 100).toFixed(1)
   + `${s.peb.toFixed(1).padStart(8)}`
   + `${(s.pebOnSlab * 100).toFixed(0).padStart(8)}%${s.pebCm.toFixed(1).padStart(8)}\n`;
 
-function reportPlan(reference, s, label) {
+// THE TOLERANCE IS AN ARGUMENT AND NOT A CONSTANT HERE, because there are two
+// sets of it and picking the wrong one is the whole failure this fix is about.
+function reportPlan(reference, s, label, tol) {
   let ok = true;
   const say = (name, got, want, slack, unit, scale = 1) => {
     const off = Math.abs(got - want) * scale;
@@ -1832,16 +1961,16 @@ function reportPlan(reference, s, label) {
       + `  of ${`x${slack.toFixed(2)}`.padEnd(12)}${off > slack ? 'OUT' : 'ok'}\n`);
   };
   process.stdout.write(`  ${label}\n`);
-  say('slab', s.slab, reference.slab, TOLERANCE_PLAN.slab, 'pts', 100);
-  say('piece', s.piece, reference.piece, TOLERANCE_PLAN.piece, 'cm ');
-  say('vary', s.vary, reference.vary, TOLERANCE_PLAN.vary, 'x  ');
+  say('slab', s.slab, reference.slab, tol.slab, 'pts', 100);
+  say('piece', s.piece, reference.piece, tol.piece, 'cm ');
+  say('vary', s.vary, reference.vary, tol.vary, 'x  ');
   // THE ONE THAT REPLACES `peb-pan` AND `peb-verge` AS A TARGET. See the note
   // over PEB: those two counted the reference's grain as stones and the paving
   // that answered them is the carpet the committente threw out.
-  ratio('peb', s.peb, reference.peb, TOLERANCE_PLAN.peb);
-  say('shoulder', s.shoulder, reference.shoulder, TOLERANCE_PLAN.shoulder, 'pts', 100);
+  ratio('peb', s.peb, reference.peb, tol.peb);
+  say('shoulder', s.shoulder, reference.shoulder, tol.shoulder, 'pts', 100);
   // THE ONE THAT SEES A FILM. Held as a ratio, because it IS one.
-  ratio('cross', s.cross, reference.cross, TOLERANCE_PLAN.cross);
+  ratio('cross', s.cross, reference.cross, tol.cross);
   return ok;
 }
 
@@ -1874,8 +2003,8 @@ function reportPlan(reference, s, label) {
 // check-strip-register.mjs takes them, and the render is read against the paving
 // it was actually painted from.
 //
-// THE PROJECTION IS WHAT MAKES THAT EXACT. A camera at PLAN_POSE looks straight
-// down, so the ground under it lies in a plane PERPENDICULAR to the optical axis,
+// THE PROJECTION IS WHAT MAKES THAT EXACT. A plan camera looks straight down, so
+// the ground under it lies in a plane PERPENDICULAR to the optical axis,
 // and the perspective image of such a plane is a plain uniform scale: pixel to
 // world is an offset and a multiply, with nothing to invert and no foreshortening
 // anywhere in the window.
@@ -1993,7 +2122,7 @@ function weaveMarch(seed, side) {
  * `turn` and `wider` are the injections: at their defaults this is the lattice
  * the atlas was painted from, and anything else is a lattice that is NOT.
  */
-export function weaveLattice(x0, y0, side, { turn = 0, wider = 1, at = PLAN_Z } = {}) {
+export function weaveLattice(x0, y0, side, { turn = 0, wider = 1, at = PLAN_APRON_Z } = {}) {
   const s = PLAN_MM_PER_PX / 1000;
   const id = new Float64Array(side * side);
   const joint = new Uint8Array(side * side);
@@ -2204,14 +2333,19 @@ const weaveLine = (label, s) => `  ${label.padEnd(36)}${s.fits.toFixed(3).padSta
   + `${s.weld.toFixed(3).padStart(8)}${s.speck.toFixed(3).padStart(8)}`
   + `${(1000 * s.fineRms).toFixed(1).padStart(9)}\n`;
 
-/** The reference's own grain scatter, which is what `speck` is held to. */
-export function weaveReference(img) {
-  const s = PLAN_WINDOW.side;
-  const at = [0, Math.round((img.w - s) / 2), img.w - s];
-  const down = [0, Math.round((img.h - s) / 2), img.h - s];
+/**
+ * The reference's own grain scatter, which is what `speck` is held to.
+ *
+ * On the SAME square the render is read on, for the reason planReferenceWindows()
+ * carries: a band-pass and a block scatter taken over 300 px and over 400 are two
+ * readings and not one.
+ */
+export function weaveReference(img, side) {
+  const at = [0, Math.round((img.w - side) / 2), img.w - side];
+  const down = [0, Math.round((img.h - side) / 2), img.h - side];
   const rows = [];
   for (const y0 of down) {
-    for (const x0 of at) rows.push(weaveRead(img, x0, y0, s, { lattice: false }));
+    for (const x0 of at) rows.push(weaveRead(img, x0, y0, side, { lattice: false }));
   }
   const mean = (k) => rows.reduce((t, r) => t + r[k], 0) / rows.length;
   const sd = (k) => Math.sqrt(rows.reduce((t, r) => t + (r[k] - mean(k)) ** 2, 0) / rows.length);
@@ -2227,22 +2361,26 @@ export function weaveReference(img) {
 async function weaveMain(shot) {
   const frame = await readPlanImage(shot);
   if (frame.w !== FRAME.width || frame.h !== FRAME.height) {
-    throw new Error(`--weave wants a ${FRAME.width}x${FRAME.height} render of PLAN_POSE`);
+    throw new Error(`--weave wants a ${FRAME.width}x${FRAME.height} render `
+      + 'of a plan pose');
   }
-  // Which plan pose the frame is of. It defaults to the one written down here and
-  // is given for any other, because the lattice this read stands on is the
-  // lattice AT THAT PLACE: see the note in weaveLattice().
+  // WHICH PLAN THE FRAME IS OF, and it is a whole plan and not just a northing:
+  // the window follows the tuning, because the stone is not the same width at
+  // the two. `--at=` stays on top of it for a frame shot at neither, because the
+  // lattice this read stands on is the lattice AT THAT PLACE: see the note in
+  // weaveLattice().
+  const plan = planTuning();
   const atFlag = process.argv.find((a) => a.startsWith('--at='));
-  const at = atFlag ? Number(atFlag.slice(5)) : PLAN_Z;
-  const W = PLAN_WINDOW;
-  process.stdout.write(`  ${shot}, window ${W.side} px at (${W.x}, ${W.y}), `
-    + `${PLAN_MM_PER_PX} mm a pixel, camera at z=${at}\n`);
+  const at = atFlag ? Number(atFlag.slice(5)) : plan.z;
+  const W = plan.window;
+  process.stdout.write(`  ${shot}: ${planTitle(plan)}\n`);
+  process.stdout.write(`  ${PLAN_MM_PER_PX} mm a pixel, camera at z=${at}\n`);
   process.stdout.write(WEAVE_HEAD);
   const got = weaveRead(frame, W.x, W.y, W.side, { at });
   process.stdout.write(weaveLine('this world, on its own lattice', got));
 
   if (existsSync(PLAN_REFERENCE)) {
-    const ref = weaveReference(await readPlanImage(PLAN_REFERENCE));
+    const ref = weaveReference(await readPlanImage(PLAN_REFERENCE), W.side);
     process.stdout.write(`  the reference's own grain: speck ${ref.speck.toFixed(3)}`
       + ` (scatter ${ref.speckScatter.toFixed(3)} over nine windows),`
       + ` fineRms ${(1000 * ref.fineRms).toFixed(1)}\n`);
@@ -2283,7 +2421,7 @@ async function main() {
   if (weaveAt >= 0) {
     const shot = process.argv[weaveAt + 1];
     if (!shot || shot.startsWith('--')) {
-      throw new Error('--weave wants the render of PLAN_POSE that follows it');
+      throw new Error('--weave wants the render of a plan pose that follows it');
     }
     return weaveMain(shot);
   }
@@ -2292,7 +2430,7 @@ async function main() {
   let closeReference = null;
   let closeImage = null;
   let closeRows = null;
-  let planWindows = null;
+  let planNulls = null;
   if (wantsClose) {
     if (!existsSync(CLOSE_REFERENCE)) {
       throw new Error(`the close reference of the material is not here: ${CLOSE_REFERENCE}`);
@@ -2305,7 +2443,14 @@ async function main() {
     if (!existsSync(PLAN_REFERENCE)) {
       throw new Error(`the plan reference of the paving is not here: ${PLAN_REFERENCE}`);
     }
-    planWindows = planReferenceWindows(await readPlanImage(PLAN_REFERENCE));
+    // ONE READING OF THE REFERENCE PER PLAN, because the nine windows are the
+    // size of the square the render is read on. --self asks both; a --plan asks
+    // only the one it was pointed at, and pays for only that one.
+    const picture = await readPlanImage(PLAN_REFERENCE);
+    const wanted = process.argv.includes('--self')
+      ? Object.values(PLANS) : [planTuning()];
+    planNulls = new Map(wanted.map((plan) => [plan.name,
+      { plan, nine: planReferenceWindows(picture, plan.window.side) }]));
   }
 
   // THE MARCH IS PAID FOR ONLY WHEN IT IS ASKED FOR. Naming which pixels of the
@@ -2400,30 +2545,48 @@ async function main() {
     if (!reportClose(closeNear, closeFar, 'one material, split by distance and measured apart')) ok = false;
     if (!reportClose(oddRows, evenRows, 'the same rows interleaved: the noise floor')) ok = false;
 
-    // AND THE PLAN MEASURE, ASKED BOTH WAYS ROUND.
+    // AND THE PLAN MEASURE, ASKED BOTH WAYS ROUND — ONCE PER PLAN.
     //
-    // The four corner windows are the null: one paving, read four times in four
-    // places, and whatever they disagree by is what a paving costs. Then two
-    // pavings that are NOT this one are fed to it, and it has to say so — a
-    // measure that only ever agrees is not a measure. The carpet is the one that
-    // matters: it is the shape this world actually took while it was chasing a
-    // count of bright runs per path width.
-    const planRef = planMean(planWindows);
-    process.stdout.write(PLAN_HEAD);
-    process.stdout.write(planLine('REFERENCE (plan), mean of nine', planRef));
-    planWindows.forEach((s, k) => process.stdout.write(planLine(`  window ${k + 1} of nine`, s)));
-    const spread = (key) => {
-      const v = planWindows.map((s) => s[key]).sort((a, b) => a - b);
-      return v.at(-1) - v[0];
-    };
-    process.stdout.write(`    the nine scatter by: slab ${(spread('slab') * 100).toFixed(1)} pts`
-      + `  piece ${spread('piece').toFixed(2)} cm  vary ${spread('vary').toFixed(2)} x`
-      + `  peb ${spread('peb').toFixed(1)} /m2  shoulder ${(spread('shoulder') * 100).toFixed(1)} pts\n`);
-    // One paving, split in two and measured apart: the diagonals of the four, so
-    // neither half is one side of the picture.
-    if (!reportPlan(planMean(planWindows.filter((_, k) => k % 2 === 0)),
-      planMean(planWindows.filter((_, k) => k % 2 === 1)),
-      'one paving from above, split in two and measured apart')) ok = false;
+    // The nine windows are the null: one paving, read nine times in nine places,
+    // and whatever they disagree by is what a paving costs. Then two pavings that
+    // are NOT this one are fed to it, and it has to say so — a measure that only
+    // ever agrees is not a measure. The carpet is the one that matters: it is the
+    // shape this world actually took while it was chasing a count of bright runs
+    // per path width.
+    //
+    // TWICE, BECAUSE THERE ARE TWO PLANS AND EACH HAS ITS OWN SQUARE AND ITS OWN
+    // SLACK. A set of tolerances that says yes and no in the right places at 400
+    // px has proved nothing whatever about 300, and the file carries both.
+    for (const { plan, nine } of planNulls.values()) {
+      const planRef = planMean(nine);
+      process.stdout.write(`\n  ${planTitle(plan)}\n`);
+      process.stdout.write(PLAN_HEAD);
+      process.stdout.write(planLine('REFERENCE (plan), mean of nine', planRef));
+      nine.forEach((w, k) => process.stdout.write(planLine(`  window ${k + 1} of nine`, w)));
+      const spread = (key) => {
+        const v = nine.map((w) => w[key]).sort((a, b) => a - b);
+        return v.at(-1) - v[0];
+      };
+      process.stdout.write(`    the nine scatter by: slab ${(spread('slab') * 100).toFixed(1)} pts`
+        + `  piece ${spread('piece').toFixed(2)} cm  vary ${spread('vary').toFixed(2)} x`
+        + `  peb ${spread('peb').toFixed(1)} /m2  shoulder ${(spread('shoulder') * 100).toFixed(1)} pts\n`);
+      // One paving, split in two and measured apart: alternate windows, so
+      // neither half is one side of the picture.
+      if (!reportPlan(planMean(nine.filter((_, k) => k % 2 === 0)),
+        planMean(nine.filter((_, k) => k % 2 === 1)),
+        `one paving from above at the ${plan.name} window, split in two and measured apart`,
+        plan.tolerance)) ok = false;
+
+      for (const kind of ['sheet', 'carpet']) {
+        const got = planStatistic(planDegenerate(kind, plan.window.side));
+        process.stdout.write(planLine(`  a ${kind}, which is not this paving`, got));
+        if (reportPlan(planRef, got, `a ${kind} must NOT pass the ${plan.name} plan`,
+          plan.tolerance)) {
+          ok = false;
+          process.stdout.write(`    THE MEASURE ACCEPTS A ${kind.toUpperCase()}\n`);
+        }
+      }
+    }
 
     // The evidence that the stone threshold is the cut between a stone and the
     // grain of a stone, printed rather than asserted: what the same counter
@@ -2436,15 +2599,6 @@ async function main() {
       process.stdout.write(`      at least ${String(least).padStart(2)} mm across:`
         + `${String(c.count).padStart(7)} stones over ${(planWhole.w * planWhole.h * (PLAN_MM_PER_PX / 1000) ** 2).toFixed(1)} m2`
         + ` = ${c.perM2.toFixed(1).padStart(6)} /m2${least === PEB.size[0] ? '   <- the cut' : ''}\n`);
-    }
-
-    for (const kind of ['sheet', 'carpet']) {
-      const got = planStatistic(planDegenerate(kind));
-      process.stdout.write(planLine(`  a ${kind}, which is not this paving`, got));
-      if (reportPlan(planRef, got, `a ${kind} must NOT pass`)) {
-        ok = false;
-        process.stdout.write(`    THE MEASURE ACCEPTS A ${kind.toUpperCase()}\n`);
-      }
     }
 
     process.stdout.write(ok
@@ -2466,28 +2620,35 @@ async function main() {
   let bad = 0;
   if (plan) {
     if (!existsSync(plan)) throw new Error(`no render at ${plan}`);
+    const tuning = planTuning();
+    const W = tuning.window;
     const shot = await readPlanImage(plan);
     // A picture that is already exactly the window is read whole. That is how a
     // plan view composed offline is checked while a coat of paint is being
-    // chosen — the VERDICT is always a real render at PLAN_POSE, which is the
-    // only thing that carries the shader.
-    const exact = shot.w === PLAN_WINDOW.side && shot.h === PLAN_WINDOW.side;
-    if (!exact && (shot.w < PLAN_WINDOW.x + PLAN_WINDOW.side
-      || shot.h < PLAN_WINDOW.y + PLAN_WINDOW.side)) {
-      throw new Error(`${plan} is ${shot.w}x${shot.h}: too small for the plan window`);
+    // chosen — the VERDICT is always a real render at the plan's own pose, which
+    // is the only thing that carries the shader.
+    const exact = shot.w === W.side && shot.h === W.side;
+    if (!exact && (shot.w < W.x + W.side || shot.h < W.y + W.side)) {
+      throw new Error(`${plan} is ${shot.w}x${shot.h}: too small for the `
+        + `${tuning.name} plan window`);
     }
-    const reference = planMean(planWindows);
-    const got = planStatistic(exact ? shot : planWindow(shot, PLAN_WINDOW.x, PLAN_WINDOW.y));
+    // AND THE TUNING IS PRINTED BEFORE THE NUMBERS ARE, not after them. A plan
+    // reading without the tuning it was taken in is exactly what made this file
+    // measure the near paving and call it the paving.
+    process.stdout.write(`  ${planTitle(tuning)}\n`);
+    const reference = planMean(planNulls.get(tuning.name).nine);
+    const got = planStatistic(exact ? shot : planWindow(shot, W.x, W.y, W.side));
     process.stdout.write(PLAN_HEAD);
     process.stdout.write(planLine('REFERENCE (plan), mean of nine', reference));
     const name = plan.replace(/\\/g, '/').split('/').pop();
     process.stdout.write(planLine(name, got));
     process.stdout.write('\n');
-    if (!reportPlan(reference, got, name)) bad++;
+    if (!reportPlan(reference, got, `${name}, against the ${tuning.name} plan`,
+      tuning.tolerance)) bad++;
     if (!frames.length && !close) {
       process.stdout.write(bad
-        ? '\nthe paving from above is not the reference texture\'s.\n'
-        : '\nthe paving from above is the reference texture\'s.\n');
+        ? `\nthe ${tuning.name} paving from above is not the reference texture's.\n`
+        : `\nthe ${tuning.name} paving from above is the reference texture's.\n`);
       if (bad) process.exitCode = 1;
       return;
     }
