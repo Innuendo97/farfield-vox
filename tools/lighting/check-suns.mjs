@@ -76,7 +76,6 @@ const CONSUMERS = [
   'assets-src/clouds/plates.json',
   'tools/clouds/cloud-pieces.mjs',
   'assets-src/terrain/terrain.json',
-  'assets-src/rocks/rocks-bake.json',
 ];
 
 const WAIVERS = new Map();
@@ -240,9 +239,13 @@ checkAngles('tools/clouds/cloud-pieces.mjs', 'the cloud piece generator carries 
 // ------------------------------------------------------------- what was baked
 if (!sourcesOnly) {
   console.log('\nthe light that has actually been baked');
+  // ONE LEFT, AND THE SHRINKING IS THE POINT. The rocks were here until V2
+  // rebuilt them as cubes: their manifest was a Cycles bake of the light on ten
+  // decimated spheres, and it is not re-authored under the seat, it is GONE —
+  // the file, the mesh, the atlas and the waiver that covered it, in one act.
+  // A consumer that no longer exists cannot disagree with the seat.
   const baked = [
     ['assets-src/terrain/terrain.json', 'the ground and the stair'],
-    ['assets-src/rocks/rocks-bake.json', 'the rocks'],
   ];
   for (const [path, what] of baked) {
     if (!existsSync(join(REPO_ROOT, path))) {

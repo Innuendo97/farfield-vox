@@ -42,19 +42,20 @@
       "role": "lightmap",
       "source": "monoliths/monolith-light.png",
       "priority": "critical"
-    },
-    {
-      "id": "rocks-scene",
-      "type": "model",
-      "source": "rocks/rocks.glb",
-      "priority": "high"
-    },
-    {
-      "id": "rock-light",
-      "type": "texture",
-      "role": "lightmap",
-      "source": "rocks/rock-light.png",
-      "priority": "high"
     }
+  ],
+  "retired": [
+    "rocks-scene (rocks/rocks.glb) and rock-light (rocks/rock-light.png) were the",
+    "last two assets this layer asked for at any arrival, and they are gone with the",
+    "sources they named. The rocks are piles of cubes on the world's own lattice now,",
+    "generated in src/world/rock-piles.js from the plan the reference camera traced,",
+    "and drawn by the stone material the six blocks are drawn by. The layer's `plant`",
+    "phase went with them: it had nothing left to build.",
+    "",
+    "The six entries above are the same debt one step behind: the blocks and the",
+    "stair no longer read any of them either -- v2-pietra declares `needs: []` at",
+    "dress -- but their sources are still on disk and retiring them is a separate",
+    "act with its own verification. Named here so the next hand knows the fragment",
+    "is not finished emptying."
   ]
 }
