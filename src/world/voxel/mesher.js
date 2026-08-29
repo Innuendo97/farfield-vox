@@ -379,10 +379,103 @@ function takesGrain(ix, iz) {
 }
 
 // ======================================================================
+// WHERE THE GROUND IS CUT AWAY, AND WHO IS ENTITLED TO SAY SO.
+//
+// The corridor is not this engine's. Where it runs, the ground belongs to the
+// session that draws the paving, and the disc lays no column under it -- which
+// is a fact the disc has to KNOW and has never been told. What it used a
+// straight passage for instead: half a metre of run and one half width either
+// side, which is a corridor drawn with a ruler over one that wanders.
+//
+// MEASURED, THAT APPROXIMATION LEAVES COLUMNS STANDING UNDER FULL STONE. The
+// world's own answer is groundHoleAt in src/world/contracts.js -- pathHoleAt,
+// which reaches out to 1.28 half widths and lives wherever there is any paving
+// at all rather than only where there is half of it. Between the two predicates
+// the disc lays 923 columns at the fourteen metres three tiers ship and 2 091 at
+// thirty five, and 277 of the fourteen stand under paving that is fully opaque,
+// up to 72 cm proud of the stone drawn over them (v1-suolo/misure/d4b-buco.json).
+//
+// AND THEY ARE NOT ALL INVISIBLE, WHICH IS MEASURED AND NOT ASSUMED. The 277
+// under opaque stone are; the other 646 stand between 1.10 and 1.28 half widths,
+// where the corridor's own surface is already fading, so what they were was a
+// cubic kerb along both verges of the paving. Taking them out is seen: 2.64% of
+// the frame at vox-giorno against a null control of 0.13%, nothing at all at
+// picco-85, and the changed pixels are the two verges and nothing else
+// (v1-suolo/misure/d4b-visibile.json, and the crops beside it).
+//
+// SO WHY IS IT A SEAT AND NOT AN IMPORT. Because the import is a ring: contracts
+// reads columnTop from this file to answer for the walker's floor, and the path
+// reads the contract. A mesher that imported the contract back would close it,
+// and it would drag the corridor's whole file into the worker -- which is the
+// one module graph in this world that is kept to arithmetic on purpose.
+//
+// So the engine keeps a SEAT and its own approximation sits in it until someone
+// who can see the whole world says otherwise. That is setGroundDiscRadius's
+// shape exactly, and it buys the same property: three arguments to meshChunk
+// still lay bit for bit the disc they always laid, and what ships is what the
+// page injected.
+
+/**
+ * The corridor's footprint, as a FORM and not as one pair of numbers.
+ *
+ * Both answers in this world have this shape -- some of the run, some of the
+ * half width -- so the shape is written once and the numbers are the argument.
+ * `pathRun` and `pathCoord` are the field's own, read and never copied.
+ *
+ * @param {number} run  how much paving there has to be at a northing to count
+ * @param {number} coord  how many half widths off the centreline it reaches
+ */
+function corridorHole(run, coord) {
+  return (x, z) => pathRun(z) > run && Math.abs(pathCoord(x, z)) < coord;
+}
+
+// The engine's own answer: a straight passage, and the only one it can give
+// without being told. It is what sits in the seat below when nobody has spoken.
+const PAVING = corridorHole(0.5, 1);
 
 /** Whether a point stands on the paving, which is not voxel and never becomes one. */
 export function onPaving(x, z) {
-  return pathRun(z) > 0.5 && Math.abs(pathCoord(x, z)) < 1;
+  return PAVING(x, z);
+}
+
+// Who answers for the hole. The engine's own approximation until it is told.
+let groundHole = onPaving;
+
+/**
+ * Who says where the ground is cut away, told to the engine that lays no column
+ * under it.
+ *
+ * AN ADDITION AND NOT A CHANGE OF DOOR. meshChunk, meshDisc, columnTop and
+ * chunkList keep their names, their arguments and their meaning; a caller that
+ * never comes here lays the disc this file has always laid.
+ *
+ * TWO ADMISSIBLE ARGUMENTS, AND THE SECOND ONE IS A THREAD.
+ *
+ *   A FUNCTION is the honest form and the one every caller that can reach the
+ *   contract uses: src/world/layers/v1-suolo.js hands over groundHoleAt itself,
+ *   so the disc and the walker's floor are one answer and not two that agree.
+ *
+ *   THE TWO NUMBERS exist because the disc is cut in a WORKER, and a worker is
+ *   a module graph of its own that no function can be posted into. The corridor
+ *   travels there as data -- exactly as the radius does -- and is rebuilt here,
+ *   through the same pathRun and pathCoord the contract's own predicate calls.
+ *   That reconstruction is a RE-STATEMENT and it is pinned rather than trusted:
+ *   over every column of the disc, at all three radii the world can lay, it
+ *   answers the contract's own groundHoleAt with ZERO disagreements
+ *   (v1-suolo/misure/d4b-buco.json), and the day it stopped, the page would draw
+ *   a different disc from the engine and the green gate in
+ *   v1-suolo/analisi/quota-disegnata.mjs would say so.
+ *
+ * @param {Function|{run: number, coord: number}} hole  the predicate, or the
+ *        corridor's two numbers for a thread that cannot be handed one
+ * @returns {Function} what now sits in the seat
+ */
+export function setGroundHole(hole) {
+  if (typeof hole === 'function') groundHole = hole;
+  else if (hole && Number.isFinite(hole.run) && Number.isFinite(hole.coord)) {
+    groundHole = corridorHole(hole.run, hole.coord);
+  } else groundHole = onPaving;
+  return groundHole;
 }
 
 /** Whether a point stands inside the block's own footprint. */
@@ -441,7 +534,9 @@ export const NO_COLUMN = -32768;
 export function columnTop(ix, iz, tuft = true, radius = DISC_RADIUS) {
   const { x, z } = columnCentre(ix, iz);
   if (Math.hypot(x - CENTRE.x, z - CENTRE.z) > radius) return EMPTY;
-  if (onPaving(x, z)) return EMPTY;
+  // THE SEAT AND NOT THE APPROXIMATION, which is the whole of this line's
+  // history: until somebody injects, the two are the same function.
+  if (groundHole(x, z)) return EMPTY;
   if (insideBlock(x, z)) return EMPTY;
   const step = Math.round(heightAt(x, z) / VOXEL);
   if (!tuft) return step;

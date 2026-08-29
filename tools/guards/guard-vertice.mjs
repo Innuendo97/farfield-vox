@@ -1,9 +1,17 @@
-import { chunkList, meshChunk } from '../../src/world/voxel/pure.js';
+import { chunkList, meshChunk, setGroundHole } from '../../src/world/voxel/pure.js';
+import { groundHoleAt } from '../../src/world/contracts.js';
 import { TIERS } from '../../src/core/quality.js';
 import { lineOf, read, reporter, selfTest, walk } from './lib.mjs';
 
 /** The largest disc any tier lays, which is the biggest one that ships. */
 const SHIPPED_RADIUS = Math.max(...TIERS.map((t) => t.voxelDiscRadius));
+
+// And where the ground is cut away, from the seat the page fills. Nothing here
+// reads a COUNT -- this guard is about the shape of a chunk's buffers, and any
+// real chunk would do -- but the note below says the guard must not mesh a disc
+// the world does not lay, and since the corridor's own hole went into the engine
+// that sentence has a second half. It costs one call.
+setGroundHole(groundHoleAt);
 
 // NEVER A PER-VOXEL PROPERTY IN A VERTEX ATTRIBUTE, AND THE PRICE IS MEASURED.
 //

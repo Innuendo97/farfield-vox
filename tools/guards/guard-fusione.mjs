@@ -1,4 +1,5 @@
-import { meshDisc } from '../../src/world/voxel/pure.js';
+import { meshDisc, setGroundHole } from '../../src/world/voxel/pure.js';
+import { groundHoleAt } from '../../src/world/contracts.js';
 import { TIERS } from '../../src/core/quality.js';
 import { reporter, selfTest } from './lib.mjs';
 
@@ -10,6 +11,15 @@ import { reporter, selfTest } from './lib.mjs';
 // so a guard reading the default while the tiers laid something smaller would
 // report a number flattering to a world nobody draws.
 const SHIPPED_RADIUS = Math.max(...TIERS.map((t) => t.voxelDiscRadius));
+
+// AND THE CORRIDOR IS TOLD TO THE ENGINE, FOR THE SAME REASON AND IN THE SAME
+// SENTENCE. The engine's own answer to "where is the ground not mine" is a
+// straight passage it can work out without being told; the page injects the
+// world's own -- groundHoleAt -- and the disc that ships is 923 columns smaller
+// for it at this radius (v1-suolo/misure/d4b-buco.json). A guard left on the
+// engine's default would weigh a disc nobody draws, which is the very thing the
+// paragraph above exists to forbid.
+setGroundHole(groundHoleAt);
 
 
 // HOW WELL THE GREEDY MESHER FUSES THE FIELD, MEASURED AND NOT CLAIMED.
@@ -70,7 +80,18 @@ const SHIPPED_RADIUS = Math.max(...TIERS.map((t) => t.voxelDiscRadius));
 // the disc actually ships, so it follows the ship wherever the ship goes:
 //
 //   clump 0.85 alone (grana 0.45)   ships 1.4442   wall 1.50
-//   grana 0.53 on top of it         ships 1.5261   wall 1.59   <- now
+//   grana 0.53 on top of it         ships 1.5261   wall 1.59
+//   the corridor's own hole         ships 1.5270   wall 1.59   <- now
+//
+// THE LAST ROW MOVED THE SHIP AND DID NOT MOVE THE WALL, and that is worth
+// saying rather than leaving to be noticed. The disc stopped laying 923 columns
+// that stood under the paving; a column carries roughly its own quads, so the
+// RATIO barely moves -- 1.5261 to 1.5270, nine ten-thousandths -- while the
+// world got 1 356 quads and 2 712 triangles cheaper. 4.15% over the new ship
+// still rounds to 1.59. A fusion figure that rises while the bill falls is the
+// honest reading of a ratio whose denominator lost its cheapest columns, and it
+// is exactly why E-V1b retired this metric: the triangles are in
+// v1-suolo/misure/d4b-buco.json and quota-disegnata.mjs is where they gate.
 //
 // What is forbidden by E-V1b is moving a wall SO THAT A NUMBER CAN PASS. What
 // is done here is holding the margin fixed and letting the wall follow the
@@ -142,7 +163,7 @@ if (process.argv.includes('--self')) {
     {
       what: 'the measurement itself still lands where the shape and grain put it',
       caught: Math.abs(meshDisc(null, true, SHIPPED_RADIUS).quadsPerColumn
-        - 1.5260655342314715) < 1e-12,
+        - 1.5269856275055582) < 1e-12,
     },
   ]);
 }

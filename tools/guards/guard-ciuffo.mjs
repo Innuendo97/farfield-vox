@@ -1,4 +1,5 @@
-import { TUFT_CORRELATION, TUFT_GATE, meshDisc } from '../../src/world/voxel/pure.js';
+import { TUFT_CORRELATION, TUFT_GATE, meshDisc, setGroundHole } from '../../src/world/voxel/pure.js';
+import { groundHoleAt } from '../../src/world/contracts.js';
 import { TIERS } from '../../src/core/quality.js';
 import { reporter, selfTest } from './lib.mjs';
 
@@ -10,6 +11,14 @@ import { reporter, selfTest } from './lib.mjs';
 // so a guard reading the default while the tiers laid something smaller would
 // report a number flattering to a world nobody draws.
 const SHIPPED_RADIUS = Math.max(...TIERS.map((t) => t.voxelDiscRadius));
+
+// AND THE CORRIDOR IS TOLD TO THE ENGINE, for the same reason as the radius: the
+// page injects the world's own answer for where the ground is cut away
+// (groundHoleAt), and the disc that ships is 923 columns smaller for it
+// (v1-suolo/misure/d4b-buco.json). BOTH ARMS BELOW ARE MESHED WITH IT, which is
+// what keeps the difference between them a fact about the CARPET: the bare field
+// lost the same columns the carpeted one did.
+setGroundHole(groundHoleAt);
 
 
 // THE TWO DIALS THAT MOVE THE GEOMETRY OF THE WORLD WHILE LOOKING LIKE TASTE.
@@ -86,7 +95,18 @@ const AT_APPROVED = { on: 1.5362, off: 0.1903, carpet: 1.3459 };
 //
 // This is the yardstick a DRIFT is read against, because a drift is something
 // nobody meant. The line above is the yardstick a DECISION is read against.
-const AT_TODAY = { on: 1.5261, off: 0.1903, carpet: 1.3358 };
+//
+// AND IT WAS RE-BASED ONCE MORE, BY A DECISION AND NOT BY A DRIFT. The disc
+// stopped laying the 923 columns that stood under the corridor's own paving --
+// authorised at E-V1g, measured in v1-suolo/misure/d4b-buco.json -- so both arms
+// of this row are 923 columns lighter than they were: 1.5261 -> 1.5270 with the
+// carpet, 0.1903 -> 0.1919 bare, and the CARPET ALONE 1.3358 -> 1.3351. The
+// carpet fell by seven ten-thousandths and the two full discs ROSE, because the
+// columns that went were the flattest and cheapest in the world -- ground under
+// stone -- and a ratio that loses its cheapest denominator goes up while the
+// bill goes down. The bill is 1 356 quads and 2 712 triangles, in the same file.
+// A row left behind at 1.3358 would have called a decided change a drift.
+const AT_TODAY = { on: 1.5270, off: 0.1919, carpet: 1.3351 };
 
 /** Whether a constant is still the frozen one. Bit for bit: these are dials. */
 export const frozen = (actual, expected) => actual === expected;

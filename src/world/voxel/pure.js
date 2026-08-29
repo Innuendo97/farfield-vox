@@ -35,6 +35,7 @@ export {
   meshDisc,
   moundAt,
   onPaving,
+  setGroundHole,
   tuftAt,
 } from './mesher.js';
 

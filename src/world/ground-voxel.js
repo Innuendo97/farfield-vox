@@ -74,12 +74,21 @@ const chunkKey = (cx, cz) => `${cx},${cz}`;
  *                                   which is what it costs to not do this.
  * @param {number}  options.radius   how far the ten centimetre ground reaches,
  *                                   in metres. The tier's, never this file's.
+ * @param {object}  options.hole     where the ground is cut away, as the two
+ *                                   numbers of the corridor's own footprint.
+ *                                   The disc is meshed in a WORKER and a worker
+ *                                   cannot be handed a function, so the layer
+ *                                   that knows the contract sends this instead
+ *                                   and the engine's seat rebuilds it there.
+ *                                   Nought says nothing, and the engine answers
+ *                                   with its own approximation.
  * @returns {object} the group to hang, the floor the cubes make, and the numbers
  */
 export function createGroundVoxel({
   dispose = true,
   boundingFromWorker = true,
   radius = DISC_RADIUS,
+  hole = null,
 } = {}) {
   const group = new Group();
   group.name = 'ground-voxel';
@@ -346,8 +355,11 @@ export function createGroundVoxel({
     // that changes when somebody edits that default. The radius is named for
     // the same reason and with more force: the disc the TIER asked for is the
     // disc the page has to lay, and a page that let the engine's default answer
-    // would draw a world nobody chose the moment the two parted company.
-    worker = runInWorker({ tuft: true, radius }, receive);
+    // would draw a world nobody chose the moment the two parted company. The
+    // corridor rides along for the same reason and with the same force: the
+    // thread that cuts the disc is the one that has to know where the ground is
+    // not its own, and it cannot ask.
+    worker = runInWorker({ tuft: true, radius, hole }, receive);
   }
 
   return {

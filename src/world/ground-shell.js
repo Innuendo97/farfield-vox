@@ -131,9 +131,19 @@ function buildShell(radius) {
     for (let s = 0; s < SPOKES; s++) {
       const s1 = (s + 1) % SPOKES;
       // THE PAVING IS NOT THIS SHEET'S, and where it runs out under the rim the
-      // sheet stands aside rather than fighting the ground that draws it. It is
-      // the same rule the disc lays no column under: onPaving is the engine's
-      // and there is one of it.
+      // sheet stands aside rather than fighting the ground that draws it.
+      //
+      // AND IT IS NO LONGER THE SAME RULE THE DISC LAYS NO COLUMN UNDER, which
+      // is said here because it used to be and the two files were written as if
+      // it always would be. The disc now stands aside on the CORRIDOR's own
+      // answer, injected by the layer (see setGroundHole in voxel/mesher.js);
+      // this sheet keeps the engine's straight passage, DELIBERATELY. The two
+      // surfaces never cover the same ground -- the sheet begins exactly where
+      // the disc ends -- so there is no seam between them to disagree about, and
+      // widening what the sheet drops would open the band between one and 1.28
+      // half widths to the bent grid beneath, out past the rim, where the
+      // corridor's own surface is already fading. That is a change to a picture,
+      // and this unit's change is 923 columns nobody can see.
       const rMid = (ringRadius(i, inner) + ringRadius(i + 1, inner)) / 2;
       const aMid = ((s + 0.5) / SPOKES) * Math.PI * 2;
       if (onPaving(AREA_CENTER.x + Math.cos(aMid) * rMid,

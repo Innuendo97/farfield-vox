@@ -1,4 +1,6 @@
-import { DISC_RADIUS, chunkList, meshChunk } from './mesher.js';
+import {
+  DISC_RADIUS, chunkList, meshChunk, setGroundHole,
+} from './mesher.js';
 import { buildMasonry, stoneTileData } from './courses.js';
 import { MONOLITHS } from '../layout.js';
 
@@ -35,11 +37,27 @@ import { MONOLITHS } from '../layout.js';
 // few hundred vertices of bent grid built in a millisecond on the main thread,
 // and moving it onto this one would buy nothing and cost the one thing this
 // thread is for — the disc's own arithmetic arriving as early as it can.
+//
+// AND THE CORRIDOR ARRIVES THE SAME WAY THE RADIUS DOES, WHICH IS THE ONLY WAY
+// IT CAN. Where the ground is cut away is the CONTRACT's answer, and a contract
+// is a function: it cannot be posted across a thread, and importing it here
+// would pull the corridor's whole file into the one module graph in this world
+// that is kept to arithmetic on purpose. So what crosses is the corridor's two
+// numbers, and the engine's own seat rebuilds the predicate out of the field it
+// already reads -- see setGroundHole in ./mesher.js, and the measurement that
+// pins the rebuild to the contract digit for digit. This file learns no import
+// it did not already have: setGroundHole comes from the mesher, and the mesher
+// was always here.
+//
+// A MESSAGE THAT SAYS NOTHING LAYS YESTERDAY'S DISC, deliberately: the engine's
+// bench in src/dev/voxeltest.js draws the engine's own answer with no corridor
+// anywhere near it, and it should keep drawing exactly that.
 self.onmessage = (event) => {
   const woke = performance.now();
   const {
-    tuft = true, tile = 512, block = '05', radius = DISC_RADIUS,
+    tuft = true, tile = 512, block = '05', radius = DISC_RADIUS, hole = null,
   } = event.data || {};
+  if (hole) setGroundHole(hole);
 
   const tileStarted = performance.now();
   const data = stoneTileData(tile);
