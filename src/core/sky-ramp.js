@@ -64,8 +64,10 @@ export function rampMix(sinElevation, knee, gain) {
  *  2. It is smooth. The other law U-V7-B fitted — two mixes joined at tm —
  *     is cheaper still, but its DERIVATIVE steps at the joint, and a step of
  *     derivative in a gradient this smooth is a Mach band, which is precisely
- *     the defect a ramp was chosen to be free of. The two fitted within a tenth
- *     of a level of each other, so the smoothness was free.
+ *     the defect a ramp was chosen to be free of. In the event the argument
+ *     was never needed: fitted side by side on the day, the quadratic came back
+ *     at 6.71 against the piecewise 6.86, so it won on the number as well and
+ *     nothing had to be traded for the smoothness.
  *  3. A COLLINEAR MIDDLE ANCHOR IS AN EXACT NO-OP, not nearly one. Put M on the
  *     segment, M = H + (Z - H) tm, and the numerator of K is identically nought
  *     — no cancellation of large numbers, no residue at the eighth decimal. That
