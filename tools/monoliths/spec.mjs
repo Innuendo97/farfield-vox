@@ -1,5 +1,8 @@
 import { readFileSync } from 'node:fs';
-import { COURSE, CHAMFER, LENGTHS, masonryCensus } from '../../src/world/voxel/pure.js';
+import {
+  CHAMFER, COURSE, LENGTHS, masonryCensus, masonryLaw,
+} from '../../src/world/voxel/pure.js';
+import { stoneSpecs } from '../../src/world/stone.js';
 import { MONOLITHS } from '../../src/world/layout.js';
 
 // THE MEASURED MASONRY AGAINST THE MASONRY THE ENGINE CUTS, LINE BY LINE.
@@ -219,72 +222,116 @@ line(`        merge distance ${MERGE.toFixed(3)} m = 3x the course wander at p90
 
 // ==================================================== 1. what the door carries
 line('\n=== 1. THE SPEC, LINE BY LINE, AGAINST THE DOOR =================\n');
-line('  buildMasonry(spec) reads spec.size and spec.rotationY and nothing else;');
-line('  the rise, the lengths and the chamfer are module constants. So a line is');
-line('  CARRIED only if it can be said in a box.\n');
-line(`  ${'spec line'.padEnd(20)}${'measured'.padEnd(34)}${'engine today'.padEnd(32)}carried?`);
+line('  THE DOOR IS WIDER THAN IT WAS AND THIS SECTION IS THE DIFFERENCE.');
+line('  buildMasonry(spec) still takes one argument and still has one signature;');
+line('  what it reads now is spec.masonry as well, and every line below travels');
+line('  in there as DATA. So a line is CARRIED if the law the world builds with');
+line('  -- masonryLaw() over src/world/stone.js -- actually holds the reading.\n');
+line(`  ${'spec line'.padEnd(20)}${'measured'.padEnd(34)}${'the law built'.padEnd(32)}carried?`);
+
+// The law the world builds with, not a copy of it: this is the same
+// stoneSpecs() the layer and the worker are handed.
+const BUILT = stoneSpecs(SPEC);
+const law = masonryLaw(BUILT[0]);
+const near = (a, b, tol) => Math.abs(a - b) <= tol;
+
+const heads = BUILT.map((s) => masonryLaw(s));
+const levels = BUILT.map((s) => (s.masonry.head ? s.masonry.head.length : 1));
+const steps = [];
+for (const s of BUILT) {
+  const runs = s.masonry.head || [];
+  for (let i = 1; i < runs.length; i++) steps.push(Math.abs(runs[i].courses - runs[i - 1].courses));
+}
+const spread = law.wander * 0.1791;
 
 const rows = [
   ['course rise', `${SPEC.course.rise} m (${SPEC.course.band.join('-')})`,
-    `COURSE ${COURSE} m`, 'no -- constant'],
-  ['course scatter', `${(SPEC.course.scatterFraction * 100).toFixed(0)}% sd, `
-    + `${SPEC.course.runsFrom}-${SPEC.course.runsTo} m`, 'one rise for all', 'no -- no seat'],
+    `law.rise ${law.rise}`, near(law.rise, SPEC.course.rise, 1e-9) ? 'YES' : 'NO'],
+  ['course scatter', `${(SPEC.course.scatterSd * 1000).toFixed(0)} mm sd between courses`,
+    `${(spread * Math.SQRT2 * 1000).toFixed(0)} mm from one amplitude`,
+    near(spread * Math.SQRT2, SPEC.course.scatterSd, 0.006) ? 'YES' : 'NO'],
   ['course wander', `${(SPEC.course.wanderMedian * 1000).toFixed(0)} mm p50 across a face`,
-    'a course is a line', 'no -- no seat'],
+    `${(spread * 1000).toFixed(0)} mm, law.wander ${law.wander.toFixed(3)}`,
+    near(spread, SPEC.course.wanderMedian, 0.003) ? 'YES' : 'NO'],
   ['block width', `${SPEC.block.meanWidth.inWindow} m, ${SPEC.block.aspectToCourse}:1 to course`,
-  `LENGTHS ${LENGTHS.join('/')}`, 'no -- constant'],
+    `law.cell ${law.cell}`, near(law.cell, SPEC.block.meanWidth.inWindow, 1e-9) ? 'YES' : 'NO'],
   ['doubles / triples', `${(SPEC.block.doubles.fraction * 100).toFixed(0)}% / `
-    + `${(SPEC.block.triples.fraction * 100).toFixed(0)}%`, 'uniform over three', 'no -- no seat'],
-  ['head course count', 'per block, from the target', 'round(height / COURSE)', 'no -- derived'],
+    + `${(SPEC.block.triples.fraction * 100).toFixed(0)}%`,
+  `runCut ${law.runCut.toFixed(2)} predicts ${((1 - law.runCut) * 100).toFixed(0)}% / `
+    + `${((1 - law.runCut) ** 2 * 100).toFixed(1)}%`,
+  near((1 - law.runCut) ** 2, SPEC.block.triples.fraction, 0.012) ? 'YES' : 'NO'],
+  ['head course count', 'per block, from the target',
+    `${BUILT.map((s) => s.masonry.courses).join('/')}`,
+    BUILT.every((s) => !SPEC.heads.perBlock[s.id]
+      || s.masonry.courses === SPEC.heads.perBlock[s.id].courses) ? 'YES' : 'NO'],
   ['head levels', `${SPEC.head.levelsPerHead.join('-')} levels, `
-    + `${SPEC.head.stepDepthCourses.join('-')} courses deep`, 'a flat cap', 'no -- no seat'],
+    + `${SPEC.head.stepDepthCourses.join('-')} courses deep`,
+  `${Math.min(...levels)}-${Math.max(...levels)} levels, `
+    + `${Math.min(...steps)}-${Math.max(...steps)} deep`,
+  Math.max(...levels) <= SPEC.head.levelsPerHead[1]
+    && Math.max(...steps) <= Math.ceil(SPEC.head.stepDepthCourses[1]) ? 'YES' : 'NO'],
   ['pale top course', `${SPEC.head.paleTopCourse.band.join('-')}x the body`,
-    'no top course', 'no -- material'],
+    'not built', 'NO -- residue'],
   ['missing block', `${SPEC.head.missingBlock.count} on ${SPEC.head.missingBlock.block}`,
-    'every course is full', 'no -- no seat'],
-  ['quoins', 'declared, not measured', 'four independent walls', 'no -- no seat'],
+    `${BUILT.reduce((a, s) => a + s.masonry.recesses.length, 0)} recess cut`,
+    BUILT.reduce((a, s) => a + s.masonry.recesses.length, 0)
+      === SPEC.head.missingBlock.count ? 'YES' : 'NO'],
+  ['quoins', 'declared, not measured', 'four independent walls', 'NO -- not measured'],
   ['chamfer', `${SPEC.chamfer.lighten.join('-')}x, as the recipe`,
-    `CHAMFER ${CHAMFER} m, real geometry`, 'YES -- agrees'],
+    `law.chamfer ${law.chamfer} m, real geometry`, 'YES'],
   ['joint', `${SPEC.joint.darken.join('-')}, ${SPEC.joint.widthPx.join('-')} px`,
-    'uJoint 0.10 in the fragment', 'YES -- agrees'],
+    'uJoint in the fragment, on the law', 'YES'],
   ['stair run', `${SPEC.stairs.steps} steps, tread ${SPEC.stairs.tread}, `
-    + `rise ${SPEC.stairs.rise}`, 'STAIRS in layout.js', 'YES -- agrees'],
+    + `rise ${SPEC.stairs.rise}`, 'stairSpecs(), the same door', 'YES'],
 ];
 for (const [what, measured, engine, carried] of rows) {
   line(`  ${what.padEnd(20)}${measured.padEnd(34)}${engine.padEnd(32)}${carried}`);
 }
 const carriedCount = rows.filter((r) => r[3].startsWith('YES')).length;
 line(`\n  ${carriedCount} of ${rows.length} lines reach the generator through the door it has.`);
+line('  The three that do not are a MATERIAL (the pale top course), a reading');
+line('  nobody ever took (the quoins), and ONE HEAD WITH A LEVEL TOO MANY.');
+line('  The last is a disagreement of METHOD and it is left standing rather than');
+line('  tuned away: this file merges the raw columns by HEIGHT, against a group\'s');
+line('  top, which can count levels but cannot build one; src/world/stone.js');
+line('  merges them in the order the face was walked, which is what a head IS and');
+line('  the only order a run-length encoding can be laid from. The two agree on');
+line('  the depth of every step and on four of the five heads.');
 
-// ================================================= 2. what the spec would cost
+// ============================================= 2. what the wall actually costs
 line('\n=== 2. THE COUNT AND THE BUDGET ================================\n');
+line('  THE WALL IS MERGED AND THE COUNT IS OF THE MERGED WALL. A block is no');
+line('  longer two quads of its own: adjacent cells of one course are ONE');
+line('  rectangle, so what is submitted is a couple of quads a course. The block');
+line('  count below is still the census -- how many blocks the eye is meant to');
+line('  see -- and the triangles are what the geometry actually carries.\n');
 
-const atSpec = countBlocks(SPEC.heads.rise, [SPEC.block.meanWidth.inWindow]);
-const atSpecWide = countBlocks(SPEC.heads.rise, [histMean]);
-line(`  ${'masonry'.padEnd(38)}${'blocks'.padStart(8)}${'quads'.padStart(9)}${'triangles'.padStart(11)}`);
-const row = (what, blocks) => line(`  ${what.padEnd(38)}${String(blocks).padStart(8)}`
-  + `${String(blocks * 2).padStart(9)}${String(blocks * 4).padStart(11)}`);
-line(`  ${`engine today (rise ${COURSE}, mean ${(LENGTHS.reduce((a, v) => a + v, 0) / LENGTHS.length).toFixed(3)})`.padEnd(38)}`
-  + `${String(engineTotal).padStart(8)}${String(engineQuads).padStart(9)}${String(engineQuads * 2).padStart(11)}`);
-row(`spec, mean block ${SPEC.block.meanWidth.inWindow} m`, atSpec.total);
-row(`spec, mean block ${histMean.toFixed(4)} m (whole histogram)`, atSpecWide.total);
+const built = masonryCensus(BUILT);
+line(`  ${'block'.padEnd(10)}${'blocks'.padStart(8)}${'courses'.padStart(9)}`
+  + `${'quads'.padStart(8)}${'triangles'.padStart(11)}`);
+let blocks = 0;
+let quads = 0;
+for (const b of built) {
+  blocks += b.blocks;
+  quads += b.quads;
+  line(`  ${b.id.padEnd(10)}${String(b.blocks).padStart(8)}${String(b.courses).padStart(9)}`
+    + `${String(b.quads).padStart(8)}${String(b.quads * 2).padStart(11)}`);
+}
+line(`  ${'all six'.padEnd(10)}${String(blocks).padStart(8)}${''.padStart(9)}`
+  + `${String(quads).padStart(8)}${String(quads * 2).padStart(11)}`);
 line('');
 line(`  the chapter's reference band, all six:  ${SPEC.referenceCounts.allSix.join(' to ')} blocks`);
 line(`  this layer's whole triangle budget:     ${BUDGET.triangles} (six blocks, stair, `
   + 'platform, rocks, panels)');
 line('');
-const low = Math.min(atSpec.total, atSpecWide.total);
-const high = Math.max(atSpec.total, atSpecWide.total);
-line(`  AT THE MEASURED SPEC THE SIX COME TO ${low} - ${high} BLOCKS,`);
-line(`  which is ${(low / engineTotal).toFixed(2)} to ${(high / engineTotal).toFixed(2)} times what the engine cuts today, `
-  + `${(high / SPEC.referenceCounts.allSix[1]).toFixed(2)}x the top of the band,`);
-line(`  and ${low * 4} - ${high * 4} triangles against a budget of ${BUDGET.triangles} `
-  + `for the whole layer (${(high * 4 / BUDGET.triangles).toFixed(1)}x).`);
-line('');
-line('  The block is two quads: its face and the dressed edge over it. At one');
-line(`  quad a block the same wall is ${low * 2} - ${high * 2} triangles, which is the only`);
-line('  arithmetic that fits -- and it is the chamfer, which is measured and real');
-line('  geometry. That is a decision above this unit and not a tuning.');
+const unmerged = blocks * 4;
+line(`  Unmerged, at two quads a block, the same wall would be ${unmerged} triangles`);
+line(`  -- ${(unmerged / BUDGET.triangles).toFixed(1)}x the whole layer's budget, which is what the escalation of`);
+line(`  V2-DEV1 measured. Merged it is ${quads * 2}, which is `
+  + `${(quads * 2 / unmerged * 100).toFixed(0)}% of that.`);
+line('  The chamfer is not paid for by the block any more: it is one strip a');
+line('  course, so the measured dressed edge survives the budget instead of');
+line('  being the thing that broke it.');
 
 // ============================================================= 3. the heads
 line('\n=== 3. THE HEADS, QUANTISED TO THE COURSE ======================\n');
