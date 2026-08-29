@@ -510,11 +510,52 @@ export function buildMasonry(spec) {
           quad(wall.n, [
             [ax, y0a, az], [bx, y0b, bz], [bx, y1b - chamfer, bz], [ax, y1a - chamfer, az],
           ]);
-          // The dressed edge over it, leaning up and out: it is lit as the
-          // facet it is, which is where the reference's bright arris comes from
-          // with nothing fitted to make its brightness and its blue agree.
-          const inx = wall.n[0] * chamfer;
-          const inz = wall.n[2] * chamfer;
+          // The dressed edge over it, lit as the facet it is, which is where
+          // the reference's bright arris comes from with nothing fitted to make
+          // its brightness and its blue agree.
+          //
+          // AND IT ONLY LEANS BACK WHERE THERE IS SOMETHING TO LEAN BACK TO,
+          // which is a correction and the cause of a defect that reached a
+          // judgement. It used to set its top edge a chamfer INSIDE the wall on
+          // every course. Under the head that is right: the cap is inset by the
+          // same chamfer and the two meet along one line. Anywhere else it is a
+          // HOLE. The course above restarts at the wall plane, so at every
+          // course line the skin steps out by 28 mm with nothing closing it,
+          // and a skin is all there is — the inside of a block is never built,
+          // by this file's own design. A line of sight rising at slope s enters
+          // that step and passes over the facet's top edge for the last
+          // 28*s mm of it, misses the course above, and leaves through the far
+          // wall, which is back-facing and culled. What it draws there is the
+          // SKY.
+          //
+          // That is the bright dashed line along every course of every face:
+          // not the arris, not its pigment, not the law of the light, but the
+          // background seen through the wall. It is brightest exactly where it
+          // was reported worst — on the fronts standing in shadow, where dark
+          // stone frames it, and higher up a tall block, where the eye looks up
+          // more steeply and s is larger — and it cuts through the engraved
+          // glyphs because the writing is painted on stone that is not there.
+          // Measured: with the chamfer taken out altogether the same face reads
+          // 0.95% of course-line contrast against 2.76% with it, where the day
+          // target reads 1.76%; and with the facet's own material driven to
+          // black it stays at 2.77%, which is how the facet was ruled out as
+          // the cause.
+          //
+          // THE SKIN IS CLOSED WITHOUT ONE NEW TRIANGLE. The alternative was a
+          // soffit under each overhang, which is +2,594 quads and +5,188
+          // triangles, +50% on the masonry and a quarter of the whole budget
+          // for a step nobody can see at 28 mm. Instead the band stays where
+          // the wall is and keeps the NORMAL of the facet it stands for: under
+          // an analytic light a face's shading is its normal and nothing else,
+          // so the arris is lit exactly as before and foreshortens exactly as
+          // before, because it is still held in metres of stone. What is given
+          // up is 28 mm of true relief between courses, which is a silhouette
+          // and a parallax at grazing range, and it is given up on purpose and
+          // written down. It is the same device this world already uses for the
+          // vertical arris at a block's end, for the same reason.
+          const under = c + 1 >= cap.courses;
+          const inx = under ? wall.n[0] * chamfer : 0;
+          const inz = under ? wall.n[2] * chamfer : 0;
           quad([wall.n[0] * 0.7071, 0.7071, wall.n[2] * 0.7071], [
             [ax, y1a - chamfer, az], [bx, y1b - chamfer, bz],
             [bx - inx, y1b, bz - inz], [ax - inx, y1a, az - inz],
