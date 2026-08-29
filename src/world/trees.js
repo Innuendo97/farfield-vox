@@ -411,6 +411,27 @@ export function createTrees({ height }) {
   for (const key of crowns) solid.add(key);
   for (const key of trunks) solid.add(key);
 
+  // AND THE TWO SETS ARE MADE DISJOINT BEFORE EITHER IS MESHED.
+  //
+  // They overlap by construction: a crown starts at floor + trunkTall and a
+  // trunk runs up to floor + trunkTall inclusive, so the trunk's top cube is a
+  // member of both. Occluding them against the union is not enough to make that
+  // safe -- it only hides the faces the two sets bury in each other. A face of
+  // that shared cube which is exposed to the AIR is emitted by both families,
+  // once brown and once green on the same plane, and two coplanar quads a
+  // fragment apart is a z-fight that flickers as the eye moves.
+  //
+  // It is not hypothetical and it is not everywhere: a crown an EVEN number of
+  // cubes across has its axis half a cube to one side, so its bottom row covers
+  // the trunk's column but not the column's +x and +z neighbours, and those two
+  // faces stand open. Measured on the population as it stands, four crowns of
+  // four cubes leave eight such faces -- 0.08 m2 drawn twice.
+  //
+  // The crown keeps them, because a cube level with the foliage reads as
+  // foliage. `solid` is already the union above, so nothing about what is
+  // hidden changes: this only settles which family draws what is not.
+  for (const key of crowns) trunks.delete(key);
+
   const meshes = [];
   const census = { trees: trees.length, cells: solid.size, quads: 0, triangles: 0, by: {} };
   for (const [name, cells, albedo] of [['trees-crowns', crowns, CROWN_ALBEDO],
