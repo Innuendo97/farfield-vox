@@ -1,5 +1,6 @@
 import { FIELD, heightAt, pathCoord, pathRun } from './terrain-field.js';
 import { stairHeightAt as stairRunHeight } from './stairs.js';
+import { flowerField } from './vegetation.js';
 import { PLATFORM } from './layout.js';
 import { pathHoleAt } from './path.js';
 
@@ -292,11 +293,20 @@ export function groundLightAt() {
  * a session that only ever looks at the night target, and the two pictures the
  * campaign is judged on would be fitted against each other.
  *
- * IT IS EMPTY TODAY AND THAT IS THE TRUTH. There is no flower field yet, so
- * there is nowhere for a lamp to stand, and an invented point would be a lamp
- * placed by the foundation. What this seat buys now is that V7 can be written
- * against a name instead of against V4's internals, and that the day the field
- * lands the night gets it without either session opening the other's file.
+ * AND THE FIELD HAS LANDED. What this seat used to buy was that V7 could be
+ * written against a name while V4 built the meadow behind it; what it returns
+ * now is the meadow V4 draws, out of the one function that decides a flower --
+ * src/world/vegetation.js, the same call with the same lattice and the same
+ * seed the ring of drawn flowers is filled from. A second sowing here, however
+ * carefully matched, would be a lamp standing where no flower is.
+ *
+ * IT IS THE WHOLE DISC AND NOT THE RING. The ring V4 draws is a few hundred
+ * heads within a few metres of the walker, because triangles; this is every
+ * flower inside r = 35 m, because a lamp is not a triangle and the night gets
+ * to choose. The height under each one comes from groundHeightAt above, which
+ * is the same function the hub hands the layer that draws them, so what is
+ * published and what is drawn stand at one height by construction rather than
+ * by agreement.
  *
  * THE SIGNATURE CARRIES FIVE FIELDS. This seat documented {x, z, y} and the
  * ratified contract said {x, z, size}, which was one contract written down
@@ -311,11 +321,23 @@ export function groundLightAt() {
  * it would be deciding the night inside the file that owns the meadow. V7 then
  * lights a SUBSET, under a cap and a radius of its own. The gap is not small
  * and nobody should discover it at integration: the night target burns 150 to
- * 250 points where a meadow of this density offers on the order of 8500, so
- * roughly one flower in forty is lit, and the ones that are lit are near and
- * clustered rather than sampled evenly. Which forty is the night's taste and
- * the night's budget, and it is stated here so that neither session mistakes
- * the length of this array for the number of lamps.
+ * 250 points where a meadow of this density offers on the order of ten
+ * thousand, so roughly one flower in fifty is lit, and the ones that are lit
+ * are near and clustered rather than sampled evenly. Which fifty is the night's
+ * taste and the night's budget, and it is stated here so that neither session
+ * mistakes the length of this array for the number of lamps.
+ *
+ * ONE NUMBER IN HERE HAS MOVED SINCE V7 WAS BRIEFED, AND IT IS `size`. The
+ * signature has not: it is the five fields E-V4c ratified. But the census that
+ * put a head at 0.13 to 0.15 m ran the target through the camera in
+ * assets-src/materia/ricetta.json, and E-V8f refitted the poses under a 1.80 m
+ * walker — the eye dropped 1.15 m and the focal length went from 979 to 1159
+ * px. Re-derived at the poses as they stand, a head is 0.082 m and a cyan one
+ * 0.073, so what this returns is smaller than the briefing said by two fifths.
+ * That is not a loss: E-V7e measured the night lamp's own core at 0.103 m — one
+ * voxel — against a day flower the old census called half again bigger, and a
+ * lamp cannot be smaller than the flower it is hung in. At 0.082 the two
+ * sessions are measuring the same object again.
  *
  * @returns {{x: number, y: number, z: number, size: number, kind: string}[]} in
  *          world metres, y at the head of the flower rather than at the ground
@@ -323,10 +345,16 @@ export function groundLightAt() {
  *          which flower it is — the handle V7 selects on
  */
 export function flowerLightPoints() {
-  return [];
+  if (!flowers) flowers = flowerField(groundHeightAt);
+  return flowers;
 }
 
 // The seats a lamp could take along the distant ridges arrive with the
 // cornice session: V5 wires `ridgeLampSeats` here on its own branch, the way
 // the path wired the ground's one hole, and it reaches this file at
 // integration. Until then the name is only a promise written down.
+
+// Built on FIRST ASK and kept, for the reason the ground's grid above is: it is
+// tens of thousands of lattice draws over the whole disc, the answer does not
+// change, and the night may ask for it more than once.
+let flowers = null;
