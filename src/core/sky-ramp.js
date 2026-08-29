@@ -127,8 +127,18 @@ export function rampRadiance(preset, direction, out = [0, 0, 0], sharpness = 1, 
   const len = Math.hypot(direction[0], direction[1], direction[2]) || 1;
   const tint = rampTint(ramp, direction[1] / len, bend || rampBend(ramp));
 
+  // THE SUN VECTOR IS NORMALISED HERE BECAUSE setSkyPreset NORMALISES IT THERE.
+  //
+  // It is not unit as it stands on disk: sky.json serialises it to six decimals,
+  // which leaves it 1,2e-6 short. The shader never sees that, because the door
+  // calls .normalize() on the way in; a twin that skipped the step would carry
+  // a cosine 1,2e-6 out, and the cos^40 lobe multiplies an error in the cosine
+  // by forty. Small — but "small" is what the halo round every cloud is made
+  // of, and the whole reason this module is imported by both sides rather than
+  // written twice is that neither side gets to be nearly right.
   const s = preset.sun.vector;
-  const c = (direction[0] * s[0] + direction[1] * s[1] + direction[2] * s[2]) / len;
+  const sl = Math.hypot(s[0], s[1], s[2]) || 1;
+  const c = (direction[0] * s[0] + direction[1] * s[1] + direction[2] * s[2]) / (len * sl);
   const forward = Math.max(0, c);
 
   // The aureole keeps the energy it carries as it widens, exactly as the
