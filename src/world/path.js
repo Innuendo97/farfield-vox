@@ -783,7 +783,7 @@ export function grainUv(x, z) {
 // over unchanged: it is a measurement of the SAME stone off the SAME reference,
 // re-solved twice already, and re-solving it a third time here on a new surface
 // would be inventing a second answer to a settled question.
-export const EARTH = [0.336, 0.269, 0.192];
+export const EARTH = [0.305, 0.272, 0.244];
 export const STONE = [0.242, 0.315, 0.313];
 export const STONE_PALE = [0.418, 0.436, 0.428];
 // What a slot takes out of the pigment, at its lip and at its trough.
