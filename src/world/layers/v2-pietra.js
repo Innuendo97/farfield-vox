@@ -1,22 +1,34 @@
 import {
-  BufferAttribute, BufferGeometry, Color, Mesh, ShaderMaterial,
+  BufferAttribute, BufferGeometry, Color, Group, Mesh, ShaderMaterial,
 } from 'three';
-import { createBakedMaterial } from '../air.js';
 import { createMonoliths, STAIR_GLOW } from '../monoliths.js';
 import { createRocks } from '../rocks.js';
-import { glowMesh, stairMesh } from '../stairs.js';
-import TERRAIN from '../../../assets-src/terrain/terrain.json';
+import { glowMesh } from '../stairs.js';
+import { createMasonry, runInWorker, stoneTile } from '../voxel/index.js';
+import { stairSpecs, stoneSpecs } from '../stone.js';
+import MASONRY_SPEC from '../../../assets-src/monoliths/masonry-spec.json';
 
 // THE BUILT STONE. Owned by V2.
 //
-// The blocks, the stair, the platform and the rocks. It has a foot in both
-// arrivals and that is why the register indexes needs by arrival: the blocks
-// and the stair are part of the first walkable frame, and the rocks are not.
+// The six blocks, the stair, the platform and the rocks — and as of this
+// delivery not one of them is a download. The blocks used to arrive as a glTF
+// scene with a painted albedo and a Cycles bake of the light on it, and the
+// stair as a second mesh with a second atlas; they are courses of masonry now,
+// cut from src/world/layout.js and from the measurement of the two targets that
+// assets-src/monoliths/masonry-spec.json carries. What that buys is not weight:
+// it is that the shape of this world can be argued with in a text file instead
+// of in a renderer nobody has any more.
 //
-// WHAT V2 REPLACES IT WITH: masonry in courses generated from layout.js, the
-// stair rebuilt as blocks, the rocks generated rather than delivered, a tile
-// atlas of real stone, and the refit of the grazing terms on flat faces. The
-// factory the stair borrows from src/world/air.js goes with that rewrite.
+// IT ASKS FOR NOTHING AT THIS ARRIVAL, which is why `needs` is empty. The stone
+// is arithmetic and the arithmetic is off the thread the walker is on, so the
+// first walkable frame no longer waits on four textures and a model.
+//
+// AND IT ARRIVES ONE BLOCK AT A TIME. The stone is cut in the engine's worker
+// and posted a block per message — cutting all eight in one and handing them
+// over together would put eight geometries, eight materials and eight shader
+// compilations into a single task on exactly the thread the work was moved off.
+// So the layer hangs a GROUP at dress and fills it as the messages land: the
+// first wall is standing while the last is still being cut.
 //
 // THE STAIR AND THE BLOCKS ARE ONE STRUCTURE, which is why the glow of the
 // risers lives in this file beside the blocks and not in the hub. Lighting the
@@ -52,16 +64,9 @@ const GLOW_FRAGMENT = /* glsl */`
   }
 `;
 
-/**
- * The stair, the platform and the dark strips on the risers.
- *
- * Hung with the ground rather than with the blocks, because it is the same kind
- * of surface: painted albedo times baked light, in the same air. Before the
- * textures arrive there is no stair, exactly as there is no meadow.
- */
-function buildStairs({ stairsAlbedo, stairsLight, lightScale = TERRAIN.lightScale }) {
-  const meshes = [];
-  const glowMaterial = new ShaderMaterial({
+/** The dark strips under the nosings, ready for the emissive pass to light them. */
+function buildGlow() {
+  const material = new ShaderMaterial({
     uniforms: {
       uColour: { value: new Color(GLOW_COLOUR).convertSRGBToLinear() },
       uIntensity: { value: 0 },
@@ -70,35 +75,14 @@ function buildStairs({ stairsAlbedo, stairsLight, lightScale = TERRAIN.lightScal
     fragmentShader: GLOW_FRAGMENT,
     fog: false,
   });
-
-  if (stairsAlbedo && stairsLight) {
-    const built = stairMesh();
-    const geometry = new BufferGeometry();
-    geometry.setAttribute('position', new BufferAttribute(built.positions, 3));
-    geometry.setAttribute('uv', new BufferAttribute(built.uvs, 2));
-    geometry.setIndex(new BufferAttribute(built.indices, 1));
-    geometry.computeBoundingSphere();
-
-    const mesh = new Mesh(geometry, createBakedMaterial({
-      albedo: stairsAlbedo, light: stairsLight, lightScale,
-    }));
-    mesh.name = 'stairs';
-    meshes.push(mesh);
-
-    const glow = glowMesh();
-    const glowGeometry = new BufferGeometry();
-    glowGeometry.setAttribute('position', new BufferAttribute(glow.positions, 3));
-    glowGeometry.setIndex(new BufferAttribute(glow.indices, 1));
-    glowGeometry.computeBoundingSphere();
-    const strips = new Mesh(glowGeometry, glowMaterial);
-    strips.name = 'stair-glow';
-    meshes.push(strips);
-  }
-
-  return {
-    meshes,
-    setGlow(intensity) { glowMaterial.uniforms.uIntensity.value = intensity; },
-  };
+  const built = glowMesh();
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new BufferAttribute(built.positions, 3));
+  geometry.setIndex(new BufferAttribute(built.indices, 1));
+  geometry.computeBoundingSphere();
+  const mesh = new Mesh(geometry, material);
+  mesh.name = 'stair-glow';
+  return { mesh, setGlow(intensity) { material.uniforms.uIntensity.value = intensity; } };
 }
 
 const layer = {
@@ -107,28 +91,48 @@ const layer = {
   meshes: [],
 
   monoliths: null,
-  stairs: null,
+  stone: null,
+  glow: null,
   rocks: null,
+  worker: null,
+
+  /** Every wall that has landed, by the id of the piece it belongs to. */
+  built: new Map(),
 
   dress: {
-    needs: [
-      'monoliths-scene', 'monolith-albedo', 'monolith-relief', 'monolith-light',
-      'stairs-albedo', 'stairs-light',
-    ],
+    // NOTHING. Every byte the six blocks and the stair used to cost — a glTF
+    // scene, three stone sheets and two stair atlases — is arithmetic now.
+    needs: [],
 
-    build(assets) {
-      layer.monoliths = createMonoliths({
-        scene: assets['monoliths-scene'],
-        stone: assets['monolith-albedo'],
-        relief: assets['monolith-relief'],
-        stoneLight: assets['monolith-light'],
+    build() {
+      layer.stone = new Group();
+      layer.stone.name = 'stone';
+      layer.monoliths = createMonoliths();
+      layer.glow = buildGlow();
+      layer.meshes = [layer.stone, layer.glow.mesh, ...layer.monoliths.meshes];
+      layer.glow.setGlow(STAIR_GLOW);
+
+      const pieces = [...stoneSpecs(MASONRY_SPEC), ...stairSpecs(MASONRY_SPEC)];
+      const engraved = new Set(stoneSpecs(MASONRY_SPEC).map((s) => s.id));
+      let tile = null;
+      // The disc is not asked for: the meadow is V1's and does not come from
+      // here, and a worker that cut it anyway would spend tens of milliseconds
+      // and post twenty megabytes nobody in this world reads.
+      layer.worker = runInWorker({ blocks: pieces, disc: false }, (message) => {
+        if (message.kind === 'tile') {
+          tile = stoneTile(message.data, message.side);
+          for (const [, piece] of layer.built) {
+            piece.material.uniforms.tStone.value = tile;
+          }
+          return;
+        }
+        if (message.kind !== 'masonry') return;
+        const spec = pieces.find((p) => p.id === message.id);
+        const piece = createMasonry(spec, tile, message.built, engraved.has(spec.id));
+        layer.stone.add(piece.mesh);
+        layer.built.set(spec.id, piece);
+        if (engraved.has(spec.id)) layer.monoliths.attach(spec.id, piece);
       });
-      layer.stairs = buildStairs({
-        stairsAlbedo: assets['stairs-albedo'],
-        stairsLight: assets['stairs-light'],
-      });
-      layer.meshes = [...layer.monoliths.meshes, ...layer.stairs.meshes];
-      layer.stairs.setGlow(STAIR_GLOW);
       return layer.monoliths;
     },
   },
@@ -158,7 +162,7 @@ const layer = {
    * and this is the handle it will pull.
    */
   setStairGlow(intensity) {
-    if (layer.stairs) layer.stairs.setGlow(intensity);
+    if (layer.glow) layer.glow.setGlow(intensity);
   },
 
   /**
@@ -172,12 +176,19 @@ const layer = {
   setFocus(id, amount, opened = 0) {
     if (!layer.monoliths) return;
     layer.monoliths.setFocus(id, amount, opened);
-    if (id === '03') layer.stairs.setGlow(STAIR_GLOW * (1 + STAIR_FOCUS * amount));
+    if (id === '03' && layer.glow) layer.glow.setGlow(STAIR_GLOW * (1 + STAIR_FOCUS * amount));
   },
 
   /** What the rocks are costing, for the development panel. */
   get rockTriangles() {
     return layer.rocks ? layer.rocks.triangles : 0;
+  },
+
+  /** What the built stone is costing, for the development panel and the gate. */
+  get stoneTriangles() {
+    let quads = 0;
+    for (const [, piece] of layer.built) quads += piece.quads;
+    return quads * 2;
   },
 
   update({ elapsed }) {
