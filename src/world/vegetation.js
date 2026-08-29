@@ -260,6 +260,21 @@ const FAR_REACH = 18.0;
 const FAR_REACH_MAX = 20.0;
 const FAR_FADE = 2.5;
 
+// AND HOW FAR IT CARRIES THE CYAN ONES, WHICH IS A NEARER EDGE AND A DIFFERENT
+// READING. A cyan head is a tenth smaller than a white one and it stands on
+// meadow three times darker -- the law under CYAN_IN_SHADE, in linear luminance
+// 0.054 against 0.162 -- so it leaves the target's census sooner. Past eight
+// metres the census resolves thirteen white heads against a SINGLE cyan, at
+// 10.34 m on the edge of the west middle window; inside eight it resolves three
+// in the two near windows alone, at 6.64, 6.83 and 6.92 m.
+//
+// So the rule is cyan to here and whites beyond, and it FOLLOWS THE TARGET
+// RATHER THAN THE RING. Both the exchange and the tier are this machine's
+// affordances, and a reading of the target does not get shorter because a
+// laptop is slower: a tier that pulls the exchange in to 4.11 m simply hands
+// this family more of the cyan to carry, and the meadow keeps its composition.
+const CYAN_REACH = 8.0;
+
 // WHAT THE FAR LATTICE IS FILLED WITH, AND WHY IT IS NOT REFILLED AS OFTEN AS
 // THE SOLIDS ARE. The far ring holds five to six times the candidates the solid
 // ring does -- eighteen metres against six and a half -- and refilling it on
@@ -300,6 +315,18 @@ const FAR_SLICE = 340;
 // which is what keeps a slow frame from opening a bare ring just outside the
 // exchange.
 const FAR_SLACK = 5.0;
+// AND THE CYAN EDGE IS FILLED WITH THE SAME SLACK, FOR THE SAME REASON AND AT A
+// PRICE THAT IS DECLARED. What the shader trims cyan at is CYAN_REACH of the
+// walker's LIVE position, so the buffer has to hold every cyan head that could
+// come inside it before the next sweep lands -- which is the same walker moving
+// during the same second, so it is the same five metres. Filled any tighter and
+// the cyan of the judged band would come and go once a sweep at walking pace,
+// because at 3 m/s the fill is already three metres behind by the time it
+// lands: a flicker of the three heads this rule exists to draw, which is worse
+// than the buffer it saves. What it costs is cyan candidates between eight and
+// thirteen metres that collapse in the vertex shader and draw no pixel, counted
+// and charged with the rest of the scroll in the verbale.
+const CYAN_FILL = CYAN_REACH + FAR_SLACK;
 // AND THE OTHER EDGE IS NOT WIDENED AT ALL, because out there the same slack
 // would be a ring three metres wide at eighteen metres out -- five hundred
 // quads of buffer that never draw a pixel. What is done instead is to draw only
@@ -1300,13 +1327,24 @@ const FLOWER_FRAGMENT = /* glsl */`
 // of walking buries: the same two frames a step apart differ by 40 levels of
 // parallax with or without the swap, and the swap adds -0.8 of that.
 //
-// WHY IT IS WHITES ONLY, and it is the target's reading and not a saving. Past
-// eight metres the census resolves thirteen white heads and NOT ONE cyan: a
-// cyan head stands on meadow three times darker than a white one does, and at
-// that size it is not in the picture. Drawing cyan out there would be putting
-// in what the target does not show. The cost of that rule at THIS ring is a
-// declared one: between 6.5 and 8 m the census does still resolve cyan (two
-// heads in one window, one in another) and this family does not draw them.
+// WHAT IT CARRIES, AND IT IS THE TARGET'S READING AND NOT A SAVING. Whites all
+// the way out, cyan as far as CYAN_REACH: past eight metres a cyan head stands
+// on meadow three times darker than a white one does and at that size it is not
+// in the picture, so drawing it out there would be putting in what the target
+// does not show. The other half of that rule is the one this family was built
+// without, and it was a declared cost rather than a hidden one: between the
+// exchange and eight metres the census DOES resolve cyan -- three heads in the
+// two near windows -- and a head the target shows and the frame does not is a
+// difference somebody finds by looking. So it is drawn.
+//
+// AND THE EDGE IS HARD, LIKE THE EXCHANGE AND FOR A NEARER REASON. A cyan head
+// crossing CYAN_REACH arrives at full size, which is a pop -- and it is the pop
+// that was already there, moved OUTWARD: before this the same head first
+// appeared at the exchange as a full-size SOLID, a metre and a half nearer and
+// a quarter wider on the screen. Fading it in over the last metres instead
+// would put the shrunk half of that band exactly where the census found its
+// three heads, drawing at the wrong size the very heads this rule exists to
+// draw at the right one.
 
 /** The quad: four corners of a unit square about its own centre. */
 function farGeometry() {
@@ -1320,13 +1358,14 @@ function farGeometry() {
 
 const FAR_VERTEX = /* glsl */`
   attribute vec4 aFlower;   // world x, y, z of the HEAD'S CENTRE, and its size
-  attribute float aTint;
+  attribute vec2 aLook;     // nought for white and one for cyan, and the tint
 
   varying vec3 vTint;
   varying float vFog;
 
   uniform vec3 uPale;
   uniform vec3 uCream;
+  uniform vec3 uCyan;
   uniform vec2 uCentre;
   uniform float uRing;      // the exchange ring: the solids' own radius
   uniform float uReach;
@@ -1341,6 +1380,12 @@ const FAR_VERTEX = /* glsl */`
     // Inside the ring this head is drawn as a solid, by the family that reads
     // this same uniform for the opposite half of the comparison.
     float keep = step(uRing, reach);
+    // And a cyan one stops sooner, because the census does. It is a THIRD trim
+    // on the same live distance rather than a filter on the fill, for the reason
+    // the other two are: the buffer holds a superset and every edge this family
+    // has is worked out against where the walker IS, so a sweep that is a second
+    // stale costs coverage and never correctness.
+    keep *= 1.0 - aLook.x * step(${CYAN_REACH.toFixed(1)}, reach);
     // And at the rim there is nothing beyond, so the trim comes back: a quad
     // leaves by shrinking about its own centre over the last metres.
     float trim = 1.0 - smoothstep(uReach - uFade, uReach, reach);
@@ -1377,9 +1422,16 @@ const FAR_VERTEX = /* glsl */`
     float area = share.x + share.y + share.z;
     vec3 alongX = vec3(toEye.x >= 0.0 ? 1.0 : -1.0, 0.0, 0.0);
     vec3 alongZ = vec3(0.0, 0.0, toEye.z >= 0.0 ? 1.0 : -1.0);
-    vec3 head = (uPale * faceLight(alongX) * share.x
-      + uPale * faceLight(vec3(0.0, 1.0, 0.0)) * share.y
-      + uCream * faceLight(alongZ) * share.z) / area;
+    // AND A CYAN HEAD IS THE SAME HEAD IN ANOTHER PIGMENT, which is exactly how
+    // the solids have it: their one line reads mix(pale-or-cream, cyan, flag),
+    // and this is that line twice, once for each pigment the three faces are
+    // drawn from. The weighting above is untouched, so a cyan quad is the cyan
+    // CUBE'S own average and not a second recipe for the same flower.
+    vec3 pale = mix(uPale, uCyan, aLook.x);
+    vec3 cream = mix(uCream, uCyan, aLook.x);
+    vec3 head = (pale * faceLight(alongX) * share.x
+      + pale * faceLight(vec3(0.0, 1.0, 0.0)) * share.y
+      + cream * faceLight(alongZ) * share.z) / area;
 
     float size = aFlower.w * sqrt(area) * keep * trim;
 
@@ -1396,7 +1448,7 @@ const FAR_VERTEX = /* glsl */`
 
     // Nothing is added to it: no emissive term, no additive blend, no second
     // opinion about the hour.
-    vTint = head * aTint;
+    vTint = head * aLook.y;
     vFog = fogAmount(length(cameraPosition - aFlower.xyz), aFlower.y);
 
     gl_Position = projectionMatrix * view;
@@ -1433,13 +1485,17 @@ function createFarFlowers({ height, lightScale, pigments, ring }) {
   const offsets = ringOffsets(FAR_REACH_MAX + FAR_SLACK, FLOWER_CELL);
   const capacity = Math.ceil(offsets.length * FLOWER_PER_CELL * FLOWER_SHARE * 1.35) + 128;
   const flowerData = new Float32Array(capacity * 4);
-  const tintData = new Float32Array(capacity);
+  // The same record the solids read, under the same name: which of the two
+  // flowers this is, and its tint. Two families reading one record the same way
+  // is the whole reason a cyan quad cannot end up a different colour from the
+  // cyan cube it takes over from.
+  const lookData = new Float32Array(capacity * 2);
   const flowerAttribute = new InstancedBufferAttribute(flowerData, 4);
-  const tintAttribute = new InstancedBufferAttribute(tintData, 1);
+  const lookAttribute = new InstancedBufferAttribute(lookData, 2);
   flowerAttribute.setUsage(DynamicDrawUsage);
-  tintAttribute.setUsage(DynamicDrawUsage);
+  lookAttribute.setUsage(DynamicDrawUsage);
   geometry.setAttribute('aFlower', flowerAttribute);
-  geometry.setAttribute('aTint', tintAttribute);
+  geometry.setAttribute('aLook', lookAttribute);
   geometry.instanceCount = 0;
   geometry.boundingSphere = new Sphere(new Vector3(), FAR_REACH_MAX + FAR_SLACK + 1);
 
@@ -1447,6 +1503,7 @@ function createFarFlowers({ height, lightScale, pigments, ring }) {
     uniforms: {
       uPale: { value: pigments.pale },
       uCream: { value: pigments.cream },
+      uCyan: { value: pigments.cyan },
       ...faceLightUniforms(lightScale * GROUND_EXPOSURE),
       ...SCENE_LIGHT_UNIFORMS,
       uCentre: { value: new Vector2() },
@@ -1471,14 +1528,16 @@ function createFarFlowers({ height, lightScale, pigments, ring }) {
   // is written and the live buffer is left alone until the sweep is complete,
   // so a frame never draws half a ring.
   const shadowFlower = new Float32Array(capacity * 4);
-  const shadowTint = new Float32Array(capacity);
+  const shadowLook = new Float32Array(capacity * 2);
   let lastStepX = null;
   let lastStepZ = null;
   let placed = 0;
+  let cyan = 0;
   let sliceMs = 0;
   let sweepMs = 0;
   let cursor = -1;
   let sweepN = 0;
+  let sweepCyan = 0;
   let sweepCellX = 0;
   let sweepCellZ = 0;
   let sweepStarted = 0;
@@ -1499,6 +1558,7 @@ function createFarFlowers({ height, lightScale, pigments, ring }) {
     sweepFrom = Math.max(0, ring.value - FAR_SLACK);
     cursor = 0;
     sweepN = 0;
+    sweepCyan = 0;
     sweepStarted = performance.now();
   }
 
@@ -1509,6 +1569,7 @@ function createFarFlowers({ height, lightScale, pigments, ring }) {
     const from = sweepFrom;
     const to = sweepTo;
     let n = sweepN;
+    let blue = sweepCyan;
     let i = cursor;
     const stop = Math.min(offsets.length, i + FAR_SLICE);
     for (; i < stop; i++) {
@@ -1517,9 +1578,15 @@ function createFarFlowers({ height, lightScale, pigments, ring }) {
       if (offset.d + FLOWER_CELL < from) continue;
       for (let k = 0; k < FLOWER_PER_CELL; k++) {
         const flower = flowerAt(sweepCellX + offset.i, sweepCellZ + offset.j, k, height);
-        // WHITES ONLY, and the cyan is not filtered out of a drawn thing: it is
-        // never put in one. See the note over this family.
-        if (!flower || flower.kind === 'ciano') continue;
+        if (!flower) continue;
+        // THE FILL'S HALF OF THE CYAN RULE, and it is the cheap half: a cyan
+        // candidate this far out cannot come inside CYAN_REACH of the walker
+        // before the next sweep lands, so it is never put in the buffer. The
+        // edge itself is the shader's, at CYAN_REACH of the live position -- so
+        // this cannot draw one too far out, only keep one out of the buffer
+        // that was certain to collapse.
+        const isCyan = flower.kind === 'ciano';
+        if (isCyan && offset.d > CYAN_FILL) continue;
         const o = n * 4;
         // THE HEAD'S CENTRE, which is the point the contract publishes and the
         // point a lamp is hung at. The solids store the foot of the stalk
@@ -1530,24 +1597,28 @@ function createFarFlowers({ height, lightScale, pigments, ring }) {
         // SIZE FROM THE CONTRACT: the head's own edge, so the quad covers what
         // the cube it replaces covers.
         shadowFlower[o + 3] = flower.size;
-        shadowTint[n] = flower.tint;
+        shadowLook[n * 2] = isCyan ? 1 : 0;
+        shadowLook[n * 2 + 1] = flower.tint;
+        if (isCyan) blue++;
         n++;
         if (n >= capacity) break;
       }
       if (n >= capacity) { i = offsets.length; break; }
     }
     sweepN = n;
+    sweepCyan = blue;
     cursor = i;
     sliceMs = performance.now() - started;
     if (cursor < offsets.length) return;
     // Done: publish the whole ring at once, and with it where it was filled
     // from, which is what the rim is then measured against.
     flowerData.set(shadowFlower.subarray(0, sweepN * 4));
-    tintData.set(shadowTint.subarray(0, sweepN));
+    lookData.set(shadowLook.subarray(0, sweepN * 2));
     placed = sweepN;
+    cyan = sweepCyan;
     geometry.instanceCount = sweepN;
     flowerAttribute.needsUpdate = true;
-    tintAttribute.needsUpdate = true;
+    lookAttribute.needsUpdate = true;
     liveX = (sweepCellX + 0.5) * FLOWER_CELL;
     liveZ = (sweepCellZ + 0.5) * FLOWER_CELL;
     liveTo = sweepTo;
@@ -1597,6 +1668,12 @@ function createFarFlowers({ height, lightScale, pigments, ring }) {
     stats: () => ({
       capacity,
       placed,
+      // How many of them are cyan, published for the same reason the solids
+      // publish theirs: the census of what this world renders is taken against
+      // the census of the target, and the two-colour split is one of the things
+      // it is taken on. It is a count of what is in the BUFFER, so it includes
+      // the ones past CYAN_REACH that the shader collapses.
+      cyan,
       // Both of them, because only one of them is what a frame pays: sliceMs is
       // the worst any single frame is asked for and sweepMs is what the whole
       // refill would have cost in one go.
