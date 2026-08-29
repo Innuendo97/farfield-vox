@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import sharp from 'sharp';
 import { MONOLITHS, PLATFORM } from '../../src/world/layout.js';
 import { POSES } from '../../src/core/poses.js';
+import { poseNote, resolvePose } from './lib/pose.mjs';
 
 // WHERE THE BLOCKS END, AND WHAT THAT IS MEASURED AGAINST.
 //
@@ -392,16 +393,25 @@ try {
 }
 
 const poseName = argv[1] || 'vox-giorno';
-const pose = POSES[poseName];
-if (!pose) {
+const named = POSES[poseName];
+if (!named) {
   out(`  no pose named ${poseName}. Known: ${Object.keys(POSES).join(', ')}`);
   process.exit(2);
 }
+// THE SENTINEL, RESOLVED THE WAY THE PAGE RESOLVES IT (E-V8i). This tool used
+// to hand a pose object straight to the projector, which put the eye at
+// EYE_HEIGHT itself whenever a pose wrote the sentinel -- 1.70 against the
+// 1.5158 the walker actually stands the eye at, at `target`. The default pose
+// here carries an absolute y and was never affected, which is why it survived:
+// the poses that were wrong are the ones nobody defaulted to.
+const pose = resolvePose(named);
 const frame = RECIPE.measuredBy.frame;
 const points = await reduce(path, pose, frame);
 const edges = byEdge(points);
 
 out(`SILHOUETTE -- ${path} at pose ${poseName}\n`);
+out(`  camera     ${pose.position.x.toFixed(3)}, ${pose.position.y.toFixed(4)}, `
+  + `${pose.position.z.toFixed(3)}   ${poseNote(named)}`);
 out(`  reference  assets-src/monoliths/silhouette-target.json, `
   + `${reference.points} points off ${reference.measuredFrom}`);
 out(`  tolerance  ${reference.tolerance.toFixed(3)} m, `
