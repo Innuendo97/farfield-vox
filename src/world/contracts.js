@@ -1,8 +1,9 @@
-import { FIELD, heightAt, pathCoord, pathRun } from './terrain-field.js';
+import { heightAt, pathCoord, pathRun } from './terrain-field.js';
 import { stairHeightAt as stairRunHeight } from './stairs.js';
 import { flowerField } from './vegetation.js';
 import { PLATFORM } from './layout.js';
 import { pathHoleAt } from './path.js';
+import { CENTRE, DISC_RADIUS, VOXEL, columnTop } from './voxel/mesher.js';
 
 // THE CONTRACTS BETWEEN THE SESSIONS, AND THE ONLY DOOR BETWEEN THEM.
 //
@@ -31,55 +32,102 @@ import { pathHoleAt } from './path.js';
 
 // ------------------------------------------------------------ the ground
 //
-// The field is arithmetic and could be evaluated directly, but it is sampled
-// into a grid once and read back bilinearly instead: the walker asks for this
-// every frame, and a grid read costs the same whatever the field grows into
-// later.
+// THE GROUND IS THE CARPET NOW, AND THIS SEAT HAD NOT NOTICED. Until this unit
+// the answer here was the smooth field, sampled into a grid every 0.28 m and
+// read back bilinearly -- which was the whole truth while the meadow was a bent
+// grid laid ON that field. It stopped being the truth the day the disc became
+// the world: measured over the disc it lays, the tops of the cubes stand a
+// MEDIAN 12.5 cm and as much as 1.20 m above the field, so a walker seated on
+// the field walks through ground he can see (v1-suolo/analisi/d4-cuciture.json).
+// The picture is not wrong; this was.
 //
-// Built on FIRST ASK and not at import, because it is tens of milliseconds of
-// arithmetic and the module graph is walked before there is a scene to spend
-// them on. It is one grid for the whole run, which is the point: the walker's
-// floor, the mesh's own vertices and anything V8 stands behind the walker all
-// come off the same numbers.
-let grid = null;
+// IT IS THE CARPET'S FIELD AND NOT THE CARPET'S MESH, and that is the whole of
+// why it can be here at all. `columnTop` is a pure function of a point: it is
+// what the worker meshes FROM, so it answers before a single chunk has been
+// cut, off the main thread, on a page whose disc is still being built, and in a
+// node harness with no page at all. Reading the delivered height maps instead
+// -- ground-voxel's own topAt -- would have made the walker's floor depend on
+// whether a download had finished, which is the one thing a contract may never
+// do.
+//
+// AND IT COSTS WHAT IT COSTS, MEASURED RATHER THAN FEARED: 1 165 ns a call
+// against the grid's 46, which is 7.0 microseconds a frame at the six calls a
+// step takes, against sixteen thousand (v1-suolo/analisi/d4-costo.json). The
+// grid was justified in this file by the walker asking every frame; the walker
+// is not what makes this expensive and never was.
 
-function sampled() {
-  if (grid) return grid;
-  const { samples, originX, originZ, spacing } = FIELD;
-  const plane = new Float32Array(samples * samples);
-  for (let j = 0; j < samples; j++) {
-    const z = originZ + j * spacing;
-    for (let i = 0; i < samples; i++) {
-      plane[j * samples + i] = heightAt(originX + i * spacing, z);
-    }
-  }
-  grid = plane;
-  return grid;
+// How far the ten centimetre ground reaches, in metres.
+//
+// THE TIER DECIDES IT AND THE GROUND DECLARES IT, because the disc that ships
+// is not the engine's own: quality.js carries 14 m on three tiers and 12 on the
+// fourth, and a contract that answered for 35 would be promising cubes over
+// twenty metres of ground the page draws as sheet. The engine's default sits
+// here only so that the honest answer to "nobody has said yet" is the engine's
+// and not a number invented in this file.
+let discRadius = DISC_RADIUS;
+
+/**
+ * What the ground session laid, told to the seat that has to answer for it.
+ *
+ * Called by src/world/layers/v1-suolo.js at the one place the radius is
+ * resolved, so the disc, the sheet and this contract are three readers of ONE
+ * decision rather than three opinions about it.
+ *
+ * @param {number} radius  metres of ten centimetre ground from the centre
+ */
+export function setGroundDiscRadius(radius) {
+  discRadius = radius > 0 ? radius : DISC_RADIUS;
+  return discRadius;
 }
+
+// What columnTop hands back where no column stands. The engine keeps the value
+// to itself, so it is recognised by size and not by equality: no top of any
+// real column is within a decade of it, and matching on the magnitude cannot
+// break the day the engine picks a different sentinel.
+const NO_TOP = -1e8;
 
 /**
  * Height of the ground under a point, in metres.
  *
- * V1 FILLS THIS. Today it reads the bent grid of the meadow; tomorrow it is the
- * top of a column of the voxel disc inside r=35 and of the quantised shell
- * beyond it, and it still has to be one answer -- the walker cannot stand at a
- * height the ground is not drawn at.
+ * V1 FILLS THIS, and it is three grounds behind one name because the world has
+ * three and the walker may stand on all of them:
+ *
+ *   1. WHERE THE CORRIDOR OWNS THE GROUND the answer is the field, and it is
+ *      the field EXACTLY rather than resampled. groundHoleAt is true over
+ *      precisely the footprint V3's surface covers, that surface is laid on the
+ *      ground rather than on a column, and a cube answered here would put the
+ *      walker on a lip the paving is drawn over. Measured on the corridor, the
+ *      exact field stands 26.4 mm from the ground as drawn at worst against the
+ *      grid's 28.8 -- the rest of that gap is the meadow's own triangulation
+ *      and belongs to whoever chose it, which is said in full in the verbale.
+ *   2. INSIDE THE DISC the top of the column, which is what the frame draws.
+ *      Where the disc lays none -- a block's own footprint -- the bent grid is
+ *      still what draws, so the field answers there too.
+ *   3. BEYOND THE DISC the sheet, SNAPPED THE WAY THE SHEET SNAPS. This is not
+ *      a flourish: the walker's hard radius is 21 m and the disc reaches 14, so
+ *      seven metres of what he can walk on are sheet, and an unsnapped answer
+ *      there would have him riding a smooth field over terraced ground for a
+ *      third of his own range.
+ *
+ * The arithmetic of 3 is ground-shell.js's shellHeight, RE-DECLARED and not
+ * imported, and that is a debt this unit is naming rather than hiding: the
+ * sheet is built in a session file and the contract cannot import a layer
+ * without the layer's whole dependency graph following it into every tool that
+ * reads a height. The two are pinned together by guard-lift's own leg rather
+ * than by an import -- see the note there.
  */
 export function groundHeightAt(x, z) {
-  const plane = sampled();
-  const { samples, originX, originZ, spacing } = FIELD;
-  const fx = (x - originX) / spacing;
-  const fz = (z - originZ) / spacing;
-  // Outside the grid the field is flat, so the rim value is the right answer.
-  const i = Math.max(0, Math.min(samples - 2, Math.floor(fx)));
-  const j = Math.max(0, Math.min(samples - 2, Math.floor(fz)));
-  const tx = Math.max(0, Math.min(1, fx - i));
-  const tz = Math.max(0, Math.min(1, fz - j));
-  const a = plane[j * samples + i];
-  const b = plane[j * samples + i + 1];
-  const c = plane[(j + 1) * samples + i];
-  const d = plane[(j + 1) * samples + i + 1];
-  return (a * (1 - tx) + b * tx) * (1 - tz) + (c * (1 - tx) + d * tx) * tz;
+  // 1. Something else owns this column, and it is laid on the ground rather
+  //    than on the carpet.
+  if (groundHoleAt(x, z)) return heightAt(x, z);
+  // 2. The carpet, from the arithmetic the worker meshes from.
+  const top = columnTop(Math.floor(x / VOXEL), Math.floor(z / VOXEL), true, discRadius);
+  if (top > NO_TOP) return (top + 1) * VOXEL;
+  const r = Math.hypot(x - CENTRE.x, z - CENTRE.z);
+  //    Inside the disc with no column: a block's footprint, where the grid draws.
+  if (r <= discRadius) return heightAt(x, z);
+  // 3. The sheet.
+  return Math.round((heightAt(x, z) + basinProfile(r)) / VOXEL) * VOXEL;
 }
 
 // ----------------------------------------------------------- the basin

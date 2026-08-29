@@ -2,6 +2,7 @@ import { createTerrain } from '../terrain.js';
 import { createGroundVoxel } from '../ground-voxel.js';
 import { createGroundShell } from '../ground-shell.js';
 import { DISC_RADIUS } from '../voxel/index.js';
+import { setGroundDiscRadius } from '../contracts.js';
 
 // THE SOIL. Owned by V1.
 //
@@ -109,6 +110,12 @@ const layer = {
       // default, which only ever answers "nobody said". A number written in
       // this file instead would be a fourth opinion about the size of the world.
       const radius = wanted.radius ?? assets.voxelDiscRadius ?? DISC_RADIUS;
+      // AND THE CONTRACT IS TOLD, HERE AND NOWHERE ELSE. groundHeightAt has to
+      // answer cubes inside the disc and sheet beyond it, so it has to know
+      // where the disc ends -- and the only way that is one answer instead of
+      // two is for the seat that DECIDES the radius to hand it over, rather
+      // than for the contract to work it out again from the tier.
+      setGroundDiscRadius(radius);
 
       layer.built = createTerrain({
         albedo: assets['terrain-albedo'],
