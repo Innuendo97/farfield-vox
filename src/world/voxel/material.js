@@ -86,8 +86,26 @@ export function voxelSettings() {
     // brightest family does keep widening past 1.60 -- but only because the
     // k-means has stopped cutting by orientation and started cutting by
     // brightness, and the bottom rung falls out of guard-scala's gate as it does
-    // it. 1.60 is where the spread stops rising for a reason the gate accepts.
-    // v1-suolo/misure/tinta.mjs section 3 is the table.
+    // it. v1-suolo/misure/tinta.mjs section 3 is the table.
+    //
+    // 1.60 IS REACHABLE AND IS NOT TAKEN, AND THAT IS A DECISION SOMEBODY ELSE'S.
+    // Swept on the page it reads 9.5% of family sd at the demo window against
+    // this setting's 8.1%, with the ladder's bottom rung unmoved -- so the 9.2%
+    // the campaign has been calling a ceiling is beaten. But the OTHER reading of
+    // the same meadow goes the other way, and it is the one that can be taken off
+    // the target directly instead of through a k-means:
+    //
+    //                          family sd    p90/p10 of a cube    sd/mean
+    //     the day target           18.7%                 3.10      40.5%
+    //     tint 1.30                 8.1%                 5.77      54.5%
+    //     tint 1.60                 9.5%                 6.54      61.5%
+    //
+    // This meadow is already spread WIDER cube to cube than the target's, not
+    // narrower; what the family sd is short of is a bright minority, which a
+    // wider uniform draw does not make. Buying the clustered number by moving
+    // further from the unclustered one is a trade about which reading the
+    // campaign is judged on, so it is raised with both numbers and a pair of
+    // crops rather than taken here.
     tint: 1.30,
     // THE SHAPE OF THE DRAW, WHICH IS THE HALF NOBODY HAD SWEPT.
     //
@@ -107,7 +125,21 @@ export function voxelSettings() {
     // A BLEND AND NOT A POWER, because a power is a log and an exponent in every
     // fragment of the meadow to buy a shape a single multiply already reaches.
     // The file's other two shape knobs are blends for the same reason.
-    tintShape: 0.0,
+    //
+    // ONE, MEASURED AND NOT PREFERRED. Swept in the browser at the four settings
+    // and read at the window the campaign judges on, against the target read the
+    // same way, it moves every column of that statistic the right way at once:
+    //
+    //                          p90/p10   sd/mean   in the middle
+    //     the day target          3.10     40.5%          37.9%
+    //     tintShape 0             5.77     54.5%          27.6%
+    //     tintShape 1             4.65     48.7%          29.2%
+    //
+    // and at picco-85, where a cube is 67 px and the residue was first seen, it
+    // takes the last column from 31.9% to 37.1%. It costs three tenths of a per
+    // cent of the estimator's own family sd and pays for it in the joint, the
+    // arris ratio and the bottom rung, all three of which improve.
+    tintShape: 1.0,
     // A little of that spread in hue as well as in level, because a meadow
     // varies in both and a pure luminance jitter reads as dirt on one colour.
     hue: 0.22,
@@ -115,6 +147,13 @@ export function voxelSettings() {
     // to be ON SCREEN. The reference's joint is six per cent over one or two
     // pixels — a LINE, not a well — so the width is held in pixels and the
     // whole term lets go once a cube is too small to have an inside.
+    // AND THE WIDTH IS AT ITS FLOOR ALREADY, swept rather than assumed. The
+    // recipe's own entry says this joint reads one pixel wider than the target's,
+    // so 1.1 was tried: the frame changes and the estimator's reading does not
+    // move at all -- 0.953 deep and 3 px wide on both, to three decimals, at
+    // every window. What sets the width at this range is the metre cap two lines
+    // below in the shader and the estimator's own edge finding, not this number.
+    // It is left where it was fitted because moving it buys nothing measurable.
     joint: 0.06,
     jointPixels: 1.6,
     // The lightened upper arris, which is the strongest single signal in the
@@ -124,7 +163,22 @@ export function voxelSettings() {
     arris: 1.0,
     arrisPixels: 2.2,
     // How far the facet leans, nought for none and one for halfway to level.
-    arrisLean: 1.0,
+    //
+    // 0.33, SWEPT ON THE PAGE AND CONFIRMED TWICE. The recipe wants a lift of
+    // 1.09x and this arris was delivering 1.16x: too strong, and the lean is what
+    // decides how much of the leaning facet's light is mixed in. Read against the
+    // target on three windows at once it is the only setting that improves all
+    // three -- 1.13 / 1.12 / 1.10 against the shipped 1.16 / 1.15 / 1.14, where
+    // the target reads 1.09 on every one of them.
+    //
+    // AND ITS BLUE IS NOT A KNOB, which is worth writing down because it looks
+    // like one. Solved offline over the whole grid of lean and blend, the lift's
+    // blue over red never leaves the band 0.91 to 1.05: it is the colour of the
+    // sky against the colour of the sun, and the two settings decide only how
+    // MUCH of it there is. What actually moved that reading onto the target was
+    // the pigment -- at the solved albedo the estimator reads B/R 0.43 against
+    // the target's 0.43, where the old pigment read 0.68.
+    arrisLean: 0.33,
     // THE TWO KNOBS THAT ARE NOT THE VOXEL'S. They are still reachable from
     // here, because a sweep on the page is what they exist for; what they MEAN,
     // and why a delivery ships them at one, is stated once over NEUTRAL_LIFT in
