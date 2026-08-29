@@ -1,4 +1,4 @@
-import { cpSync } from 'node:fs';
+import { cpSync, realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import { renderCvPage } from './tools/cv-page/build-cv.mjs';
@@ -47,6 +47,16 @@ export default defineConfig({
   // Relative base keeps the build working on any static host, including
   // preview URLs served from a sub-path.
   base: './',
+  server: {
+    fs: {
+      // The session worktrees reach node_modules through a junction into this
+      // tree. Vite resolves the junction to its real path, which sits outside
+      // the worktree's root, and answers 403 for every file in it -- the Basis
+      // transcoder first, so KTX2 textures never transcode and the world runs
+      // undressed. Allowing the real location keeps the junctions working.
+      allow: ['.', realpathSync(fromRoot('node_modules'))],
+    },
+  },
   plugins: [copyContent(), cvPage()],
   optimizeDeps: {
     // The KTX2 loader resolves the Basis transcoder relative to its own module
