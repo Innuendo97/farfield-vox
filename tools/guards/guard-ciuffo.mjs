@@ -63,16 +63,20 @@ const AT_APPROVED = { on: 1.5362, off: 0.1903, carpet: 1.3459 };
 //
 // The orchestrator judged the crops and passed everything except the SHAPE of
 // the carpet: our three-and-over stood as single column towers with their
-// flanks in shadow where the target lifts broad shouldered masses. The two
-// dials that answer that are in mesher.js -- MOUND.clump 0.42 -> 0.85 and
-// MOUND.meadowGate 0.70 -> 0.80 -- and BOTH OF THEM PILE LESS MEADOW, so the
-// bill went DOWN: 1.72x of the reallocated budget at vox-giorno became 1.59x.
-// A price that falls is declared and shipped; one that rose would have needed
-// the committente's word before a line was written.
+// flanks in shadow where the target lifts broad shouldered masses. The dial
+// that answers that is in mesher.js -- MOUND.clump 0.42 -> 0.85, a clump as
+// wide as the band a mound stands in -- and it PILES NO LESS MEADOW, it gathers
+// the same meadow into half as many masses twice as broad. That is cheaper
+// geometry for the same ground, so the bill went DOWN: 1.72x of the reallocated
+// budget at vox-giorno became 1.62x. A price that falls is declared and
+// shipped; one that rose would have needed the committente's word before a line
+// was written, and one did -- see the note over MOUND.meadowGate, which went to
+// 0.80 and came back when the eye and the estimator both said the tail had gone
+// past the target rather than onto it.
 //
 // This is the yardstick a DRIFT is read against, because a drift is something
 // nobody meant. The line above is the yardstick a DECISION is read against.
-const AT_TODAY = { on: 1.4129, off: 0.1903, carpet: 1.2226 };
+const AT_TODAY = { on: 1.4442, off: 0.1903, carpet: 1.2539 };
 
 /** Whether a constant is still the frozen one. Bit for bit: these are dials. */
 export const frozen = (actual, expected) => actual === expected;
@@ -91,6 +95,10 @@ if (process.argv.includes('--self')) {
     {
       what: 'a yardstick left behind by a dial that moved is caught',
       caught: Math.abs(1.3459 - AT_TODAY.carpet) >= 5e-4,
+    },
+    {
+      what: 'the two yardsticks are not the same number wearing two names',
+      caught: Math.abs(AT_APPROVED.carpet - AT_TODAY.carpet) >= 5e-4,
     },
   ]);
 }

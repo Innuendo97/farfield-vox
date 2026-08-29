@@ -67,12 +67,13 @@ const SHIPPED_RADIUS = Math.max(...TIERS.map((t) => t.voxelDiscRadius));
 //
 // AND THEN IT CAME DOWN, BY THE SAME ARITHMETIC AND IN THE OTHER DIRECTION.
 // The orchestrator's eye passed everything of that arm except the SHAPE of the
-// carpet -- towers where the target lifts broad masses -- and the two dials
-// that answer it (MOUND.clump 0.42 -> 0.85, MOUND.meadowGate 0.70 -> 0.80)
-// both pile LESS meadow: the disc ships at 1.4129 q/col, not 1.5362. A wall
-// left at 1.60 would sit 13% above what ships and would not notice the carpet
-// growing a tenth of itself back. So the SAME 4.15% margin is taken over the
-// new figure -- 1.4715 -- and the wall is 1.47. Lowering a wall to follow a
+// carpet -- towers where the target lifts broad masses -- and the dial that
+// answers it (MOUND.clump 0.42 -> 0.85) does not pile less meadow, it gathers
+// the same meadow into half as many masses twice as broad, which is cheaper
+// geometry over the same ground: the disc ships at 1.4442 q/col, not 1.5362.
+// A wall left at 1.60 would sit 11% above what ships and would not notice the
+// carpet growing a tenth of itself back. So the SAME 4.15% margin is taken over
+// the new figure -- 1.5041 -- and the wall is 1.50. Lowering a wall to follow a
 // bill that fell is the opposite of the move E-V1b warns about, and it is
 // written here rather than left implicit precisely because the two look alike
 // from a distance: what is forbidden is moving the wall so a number can pass,
@@ -90,7 +91,7 @@ const SHIPPED_RADIUS = Math.max(...TIERS.map((t) => t.voxelDiscRadius));
 // ------------------------------------------------------------------------
 
 /** D1's wall, at the same margin over what ships. Provisional: see above. */
-const DISQUALIFY = 1.47;
+const DISQUALIFY = 1.50;
 // D1's target. E-V1b retired it as an imposed number -- the absolute floor
 // under any partition of this field is 0.5035, so 0.45 is unreachable in any
 // world and the target's own meadow reads 1.54 -- but it is left printing,
@@ -109,14 +110,18 @@ export function verdict(perColumn) {
 if (process.argv.includes('--self')) {
   selfTest('guard-fusione', [
     { what: 'a disc at 1.70 q/col is disqualified', caught: verdict(1.70).disqualified },
-    { what: 'a disc at 1.4700001 q/col is disqualified', caught: verdict(1.4700001).disqualified },
+    { what: 'a disc at 1.5000001 q/col is disqualified', caught: verdict(1.5000001).disqualified },
     {
       what: 'the arm the committente approved would no longer pass this wall',
       caught: verdict(1.5362).disqualified,
     },
     {
-      what: 'a disc at 1.45 q/col passes but is declared short of the target',
-      caught: !verdict(1.45).disqualified && verdict(1.45).missed,
+      what: 'the arm that busted the coordinator\'s ceiling is disqualified here too',
+      caught: verdict(1.5614512627915790).disqualified,
+    },
+    {
+      what: 'a disc at 1.48 q/col passes but is declared short of the target',
+      caught: !verdict(1.48).disqualified && verdict(1.48).missed,
     },
     {
       what: 'a disc at 0.44 q/col passes with nothing to declare',
@@ -125,7 +130,7 @@ if (process.argv.includes('--self')) {
     {
       what: 'the measurement itself still lands where the shape correction put it',
       caught: Math.abs(meshDisc(null, true, SHIPPED_RADIUS).quadsPerColumn
-        - 1.4128966681597355) < 1e-12,
+        - 1.4441649726079315) < 1e-12,
     },
   ]);
 }

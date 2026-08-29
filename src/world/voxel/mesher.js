@@ -233,9 +233,9 @@ export const CARPET_GRAIN = 0.45;
 // every mass in columns and the drawn faces in square metres, both validated in
 // both directions:
 //
-//   the crest of a mass       2.20 columns  ->  3.60      (median 2 -> 3)
-//   the flank's share of face 64.4%         ->  58.2%     (bare ground: 14.3%)
-//   the mean seam             2.26 voxels   ->  1.69
+//   the crest of a mass       2.20 columns  ->  4.30      (median 2 -> 4)
+//   the flank's share of face 64.4%         ->  59.7%     (bare ground: 14.3%)
+//   the mean seam             2.26 voxels   ->  1.79
 //
 // AND THE WIDTH IS THE BAND. 0.85 m is already in this object: it is how far
 // out from a stone a mound may sit. A clump as wide as that band is a mound
@@ -249,15 +249,32 @@ export const MOUND = {
   gate: 0.56,   // how much of that band is piled and how much stays meadow
   // AND HOW MUCH OF THE OPEN MEADOW IS PILED, which is far less.
   //
-  // 0.80 AND NOT 0.70, AND THE PRICE GOES DOWN. The arm was tuned on A1-bis's
-  // reading of the day target at the OLD poses -- thirteen to fourteen per cent
-  // of its risers three voxels or more. D3a re-read the same target at the
-  // fitted poses and got 10.46%, writing that the direction survives the refit
-  // and the figure does not. This gate is what closes that difference, and it
-  // closes it by piling LESS meadow, not more: 1.72x of the reallocated budget
-  // becomes 1.59x with the clump above. A price that falls is declared and not
-  // asked for; one that rose would need the committente's word first.
-  meadowGate: 0.80,
+  // IT WENT TO 0.80 AND CAME BACK, AND THE ROUND TRIP IS THE MEASUREMENT.
+  //
+  // Raising it was meant to close a difference of readings: the arm was tuned on
+  // A1-bis's count of the day target at the OLD poses, thirteen to fourteen per
+  // cent of its risers three voxels or more, and D3a re-read the same target at
+  // the fitted poses and got 10.46%. At the clump this object used to carry,
+  // 0.80 landed the tail on that figure and cost less.
+  //
+  // AT THE CLUMP ABOVE IT DOES NOT, AND THE TWO DIALS TURN OUT TO CUT THE SAME
+  // THING. The three-and-over risers of a mass ARE its outer edge. Widening the
+  // clump gathers the same piled meadow into half as many masses, so it removes
+  // edge; raising this gate removes masses, so it removes edge too. Together
+  // they took the tail from 12.66% of the painted risers to 2.65%, against a
+  // target of 10.46% -- past the mark and out the other side. Measured, both
+  // arms rendered at the fitted camera and read with the same estimator:
+  //
+  //                          flank   tail   double step   price
+  //   gate 0.80, clump 0.85  58.28%  2.65%    10.66%      1.59x
+  //   gate 0.70, clump 0.85  61.16%  5.82%    11.32%      1.62x   <- this
+  //   the day target         62.58% 10.46%    21.51%
+  //
+  // So the gate is back at the value the committente chose and the WIDTH is
+  // doing the work alone. The price still falls -- 1.72x to 1.62x -- because
+  // gathering a carpet is cheaper than piling one, and a bill that falls is
+  // declared rather than asked for.
+  meadowGate: 0.70,
   low: 3,       // the census E-V4d names: three voxels ...
   high: 6,      // ... to six.
 };
