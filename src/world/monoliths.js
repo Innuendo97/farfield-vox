@@ -1,6 +1,6 @@
 import {
-  AdditiveBlending, BufferAttribute, BufferGeometry, DoubleSide, Mesh,
-  ShaderMaterial, Vector2, Vector3,
+  AdditiveBlending, Box3, BufferAttribute, BufferGeometry, DoubleSide,
+  DynamicDrawUsage, Mesh, ShaderMaterial, Sphere, Vector3,
 } from 'three';
 import { MONOLITHS } from './layout.js';
 import { INK_CORE, INK_GAIN, INK_HALO } from './voxel/masonry.js';
@@ -52,101 +52,164 @@ const DEG = Math.PI / 180;
 // of every block and the hoop at the fifth are things the targets DO show, and
 // they are content, not decoration.
 
-// The marker at the foot of every block: a small cyan rhombus that hangs in
-// front of the stone and breathes. Drawn as a quad with the shape cut out of it
-// in the shader rather than as a sprite, because a rhombus is one absolute
-// value and a texture for it would be a download.
+// WHAT HANGS AT THE FOOT OF THE BLOCKS IS SEVEN THINGS AND ONE DRAW.
+//
+// The marker at the foot of every block is a small cyan rhombus that hangs in
+// front of the stone and breathes, and at the fifth there is a hoop as well.
+// Both are quads with their shape cut out of them in the shader rather than
+// sprites, because a rhombus is one absolute value and a texture for it would
+// be a download.
+//
+// THEY USED TO BE SEVEN MESHES WITH SEVEN ShaderMaterials, and the gate counted
+// what that cost: SEVEN DRAW CALLS FOR FOURTEEN TRIANGLES, submitted at every
+// pose in the world because each of them carried `frustumCulled = false`. They
+// are one mesh now — one geometry of seven quads, one material, one call — and
+// what used to be a uniform per mesh is an attribute per quad:
+//
+//   aCentre  where this quad hangs, in world metres. The billboarding needs a
+//            centre per quad and nothing else changes, so the whole turn to the
+//            eye still happens in the vertex shader.
+//   aShape   which of the two figures to cut: the rhombus or the hoop.
+//   aPulse   (size in metres, intensity), the two things that breathe. They are
+//            written into the buffer every frame instead of into seven uniform
+//            blocks -- 56 floats, against seven material binds.
+//
+// FUSING THEM CANNOT CHANGE THE PICTURE, and the reason is worth stating rather
+// than hoping: the arithmetic of each figure below is the arithmetic it had,
+// and the blending is ADDITIVE with depth writes off, so the order the quads
+// are drawn in cannot matter. Seven meshes sorted back to front and one mesh
+// drawn in index order composite to the same colour.
+//
+// AND THE CULLING IS REAL NOW rather than switched off. Each of the seven had
+// to disable it, because a billboard built in the vertex shader has nothing to
+// do with the bounds three.js would compute from its unit quad -- so all seven
+// went to the GPU wherever the walker stood, including with their backs to the
+// hub. One mesh can afford a bound that is actually true: the sphere is set by
+// hand below, over the seven centres and the largest a quad can breathe to.
 const MARKER_VERTEX = /* glsl */`
+  attribute vec3 aCentre;
+  attribute float aShape;
+  attribute vec2 aPulse;
   varying vec2 vUv;
-  uniform vec3 uCentre;
-  uniform vec2 uSize;
+  varying float vShape;
+  varying float vIntensity;
 
   void main() {
     vUv = uv;
+    vShape = aShape;
+    vIntensity = aPulse.y;
     // Billboarded about the vertical only: the marker is a thing standing in
     // the world, not a decal on the lens, and rolling it with the camera pitch
     // makes it read as interface.
-    vec3 toEye = cameraPosition - uCentre;
+    vec3 toEye = cameraPosition - aCentre;
     vec3 right = normalize(vec3(-toEye.z, 0.0, toEye.x));
-    vec3 world = uCentre + right * (position.x * uSize.x) + vec3(0.0, position.y * uSize.y, 0.0);
+    vec3 world = aCentre + right * (position.x * aPulse.x) + vec3(0.0, position.y * aPulse.x, 0.0);
     gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
   }
 `;
 
+// The two figures, in the one shader that draws them both.
+//
+// THE RHOMBUS: an outlined diamond with a filled heart and a soft field around
+// it, because the reference draws all three.
+//
+// THE HOOP AT THE FIFTH: the reference puts a lit circle there and nowhere
+// else, which is the section about where the walker is going -- a hoop of light
+// standing on the meadow with a star burning in the middle of it. It is
+// billboarded like the rhombus because in the reference it is a circle seen
+// face on while everything around it is seen in perspective, which a hoop lying
+// on the ground could never be.
 const MARKER_FRAGMENT = /* glsl */`
   precision highp float;
   varying vec2 vUv;
+  varying float vShape;
+  varying float vIntensity;
   uniform vec3 uCore;
   uniform vec3 uHalo;
-  uniform float uIntensity;
 
   void main() {
     vec2 p = (vUv - 0.5) * 2.0;
-    float d = abs(p.x) + abs(p.y);
-    // An outlined rhombus with a filled heart, and a soft field around it: the
-    // reference draws all three.
-    float ring = smoothstep(0.045, 0.0, abs(d - 0.76));
-    float core = smoothstep(0.44, 0.16, d);
-    float glow = smoothstep(1.0, 0.30, d) * 0.34;
-    float amount = (ring + core * 0.85 + glow) * uIntensity;
+    float amount;
+    if (vShape > 0.5) {
+      float d = length(p);
+      float hoop = smoothstep(0.09, 0.0, abs(d - 0.72));
+      float star = smoothstep(0.34, 0.0, d);
+      // Four spokes out of the middle, which is what a point of light does when
+      // it is drawn rather than photographed.
+      float spokes = max(
+        smoothstep(0.055, 0.0, abs(p.x)) * smoothstep(0.95, 0.1, abs(p.y)),
+        smoothstep(0.055, 0.0, abs(p.y)) * smoothstep(0.95, 0.1, abs(p.x)));
+      float wash = smoothstep(1.0, 0.0, d) * 0.22;
+      amount = (hoop + star * 1.5 + spokes * 0.55 + wash) * vIntensity;
+    } else {
+      float d = abs(p.x) + abs(p.y);
+      float ring = smoothstep(0.045, 0.0, abs(d - 0.76));
+      float core = smoothstep(0.44, 0.16, d);
+      float glow = smoothstep(1.0, 0.30, d) * 0.34;
+      amount = (ring + core * 0.85 + glow) * vIntensity;
+    }
     gl_FragColor = vec4(mix(uHalo, uCore, clamp(amount, 0.0, 1.0)) * amount, 1.0);
   }
 `;
 
-// The ring at the foot of the fifth block. The reference puts a lit circle
-// there and nowhere else, which is the section about where the walker is going:
-// a hoop of light standing on the meadow, with a star burning in the middle of
-// it. It is billboarded like the rhombus, because in the reference it is a
-// circle seen face on while everything around it is seen in perspective, which
-// a hoop lying on the ground could never be.
-const RING_FRAGMENT = /* glsl */`
-  precision highp float;
-  varying vec2 vUv;
-  uniform vec3 uCore;
-  uniform vec3 uHalo;
-  uniform float uIntensity;
+const SHAPE_RHOMBUS = 0;
+const SHAPE_HOOP = 1;
 
-  void main() {
-    vec2 p = (vUv - 0.5) * 2.0;
-    float d = length(p);
-    float hoop = smoothstep(0.09, 0.0, abs(d - 0.72));
-    float star = smoothstep(0.34, 0.0, d);
-    // Four spokes out of the middle, which is what a point of light does when
-    // it is drawn rather than photographed.
-    float spokes = max(
-      smoothstep(0.055, 0.0, abs(p.x)) * smoothstep(0.95, 0.1, abs(p.y)),
-      smoothstep(0.055, 0.0, abs(p.y)) * smoothstep(0.95, 0.1, abs(p.x)));
-    float wash = smoothstep(1.0, 0.0, d) * 0.22;
-    float amount = (hoop + star * 1.5 + spokes * 0.55 + wash) * uIntensity;
-    gl_FragColor = vec4(mix(uHalo, uCore, clamp(amount, 0.0, 1.0)) * amount, 1.0);
-  }
-`;
-
-function emissiveMaterial(fragmentShader, vertexShader, uniforms) {
-  return new ShaderMaterial({
-    uniforms,
-    vertexShader,
-    fragmentShader,
-    transparent: true,
-    depthWrite: false,
-    blending: AdditiveBlending,
-    side: DoubleSide,
-    fog: false,
-  });
-}
-
-function markerGeometry() {
-  // A unit quad centred on the origin; the vertex shader turns it to the eye
-  // and gives it its size in metres.
+/**
+ * The seven quads, as one geometry, with a bound that is true.
+ *
+ * The quads are unit squares centred on the origin; the vertex shader turns
+ * each one to the eye and gives it its size in metres from `aPulse`. Which
+ * means the positions in this buffer say NOTHING about where the mesh is in the
+ * world, and the sphere three.js would compute from them would cull the whole
+ * hub's markers the moment the origin left the frustum. So it is set here, over
+ * the centres the quads actually hang at and the largest each can breathe to.
+ *
+ * @param {{centre: Vector3, shape: number, size: number}[]} quads
+ */
+function markersGeometry(quads) {
   const geometry = new BufferGeometry();
-  geometry.setAttribute('position', new BufferAttribute(new Float32Array([
-    -0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0,
-  ]), 3));
-  geometry.setAttribute('uv', new BufferAttribute(new Float32Array([
-    0, 0, 1, 0, 1, 1, 0, 1,
-  ]), 2));
-  geometry.setIndex([0, 1, 2, 0, 2, 3]);
-  geometry.computeBoundingSphere();
+  const position = new Float32Array(quads.length * 12);
+  const uv = new Float32Array(quads.length * 8);
+  const centre = new Float32Array(quads.length * 12);
+  const shape = new Float32Array(quads.length * 4);
+  const pulse = new Float32Array(quads.length * 8);
+  const index = [];
+
+  quads.forEach((q, i) => {
+    position.set([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0], i * 12);
+    uv.set([0, 0, 1, 0, 1, 1, 0, 1], i * 8);
+    for (let c = 0; c < 4; c++) {
+      centre.set([q.centre.x, q.centre.y, q.centre.z], i * 12 + c * 3);
+      shape[i * 4 + c] = q.shape;
+      pulse.set([q.size, 0], i * 8 + c * 2);
+    }
+    const base = i * 4;
+    index.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  });
+
+  geometry.setAttribute('position', new BufferAttribute(position, 3));
+  geometry.setAttribute('uv', new BufferAttribute(uv, 2));
+  geometry.setAttribute('aCentre', new BufferAttribute(centre, 3));
+  geometry.setAttribute('aShape', new BufferAttribute(shape, 1));
+  const breathing = new BufferAttribute(pulse, 2);
+  breathing.setUsage(DynamicDrawUsage);
+  geometry.setAttribute('aPulse', breathing);
+  geometry.setIndex(index);
+
+  // The bound, over where the quads hang and how large they can get. A quad of
+  // side s billboarded about the vertical reaches s/2 sideways and s/2 up, so
+  // its far corner is s/sqrt(2) from its centre; FOCUS_SIZE is how much wider
+  // than its resting size a lit one breathes.
+  const box = new Box3();
+  for (const q of quads) box.expandByPoint(q.centre);
+  const middle = box.getCenter(new Vector3());
+  let radius = 0;
+  for (const q of quads) {
+    radius = Math.max(radius,
+      middle.distanceTo(q.centre) + q.size * (1 + FOCUS_SIZE) * Math.SQRT1_2);
+  }
+  geometry.boundingSphere = new Sphere(middle, radius);
   return geometry;
 }
 
@@ -206,8 +269,8 @@ export function createMonoliths() {
   // other is the defect below.
   const engravings = new Map();
 
-  // ------------------------------------------------------------- the markers
-  const quad = markerGeometry();
+  // ------------------------------------------------- where the seven quads hang
+  const quads = [];
   const placed = new Map();
   for (const spec of MONOLITHS) {
     const angle = spec.rotationY * DEG;
@@ -221,22 +284,12 @@ export function createMonoliths() {
       spec.baseY + spec.size[1] * MARKER_HEIGHT,
       centre.z + front.z * (spec.size[2] / 2 + MARKER_STANDOFF),
     );
-    const material = emissiveMaterial(MARKER_FRAGMENT, MARKER_VERTEX, {
-      uCentre: { value: at },
-      uSize: { value: new Vector2(MARKER_SIZE, MARKER_SIZE) },
-      uCore: { value: new Vector3(...INK_CORE) },
-      uHalo: { value: new Vector3(...INK_HALO) },
-      uIntensity: { value: MARKER_GAIN },
-    });
-    const marker = new Mesh(quad, material);
-    marker.name = `marker-${spec.id}`;
-    marker.frustumCulled = false;
-    meshes.push(marker);
+    quads.push({ centre: at, shape: SHAPE_RHOMBUS, size: MARKER_SIZE });
     // Each one breathes on its own clock, so five markers in one frame never
     // pulse as a single blinking row.
     pulses.push({
-      id: spec.id, material, phase: Number(spec.id) * 1.13, base: MARKER_GAIN,
-      size: MARKER_SIZE,
+      id: spec.id, slot: quads.length - 1, phase: Number(spec.id) * 1.13,
+      base: MARKER_GAIN, size: MARKER_SIZE,
     });
   }
 
@@ -251,21 +304,31 @@ export function createMonoliths() {
       spec.baseY + spec.size[1] * MARKER_HEIGHT - RING_DROP,
       centre.z + front.z * (spec.size[2] / 2 + MARKER_STANDOFF + RING_FORWARD) - right.z * RING_LEFT,
     );
-    const material = emissiveMaterial(RING_FRAGMENT, MARKER_VERTEX, {
-      uCentre: { value: at },
-      uSize: { value: new Vector2(RING_SIZE, RING_SIZE) },
-      uCore: { value: new Vector3(...INK_CORE) },
-      uHalo: { value: new Vector3(...INK_HALO) },
-      uIntensity: { value: RING_GAIN },
-    });
-    const ring = new Mesh(quad, material);
-    ring.frustumCulled = false;
-    ring.name = 'marker-ring-05';
-    meshes.push(ring);
+    quads.push({ centre: at, shape: SHAPE_HOOP, size: RING_SIZE });
     pulses.push({
-      id: '05', material, phase: 2.5, depth: 0.14, base: RING_GAIN, size: RING_SIZE,
+      id: '05', slot: quads.length - 1, phase: 2.5, depth: 0.14,
+      base: RING_GAIN, size: RING_SIZE,
     });
   }
+
+  // ------------------------------------------------------- and the one mesh
+  const geometry = markersGeometry(quads);
+  const breath = geometry.getAttribute('aPulse');
+  const markers = new Mesh(geometry, new ShaderMaterial({
+    uniforms: {
+      uCore: { value: new Vector3(...INK_CORE) },
+      uHalo: { value: new Vector3(...INK_HALO) },
+    },
+    vertexShader: MARKER_VERTEX,
+    fragmentShader: MARKER_FRAGMENT,
+    transparent: true,
+    depthWrite: false,
+    blending: AdditiveBlending,
+    side: DoubleSide,
+    fog: false,
+  }));
+  markers.name = 'markers';
+  meshes.push(markers);
 
   return {
     meshes,
@@ -342,16 +405,29 @@ export function createMonoliths() {
       }
     },
 
+    /**
+     * The breathing, written into the one buffer the seven quads share.
+     *
+     * The arithmetic is untouched from when each quad had a material to write
+     * it into; what changed is where it lands. A quad's four corners all carry
+     * its own (size, intensity), so one upload of 56 floats replaces seven
+     * uniform writes and the seven binds that went with them.
+     */
     update(elapsed) {
+      const values = breath.array;
       for (const pulse of pulses) {
         const lit = focus.get(pulse.id)?.value || 0;
         const depth = (pulse.depth === undefined ? MARKER_PULSE.depth : pulse.depth)
           + FOCUS_PULSE * lit;
-        pulse.material.uniforms.uIntensity.value = pulse.base * (1 + FOCUS_MARKER * lit)
+        const intensity = pulse.base * (1 + FOCUS_MARKER * lit)
           * (1 + depth * Math.sin(elapsed * (Math.PI * 2 / MARKER_PULSE.period) + pulse.phase));
         const size = pulse.size * (1 + FOCUS_SIZE * lit);
-        pulse.material.uniforms.uSize.value.set(size, size);
+        for (let c = 0; c < 4; c++) {
+          values[pulse.slot * 8 + c * 2] = size;
+          values[pulse.slot * 8 + c * 2 + 1] = intensity;
+        }
       }
+      breath.needsUpdate = true;
     },
   };
 }
