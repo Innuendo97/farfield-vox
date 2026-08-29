@@ -131,6 +131,72 @@ const STONE_JOINT_PIXELS = 1.6;
 const STONE_ARRIS = 1.0;
 const STONE_ARRIS_PIXELS = 2.2;
 
+// AND THE DRESSED EDGE IS A MATERIAL AS WELL AS A SHAPE. THE FACET IS NOT
+// TOUCHED AND NEITHER IS THE LAW OF THE LIGHT.
+//
+// A cut edge on weathered stone is freshly broken face — denser, less bleached,
+// darker than the weathered flat it was cut from — so a pigment belongs on it,
+// by the same doctrine as painted occlusion: the material carries what the
+// material knows, and the light stays whoever's it is.
+//
+// FITTED AND NOT ARGUED, against the day target through one estimator
+// (v2-pietra/dev2b/materia.mjs, run on the target and on the render with the
+// same lines) on the two lit fronts it resolves cleanly. 04 reads 1.244 on the
+// target and 05 reads 1.163; the render's pair runs 1.309 at one, 1.250 at
+// 0.85, 1.223 at 0.75, 1.174 at 0.63 and 1.118 at 0.5, so the pair lands on the
+// target's 1.204 at the value below. 01 is left out of the fit and not out of
+// the verbale: it is the face the target reads 12.3% mossy, its arris comes
+// back 0.718 there — under one, which a median of maxima cannot mean — and
+// fitting to a reading that broken would be fitting to the moss.
+//
+// AND IT IS NOT WHAT CURED THE BRIGHT COURSE LINES, which is worth saying here
+// because the number is close enough to the one the diagnosis predicted to look
+// like a confirmation of it. It is not: the lines were a HOLE in the skin, they
+// are cured in src/world/voxel/courses.js where the hole is, and the sweep that
+// ruled the material out is written there. This is the material being right
+// about itself, measured after the hole was closed.
+//
+// AND THE NIGHT SCALES WITH IT, stated because it cannot be checked here: the
+// night thread of the recipe is the same dressed edge seen by the same
+// material, so it comes down by this same factor in the same proportion. There
+// is no night seat in this world yet — it is V7's — so this is an implication
+// written down, not a reading taken.
+const STONE_ARRIS_PIGMENT = 0.70;
+
+// HOW MUCH PALER THE TOP COURSE OF A WALL IS THAN THE STONE UNDER IT, and over
+// how many courses it comes back.
+//
+// A weathering fact and a reading, not a taste: assets-src/monoliths/
+// masonry-spec.json carries head.paleTopCourse, which is the top course against
+// the courses three down ON THE SAME FACE, over six faces — 1.072, 1.157,
+// 1.303, 1.192, 2.370 and 1.002. The median of those six is what is used, and
+// the band [1.00, 2.37] is declared rather than averaged away: 04 is nearly
+// two and a half times and 05 is flat, and one law over one wall cannot be both.
+// The fade is the measurement's own baseline and not a shape chosen to look
+// right — the reading compares the top course TO THE COURSES THREE DOWN, so
+// three courses is where it has to be back to one.
+//
+// AND THE SPEC'S OWN BAND IS RE-READ HERE WITHOUT BEING RE-CUT, because the
+// spec is V2-AN's seat and not this file's. Run again with the same line but
+// the band taken under the stone the picture actually DRAWS rather than under
+// the box layout.js declares — the two differ by up to 0.435 m, and the spec
+// prints both numbers itself — the six come back 1.051, 1.161, 1.119, 1.103,
+// 1.096 and 1.008, median 1.103. The 2.370 on 04 was a band 0.35 m above where
+// that block's stone stops, so a third of it was sky. The value below stays the
+// published median; the re-reading is in the verbale for whoever owns the spec,
+// and the difference between the two is 7% of an effect this estimator cannot
+// separate from face to face at the seat anyway (the render moves 0.028 over
+// the whole sweep against a face-to-face scatter of 0.15).
+const STONE_PALE_TOP = 1.175;
+const STONE_PALE_COURSES = 3.0;
+
+// The most head levels this world's masonry is cut into, which is the stair's
+// six treads; the six blocks run to five. It is a fixed size because a uniform
+// array has to be one, and it is stated here so that a head deeper than this
+// is a thing somebody has to come and change rather than a thing that quietly
+// paints the wrong course pale at the far end of a wall.
+const MAX_HEAD_RUNS = 8;
+
 // ------------------------------------------------------------------ the moss
 //
 // THE LAW OF IT, AS THE TARGETS GIVE IT, and every one of the four numbers is a
@@ -356,6 +422,12 @@ const FRAGMENT = /* glsl */`
   uniform vec3 uMossTint;
   uniform float uArris;
   uniform float uArrisPixels;
+  uniform float uArrisPigment;
+
+  uniform vec2 uHead[${MAX_HEAD_RUNS}];  // (the run's far edge in x, its courses)
+  uniform int uHeadRuns;
+  uniform float uPaleTop;
+  uniform float uPaleCourses;
   uniform float uF0;
   uniform float uRim;
   uniform float uRimPower;
@@ -406,6 +478,12 @@ const FRAGMENT = /* glsl */`
     float sx = abs(f.x);
     float sz = abs(f.z);
     bool lid = abs(f.y) > 0.9;
+    // AND THE DRESSED FACET IS NAMED HERE, off the same normal, because it is
+    // the only thing on a block that leans: a wall stands at nought, a lid and
+    // the floor of a socket at one, and the chamfer over a course at 0.7071
+    // exactly. Named this early because what it changes is the LIGHT, and the
+    // light is settled long before the joint and the arris are drawn.
+    float facet = step(0.30, abs(f.y)) * (1.0 - step(0.90, abs(f.y)));
     // u along the wall from its own near corner, and span, in the same
     // direction the generator walked it. Where the two disagreed, a joint would
     // not land on the break the geometry was cut at.
@@ -486,6 +564,35 @@ const FRAGMENT = /* glsl */`
     vec2 draw = stoneHash(course, first, 11.0);
     albedo *= 1.0 + uTint * (draw.x - 0.5);
 
+    // ------------------------------------------------- the pale top course
+    //
+    // The head of a wall is bleached and the stone three courses down is not,
+    // and the targets read the difference on six faces. It is a PIGMENT, like
+    // everything else about this stone that is not a shape.
+    //
+    // WHICH COURSE IS THE TOP ONE IS A FACT ABOUT THE HEAD AND NOT ABOUT THE
+    // BLOCK, which is why the head arrives as a uniform. A head steps down over
+    // part of its width — one to four levels on the six, six treads on the
+    // stair — so a wall has no single top course, and a law written off the
+    // block's own height would paint a pale band across the middle of every
+    // level that steps down. The runs come in the same order and with the same
+    // edges the generator cut them at, and this walks them exactly the way
+    // src/world/voxel/courses.js walks them: the first run whose far edge
+    // covers this point, and the last one for anything past the end.
+    //
+    // A LID IS THE TOP COURSE'S OWN SURFACE, so it takes the whole of it. No
+    // upper face of any of the six is in the reference framing — the eye is
+    // below every head — but the treads of the stair are, and a tread is the
+    // top of the course it caps.
+    float top = uHead[0].y;
+    for (int i = 0; i < ${MAX_HEAD_RUNS}; i++) {
+      if (i >= uHeadRuns) break;
+      top = uHead[i].y;
+      if (vLocal.x <= uHead[i].x) break;
+    }
+    float below = lid ? 0.0 : top - 1.0 - course;
+    albedo *= 1.0 + (uPaleTop - 1.0) * clamp(1.0 - below / uPaleCourses, 0.0, 1.0);
+
     // The same two analytic terms as the meadow, because they come from the
     // same place: src/world/face-light.js is the one producer of the pair, and
     // this file used to write out a second copy of it. A block and the grass at
@@ -498,6 +605,16 @@ const FRAGMENT = /* glsl */`
     // business. Producing one is not.
     vec2 terms = faceTerms(n);
     terms.x *= clamp(1.0 - uRelief * (above - pair.g), 0.45, 1.9);
+    // AND THE SKY TERM IS LEFT ALONE ON THE DRESSED EDGE, which is a decision
+    // and not an omission. A facet leaning at the sky is handed 0.854 by
+    // faceTerms against the wall's 0.5 — 1.71x, of sky alone — and this file
+    // escalated that against the targets' 1.072 to 1.091. Occluding it here was
+    // tried and MEASURED: with the skin closed, driving the facet's share of
+    // the sky from 1.00 to 0.20 moves the arris the estimator reads from 1.150
+    // to 1.117 pooled, and the render is already AT the target without it (04
+    // and 05 read 1.083 and 1.173 against 1.244 and 1.163). A knob that ships
+    // at the value the measurement asks for is not a knob, and the 1.71x stays
+    // parked at D5 with its number rather than being quietly spent here.
     vec3 light = faceLightOf(terms);
 
     // ------------------------------------------------------------- the moss
@@ -586,12 +703,33 @@ const FRAGMENT = /* glsl */`
     // which is the whole reason it is not painted paler.
     float endBand = min(uArrisPixels * pixel, uCell * 0.30);
     float end = 1.0 - smoothstep(0.0, endBand, across);
+    float leaned = 0.0;
     if (!lid && end > 0.0) {
       vec3 sideways = normalize(vec3(-n.z, 0.0, n.x)) * sign(u - 0.5 * (blockFrom + blockTo));
       vec3 leaning = normalize(mix(n, normalize(n + sideways), 0.7071));
-      light = mix(light, faceLightOf(faceTerms(leaning)),
-        end * uArris * smoothstep(2.5, 5.0, onScreen));
+      leaned = end * uArris * smoothstep(2.5, 5.0, onScreen);
+      light = mix(light, faceLightOf(faceTerms(leaning)), leaned);
     }
+
+    // AND WHAT THE DRESSED STONE IS MADE OF, which is this file's half of the
+    // arris and the half that was missing.
+    //
+    // Both edges take it and they have to, because they are one edge: the
+    // horizontal one is the real facet the geometry carries over every course,
+    // the vertical one is the same facet at a block's end, turned in the
+    // fragment because a quad there would cost the merge. A pigment on one and
+    // not the other would draw a block dressed along the top and raw down the
+    // side.
+    //
+    // AND IT IS THE SMALLER HALF OF THIS CURE AND IS KEPT ANYWAY, which is
+    // worth saying plainly rather than shipping a knob that looks decisive. A
+    // cut edge on weathered stone is freshly broken face, denser and less
+    // bleached than the flat it was cut from, so the pigment belongs on it; but
+    // what drew the line along every course was the sky, and the sweep that
+    // proved it is in the verbale. This is the material being right about
+    // itself, not the cure.
+    float dressed = max(facet, leaned);
+    albedo *= mix(1.0, uArrisPigment, dressed);
 
     // ------------------------------------------------------------ engraving
     //
@@ -654,6 +792,17 @@ export function createMasonry(entry, tile, ready = null, engraved = true) {
     spec.position.x, spec.baseY + spec.size[1] / 2, spec.position.z,
   );
 
+  // The head levels, as the fragment reads them: where each run ends along the
+  // block's own x, and how many courses stand under it. Padded to the fixed
+  // size a uniform array has to have, with the padding standing at the last
+  // real run so that nothing past the end can name a course that was never cut.
+  const runs = built.runs || [{ x1: spec.size[0] / 2, courses: built.courses ?? 1 }];
+  const head = [];
+  for (let i = 0; i < MAX_HEAD_RUNS; i++) {
+    const run = runs[Math.min(i, Math.min(runs.length, MAX_HEAD_RUNS) - 1)];
+    head.push(new Vector2(run.x1, run.courses));
+  }
+
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new BufferAttribute(built.positions, 3));
   geometry.setAttribute('normal', new BufferAttribute(built.normals, 3));
@@ -673,6 +822,15 @@ export function createMasonry(entry, tile, ready = null, engraved = true) {
       uTint: { value: STONE_TINT },
       uArris: { value: STONE_ARRIS },
       uArrisPixels: { value: STONE_ARRIS_PIXELS },
+      uArrisPigment: { value: STONE_ARRIS_PIGMENT },
+      // The head as the fragment has to walk it, from the runs the GENERATOR
+      // cut — not from the spec it was cut out of. Between the two there is a
+      // rounding to whole courses and a fusing of narrow levels, and the pale
+      // course has to land on the course the geometry actually stops at.
+      uHead: { value: head },
+      uHeadRuns: { value: Math.min(runs.length, MAX_HEAD_RUNS) },
+      uPaleTop: { value: STONE_PALE_TOP },
+      uPaleCourses: { value: STONE_PALE_COURSES },
       uMoss: { value: MOSS_COVER },
       uMossScale: { value: MOSS_SCALE },
       uMossLit: { value: MOSS_LIT },
