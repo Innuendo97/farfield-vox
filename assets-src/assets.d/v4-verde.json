@@ -1,19 +1,12 @@
 {
   "owner": "V4",
-  "note": "The green. The cards stay in the pivot; what changes is how one takes its light, which is code and not a sheet.",
+  "note": "The green asks for ONE sheet. The accent's cards need a sheet because a blade is a picture; the flowers do not, because a flower here is a cube head and no cube in this world carries a texture. props-atlas went with the crossed cards and the two bushes E-V4d gave to V1.",
   "assets": [
     {
       "id": "grass-atlas",
       "type": "texture",
       "role": "albedo",
       "source": "vegetation/grass-atlas.png",
-      "priority": "high"
-    },
-    {
-      "id": "props-atlas",
-      "type": "texture",
-      "role": "albedo",
-      "source": "vegetation/props-atlas.png",
       "priority": "high"
     }
   ]

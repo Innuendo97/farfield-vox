@@ -36,12 +36,20 @@ const layer = {
     // colour is a pigment measured off the target as a ratio to the meadow's
     // own, and their shape is arithmetic -- so they arrive with the bundle and
     // wait for no download.
-    needs: ['grass-atlas', 'props-atlas'],
+    // ONE SHEET NOW, AND THE SECOND ONE IS OFF THE WIRE. `props-atlas` carried
+    // two bushes and two cells of crossed flower cards. E-V4d gave the bush to
+    // V1 -- what bites the stone in the targets is the ground's own carpet
+    // standing higher, not an object -- and the flower is a cube head with no
+    // texture on it at all, for the same reason no cube in this world has one.
+    // Nothing reads that sheet any more, so it stops being downloaded: the
+    // fragment below no longer declares it and the tool that painted it is
+    // gone, which is also how assets-src/vegetation/palette.json loses its last
+    // consumer instead of being patched (E-V4f.3).
+    needs: ['grass-atlas'],
 
     build(assets) {
       layer.vegetation = createVegetation({
         grassAtlas: assets['grass-atlas'],
-        propsAtlas: assets['props-atlas'],
         // Where the ground is, which the hub knows and no delivery carries.
         height: assets.height,
       });
@@ -58,13 +66,21 @@ const layer = {
 
   /** Development handle: the whole of the green, so its cost can be measured. */
   setVisible(visible) {
-    if (layer.vegetation) layer.vegetation.setGrassVisible(visible);
+    if (layer.vegetation) {
+      layer.vegetation.setGrassVisible(visible);
+      layer.vegetation.setFlowersVisible(visible);
+    }
     if (layer.trees) layer.trees.setVisible(visible);
   },
 
   /** And the trees on their own, which is the only way to price them apart. */
   setTreesVisible(visible) {
     if (layer.trees) layer.trees.setVisible(visible);
+  },
+
+  /** And the flowers on their own, for the same reason. */
+  setFlowersVisible(visible) {
+    if (layer.vegetation) layer.vegetation.setFlowersVisible(visible);
   },
 
   /** What the layer is currently costing, for the development panel. */
