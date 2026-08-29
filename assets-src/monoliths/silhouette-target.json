@@ -1,0 +1,86 @@
+{
+  "why": [
+    "WHERE THE TWO TARGETS PUT THE EDGES OF THE STONE, IN METRES.",
+    "",
+    "Measured off the day target through the camera the recipe fitted on it,",
+    "and written down because the target itself is never carried into this",
+    "repository. offset is how far the picture stands outside the box",
+    "src/world/layout.js declares, signed outward, at the upright corner that",
+    "made that edge; spread is how far the eight rows of one edge disagree",
+    "among themselves, which is what the tolerance is derived from.",
+    "",
+    "THIS REPLACES THE BOXES AS THE REFERENCE. A head built as the targets",
+    "draw it steps down by up to six courses over part of its width, so a",
+    "render is MEANT to disagree with its box; what it may not do is disagree",
+    "with the picture. Remeasure with --measure if the camera or the plan",
+    "moves, never by hand."
+  ],
+  "measuredFrom": "farfield-day-voxel-target.png",
+  "camera": "assets-src/materia/ricetta.json, measuredBy.camera",
+  "reader": "outermost luminance step of 12 within 10 px, 8 rows a side",
+  "points": 94,
+  "pooledSpread": 0.0878,
+  "tolerance": 0.2633,
+  "edges": {
+    "01-left": {
+      "offset": 0.0561,
+      "spread": 0.0688,
+      "rows": 7
+    },
+    "01-right": {
+      "offset": 0.0463,
+      "spread": 0.0455,
+      "rows": 8
+    },
+    "02-left": {
+      "offset": 0.1879,
+      "spread": 0.0531,
+      "rows": 8
+    },
+    "02-right": {
+      "offset": 0.0336,
+      "spread": 0.1292,
+      "rows": 8
+    },
+    "03-left": {
+      "offset": 0.2844,
+      "spread": 0.0107,
+      "rows": 8
+    },
+    "03-right": {
+      "offset": 0.1797,
+      "spread": 0.0792,
+      "rows": 8
+    },
+    "04-left": {
+      "offset": -0.0175,
+      "spread": 0.0951,
+      "rows": 8
+    },
+    "04-right": {
+      "offset": 0.0516,
+      "spread": 0.1374,
+      "rows": 8
+    },
+    "05-left": {
+      "offset": 0.0998,
+      "spread": 0.032,
+      "rows": 7
+    },
+    "05-right": {
+      "offset": 0.0813,
+      "spread": 0.034,
+      "rows": 8
+    },
+    "platform-left": {
+      "offset": 0.149,
+      "spread": 0.1468,
+      "rows": 8
+    },
+    "platform-right": {
+      "offset": 0.2144,
+      "spread": 0.0897,
+      "rows": 8
+    }
+  }
+}
