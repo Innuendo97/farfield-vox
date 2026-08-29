@@ -1,9 +1,6 @@
-import {
-  BufferAttribute, BufferGeometry, Color, Group, Mesh, ShaderMaterial,
-} from 'three';
-import { createMonoliths, STAIR_GLOW } from '../monoliths.js';
+import { Group } from 'three';
+import { createMonoliths } from '../monoliths.js';
 import { createRocks } from '../rocks.js';
-import { glowMesh } from '../stairs.js';
 import { createMasonry, runInWorker, stoneTile } from '../voxel/index.js';
 import { stairSpecs, stoneSpecs } from '../stone.js';
 import MASONRY_SPEC from '../../../assets-src/monoliths/masonry-spec.json';
@@ -37,60 +34,16 @@ import MASONRY_SPEC from '../../../assets-src/monoliths/masonry-spec.json';
 // So the layer hangs a GROUP at dress and fills it as the messages land: the
 // first wall is standing while the last is still being cut.
 //
-// THE STAIR AND THE BLOCKS ARE ONE STRUCTURE, which is why the glow of the
-// risers lives in this file beside the blocks and not in the hub. Lighting the
-// writing on block 03 while leaving the risers where they were would split one
-// structure into two, and the hub is not the place that knows they are one.
-
-// Colour of the under glow on the risers, from the engraved cyan of the
-// reference. It lives here rather than in layout.js because it is a property of
-// this surface, not of the plan of the hub.
-const GLOW_COLOUR = 0x7fd4f5;
-
-// How much brighter the risers burn with a walker at the foot of the stair.
-// Held well under the engraving's own answer: the reference lights the strip
-// very gently, and what has to read at the top of the ramp is still a line
-// under each nosing rather than a lit staircase.
-const STAIR_FOCUS = 0.8;
-
-// The strip on the risers. It carries a flat colour and an intensity, and it
-// is drawn at intensity zero: the geometry is here so that lighting it later is
-// a uniform rather than a change of scene.
-const GLOW_VERTEX = /* glsl */`
-  void main() {
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
-
-const GLOW_FRAGMENT = /* glsl */`
-  precision highp float;
-  uniform vec3 uColour;
-  uniform float uIntensity;
-  void main() {
-    gl_FragColor = vec4(uColour * uIntensity, 1.0);
-  }
-`;
-
-/** The dark strips under the nosings, ready for the emissive pass to light them. */
-function buildGlow() {
-  const material = new ShaderMaterial({
-    uniforms: {
-      uColour: { value: new Color(GLOW_COLOUR).convertSRGBToLinear() },
-      uIntensity: { value: 0 },
-    },
-    vertexShader: GLOW_VERTEX,
-    fragmentShader: GLOW_FRAGMENT,
-    fog: false,
-  });
-  const built = glowMesh();
-  const geometry = new BufferGeometry();
-  geometry.setAttribute('position', new BufferAttribute(built.positions, 3));
-  geometry.setIndex(new BufferAttribute(built.indices, 1));
-  geometry.computeBoundingSphere();
-  const mesh = new Mesh(geometry, material);
-  mesh.name = 'stair-glow';
-  return { mesh, setGlow(intensity) { material.uniforms.uIntensity.value = intensity; } };
-}
+// AND THE STAIR NO LONGER GLOWS, which is the one thing this file lost rather
+// than gained. It used to build six emissive quads inset into the risers and
+// light them at 0.30, pushed to 0.54 with the third block, on the authority of
+// a PHOTOREAL reference this world has superseded. The two voxel targets draw
+// no strip: the treads measure B/G 1.02 — grey stone under a blue sky, no
+// emission — in the day frame and in the night one (Deviazione 1 of the session
+// verbale, measured in v2-pietra/an/scalinata.mjs). What the targets DO show at
+// the foot of the blocks — the rhombus and the hoop at the fifth — is built by
+// src/world/monoliths.js and is untouched: they are content, and the strip was
+// a signature this world was never asked for.
 
 const layer = {
   id: 'v2-pietra',
@@ -99,7 +52,6 @@ const layer = {
 
   monoliths: null,
   stone: null,
-  glow: null,
   rocks: null,
   worker: null,
 
@@ -115,8 +67,6 @@ const layer = {
       layer.stone = new Group();
       layer.stone.name = 'stone';
       layer.monoliths = createMonoliths();
-      layer.glow = buildGlow();
-      layer.glow.setGlow(STAIR_GLOW);
 
       // THE ROCKS ARE BUILT HERE NOW AND NOT AT `plant`, which is the whole of
       // what their pivot costs this file. They used to be a glTF scene and a
@@ -153,8 +103,12 @@ const layer = {
         if (engraved.has(spec.id)) layer.monoliths.attach(spec.id, piece);
       });
 
-      layer.meshes = [layer.stone, layer.glow.mesh, ...layer.rocks.meshes,
-        ...layer.monoliths.meshes];
+      // WHAT THIS LIST IS FOR, BEYOND HANGING IT. The hub adds these to the
+      // scene; they are also the only true statement of what this layer costs,
+      // and the gate's budget is counted off them by object identity rather
+      // than off a pattern of names — a second, hand-written rule for what
+      // belongs to V2 is how seven meshes went uncounted once already.
+      layer.meshes = [layer.stone, ...layer.rocks.meshes, ...layer.monoliths.meshes];
       return layer.monoliths;
     },
   },
@@ -165,27 +119,16 @@ const layer = {
   },
 
   /**
-   * Intensity of the strip on the risers, in light units.
-   *
-   * Built dark. The emissive pass that lights it belongs with the monoliths,
-   * and this is the handle it will pull.
-   */
-  setStairGlow(intensity) {
-    if (layer.glow) layer.glow.setGlow(intensity);
-  },
-
-  /**
    * How lit one block is, nought to one, as the walker comes and goes.
    *
-   * The stair answers with the third block because it is part of it: it is the
-   * way up onto its platform and nothing else in the hub uses it, so lighting
-   * the writing while leaving the risers where they were would split one
-   * structure into two.
+   * IT USED TO ANSWER FOR THE STAIR AS WELL — the third block's focus pushed
+   * the riser strip from 0.30 to 0.54 — and the stair is indeed part of that
+   * block. But the strip itself is not in the targets, so what focus reaches on
+   * this structure is the writing and the rhombus, and nothing on the run.
    */
   setFocus(id, amount, opened = 0) {
     if (!layer.monoliths) return;
     layer.monoliths.setFocus(id, amount, opened);
-    if (id === '03' && layer.glow) layer.glow.setGlow(STAIR_GLOW * (1 + STAIR_FOCUS * amount));
   },
 
   /** What the rocks are costing, for the development panel. */

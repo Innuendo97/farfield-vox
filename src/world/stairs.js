@@ -51,14 +51,13 @@ const TOP_STEP_TUCK = 1.1;
 // platform. That was the black wedge across the head of the run.
 const TOP_STEP_DROP = 0.012;
 
-// The strip that lights the risers. Sizes are a fraction of the riser so they
-// follow it now that the run has been refitted against the reference. It is a
-// line under the nosing and not a lit riser: at a fifth of the riser it read as
-// six cyan bars stacked up the run, which is a staircase made of light rather
-// than a staircase with light under its edges.
-const GLOW_HEIGHT = 0.09;
-const GLOW_INSET = 0.06;
-const GLOW_LIFT = 0.006;
+// THE STRIP THAT LIT THE RISERS IS GONE, geometry and all. It was six quads
+// inset into the risers, sized as a fraction of one, and it existed because the
+// PHOTOREAL reference this world superseded drew a line under each nosing. The
+// two voxel targets do not: measured on the treads themselves the run reads
+// B/G 1.02, grey stone under a blue sky, with no emission on it in either the
+// day or the night frame. Deviazione 1 of the session verbale is that reading;
+// this is it carried out.
 
 const DEG = Math.PI / 180;
 
@@ -186,22 +185,6 @@ export function stairFaces() {
   return faces;
 }
 
-/** The dark strip on each riser, ready for the emissive pass to light it. */
-export function glowFaces() {
-  const faces = [];
-  const x0 = STAIRS.x - STAIRS.width / 2 + GLOW_INSET;
-  const x1 = STAIRS.x + STAIRS.width / 2 - GLOW_INSET;
-  for (let k = 0; k < STAIRS.steps; k++) {
-    const h = stepHeight(k);
-    const below = k + 1 < STAIRS.steps ? stepHeight(k + 1) : 0;
-    const z = STAIRS.z + STAIRS.tread * (k + 1) + GLOW_LIFT;
-    const top = h - (h - below) * 0.18;
-    const bottom = top - (h - below) * GLOW_HEIGHT;
-    faces.push(quad([x0, top, z], [x1, top, z], [x1, bottom, z], [x0, bottom, z], 'glow'));
-  }
-  return faces;
-}
-
 function faceSize(face) {
   const [a, b, , d] = face.corners;
   const width = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
@@ -287,30 +270,4 @@ export function stairMesh(faces = stairFaces()) {
   });
 
   return { positions, uvs, indices, faces, rects };
-}
-
-/**
- * The riser strips, as a mesh of their own.
- *
- * No atlas and no light: it is emissive geometry, and until the emissive pass
- * arrives it is drawn at zero intensity. It exists now so that switching it on
- * later is a uniform and not a change of scene.
- */
-export function glowMesh() {
-  const faces = glowFaces();
-  const positions = new Float32Array(faces.length * 12);
-  const indices = new Uint16Array(faces.length * 6);
-  faces.forEach((face, f) => {
-    for (let c = 0; c < 4; c++) {
-      const o = (f * 4 + c) * 3;
-      positions[o] = face.corners[c][0];
-      positions[o + 1] = face.corners[c][1];
-      positions[o + 2] = face.corners[c][2];
-    }
-    const base = f * 4;
-    const k = f * 6;
-    indices[k] = base; indices[k + 1] = base + 2; indices[k + 2] = base + 1;
-    indices[k + 3] = base; indices[k + 4] = base + 3; indices[k + 5] = base + 2;
-  });
-  return { positions, indices, faces };
 }

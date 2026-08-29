@@ -37,11 +37,20 @@ const DEG = Math.PI / 180;
 // all — so a copy of the three numbers here would be two answers about one
 // colour, which is exactly the defect this session spent its first paragraph on.
 
-// The strip of light under the nosing of every stair riser. It is built dark by
-// src/world/stairs.js and lit from here, because it is the same light as the
-// engraving and has to move with it. The reference lights it very gently:
-// what reads is a thin line under each nosing, not a lit staircase.
-export const STAIR_GLOW = 0.30;
+// THE STRIP UNDER THE STAIR NOSINGS IS NOT HERE ANY MORE, and it is worth
+// saying what it was and why it went. It was a gain — STAIR_GLOW = 0.30, pushed
+// to 0.54 when the third block took focus — lighting six quads built dark by
+// src/world/stairs.js, and its comment justified itself by what "the reference"
+// lights. That reference was the PHOTOREAL scene this world superseded. The two
+// voxel targets this session measured against draw no such strip: the treads
+// read B/G 1.02, which is grey stone under a blue sky and no emission at all
+// (v2-pietra/an/scalinata.mjs; FASE 0 and Deviazione 1 of the session verbale).
+// So the strip is gone rather than turned down, because a mesh drawn at zero is
+// still a mesh somebody has to keep switching off.
+//
+// WHAT DOES GLOW ON THIS STRUCTURE IS BELOW AND STAYS: the rhombus at the foot
+// of every block and the hoop at the fifth are things the targets DO show, and
+// they are content, not decoration.
 
 // The marker at the foot of every block: a small cyan rhombus that hangs in
 // front of the stone and breathes. Drawn as a quad with the shape cut out of it

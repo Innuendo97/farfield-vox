@@ -148,14 +148,6 @@ export function buildHub() {
     /** The engraving of one section, once its text has been drawn. */
     setEngraving(id, texture) { stone.setEngraving(id, texture); },
 
-    /**
-     * Intensity of the strip on the risers, in light units.
-     *
-     * Built dark. The emissive pass that lights it belongs with the monoliths,
-     * and this is the handle it will pull.
-     */
-    setStairGlow(intensity) { stone.setStairGlow(intensity); },
-
     /** How lit one block is, nought to one, as the walker comes and goes. */
     setMonolithFocus(id, amount, opened = 0) { stone.setFocus(id, amount, opened); },
 
