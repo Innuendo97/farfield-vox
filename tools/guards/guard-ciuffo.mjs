@@ -28,12 +28,20 @@ const SHIPPED_RADIUS = Math.max(...TIERS.map((t) => t.voxelDiscRadius));
 // what is wanted is that nobody moves them WITHOUT SAYING SO -- which means
 // moving this file too, in the same commit, where a reviewer can see it.
 //
-// AND IT PRINTS WHAT THE TUFT COSTS, every run. The frozen constants stop the
+// AND IT PRINTS WHAT THE CARPET COSTS, every run. The frozen constants stop the
 // dial from being turned; they say nothing about the field underneath it moving,
 // and the tuft's share of the disc is the number that would show that first. It
 // is printed rather than gated because the disc is V1's to rewrite and the total
 // is already walled by guard-fusione: what this adds is that the drift is SEEN
 // while it happens rather than found afterwards.
+//
+// WHAT THE `tuft` FLAG NOW SEPARATES, and it is more than it was. It used to be
+// the tuft alone; the ground it switches off is now the whole CARPET the
+// committente chose (E-DECISIONI.1) -- the tuft, the grain that replaces it on
+// 45% of the columns, and the piles of three to six voxels against the stone and
+// in the open meadow. So the figure below jumped, and it jumped because the
+// meadow changed and not because anything drifted. The foundation reading is
+// kept beside it as the record of where it came from.
 
 // The values the sweep was run at, restated here on purpose: two files have to
 // change together or the guard goes red.
@@ -42,6 +50,12 @@ const FROZEN = { TUFT_CORRELATION: 0.30, TUFT_GATE: 0.5 };
 // What the tuft cost when the engine was promoted into the foundation, as the
 // yardstick the printed figure is read against.
 const AT_FOUNDATION = { on: 0.5360, off: 0.1985, tuft: 0.3375 };
+
+// And what the CARPET cost on the day the committente was shown its price and
+// chose it (E-DECISIONI.1), at the radius the tiers lay: 1.5362 q/col over a
+// bare field of 0.1903, measured offline and reproduced by the page digit for
+// digit. This is the yardstick a drift is read against from here on.
+const AT_TODAY = { on: 1.5362, off: 0.1903, carpet: 1.3459 };
 
 /** Whether a constant is still the frozen one. Bit for bit: these are dials. */
 export const frozen = (actual, expected) => actual === expected;
@@ -53,14 +67,14 @@ if (process.argv.includes('--self')) {
     { what: 'a gate moved from thirds to halves is caught', caught: !frozen(0.3333, FROZEN.TUFT_GATE) },
     { what: 'the frozen pair passes', caught: frozen(0.30, FROZEN.TUFT_CORRELATION) && frozen(0.5, FROZEN.TUFT_GATE) },
     {
-      what: 'the tuft still costs what it cost when the engine was promoted',
+      what: 'the carpet still costs what it cost when the committente was shown its price',
       caught: Math.abs((meshDisc(null, true, SHIPPED_RADIUS).quadsPerColumn
-        - meshDisc(null, false, SHIPPED_RADIUS).quadsPerColumn) - 0.3359) < 5e-4,
+        - meshDisc(null, false, SHIPPED_RADIUS).quadsPerColumn) - AT_TODAY.carpet) < 5e-4,
     },
   ]);
 }
 
-const report = reporter('guard-ciuffo -- the two dials, and what the tuft costs today');
+const report = reporter('guard-ciuffo -- the two dials, and what the carpet costs today');
 
 report.check(frozen(TUFT_CORRELATION, FROZEN.TUFT_CORRELATION),
   'TUFT_CORRELATION is the value the sweep was run at',
@@ -71,21 +85,22 @@ report.check(frozen(TUFT_GATE, FROZEN.TUFT_GATE),
 
 const on = meshDisc(null, true, SHIPPED_RADIUS);
 const off = meshDisc(null, false, SHIPPED_RADIUS);
-const tuft = on.quadsPerColumn - off.quadsPerColumn;
-const share = tuft / off.quadsPerColumn;
+const carpet = on.quadsPerColumn - off.quadsPerColumn;
+const share = carpet / off.quadsPerColumn;
 
 report.line('');
-report.line(`  the disc with the tuft   ${on.quadsPerColumn.toFixed(4)} q/col`
+report.line(`  the disc with the carpet ${on.quadsPerColumn.toFixed(4)} q/col`
   + `   (at the foundation ${AT_FOUNDATION.on.toFixed(4)})`);
-report.line(`  the disc without it      ${off.quadsPerColumn.toFixed(4)} q/col`
+report.line(`  the bare voxelised field ${off.quadsPerColumn.toFixed(4)} q/col`
   + `   (at the foundation ${AT_FOUNDATION.off.toFixed(4)})`);
-report.line(`  THE TUFT ALONE           ${tuft.toFixed(4)} q/col`
-  + `   (at the foundation ${AT_FOUNDATION.tuft.toFixed(4)}), ${(share * 100).toFixed(0)}% of the rest`);
+report.line(`  THE CARPET ALONE         ${carpet.toFixed(4)} q/col`
+  + `   (at the foundation, when it was only the tuft, ${AT_FOUNDATION.tuft.toFixed(4)})`
+  + `, ${(share * 100).toFixed(0)}% of the rest`);
 
-const drift = Math.abs(tuft - AT_FOUNDATION.tuft);
+const drift = Math.abs(carpet - AT_TODAY.carpet);
 if (drift >= 5e-4) {
-  report.note(`the tuft's share has moved ${drift.toFixed(4)} q/col from the foundation reading `
-    + '-- the constants are frozen, so what moved is the field under them');
+  report.note(`the carpet's share has moved ${drift.toFixed(4)} q/col from the reading the `
+    + 'committente was priced at -- the constants are frozen, so what moved is the field under them');
 }
 
 report.end();

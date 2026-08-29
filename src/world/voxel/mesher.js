@@ -1,5 +1,10 @@
-import { heightAt, pathCoord, pathRun } from '../terrain-field.js';
+import { heightAt, pathCoord, pathRun, smoothstep } from '../terrain-field.js';
 import { AREA_CENTER, MONOLITHS } from '../layout.js';
+// The plan and not the meshes: where the boulders stand is a number in a file,
+// and rocks.js -- which is where they become geometry -- reaches three.js. The
+// import attribute is what lets the same line be read by node and by the
+// bundler, which is the property this whole half of the engine rests on.
+import ROCK_PLAN from '../../../assets-src/rocks/rocks.json' with { type: 'json' };
 
 // The voxel field and the greedy mesher over it.
 //
@@ -159,6 +164,148 @@ export function tuftAt(x, z, gate = TUFT_GATE) {
   return 0;
 }
 
+// ======================================================================
+// THE CARPET, AS THE TARGET DRAWS IT -- and it is the committente's word
+// and not a taste taken here (E-DECISIONI.1: «A - come il target»).
+//
+// WHAT THE TUFT ABOVE CANNOT DO, MEASURED RATHER THAN ARGUED. A1-bis read the
+// day target's own meadow in seven windows that hold no stone at all and found
+// the census of its risers to be 59 / 26 / 14 -- fourteen per cent of them are
+// THREE VOXELS OR MORE. The tuft is plus or minus one voxel, so its tallest
+// possible wall is two: it cannot make that fourteen per cent at any
+// correlation length and at any gate. Shortening the correlation does not get
+// there either; it reaches two thirds of the target's step density and then
+// RESONATES, because at 0.10 m the noise's own lattice lands exactly on the
+// voxel lattice. That is a wall and not a tuning problem.
+//
+// SO THE CARPET IS THREE TERMS, AND EACH ONE ANSWERS A READING:
+//
+//   THE GRAIN      a share of columns take their state from their own hash
+//                  instead of from the smooth tuft, which is what
+//                  "uncorrelated" means for a carpet. It carries the step
+//                  density, and it keeps the amplitude at exactly one voxel
+//                  either way.
+//   THE MOUNDS     E-V4d: what the targets draw as "bushes" against the stone
+//                  are not plants, they are the carpet PILED UP, three to six
+//                  voxels of it, banked on a block's foot or a boulder's flank.
+//                  The stone they lean on is V2's and is not touched here.
+//   THE MEADOW     and the same pile in the OPEN meadow, which is where the
+//                  three-voxel risers of the target's own census actually are.
+//                  E-V1b settled the attribution: they are V1's, because V4's
+//                  accents are seeded at 0.04-0.09 per square metre and cannot
+//                  make fourteen per cent of the risers of anything.
+//
+// EVERY ONE OF THEM IS A FIELD -- a pure function of the point, defined
+// everywhere, reproducible by a second implementation -- so the two rules at the
+// top of this file survive intact: the step is still ONE, and nothing per voxel
+// ever reaches a vertex. What changes is the arithmetic of columnTop and
+// nothing else in the file.
+//
+// AND THE PRICE WAS PAID BEFORE THE CODE WAS WRITTEN. D3a priced this arm at
+// 1.73x of the reallocated budget with the frozen engine reproducing the page
+// digit for digit, the committente was asked, and the committente chose it.
+
+/**
+ * How many columns take the grain instead of the smooth tuft, as a share.
+ *
+ * A THIRD DIAL ON THE GEOMETRY WEARING THE CLOTHES OF AN ART CHOICE, like the
+ * two above it, and the largest of the three: it is most of the difference
+ * between a meadow that costs 0.53 quads a column and one that costs 1.54.
+ * A1-bis swept it and 0.45 is where the field statistic lands on the target's
+ * own, read by the same estimator on both. It was not fitted to a budget.
+ */
+export const CARPET_GRAIN = 0.45;
+
+/** The pile: how far it reaches from the stone, how coarse it is, how tall. */
+export const MOUND = {
+  band: 0.85,   // how far out from the stone a mound may sit, in metres
+  clump: 0.42,  // how big one clump of piled carpet is, in metres
+  gate: 0.56,   // how much of that band is piled and how much stays meadow
+  meadowGate: 0.70, // and how much of the OPEN meadow is, which is far less
+  low: 3,       // the census E-V4d names: three voxels ...
+  high: 6,      // ... to six.
+};
+
+// Where the ground already rises against the stone, which is where the piles
+// are anchored: the blocks that stand in grass, and the boulders whose places
+// were traced back onto the meadow off the target's own pixels. Nothing here is
+// a position invented for the carpet.
+const GRASS_BLOCKS = MONOLITHS.filter((m) => m.baseY === 0).map((m) => ({
+  x: m.position.x,
+  z: m.position.z,
+  c: Math.cos(m.rotationY * Math.PI / 180),
+  s: Math.sin(m.rotationY * Math.PI / 180),
+  hx: m.size[0] / 2,
+  hz: m.size[2] / 2,
+}));
+const BOULDERS = ROCK_PLAN.rocks.map((r) => ({ x: r.x, z: r.z, radius: r.radius }));
+
+/** Distance from a point to the outside of a block's footprint, in metres. */
+function toBlock(b, x, z) {
+  const dx = x - b.x;
+  const dz = z - b.z;
+  const lx = Math.abs(dx * b.c - dz * b.s) - b.hx;
+  const lz = Math.abs(dx * b.s + dz * b.c) - b.hz;
+  return Math.hypot(Math.max(lx, 0), Math.max(lz, 0)) + Math.min(Math.max(lx, lz), 0);
+}
+
+/** Whole voxels of pile, from a clump field read at a strength. Nought or 3..6. */
+function pile(x, z, seedX, seedZ, gate, weight) {
+  const n = noise2(x / MOUND.clump + seedX, z / MOUND.clump + seedZ) * weight;
+  if (n <= gate) return 0;
+  const t = (n - gate) / (1 - gate);
+  return MOUND.low + Math.min(MOUND.high - MOUND.low,
+    Math.floor(t * (MOUND.high - MOUND.low + 1)));
+}
+
+/**
+ * Extra whole voxels of carpet banked against the stone. Nought almost everywhere.
+ */
+export function moundAt(x, z) {
+  let near = Infinity;
+  for (const b of GRASS_BLOCKS) {
+    const d = toBlock(b, x, z);
+    if (d >= 0 && d < near) near = d;
+  }
+  for (const r of BOULDERS) {
+    const d = Math.hypot(x - r.x, z - r.z) - r.radius;
+    if (d >= 0 && d < near) near = d;
+  }
+  if (near > MOUND.band) return 0;
+  return pile(x, z, 91.3, 27.1, MOUND.gate, 1 - smoothstep(0, MOUND.band, near));
+}
+
+/**
+ * And the same pile standing in the open meadow, which is where the target's
+ * own three-voxel risers are. A separate seed, so the two never line up.
+ */
+export function meadowMoundAt(x, z) {
+  return pile(x, z, 313.7, 57.9, MOUND.meadowGate, 1);
+}
+
+/**
+ * The three states of the grain, drawn straight from the column's own hash.
+ *
+ * A HASH AND NOT A RANDOM: the same column answers the same way in every run,
+ * in every implementation, forever -- which is what makes this a field and not
+ * a texture that would have to be stored somewhere and handed to a vertex.
+ * Symmetric about nought at the frozen gate, for the same reason the tuft is.
+ */
+export function grainAt(ix, iz, gate = TUFT_GATE) {
+  const p = (1 - gate) / 2;
+  const u = hash2(ix * 3 + 7, iz * 5 + 13);
+  if (u < p) return -1;
+  if (u > 1 - p) return 1;
+  return 0;
+}
+
+/** Whether this column takes the grain instead of the smooth tuft. */
+function takesGrain(ix, iz) {
+  return hash2(ix * 11 + 3, iz * 17 + 29) < CARPET_GRAIN;
+}
+
+// ======================================================================
+
 /** Whether a point stands on the paving, which is not voxel and never becomes one. */
 export function onPaving(x, z) {
   return pathRun(z) > 0.5 && Math.abs(pathCoord(x, z)) < 1;
@@ -184,8 +331,20 @@ export function columnCentre(ix, iz) {
 // raises its whole side rather than the sliver above a neighbour's shoulder.
 const EMPTY = -1e9;
 
-/** How far a wall with nothing beyond it drops, in voxels. See the note below. */
-const SKIRT = 2;
+// How far a wall with nothing beyond it drops, in voxels. See the note in the
+// side pass for why it exists at all.
+//
+// TWO CLOSED THE SEAM WHEN THE TALLEST THING A COLUMN COULD DO WAS STAND ONE
+// STEP PROUD OF THE FIELD. The piles of the carpet stand up to six, and a
+// curtain that still only reached two would leave up to forty centimetres of
+// daylight under every mound that happens to sit on the rim of the disc or on
+// a bank of the paving. So the drop is the pile's own height plus the two that
+// closed it before.
+//
+// IT COSTS NOT ONE QUAD. A wall is a single rectangle whatever its height: what
+// this buys is the height of four corners and nothing else. The overdraw is a
+// strip along the rim and the two banks, behind ground that is already drawn.
+const SKIRT = 2 + MOUND.high;
 
 // What a missing column reads as in the handed-back height map. The smallest
 // value the type holds, so no arithmetic on a real top can ever reach it.
@@ -197,6 +356,13 @@ export const NO_COLUMN = -32768;
  * Rounded rather than floored so the cubes straddle the true field instead of
  * sitting a half step under it: the walker's own floor is the field itself and
  * the two must not part company by a systematic half voxel.
+ *
+ * WHAT `tuft` MEANS NOW IS THE WHOLE CARPET AND NOT ONLY THE TUFT, and the name
+ * is kept because it is the third argument of a door four other sessions call
+ * through. False is the BARE voxelised ground -- the field rounded to the step
+ * and nothing added -- which is what every reader of that flag has always
+ * wanted it for: it is the baseline the carpet's own cost is read against, and
+ * guard-ciuffo prints exactly that difference every run.
  */
 export function columnTop(ix, iz, tuft = true, radius = DISC_RADIUS) {
   const { x, z } = columnCentre(ix, iz);
@@ -204,7 +370,15 @@ export function columnTop(ix, iz, tuft = true, radius = DISC_RADIUS) {
   if (onPaving(x, z)) return EMPTY;
   if (insideBlock(x, z)) return EMPTY;
   const step = Math.round(heightAt(x, z) / VOXEL);
-  return tuft ? step + tuftAt(x, z) : step;
+  if (!tuft) return step;
+  // The grain REPLACES the smooth tuft on the columns it takes, it does not add
+  // to it: that is what keeps the amplitude at exactly one voxel whichever of
+  // the two a column drew from, and it is why the carpet's tallest wall is
+  // still the field's own step plus one -- before the piles, which are the term
+  // that is meant to be taller.
+  const grained = takesGrain(ix, iz);
+  return step + (grained ? grainAt(ix, iz) : tuftAt(x, z))
+    + moundAt(x, z) + meadowMoundAt(x, z);
 }
 
 /** The whole disc, in chunk coordinates: every chunk with a column in it. */
