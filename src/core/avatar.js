@@ -12,6 +12,33 @@
 // walker in src/core/player.js still owns the one door that puts the camera in
 // the scene; it asks this file where to put it.
 
+// ------------------------------------------------------- where he is standing
+//
+// ONE LIVE OBJECT, ONE WRITER, READ BY WHOEVER DRAWS HIM. src/core/player.js
+// fills this in the same call that puts the camera in the scene, and the layer
+// that owns the voxel body reads it. It is shared by reference and never copied,
+// which is the shape this world already uses for the sun, the two light colours
+// and the air — for the same reason: a copy is a second answer.
+//
+// WHY IT IS PUBLISHED AND NOT WORKED OUT AGAIN. Everything here except the yaw
+// could be had from the eye the layers are already handed — and would be WRONG
+// the moment a pose names an altitude, because then the eye is not a stance plus
+// a constant. That is exactly the subtraction the campaign has already had to
+// unpick once. The stance is the number whose definition never moves, so the
+// stance is what travels.
+export const STANDING = {
+  /** Where his feet are, in world metres. `y` is the ground he is standing on. */
+  x: 0,
+  y: 0,
+  z: 0,
+  /** Which way he faces, radians, the walker's own smoothed yaw. */
+  yaw: 0,
+  /** Whether anything should draw him: he is not in his own first person. */
+  drawn: false,
+  /** Bumped by every write, so a reader can tell a stale frame from a still one. */
+  serial: 0,
+};
+
 // --------------------------------------------------------------- the body
 //
 // H = 1.80 m, AND IT IS A DECISION RATHER THAN A READING. The two reference
@@ -124,7 +151,7 @@ export function rigMetres(height = AVATAR.height) {
 // THE CURVE IS PROVISIONAL AND SAYS SO. Linear in |pitch| is the simplest law
 // that provably reaches zero exactly at the limit; it is not claimed to be the
 // right FEEL, because feel is not something this unit measured. What is
-// measured is what it does — v8-avatar/dev-a/prova-braccio.txt sweeps the whole
+// measured is what it does — v8-avatar/dev-a/prova-terza.txt sweeps the whole
 // range and reports clearance at every degree. E-V8c is open on purpose: it
 // gets closed with those numbers in front of somebody, not by this comment.
 const DEG = Math.PI / 180;

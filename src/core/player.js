@@ -4,7 +4,7 @@ import {
   EYE_HEIGHT, RUN_SPEED, SPAWN, WALK_SPEED,
 } from '../world/layout.js';
 import { criticalStep, TUNING } from './presence.js';
-import { AVATAR, thirdPersonEye } from './avatar.js';
+import { AVATAR, STANDING, thirdPersonEye } from './avatar.js';
 
 // THE LOOK IS TWO ANGLES, NOT ONE.
 //
@@ -419,10 +419,16 @@ export class Player {
   get rigEye() { return this.#rigEye; }
 
   applyTo(camera) {
+    // WHERE HIS FEET ARE, ONCE, FOR BOTH OF THE THINGS THAT NEED IT. The boom
+    // swings from the stance and the body stands on it, and until now only the
+    // boom asked: a body that worked it out for itself would be a second
+    // opinion about one floor, which is the defect this campaign has already
+    // spent a session removing from the camera.
+    const stance = this.#stance === null
+      ? this.position.y - EYE_HEIGHT
+      : this.#stance;
+
     if (this.#person === 'terza') {
-      const stance = this.#stance === null
-        ? this.position.y - EYE_HEIGHT
-        : this.#stance;
       thirdPersonEye(
         this.#rigEye,
         { x: this.position.x, z: this.position.z, stance, yaw: this.#yawF.x },
@@ -432,6 +438,18 @@ export class Player {
     } else {
       camera.position.copy(this.position);
     }
+
+    // AND THE BODY IS TOLD, in the same call rather than in a second pass: this
+    // is the one place a frame decides where the walker is and which way he
+    // looks, so it is the one place that can say it without being asked twice.
+    // See STANDING in src/core/avatar.js for why it travels instead of being
+    // rebuilt from the eye.
+    STANDING.x = this.position.x;
+    STANDING.y = stance;
+    STANDING.z = this.position.z;
+    STANDING.yaw = this.#yawF.x;
+    STANDING.drawn = this.#person === 'terza';
+    STANDING.serial++;
     // THE AIM IS THE WALKER'S IN BOTH, and in third person that is the whole
     // of the framing: the camera does not look AT the avatar, it looks where
     // the walker looks and the boom's offset puts him low and to the left of
