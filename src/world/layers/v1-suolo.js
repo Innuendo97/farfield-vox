@@ -1,46 +1,46 @@
 import { createTerrain } from '../terrain.js';
 import { createGroundVoxel } from '../ground-voxel.js';
+import { createGroundShell } from '../ground-shell.js';
 import { DISC_RADIUS } from '../voxel/index.js';
 
 // THE SOIL. Owned by V1.
 //
-// WHAT IS HERE TODAY IS TWO GROUNDS, AND ONLY ONE OF THEM IS THE WORLD'S.
+// THE CUBES ARE THE WORLD NOW, AND THE SWITCH THAT SAID OTHERWISE IS GONE.
 //
-// The delivered ground is hung exactly as the hub used to hang it, so a page
-// opened without asking for anything draws the picture it drew before this
-// session existed. Behind `?voxsuolo=1` the voxel disc is hung as well, standing
-// in the meadow where the bent grid used to be the meadow.
+// It stood behind `?voxsuolo=1` for as long as there were two grounds and the
+// campaign still had to be able to walk on the old one. There are not two any
+// more: the meadow is cubes to the tier's radius, a snapped sheet from there to
+// a hundred metres, and the bent grid is cut down to the paving it still draws.
+// A switch between them would now be a switch between a world and a hole.
 //
-// WHY A SWITCH AND NOT A REPLACEMENT. Eight sessions are branching off one
-// foundation and they are merged together, unbuilt, at every alignment walk. A
-// branch that swapped the ground the day the disc first stood would hand the
-// other seven a world that is only as finished as this one's newest commit — so
-// the default stays the ground the campaign is currently able to walk on, and
-// the swap is one deliberate act at the end rather than a state every commit
-// leaves behind. Retiring the bent grid, and with it the four assets below,
-// belongs to the unit that also writes the shell.
+// HOW THE THREE STAND TOGETHER, WHICH IS DECLARED AND NOT INCIDENTAL:
 //
-// HOW THE TWO STAND TOGETHER, WHICH IS DECLARED AND NOT INCIDENTAL:
-//
-//   inside the disc   the cube tops straddle the field the grid is drawn at,
-//                     from five centimetres under it to twenty five over, and
-//                     they stand a mean of ten centimetres proud of it. So the
-//                     grid is under the cubes on 91.6% of the disc's columns and
-//                     up to five centimetres over them on the other 8.4%, which
-//                     is where the tuft dropped a column by a whole voxel. What
-//                     keeps that from being visible is the walls of the
-//                     neighbouring cubes, which are taller still.
-//   on the paving     the disc lays no column at all, so what is drawn there is
-//                     the delivered ground, untouched, which is the whole point
-//                     of the paving surviving the pivot.
-//   beyond the disc   the same grid is the shell, one draw over two hundred
-//                     metres, already bent to spend its resolution where the eye
-//                     is and already carrying the air.
+//   inside the disc   ten centimetre cubes, carrying the carpet the committente
+//                     chose (E-DECISIONI.1) -- the grain, the piles against the
+//                     stone and the piles in the open meadow.
+//   on the paving     the disc lays no column at all and the sheet stands aside
+//                     from it too, so what is drawn there is the delivered
+//                     ground, untouched, which is the whole point of the paving
+//                     surviving the pivot. It is why the bent grid is cut down
+//                     rather than deleted, and why the four assets below stay.
+//   under the blocks  the same: a block's own footprint has no cubes in it.
+//   beyond the disc   the SHEET, src/world/ground-shell.js, one draw out to a
+//                     hundred metres, snapped to the same step and wearing the
+//                     disc's own material by reference.
+//   past a hundred    V5's, and nothing of V1's reaches there any more.
 //   the grass         is still planted on the FIELD and not on the cubes, so a
 //                     card can sit a quarter of a metre out over the same range.
 //   the walker        stands on the FIELD too, for the same reason and out by
-//                     the same amount, which is the whole of why this is a
-//                     switch and not the world.
+//                     the same amount. Neither is fixed here and both are D4's:
+//                     the one seat that answers for the world's floor is
+//                     groundHeightAt in src/world/contracts.js.
+//
+// AND THE PILES ARE THE OPEN QUESTION UNDER THAT LAST LINE. The carpet now
+// stands three to six voxels proud of the field in the open meadow, so where
+// the old tuft put the walker at most a voxel out, a pile puts them up to sixty
+// centimetres under the cubes they can see. It is priced, it is the committente's
+// choice, and it is the strongest argument yet for pointing groundHeightAt at
+// topAt below -- which is D4's act and not this file's.
 //
 // NEITHER OF THOSE LAST TWO IS FIXED HERE, and that is a boundary and not an
 // omission: the height every other piece of the world reads is groundHeightAt in
@@ -59,12 +59,11 @@ import { DISC_RADIUS } from '../voxel/index.js';
 /**
  * What the address asks this layer for.
  *
- * THREE SWITCHES AND NOT ONE, and the two beyond the first are not conveniences:
- * they are the only way the two disciplines the disc is accountable for can be
- * priced instead of asserted. A page that only ever runs with the saving on can
- * say the saving is there; it cannot say what it is worth.
+ * THE TWO THAT ARE LEFT ARE NOT CONVENIENCES: they are the only way the two
+ * disciplines the disc is accountable for can be priced instead of asserted. A
+ * page that only ever runs with the saving on can say the saving is there; it
+ * cannot say what it is worth.
  *
- *   voxsuolo=1     hang the voxel disc
  *   voxdispose=0   keep the JavaScript copy of every buffer after the upload
  *   voxbound=walk  walk the vertices for the box instead of taking the worker's
  *   voxradius=N    lay the disc at N metres instead of at the tier's, so a
@@ -76,7 +75,6 @@ function asked() {
   const query = new URLSearchParams(window.location.search);
   const asAsked = Number(query.get('voxradius'));
   return {
-    voxel: query.get('voxsuolo') === '1',
     dispose: query.get('voxdispose') !== '0',
     boundingFromWorker: query.get('voxbound') !== 'walk',
     radius: Number.isFinite(asAsked) && asAsked > 0 ? asAsked : null,
@@ -91,8 +89,11 @@ const layer = {
   /** What the ground came to, for the hub's own handles. */
   built: null,
 
-  /** The voxel disc, or null on a page that did not ask for it. */
+  /** The voxel disc. */
   voxel: null,
+
+  /** The sheet beyond it. */
+  shell: null,
 
   dress: {
     needs: ['terrain-albedo', 'terrain-light', 'terrain-detail', 'terrain-path'],
@@ -101,6 +102,14 @@ const layer = {
      * @param {object} assets  keyed by asset id, plus what the hub knows
      */
     build(assets) {
+      const wanted = asked();
+      // WHERE THE RADIUS COMES FROM, IN ONE PLACE AND IN THIS ORDER: what the
+      // address asked for, so a radius can be measured before it is chosen;
+      // then the TIER, which is the answer that ships; then the engine's own
+      // default, which only ever answers "nobody said". A number written in
+      // this file instead would be a fourth opinion about the size of the world.
+      const radius = wanted.radius ?? assets.voxelDiscRadius ?? DISC_RADIUS;
+
       layer.built = createTerrain({
         albedo: assets['terrain-albedo'],
         light: assets['terrain-light'],
@@ -109,28 +118,42 @@ const layer = {
         // to the ground alone and not to the stair.
         detail: assets['terrain-detail'],
         strip: assets['terrain-path'],
+        radius,
       });
       layer.meshes = layer.built.meshes;
 
-      const wanted = asked();
-      if (wanted.voxel) {
-        // WHERE THE RADIUS COMES FROM, IN ONE PLACE AND IN THIS ORDER: what the
-        // address asked for, so a radius can be measured before it is chosen;
-        // then the TIER, which is the answer that ships; then the engine's own
-        // default, which only ever answers "nobody said". A number written in
-        // this file instead would be a fourth opinion about the size of the world.
-        const radius = wanted.radius ?? assets.voxelDiscRadius ?? DISC_RADIUS;
-        layer.voxel = createGroundVoxel({ ...wanted, radius });
-        // ONE GROUP AND NOT TWENTY SIX MESHES, because the hub hangs what a
-        // layer built at the moment it built it and the chunks are still being
-        // cut in a worker at that moment. A group is on the scene from the
-        // start and the chunks arrive into it, which is also what keeps every
-        // one of them separately visible to the frustum.
-        layer.meshes = [...layer.meshes, layer.voxel.group];
-        // The handle the measurements are taken through. It exists only on a
-        // page that asked for the disc, which is never a visitor's.
-        window.voxsuolo = layer.voxel;
-      }
+      layer.voxel = createGroundVoxel({ ...wanted, radius });
+      // ONE GROUP AND NOT TWENTY SIX MESHES, because the hub hangs what a
+      // layer built at the moment it built it and the chunks are still being
+      // cut in a worker at that moment. A group is on the scene from the
+      // start and the chunks arrive into it, which is also what keeps every
+      // one of them separately visible to the frustum.
+      layer.meshes = [...layer.meshes, layer.voxel.group];
+
+      // AND THE SHEET, BUILT HERE AND NOT IN THE WORKER (E-V1d.2). It is a few
+      // thousand vertices of arithmetic on a field that is already in the
+      // bundle: a millisecond on the thread the walker is on, against a whole
+      // second message and a whole second handover to move it off. The worker
+      // exists for the disc, whose columns cost 926 ns each and number hundreds
+      // of thousands; this is not that shape of problem.
+      //
+      // THE DISC'S OWN RADIUS AND NOT THE ONE ASKED FOR: the two surfaces meet
+      // at a radius, so both read the same one, from the seat that laid it.
+      layer.shell = createGroundShell({
+        radius: layer.voxel.radius,
+        // BY REFERENCE, which is the whole seam: one material means one albedo,
+        // one tint arithmetic, one light and one air, so the sheet cannot drift
+        // from the cubes it joins even under a sweep that moves them both.
+        material: layer.voxel.material,
+      });
+      layer.meshes = [...layer.meshes, layer.shell.mesh];
+
+      // The handle the measurements are taken through, and it now carries all
+      // three grounds: what the disc came to, what the sheet came to, and what
+      // is left of the grid.
+      window.voxsuolo = layer.voxel;
+      window.voxsuolo.shell = layer.shell.built;
+      window.voxsuolo.legacy = layer.built.built;
 
       return layer.built;
     },
