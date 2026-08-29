@@ -211,10 +211,30 @@ export function tuftAt(x, z, gate = TUFT_GATE) {
  * A THIRD DIAL ON THE GEOMETRY WEARING THE CLOTHES OF AN ART CHOICE, like the
  * two above it, and the largest of the three: it is most of the difference
  * between a meadow that costs 0.53 quads a column and one that costs 1.54.
- * A1-bis swept it and 0.45 is where the field statistic lands on the target's
+ * A1-bis swept it and 0.45 was where the field statistic landed on the target's
  * own, read by the same estimator on both. It was not fitted to a budget.
+ *
+ * 0.45 -> 0.53, AND THIS ONE WAS ASKED FOR RATHER THAN DECLARED.
+ *
+ * The shape correction above -- the clump as wide as its band -- fixed the
+ * flank and the crest, and it CANNOT touch the DOUBLE STEP: gathering the same
+ * piled meadow into fewer, broader masses changes where the edge is, not how
+ * many risers stand two voxels tall. The double step is the second bucket of
+ * the target's own distribution (21.51%) and the one the carpet stands
+ * furthest from, and THIS is the only dial that moves it. 0.53 buys 16.50% ->
+ * 17.31% on the field, 11.32% -> 12.41% on the painting, and it lands the
+ * flank share at 62.04% against the target's 62.58%: half a point.
+ *
+ * WHAT IT COSTS AND WHY IT IS THIS NUMBER AND NOT A ROUNDER ONE. It is a bill
+ * that ROSE -- 1.62x -> 1.71x of the reallocated budget at vox-giorno -- so it
+ * was priced before it was taken, and the first value proposed was REFUSED:
+ * 0.57 draws 154 220 triangles, 1.752x against a ceiling of 1.73x, measured on
+ * the page through the green gate and not modelled. 0.53 is the largest value
+ * that fits under that ceiling: 150 710 triangles, 1.7126x, 1 530 triangles of
+ * margin. A price that falls is declared; this one rose, and the word for it
+ * was given before a line was written.
  */
-export const CARPET_GRAIN = 0.45;
+export const CARPET_GRAIN = 0.53;
 
 // HOW WIDE A PILE IS, AND WHY IT IS NOT HOW TALL IT IS.
 //
@@ -234,8 +254,8 @@ export const CARPET_GRAIN = 0.45;
 // both directions:
 //
 //   the crest of a mass       2.20 columns  ->  4.30      (median 2 -> 4)
-//   the flank's share of face 64.4%         ->  59.7%     (bare ground: 14.3%)
-//   the mean seam             2.26 voxels   ->  1.79
+//   the flank's share of face 65.3%         ->  60.9%     (bare ground: 14.3%)
+//   the mean seam             2.25 voxels   ->  1.78
 //
 // AND THE WIDTH IS THE BAND. 0.85 m is already in this object: it is how far
 // out from a stone a mound may sit. A clump as wide as that band is a mound
@@ -270,10 +290,11 @@ export const MOUND = {
   //   gate 0.70, clump 0.85  61.16%  5.82%    11.32%      1.62x   <- this
   //   the day target         62.58% 10.46%    21.51%
   //
-  // So the gate is back at the value the committente chose and the WIDTH is
-  // doing the work alone. The price still falls -- 1.72x to 1.62x -- because
-  // gathering a carpet is cheaper than piling one, and a bill that falls is
-  // declared rather than asked for.
+  // So the gate is back at the value the committente chose and the WIDTH does
+  // the shape work alone. Both figures in that table are at CARPET_GRAIN 0.45,
+  // which is where they were read; the grain then went to 0.53 for the double
+  // step alone -- see its own note -- and carried the flank to 62.04% and the
+  // price to 1.71x. The gate is not what moved.
   meadowGate: 0.70,
   low: 3,       // the census E-V4d names: three voxels ...
   high: 6,      // ... to six.

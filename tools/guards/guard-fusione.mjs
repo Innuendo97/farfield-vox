@@ -65,19 +65,30 @@ const SHIPPED_RADIUS = Math.max(...TIERS.map((t) => t.voxelDiscRadius));
 // NOT a wall raised to let a change through: the change was priced, put to the
 // committente in three arms, and chosen before a line of it was written.
 //
-// AND THEN IT CAME DOWN, BY THE SAME ARITHMETIC AND IN THE OTHER DIRECTION.
-// The orchestrator's eye passed everything of that arm except the SHAPE of the
-// carpet -- towers where the target lifts broad masses -- and the dial that
-// answers it (MOUND.clump 0.42 -> 0.85) does not pile less meadow, it gathers
-// the same meadow into half as many masses twice as broad, which is cheaper
-// geometry over the same ground: the disc ships at 1.4442 q/col, not 1.5362.
-// A wall left at 1.60 would sit 11% above what ships and would not notice the
-// carpet growing a tenth of itself back. So the SAME 4.15% margin is taken over
-// the new figure -- 1.5041 -- and the wall is 1.50. Lowering a wall to follow a
-// bill that fell is the opposite of the move E-V1b warns about, and it is
-// written here rather than left implicit precisely because the two look alike
-// from a distance: what is forbidden is moving the wall so a number can pass,
-// and what is done here is moving it so a number could no longer hide.
+// AND THEN IT MOVED TWICE MORE, BY THE SAME ARITHMETIC, AND THE RULE IS THE
+// ARITHMETIC AND NOT THE DIRECTION. The wall is always the SAME 4.15% over what
+// the disc actually ships, so it follows the ship wherever the ship goes:
+//
+//   clump 0.85 alone (grana 0.45)   ships 1.4442   wall 1.50
+//   grana 0.53 on top of it         ships 1.5261   wall 1.59   <- now
+//
+// What is forbidden by E-V1b is moving a wall SO THAT A NUMBER CAN PASS. What
+// is done here is holding the margin fixed and letting the wall follow the
+// measurement, in both directions, so that the wall keeps detecting the one
+// thing it exists to detect: a carpet that grows when nobody asked it to. A
+// wall left behind at 1.50 would now fail a world that is working as decided; a
+// wall left behind at 1.60 would not notice a carpet growing a twentieth of
+// itself. Neither is a gate.
+//
+// A NOTE ON WHAT THIS WALL IS NOT. It is not the coordinator's price ceiling.
+// That ceiling is 1.73x of the reallocated triangle budget MEASURED AT A POSE
+// (vox-giorno, 152 240 triangles at the buffer), and it is enforced by the
+// green gate in quota-disegnata.mjs against a chunk list the page hands over.
+// This wall is q/col on the whole disc, and it is about FUSION. The two once
+// happened to reject the same arm -- grana 0.57 -- and that coincidence was
+// briefly written into this file as a test case. It is not written here any
+// more: two gates that agree by accident are one gate with a spare name, and
+// the day they disagree the spare name is the one that lies.
 //
 // AND THE METRIC ITSELF IS ALREADY RETIRED, WHICH IS WHY THIS IS PROVISIONAL.
 // E-V1b: q/col rewards the wrong move -- taking the radius from 14 to 35
@@ -91,7 +102,7 @@ const SHIPPED_RADIUS = Math.max(...TIERS.map((t) => t.voxelDiscRadius));
 // ------------------------------------------------------------------------
 
 /** D1's wall, at the same margin over what ships. Provisional: see above. */
-const DISQUALIFY = 1.50;
+const DISQUALIFY = 1.59;
 // D1's target. E-V1b retired it as an imposed number -- the absolute floor
 // under any partition of this field is 0.5035, so 0.45 is unreachable in any
 // world and the target's own meadow reads 1.54 -- but it is left printing,
@@ -110,27 +121,28 @@ export function verdict(perColumn) {
 if (process.argv.includes('--self')) {
   selfTest('guard-fusione', [
     { what: 'a disc at 1.70 q/col is disqualified', caught: verdict(1.70).disqualified },
-    { what: 'a disc at 1.5000001 q/col is disqualified', caught: verdict(1.5000001).disqualified },
+    { what: 'a disc a hair over the wall is disqualified', caught: verdict(DISQUALIFY + 1e-7).disqualified },
+    { what: 'a disc a hair under the wall is not', caught: !verdict(DISQUALIFY - 1e-7).disqualified },
     {
-      what: 'the arm the committente approved would no longer pass this wall',
-      caught: verdict(1.5362).disqualified,
+      // The margin is the contract, not the number: this is the assertion that
+      // survives the wall moving, and it is the one that would catch a wall
+      // nudged to let a particular measurement through.
+      what: 'the wall stands at the declared 4.15% over what actually ships',
+      caught: Math.abs(DISQUALIFY
+        - Number((meshDisc(null, true, SHIPPED_RADIUS).quadsPerColumn * 1.0415).toFixed(2))) < 5e-3,
     },
     {
-      what: 'the arm that busted the coordinator\'s ceiling is disqualified here too',
-      caught: verdict(1.5614512627915790).disqualified,
-    },
-    {
-      what: 'a disc at 1.48 q/col passes but is declared short of the target',
-      caught: !verdict(1.48).disqualified && verdict(1.48).missed,
+      what: 'a disc at 1.57 q/col passes but is declared short of the target',
+      caught: !verdict(1.57).disqualified && verdict(1.57).missed,
     },
     {
       what: 'a disc at 0.44 q/col passes with nothing to declare',
       caught: !verdict(0.44).disqualified && !verdict(0.44).missed,
     },
     {
-      what: 'the measurement itself still lands where the shape correction put it',
+      what: 'the measurement itself still lands where the shape and grain put it',
       caught: Math.abs(meshDisc(null, true, SHIPPED_RADIUS).quadsPerColumn
-        - 1.4441649726079315) < 1e-12,
+        - 1.5260655342314715) < 1e-12,
     },
   ]);
 }

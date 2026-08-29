@@ -74,9 +74,19 @@ const AT_APPROVED = { on: 1.5362, off: 0.1903, carpet: 1.3459 };
 // 0.80 and came back when the eye and the estimator both said the tail had gone
 // past the target rather than onto it.
 //
+// AND THEN THE CHANGE THAT WAS ASKED FOR RATHER THAN DECLARED. Neither shape
+// dial moves the DOUBLE STEP -- the second bucket of the target's own
+// distribution, and the one this carpet stands furthest from. CARPET_GRAIN is
+// the only dial that does. 0.45 -> 0.53 buys 16.50% -> 17.31% of it and costs
+// 1.62x -> 1.71x: a bill that ROSE. So it was priced first, REFUSED at the
+// value proposed (0.57 drew 154 220 triangles at vox-giorno, 1.752x against a
+// ceiling of 1.73x, measured on the page and not modelled), and taken only at
+// the largest value that fits under the ceiling, with the word given for it.
+// That is the whole difference between this line and the one above it.
+//
 // This is the yardstick a DRIFT is read against, because a drift is something
 // nobody meant. The line above is the yardstick a DECISION is read against.
-const AT_TODAY = { on: 1.4442, off: 0.1903, carpet: 1.2539 };
+const AT_TODAY = { on: 1.5261, off: 0.1903, carpet: 1.3358 };
 
 /** Whether a constant is still the frozen one. Bit for bit: these are dials. */
 export const frozen = (actual, expected) => actual === expected;
