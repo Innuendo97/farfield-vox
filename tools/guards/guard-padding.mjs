@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { stoneTileData } from '../../src/world/voxel/pure.js';
 import { read, reporter, selfTest, walk } from './lib.mjs';
 
@@ -24,8 +25,27 @@ import { read, reporter, selfTest, walk } from './lib.mjs';
 // tile boundary and every mip level reaches twice as far, so a sheet needs a
 // gutter and a clamp. If a sheet turns up while the material still says
 // RepeatWrapping, the delivery and the material disagree, and the guard says so
-// rather than measuring the wrong thing. Until then it prints what it is waiting
-// for, so the debt is visible instead of remembered.
+// rather than measuring the wrong thing.
+//
+// IT IS ARMED NOW, AND WHAT ARRIVED IS NOT A SHEET -- so this file learned to
+// ask WHICH CONVENTION A DELIVERY IS IN instead of assuming. That is the same
+// rule one level up: the guard reads the convention out of the material and it
+// now reads the delivery's out of the delivery, because "a file whose name
+// matches /stone-tile/ is a sheet" was a restatement of a convention exactly
+// like the one this file refuses to carry about the material. What V2 delivered
+// is assets-src/stone-tiles/, a CONTRACT for V5 to consume read-only (E-V5b),
+// declaring one wrapping tile that is generated rather than shipped.
+//
+// SO THERE ARE THREE LEGS AND THE STRICTEST ONE IS THE NEW ONE. Nothing
+// delivered: earn the nought by periodicity. A wrapping-tile contract: earn the
+// nought by periodicity AND check every line of the contract against the
+// material and against the generator's actual bytes -- the side, the wrap, the
+// mips, the gutter, the length, the sha256. A sheet: the material must have
+// stopped wrapping first, and then the gutter has to survive the mip chain.
+//
+// A contract that agrees with a comment is worth nothing; one that agrees with
+// the bytes a consumer will actually receive is the whole of what V5 is being
+// asked to build on.
 
 const MATERIAL = 'src/world/voxel/masonry.js';
 
@@ -92,10 +112,24 @@ export const sheetMayBeSampled = (stated) => !stated.wrapping;
 /** The gutter a sheet needs to survive the mip chain the material asks for. */
 export const safeGutter = (stated) => (stated.mipmapped ? stated.side / 2 : 1);
 
-/** A delivered sheet of stone tiles, or null while the stone is still generated. */
+/** Whatever V2 has delivered under a stone-tile name, or null while nothing has. */
 export function findSheet() {
   const found = walk('assets-src', (path) => /stone-tile/i.test(path));
   return found.length ? found : null;
+}
+
+/**
+ * Which convention a delivery is in, as the DELIVERY states it.
+ *
+ * A declaration and not a guess. `tiles: 1` with `wrap: "repeat"` is the
+ * contract V2 publishes for V5 -- one tile that wraps, generated rather than
+ * shipped; anything else is a sheet and is measured as one. A delivery that
+ * declares neither is a sheet by default, which is the safe way round: the
+ * sheet leg is the one that refuses a wrapping sampler outright.
+ */
+export function deliveredKind(declared) {
+  return declared && declared.tiles === 1 && declared.wrap === 'repeat'
+    ? 'wrapping-tile' : 'sheet';
 }
 
 if (process.argv.includes('--self')) {
@@ -127,6 +161,25 @@ if (process.argv.includes('--self')) {
     { what: 'a sheet under a clamped sampler is allowed to be measured', caught: sheetMayBeSampled(clamped) },
     { what: 'a gutter of nought on a mipmapped sheet is under the safe one', caught: 0 < safeGutter(clamped) },
     { what: 'a gutter of half a tile is not', caught: 256 >= safeGutter(clamped) },
+    // AND THE TWO CONVENTIONS ARE TOLD APART BY WHAT THE DELIVERY SAYS, in both
+    // directions: a contract that forgot to declare itself has to fall to the
+    // strict leg, not to the lenient one.
+    {
+      what: 'a delivery declaring one wrapping tile is read as the contract',
+      caught: deliveredKind({ tiles: 1, wrap: 'repeat' }) === 'wrapping-tile',
+    },
+    {
+      what: 'a delivery of many tiles is read as a sheet',
+      caught: deliveredKind({ tiles: 16, wrap: 'clamp' }) === 'sheet',
+    },
+    {
+      what: 'a delivery that declares neither falls to the sheet leg, which is the strict one',
+      caught: deliveredKind({}) === 'sheet' && deliveredKind(null) === 'sheet',
+    },
+    {
+      what: 'one wrapping tile declared under a clamped sampler is not the contract',
+      caught: deliveredKind({ tiles: 1, wrap: 'clamp' }) === 'sheet',
+    },
   ]);
 }
 
@@ -152,21 +205,63 @@ if (!sheet) {
   report.end();
 }
 
-report.line(`  a stone sheet is on disk: ${sheet.join(', ')}`);
-report.check(sheetMayBeSampled(stated),
-  'the material has stopped sampling the stone as one wrapping tile',
-  stated.wrapping ? 'a sheet under RepeatWrapping bleeds at every tile boundary and every mip level' : '');
+report.line(`  a stone delivery is on disk: ${sheet.join(', ')}`);
 
-for (const path of sheet.filter((p) => p.endsWith('.json'))) {
+const manifests = sheet.filter((p) => p.endsWith('.json'));
+report.check(manifests.length > 0, 'the delivery declares itself',
+  manifests.length ? manifests.join(', ') : 'files with no manifest beside them cannot be checked');
+
+for (const path of manifests) {
   const declared = JSON.parse(read(path));
-  const gutter = declared.padding ?? declared.gutter;
-  if (!report.check(typeof gutter === 'number', `${path} declares its gutter`,
-    typeof gutter === 'number' ? `${gutter} texels` : 'a sheet with no declared gutter cannot be checked')) {
+  const kind = deliveredKind(declared);
+  report.line(`\n  ${path} declares itself a ${kind}`);
+
+  if (kind === 'sheet') {
+    report.check(sheetMayBeSampled(stated),
+      'the material has stopped sampling the stone as one wrapping tile',
+      stated.wrapping
+        ? 'a sheet under RepeatWrapping bleeds at every tile boundary and every mip level' : '');
+    const gutter = declared.padding ?? declared.gutter;
+    if (!report.check(typeof gutter === 'number', `${path} declares its gutter`,
+      typeof gutter === 'number' ? `${gutter} texels` : 'a sheet with no declared gutter cannot be checked')) {
+      continue;
+    }
+    report.check(gutter >= safeGutter(stated),
+      `${path} gutter survives the mip chain the material asks for`,
+      `${gutter} against ${safeGutter(stated)}`);
     continue;
   }
-  report.check(gutter >= safeGutter(stated),
-    `${path} gutter survives the mip chain the material asks for`,
-    `${gutter} against ${safeGutter(stated)}`);
+
+  // THE CONTRACT, AGAINST THE MATERIAL AND AGAINST THE BYTES.
+  //
+  // Every line of it is something a consumer in another session will build on
+  // without being able to see this material, so every line of it is checked
+  // against what a consumer would actually receive rather than against what
+  // this file believes.
+  report.check(declared.side === stated.side, `${path} states the side the material samples`,
+    `${declared.side} against ${stated.side}`);
+  report.check(stated.wrapping, 'the material still samples the stone as one wrapping tile',
+    'the contract promises RepeatWrapping to whoever consumes it');
+  report.check(declared.mipmaps === stated.mipmapped, `${path} states the mip chain the material asks for`,
+    `${declared.mipmaps} against ${stated.mipmapped}`);
+  report.check((declared.padding ?? declared.gutter) === 0, `${path} declares a gutter of nought`,
+    'under wrapping a gutter would BE the seam it is meant to prevent');
+
+  const data = stoneTileData(declared.side);
+  report.check(data.length === declared.bytes, `${path} states what the generator actually produces`,
+    `${data.length} against ${declared.bytes}`);
+  const sum = createHash('sha256')
+    .update(Buffer.from(data.buffer, data.byteOffset, data.length)).digest('hex');
+  report.check(sum === declared.sha256, `${path} fingerprints the bytes a consumer will get`,
+    sum === declared.sha256 ? sum.slice(0, 16) : `${sum.slice(0, 16)} against ${String(declared.sha256).slice(0, 16)}`);
+
+  for (const seam of seams(data, declared.side)) {
+    report.check(wraps(seam), `the delivered tile is periodic across its ${seam.axis}`,
+      `seam ${seam.seamMean.toFixed(3)} mean / ${seam.seamMax} worst, `
+      + `against ${seam.interiorMean.toFixed(3)} / ${seam.interiorMax} inside`);
+  }
+  report.note(`${path} is a contract for another session to read: any change to the side, the `
+    + 'format, the wrap or this path is a notification to the coordinator, never a silent edit');
 }
 
 report.end();
