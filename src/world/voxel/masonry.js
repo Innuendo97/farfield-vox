@@ -265,8 +265,45 @@ const MOSS_TINT = [0.62, 1.30, 0.58];
 // the fifth are the same light as the writing cut into it — that is why they are
 // cyan at all — and src/world/monoliths.js used to carry its own copy of all
 // three. One colour, one seat.
-export const INK_CORE = [0.44, 0.80, 0.99];
-export const INK_HALO = [0.16, 0.48, 0.72];
+//
+// RE-ANCHORED TO THE TARGETS, WITH THE MEASUREMENT AND WITH ITS CEILING.
+//
+// Sampled on both targets through v2-pietra/dev2t/inchiostro.mjs, by quantile
+// of luminance inside the stone the picture actually draws — the campaign's own
+// b > 1.5r + 8 does not partition a SHADED face, where the red sits at 15 to 25
+// and ordinary blue-grey stone passes it, and measured that way 99% of 01's
+// front came back "ink". What an additive stroke governs is its EXCESS over the
+// stone under it, so that is what is quoted. Pooled over five fronts:
+//
+//   day target     core - stone   +102.6 / +182.9 / +186.9    1 : 1.78 : 1.82
+//   night target   core - stone   +136.0 / +198.9 / +203.5    1 : 1.46 : 1.50
+//   render, before core - stone    +72.4 /  +61.4 /  +52.3    1 : 0.85 : 0.72
+//
+// The render was adding MORE RED THAN BLUE where both targets add nearly twice
+// as much blue as red. That is the whitish ink in one number, and the green and
+// the blue are what it is short of.
+//
+// AND THE RED IS NOT RAISED, WHICH IS WHERE THE CEILING BITES. On 03 — the face
+// the judgement names — the target's core stands at 132.1 / 238.4 / 247.2 and
+// the render's red already lands there: 121.7 before, 131.4 after. Doubling the
+// green and the blue is the direction the measurement asks for and it is where
+// this stops, because the mandate says the writing is never boosted and pushing
+// the stroke's red past the target's is what boosting would look like.
+//
+// WHAT IT BUYS AND WHAT IT CANNOT. On 03 the core goes 121.7 / 151.8 / 166.6 to
+// 131.4 / 171.2 / 183.8 against the target's 132.1 / 238.4 / 247.2, and the
+// delivered blue-over-red of the excess goes 0.77 to 0.87 against 1.71. The
+// rest is NOT in these three numbers and it was measured rather than assumed:
+// across a 4.4x change in the red primary the delivered hue moves 0.78 to 0.84,
+// and across a 5x change in the gain it moves 0.72 to 0.74. Two things
+// downstream of this material govern it, both escalated with their numbers in
+// the verbale: the height fog of src/world/air.js, which at 03's 28 m carries
+// half the blue on that face (with it off the stone reads 26.8 / 45.8 / 49.8
+// against the target's 18.1 / 42.3 / 52.5, and the hue recovers to 1.16), and
+// the 32-cube grade LUT of src/core/post.js, which flattens a bright stroke
+// towards white. Neither is V2's, and neither is worked around here.
+export const INK_CORE = [0.44, 1.60, 2.00];
+export const INK_HALO = [0.25, 0.96, 1.44];
 export const INK_GAIN = 0.78;
 
 const STONE_EXPOSURE = 1.25;
