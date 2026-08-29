@@ -44,6 +44,19 @@ import { buildMasonry, masonryLaw } from './courses.js';
 
 const DEG = Math.PI / 180;
 
+// AND THE NUMBERS BELOW ARE EXPORTED, WHICH IS NEW AND IS THE SEAT BEING NAMED
+// RATHER THAN MOVED. Nothing here changed value: what changed is that the ROCKS
+// of this world are stone now too — piles of cubes on the same lattice, drawn
+// by src/world/rocks.js — and every one of these is a number some reading of
+// the targets was taken against. A second copy of one in the rock material
+// would be two answers about one material, which is the defect this file
+// already spent its first paragraph on when the engraved cyan was copied into
+// src/world/monoliths.js. One stone, one seat.
+//
+// The rocks do NOT take the wall's shape: no courses, no wander, no head. They
+// take its PIGMENT, its grain, its joint, its dressed edge, its sky and its
+// exposure — the things a material is — and their own law for the rest.
+
 // The stone's own colour and how hard the tile bites it.
 //
 // THE PIGMENT IS 2.4 TIMES WHAT THE PIVOT DELIVERED, and the reason is the same
@@ -67,8 +80,8 @@ const DEG = Math.PI / 180;
 // times over, agreeing between the two faces to a few per cent. Divided by
 // those three the stone is the target's stone, and the blue that came off with
 // them was the third of the excess that made it read as sky.
-const STONE_ALBEDO = [0.276, 0.321, 0.230];
-const STONE_GAIN = 0.62;
+export const STONE_ALBEDO = [0.276, 0.321, 0.230];
+export const STONE_GAIN = 0.62;
 
 // Reflectance of the stone face on, how much of the sky the grazing term
 // carries, and how sharply it is confined to the very edge.
@@ -90,10 +103,10 @@ const STONE_GAIN = 0.62;
 // power was the CEILING the mandate allows; this is what the fit actually
 // prefers, and on a wall of flat faces the difference between the two is a
 // blue wash over every face turned even slightly away.
-const STONE_F0 = 0.0057;
-const STONE_RIM = 0.125;
-const STONE_RIM_POWER = 4.0;
-const SKY_BLUR = 3.0;
+export const STONE_F0 = 0.0057;
+export const STONE_RIM = 0.125;
+export const STONE_RIM_POWER = 4.0;
+export const SKY_BLUR = 3.0;
 
 // HOW FAR THE TINT OF ONE BLOCK MAY STAND FROM ITS NEIGHBOUR'S. This is the
 // sixty per cent of what makes a wall read as laid rather than printed, and it
@@ -114,22 +127,22 @@ const SKY_BLUR = 3.0;
 // widest this can go before a block is drawn at under a third of its
 // neighbour's pigment, which is a hole in a wall and not a paler block. What
 // that buys is in the verbale beside what it does not.
-const STONE_TINT = 1.4;
+export const STONE_TINT = 1.4;
 
 // The joint between blocks, as the campaign's own estimator reads it on stone:
 // 0.949 to 0.959 of the face beside it, over two or three pixels. It is the
 // same six per cent over the same one or two pixels the meadow carries, which
 // is the finding — the joint fitted on grass holds on stone without a change.
-const STONE_JOINT = 0.046;
-const STONE_JOINT_PIXELS = 1.6;
+export const STONE_JOINT = 0.046;
+export const STONE_JOINT_PIXELS = 1.6;
 
 // And the dressed edge, at the 1.072 to 1.091 four windows of stone measure —
 // the same brightness as the recipe's on grass and a different colour, about
 // twice the blue. Both come out of the facet rather than being painted: what is
 // set here is only how wide the vertical one is allowed to be on screen, since
 // the horizontal one is real geometry and has no width to set.
-const STONE_ARRIS = 1.0;
-const STONE_ARRIS_PIXELS = 2.2;
+export const STONE_ARRIS = 1.0;
+export const STONE_ARRIS_PIXELS = 2.2;
 
 // AND THE DRESSED EDGE IS A MATERIAL AS WELL AS A SHAPE. THE FACET IS NOT
 // TOUCHED AND NEITHER IS THE LAW OF THE LIGHT.
@@ -161,7 +174,7 @@ const STONE_ARRIS_PIXELS = 2.2;
 // material, so it comes down by this same factor in the same proportion. There
 // is no night seat in this world yet — it is V7's — so this is an implication
 // written down, not a reading taken.
-const STONE_ARRIS_PIGMENT = 0.70;
+export const STONE_ARRIS_PIGMENT = 0.70;
 
 // HOW MUCH PALER THE TOP COURSE OF A WALL IS THAN THE STONE UNDER IT, and over
 // how many courses it comes back.
@@ -258,7 +271,7 @@ const MOSS_SPREAD = 0.2144;
 // And what it does to the pigment. Green against the two either side of it,
 // which is the axis the detector itself is written on: min(g-r, g-b) over six
 // codes.
-const MOSS_TINT = [0.62, 1.30, 0.58];
+export const MOSS_TINT = [0.62, 1.30, 0.58];
 
 // The engraved cyan of the reference, from the core of a stroke out to the halo
 // around it, and the light it gives off.
@@ -308,7 +321,7 @@ export const INK_CORE = [0.44, 1.60, 2.00];
 export const INK_HALO = [0.25, 0.96, 1.44];
 export const INK_GAIN = 0.78;
 
-const STONE_EXPOSURE = 1.25;
+export const STONE_EXPOSURE = 1.25;
 
 // How much light the stone is given before its own exposure, and it is the LAST
 // thing the retired bake was still being asked for.
@@ -321,7 +334,7 @@ const STONE_EXPOSURE = 1.25;
 // roster of consumers that disagree with the seat, and the waiver covering it
 // stayed with it. So the number is written here, with where it came from, and
 // the file is gone.
-const STONE_LIGHT_SCALE = 1.5;
+export const STONE_LIGHT_SCALE = 1.5;
 
 /**
  * The stone tile as a texture, from bytes the worker has already generated.

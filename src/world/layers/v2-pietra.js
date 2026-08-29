@@ -19,6 +19,13 @@ import MASONRY_SPEC from '../../../assets-src/monoliths/masonry-spec.json';
 // it is that the shape of this world can be argued with in a text file instead
 // of in a renderer nobody has any more.
 //
+// AND THE ROCKS WENT THE SAME WAY, which is what empties the last phase out of
+// this layer. They were the last two assets in it — a glTF scene of decimated
+// spheres and a Cycles bake of the light on them — and they are piles of cubes
+// on the world's own lattice now, generated from the plan the reference camera
+// traced. So `plant` is gone entirely rather than emptied: a phase that asks
+// for nothing and builds nothing is a hook somebody has to keep reading.
+//
 // IT ASKS FOR NOTHING AT THIS ARRIVAL, which is why `needs` is empty. The stone
 // is arithmetic and the arithmetic is off the thread the walker is on, so the
 // first walkable frame no longer waits on four textures and a model.
@@ -109,8 +116,14 @@ const layer = {
       layer.stone.name = 'stone';
       layer.monoliths = createMonoliths();
       layer.glow = buildGlow();
-      layer.meshes = [layer.stone, layer.glow.mesh, ...layer.monoliths.meshes];
       layer.glow.setGlow(STAIR_GLOW);
+
+      // THE ROCKS ARE BUILT HERE NOW AND NOT AT `plant`, which is the whole of
+      // what their pivot costs this file. They used to be a glTF scene and a
+      // light atlas — two downloads, a phase to wait for them in, and a
+      // `needs` list — and they are arithmetic on the same lattice as the
+      // stone now, so they stand with it in the first walkable frame.
+      layer.rocks = createRocks();
 
       const pieces = [...stoneSpecs(MASONRY_SPEC), ...stairSpecs(MASONRY_SPEC)];
       const engraved = new Set(stoneSpecs(MASONRY_SPEC).map((s) => s.id));
@@ -124,6 +137,12 @@ const layer = {
           for (const [, piece] of layer.built) {
             piece.material.uniforms.tStone.value = tile;
           }
+          // ONE TILE FOR THE WALL AND THE ROCKS, handed to both. They are the
+          // same stone at two scales — how often it repeats is each material's
+          // own number and the grain is not — so a second 512 square of noise
+          // for the rocks would be a tenth of a second of held frame and a
+          // second opinion about what this stone looks like.
+          layer.rocks.setTile(tile);
           return;
         }
         if (message.kind !== 'masonry') return;
@@ -133,20 +152,10 @@ const layer = {
         layer.built.set(spec.id, piece);
         if (engraved.has(spec.id)) layer.monoliths.attach(spec.id, piece);
       });
+
+      layer.meshes = [layer.stone, layer.glow.mesh, ...layer.rocks.meshes,
+        ...layer.monoliths.meshes];
       return layer.monoliths;
-    },
-  },
-
-  plant: {
-    needs: ['rocks-scene', 'rock-light'],
-
-    build(assets) {
-      layer.rocks = createRocks({
-        rocks: assets['rocks-scene'],
-        rockLight: assets['rock-light'],
-      });
-      layer.meshes = [...layer.meshes, ...layer.rocks.meshes];
-      return layer.rocks;
     },
   },
 
