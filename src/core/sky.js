@@ -1,40 +1,57 @@
 import {
   BackSide, BoxGeometry, DataTexture, Mesh, RepeatWrapping,
-  ShaderMaterial, Vector2, Vector3, Vector4,
+  ShaderMaterial, Vector2, Vector3,
 } from 'three';
 import SKY from '../../assets-src/sky/sky.json' with { type: 'json' };
 import SCENE_LIGHT from '../../assets-src/sky/scene-light.json' with { type: 'json' };
 
 // The sky, and everything the scene takes from it.
 //
-// THE DOME CARRIES NO PICTURE. It is evaluated, per fragment, from the physical
-// model tools/grade/lib/sky-model.mjs fitted against the reference: single
-// scattering by air and by aerosol under one air mass, plus an isotropic term
-// for everything scattered more than once. Twelve numbers and two lobes, folded
-// into the bundle out of sky.json, and no texture at all.
+// THE DOME CARRIES NO PICTURE, AND IT IS A RAMP BETWEEN TWO TINTS. One mix over
+// elevation, evaluated per fragment out of sky.json's day.ramp, and no texture
+// at all.
 //
-// That is not an economy, though it is one — three hundred and sixteen
-// kilobytes and a dependent fetch per sky fragment. It is the one property the
-// committente asked for and nothing else could give: A SMOOTH ANALYTIC SKY
-// CANNOT HAVE BLOTCHES. Every version of this dome that carried material
-// measured off the photograph — the sector carry baked into an equirect, the
-// hue tables, the veil composited here — put a soft closed contour somewhere in
-// the sky, and every attempt to hide one moved it. A measurement has a
-// boundary; a boundary carried outwards is a contour; a soft dark contour in an
-// open sky is a stain, whatever arithmetic drew it and however wide the fade.
-// There is nothing to find here because there is nothing in it that could draw
-// one: a few exponentials of one monotone variable and one phase angle.
+// It replaced a fitted physical sky — single scattering by air and by aerosol
+// under one air mass — and the reason is measured rather than tasted. That dome
+// could not draw these targets AT ANY IRRADIANCE, and three separate walls said
+// so: the red the targets show costs a level of x0,020, which is ninety-eight
+// per cent of the red irradiance; far from the sun the model is
+// A*(1-exp(-tau*m)), whose steepest possible fall between two elevations is the
+// ratio of their air masses, 1,764 between fourteen and twenty-six degrees,
+// where the targets ask 3,69 in green and 4,90 in blue; and the last bands are
+// outside what AgX can print at all. The first two are the FORM of the model and
+// not its parameters, so no fit was ever going to reach them. What the targets
+// draw is a vertical ramp between two tints — the two that sky.json still
+// carried from before the physical dome, within a handful of levels of the two
+// ends of the targets' own gradient.
 //
-// Three things are given up with it, and they are named rather than discovered.
-// The reference's own sector no longer matches texel for texel — what is asked
-// of the eye now is family, not difference. The dither has to stay and matters
-// more than it did, because a gradient this smooth magnified over a screen
-// quantises into bands with nothing to hide them behind. And the sun has to be
-// drawn, because a physical sky with no sun in it is the one reading this model
-// cannot give — which is the other half of what was asked for.
+// WHAT IS KEPT, BECAUSE IT WAS NEVER THE PHYSICS THAT EARNED IT. A SMOOTH SKY
+// CANNOT HAVE BLOTCHES: every version of this dome that carried material
+// measured off the photograph — the sector carry baked into an equirect, the hue
+// tables, the veil composited here — put a soft closed contour somewhere in the
+// sky, and every attempt to hide one moved it. A measurement has a boundary; a
+// boundary carried outwards is a contour; a soft dark contour in an open sky is
+// a stain, whatever arithmetic drew it and however wide the fade. A ramp is
+// stronger here than the physics was: it is a function of ONE variable, so it
+// has no azimuth to be blotchy in, and a band or a seam would have to be a band
+// in elevation alone.
+//
+// The dither stays and matters more than it did, because a gradient this smooth
+// magnified over a screen quantises into bands with nothing to hide them behind.
+// And the sun is still drawn, because a sky with no sun in it is the one reading
+// this cannot give.
+//
+// WHAT DIED WITH THE PHYSICS, NAMED RATHER THAN LEFT TO BE DISCOVERED: the air
+// mass and its continuation below the horizon, the two optical depths, the
+// Rayleigh and Henyey-Greenstein phase functions, the isotropic multiple
+// scattering term, and the extinction that reddened the disc by itself. The
+// aureole is kept but RE-BASED — the same lobe, at the level that reproduces the
+// excess the physical dome put eight degrees from the sun — and the disc no
+// longer reddens on its own, so a preset that puts the sun near the horizon has
+// to say so in its own numbers. sky.json still carries the retired parameters
+// because the cloud atlas standing in the tree was baked against them.
 
 const DAY = SKY.day;
-const AIR = SKY.airMass;
 
 /** A number as a GLSL literal, so a constant here cannot drift from the shader's. */
 const glsl = (value, digits = 8) => value.toFixed(digits);
@@ -89,15 +106,16 @@ export const SKY_UNIFORMS = {
   // what the aureole is drawn around, which is the whole point of it being one
   // uniform and not three constants.
   uSunDir: { value: new Vector3() },
-  // Optical depth of the air and of the haze, per channel. The wavelengths are
-  // in the bake and nowhere else; what arrives here is already three numbers.
-  uSkyRayleigh: { value: new Vector3() },
-  uSkyMie: { value: new Vector3() },
-  // What turns the model's radiance into this frame's light.
+  // The two ends of the ramp, at the horizon and at the zenith. They are tints
+  // and not radiances: the exposure below multiplies both, which is what lets a
+  // night be this preset with three numbers turned down rather than six.
+  uSkyHorizon: { value: new Vector3() },
+  uSkyZenith: { value: new Vector3() },
+  // What turns the ramp's tints into this frame's light.
   uSkyExposure: { value: new Vector3() },
-  // x: how far forward the haze throws what it scatters; y: everything
-  // scattered more than once; z and w: the two lobes of the aureole.
-  uSkyShape: { value: new Vector4() },
+  // x: the knee — the power the mix rises through; y: the gain that bends the
+  // mix without moving either of its ends; z: the level of the aureole.
+  uSkyRamp: { value: new Vector3() },
   // x: the disc's angular radius in degrees; y: how far its edge is let go over;
   // z: how bright, as a multiple of the exposure above.
   uSunDisc: { value: new Vector3() },
@@ -118,16 +136,20 @@ export const SKY_UNIFORMS = {
  * into a frame as a halo or a wrong blue rather than as an error anything could
  * catch. tools/guards/guard-luce-sigillo.mjs holds the door shut.
  *
- * @param {object} preset as tools/grade/lib/sky-model.mjs dayPreset writes it
+ * @param {object} preset an entry of sky.json of the shape day has: a sun, a
+ *   ramp of two tints and a shape, an exposure, and a disc
  */
 export function setSkyPreset(preset) {
+  const ramp = preset.ramp;
+  if (!ramp) {
+    throw new Error('a sky preset needs a ramp: two tints, a knee and a gain. '
+      + 'Fit one with v6-cielo/fase2/13-preset.mjs');
+  }
   SKY_UNIFORMS.uSunDir.value.set(...preset.sun.vector).normalize();
-  SKY_UNIFORMS.uSkyRayleigh.value.set(...preset.tauRayleigh);
-  SKY_UNIFORMS.uSkyMie.value.set(...preset.tauMie);
+  SKY_UNIFORMS.uSkyHorizon.value.set(...ramp.horizon);
+  SKY_UNIFORMS.uSkyZenith.value.set(...ramp.zenith);
   SKY_UNIFORMS.uSkyExposure.value.set(...preset.exposure);
-  SKY_UNIFORMS.uSkyShape.value.set(
-    preset.g, preset.ambient, preset.aureole.wide, preset.aureole.narrow,
-  );
+  SKY_UNIFORMS.uSkyRamp.value.set(ramp.knee, ramp.gain, ramp.glow);
   SKY_UNIFORMS.uSunDisc.value.set(
     preset.disc.radiusDeg, preset.disc.softDeg, preset.disc.level,
   );
@@ -227,86 +249,83 @@ const SKY_VERTEX = /* glsl */`
 // How a direction becomes sky. Shared with every surface that reflects it, so
 // that the dome and the water can never disagree about what a bearing is worth.
 //
-// This is the same arithmetic as domeRadiance in tools/grade/lib/sky-model.mjs,
-// written twice — which is a thing worth being uncomfortable about, because the
-// cloud bake SUBTRACTS what that returns and this ADDS BACK what this returns,
-// so any difference between them lands in the frame as a halo round every piece
-// of weather. tools/grade/check-dome.mjs measures the two against each other on
-// the running page for exactly that reason, and fails on a disagreement of more
-// than a thousandth.
+// THIS ARITHMETIC HAS AN OFFLINE TWIN AND THE TWIN IS CURRENTLY THE OLD SKY.
+// domeRadiance in tools/grade/lib/sky-model.mjs still evaluates the physical
+// dome this replaced, and that matters rather than being tidy: the cloud bake
+// SUBTRACTS what the twin returns and this ADDS BACK what this returns, so a
+// difference between them lands in the frame as a halo round every piece of
+// weather. tools/grade/check-dome.mjs measures the two against each other on the
+// running page for exactly that reason and fails past a thousandth, and
+// tools/lighting/bake-environment.mjs integrates the twin to get the irradiance
+// the world is lit by.
+//
+// That file is not this session's to write, so the twin is not moved here. What
+// the ramp needs of it is eight lines, and they are already written and used
+// against the targets in v6-cielo/fase2/lib-rampa.mjs.
 export const SKY_GLSL = /* glsl */`
   uniform vec3 uSunDir;
-  uniform vec3 uSkyRayleigh;
-  uniform vec3 uSkyMie;
+  uniform vec3 uSkyHorizon;
+  uniform vec3 uSkyZenith;
   uniform vec3 uSkyExposure;
-  uniform vec4 uSkyShape;
+  uniform vec3 uSkyRamp;
   uniform vec3 uSunDisc;
 
-  // Kasten and Young relative air mass, and the two constants that continue it
-  // below the horizon with the slope it arrives with.
+  // How high a direction is, as the ramp measures height.
   //
-  // Clamping it at the horizon instead is what drew a line across the equator of
-  // the sky: above the horizon it falls steeply and below it, clamped, it falls
-  // by nothing. The value matched across the join and the slope did not, and a
-  // slope that changes in one row is a crease the eye finds immediately — on the
-  // one row a walker looking straight ahead has in the middle of the frame.
+  // The sine of the elevation is the vertical component of a unit direction, so
+  // it arrives free and no arcsine is taken: the ramp is stated in that
+  // variable rather than in degrees for exactly that reason.
   //
-  // The cosine of the zenith angle is the sine of the elevation, which is the
-  // vertical component of a unit direction, so it arrives free: the only trig
-  // here is the one arcsine the correction term needs, and 96.07995 minus the
-  // zenith angle is 6.07995 plus the elevation.
-  const float SKY_HORIZON_MASS = ${glsl(AIR.horizon, 6)};
-  const float SKY_HORIZON_SLOPE = ${glsl(AIR.horizonSlope, 6)};
-  const float SKY_BELOW_TAU = ${glsl(AIR.belowHorizonScale, 4)};
-
-  float skyAirMass(float sinElevation, float elevationDeg) {
-    if (elevationDeg >= 0.0) {
-      return 1.0 / (sinElevation + 0.50572 * pow(6.07995 + elevationDeg, -1.6364));
-    }
-    return SKY_HORIZON_MASS + SKY_HORIZON_SLOPE * SKY_BELOW_TAU
-      * (1.0 - exp(elevationDeg / SKY_BELOW_TAU));
+  // BELOW THE HORIZON THE MIX IS HELD AT NOUGHT, AND THAT JOIN IS SMOOTH RATHER
+  // THAN CLAMPED. A clamp is what drew a line across the equator of the old
+  // sky: the value matched across the join and the slope did not, and a slope
+  // that changes in one row is a crease the eye finds immediately — on the one
+  // row a walker looking straight ahead has in the middle of the frame. Here the
+  // mix leaves the horizon through a power well above one, so its slope there is
+  // nought already and meeting a constant costs nothing.
+  //
+  // The gain bends the ramp between its ends without moving either of them,
+  // which is the one degree of freedom a straight mix of two tints has not got,
+  // and it is what lets the twelve degrees the targets show be fitted without
+  // the sky above them going black.
+  float skyMix(float sinElevation) {
+    float y = clamp(sinElevation, 0.0, 1.0);
+    float s = 1.0 - pow(1.0 - y, uSkyRamp.x);
+    return ((1.0 + uSkyRamp.y) * s) / (1.0 + uSkyRamp.y * s);
   }
 
-  // The clear sky, and the sun standing in it.
+  // The sky, and the sun standing in it.
   //
   // The sharpness is how much of the sun survives, and it is the analytic
   // equivalent of a level of a texture: one for a mirror and the dome, less for
-  // a surface that scatters what it reflects. It shortens the narrow lobe —
-  // an exponent scales with the inverse square of the angular width, so the
-  // sharpness IS that scale — and it spreads the disc while taking its radiance
-  // down by the same factor its solid angle goes up by, which is what a coarser
-  // level does and is why a rough face shows the light of a sun rather than a
-  // sun. The wide lobe is forty degrees across and has nothing to blur.
+  // a surface that scatters what it reflects. The RAMP does not blur — it is
+  // smooth already, and a mix over elevation has no detail a rough face could
+  // lose — so the sharpness reaches only the two things that are narrow: it
+  // shortens the aureole's lobe, and it spreads the disc while taking its
+  // radiance down by the same factor its solid angle goes up by, which is what a
+  // coarser level does and is why a rough face shows the light of a sun rather
+  // than a sun.
   vec3 skyDome(vec3 direction, float sharpness) {
     vec3 d = normalize(direction);
-    float elevation = degrees(asin(clamp(d.y, -1.0, 1.0)));
-    float m = skyAirMass(d.y, elevation);
+    vec3 base = mix(uSkyHorizon, uSkyZenith, skyMix(d.y));
+
     float c = dot(d, uSunDir);
     float forward = max(0.0, c);
 
-    // Rayleigh, which is symmetric, and Henyey-Greenstein, which is not.
-    float pr = 0.05968310 * (1.0 + c * c);
-    float g = uSkyShape.x;
-    float gg = g * g;
-    float denom = max(1e-4, 1.0 + gg - 2.0 * g * c);
-    float pm = ((1.0 - gg) * 0.07957747) / (denom * sqrt(denom));
-
-    // And the circumsolar peak one asymmetry cannot reach, added to the SAME
-    // aerosol coefficient: it is a correction to the phase function rather than
-    // a light of its own, so it carries the haze's wavelength dependence and
-    // the haze's air mass and can invent neither a colour nor a horizon.
+    // The aureole, re-based on the ramp: a lobe ADDED to the sky rather than a
+    // correction to a phase function that no longer exists. Its level is the
+    // excess the retired physical dome put eight degrees from the sun, so the
+    // sky still whitens towards the sun by what was measured there.
     //
-    // Blurring the narrow lobe SHORTENS IT AND DIMS IT TOGETHER. A lobe of
-    // cos^n integrates to 2*pi/(n+1) over the hemisphere, so spreading one
-    // without taking its peak down multiplies the light it carries by the
-    // factor it was widened by — at the roughness the stone asks for that is
-    // sixty times, and what it drew was every rock and every giant in the world
-    // washed to a pale slab against the sky. A blur moves light about; it does
-    // not make any.
-    const float NARROW_N = ${glsl(DAY.aureole.narrowExponent, 1)};
-    float peak = NARROW_N * sharpness;
-    float extra = uSkyShape.z * pow(forward, ${glsl(DAY.aureole.wideExponent, 1)})
-      + uSkyShape.w * ((peak + 1.0) / (NARROW_N + 1.0)) * pow(forward, peak);
+    // Blurring it SHORTENS IT AND DIMS IT TOGETHER. A lobe of cos^n integrates
+    // to 2*pi/(n+1) over the hemisphere, so spreading one without taking its
+    // peak down multiplies the light it carries by the factor it was widened by
+    // — at the roughness the stone asks for that is sixty times, and what it
+    // drew was every rock and every giant in the world washed to a pale slab
+    // against the sky. A blur moves light about; it does not make any.
+    const float GLOW_N = ${glsl(DAY.ramp.glowExponent, 1)};
+    float peak = GLOW_N * sharpness;
+    float glow = uSkyRamp.z * ((peak + 1.0) / (GLOW_N + 1.0)) * pow(forward, peak);
 
     float spread = inversesqrt(max(1e-4, sharpness));
     float gamma = degrees(acos(clamp(c, -1.0, 1.0)));
@@ -315,24 +334,19 @@ export const SKY_GLSL = /* glsl */`
     float disc = (1.0 - smoothstep(edge - soft, edge + soft, gamma))
       * uSunDisc.z * sharpness;
 
-    vec3 tau = uSkyRayleigh + uSkyMie;
-    vec3 source = (uSkyRayleigh * pr + uSkyMie * (pm + extra)
-      + uSkyShape.y * tau * 0.07957747) / tau;
-    // One exponential, read twice: what the air has scattered into the ray is
-    // one minus what it has let through, and the disc is what it has let
-    // through. Which is also why the sun would redden on its own in a preset
-    // that put it near the horizon — nothing here has to be told to.
-    vec3 through = exp(-tau * m);
     // The disc is scaled by the MEAN of the three exposures rather than by each
-    // of them, so the only thing that gives the sun a colour is what the air
-    // takes out of it. Per channel it came out blue: the fit folded the
-    // reference's white balance into the exposure, and a beam carrying that
-    // balance is a beam a third as red as it is blue — which the tone curve
-    // hides on the disc, where everything saturates to white, and does not hide
-    // in the bloom, where the halo is a linear copy of it. What is left after
-    // this is extinction alone: neutral overhead, warm near the horizon.
+    // of them, so nothing here gives the sun a colour of its own. Per channel it
+    // came out blue: the exposure carries the picture's white balance, and a
+    // beam carrying that balance is a beam a third as red as it is blue — which
+    // the tone curve hides on the disc, where everything saturates to white, and
+    // does not hide in the bloom, where the halo is a linear copy of it.
+    //
+    // WHAT IS GONE WITH THE PHYSICS: the disc used to be multiplied by the air's
+    // own extinction, so it reddened by itself as a preset put the sun lower.
+    // Nothing does that now — a preset that wants a low sun has to say what
+    // colour it is, in its own numbers, through this one door.
     float beam = dot(uSkyExposure, vec3(0.33333333));
-    return uSkyExposure * source * (1.0 - through) + beam * disc * through;
+    return uSkyExposure * (base + glow) + beam * disc;
   }
 
   vec3 skyRadiance(vec3 direction, float widen) {
