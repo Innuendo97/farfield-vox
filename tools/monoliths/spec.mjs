@@ -168,9 +168,42 @@ const engineTotal = census.reduce((a, c) => a + c.blocks, 0);
 const engineQuads = census.reduce((a, c) => a + c.quads, 0);
 const modelled = countBlocks(COURSE, LENGTHS);
 const forward = Math.abs(modelled.total - engineTotal) / engineTotal;
+
+// THE DRIFT IN THIS LINE IS REGISTERED, WITH THE CAUSE, BECAUSE IT MOVED ONCE
+// WITHOUT ANYONE SAYING SO. When V2-DEV1 delivered this tool the two sides read
+// 5124 against 5002, 2.4% apart. They now read 5124 against 4790, 7.0%, and the
+// gate found the number changed with no note beside it.
+//
+// WHAT MOVED IS THE ENGINE'S COUNTER, NOT THE WALL. Measured by running
+// masonryCensus() against the file as it stood on either side of every commit
+// of this session (v2-pietra/dev4/censimento.mjs): the census reads 5002 before
+// bd98a50 and 4790 after it, and identically 4790 before and after 465bb9c --
+// so the skin closure, which was the standing candidate, is NOT the cause. The
+// courses are untouched across that commit, 185 of them, block for block.
+//
+// bd98a50 changed HOW the engine counts, because it changed how the engine
+// draws. The old census emitted a stagger walk of LENGTHS across the full span
+// of every wall and counted every piece, including the part block clipped at
+// each end; the new one walks the CELL LATTICE and lays a block wherever
+// isCut() says a cell boundary is a block edge -- which is the arithmetic the
+// fragment actually uses to decide where a block begins. On the engine's own
+// default law (cell 0.22, runCut 0.5) the two methods land 4.2% apart.
+//
+// THE MODEL BELOW STILL WALKS THE OLD METHOD. It was written to reproduce the
+// engine of its day and it still does, faithfully; the engine moved under it.
+// So this line no longer measures what it was built to measure -- whether the
+// model counts the engine -- it measures how far two counting methods differ,
+// and it does that with one point of margin left against its own 8% bar.
+// WHICH OF THE TWO IS TO FOLLOW THE OTHER IS NOT V2-DEV4'S TO DECIDE: the new
+// counter lives in src/world/voxel/, which D11 puts out of this session's
+// hands, and making the model copy it would leave the check comparing the
+// engine with itself. Escalated with these numbers; registered here so nobody
+// re-derives it.
 check(forward < 0.08, 'the model counts the engine',
   `${modelled.total} against the engine's own census ${engineTotal}, `
-  + `${(forward * 100).toFixed(1)}% apart`);
+  + `${(forward * 100).toFixed(1)}% apart`
+  + '  (was 2.4% at delivery; the engine changed counting method in bd98a50 and'
+  + ' the model still walks the old one -- see the note above)');
 
 const { mean: histMean, n: histN } = histogramMean(SPEC.block.histogram);
 const histDoubles = histogramAbove(SPEC.block.histogram, SPEC.block.doubles.over);
