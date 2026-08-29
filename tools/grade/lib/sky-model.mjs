@@ -2,6 +2,11 @@ import { agx } from './agx.mjs';
 import { agxInverse } from './agx-inverse.mjs';
 import { linearToSrgb, srgbToLinear } from './color.mjs';
 import { FRAME, makeRay } from './framing.mjs';
+// THE RAMP ITSELF, not a copy of it — see domeRadiance below. The module is
+// pure arithmetic with no dependency on three.js and none on node, which is
+// what lets the shader's own source and this one import the same lines. Same
+// answer, same reason, as src/world/voxel/pure.js is for the ground.
+import { rampRadiance } from '../../../src/core/sky-ramp.js';
 
 // Where the sun is, and what the clear sky does everywhere the reference does
 // not reach.
@@ -1192,21 +1197,34 @@ const smoothstep = (edge0, edge1, x) => {
 };
 
 /**
- * The dome, evaluated exactly as src/core/sky.js evaluates it.
+ * THE RETIRED PHYSICAL DOME.
  *
- * This is the JS twin of that shader and the two are one piece of arithmetic
- * written twice, which is a thing worth being uncomfortable about: the cloud
- * bake subtracts what this returns and the frame adds back what the shader
- * returns, so any difference between them lands in the frame as a halo round
- * every piece of weather. tools/grade/check-dome.mjs measures the two against
- * each other on the running page for exactly that reason.
+ * E-V6d took this out of the frame: the client chose the two-tint ramp of the
+ * targets, and FASE 1 had shown three walls that no tuning of these parameters
+ * gets past — the target's red at the top of the frame costs ninety-eight per
+ * cent of the red irradiance, the gradient the target asks for is steeper than
+ * the ratio of air masses allows at ANY optical depth, and two of its bands are
+ * outside what AgX can print at all.
+ *
+ * It is kept, exported and unchanged for two live reasons and one of them is
+ * load-bearing:
+ *
+ *  1. THE CLOUD ATLAS STANDING IN THE TREE WAS BAKED AGAINST IT. Until the
+ *     sixteen plates are re-cooked, the pieces on disk carry this sky's level.
+ *  2. It is the BASELINE every number of FASE 1 and FASE 2 was measured against
+ *     — the 30,19 the ramp had to beat, the ratio over 26-89 degrees that
+ *     anchors the ramp's top end, the irradiance the delta is quoted from. Those
+ *     scripts must go on getting the physical dome when they ask for it, or the
+ *     session record quietly becomes a comparison of the ramp against itself.
+ *
+ * Nothing in the running frame evaluates this any more.
  *
  * @param {object} preset   as dayPreset built it
  * @param {number[]} direction  unit vector, y up, -z north
  * @param {number} sharpness how much of the sun survives: one for the dome, and
  *   less for a surface that scatters what it reflects
  */
-export function domeRadiance(preset, direction, out = [0, 0, 0], sharpness = 1) {
+export function physicalDomeRadiance(preset, direction, out = [0, 0, 0], sharpness = 1) {
   const len = Math.hypot(direction[0], direction[1], direction[2]) || 1;
   const y = direction[1] / len;
   const elevationDeg = Math.asin(Math.min(1, Math.max(-1, y))) / DEG;
@@ -1253,6 +1271,49 @@ export function domeRadiance(preset, direction, out = [0, 0, 0], sharpness = 1) 
     out[c] = preset.exposure[c] * source * (1 - through) + beam * disc * through;
   }
   return out;
+}
+
+/**
+ * THE SKY THE FRAME DRAWS, whichever sky that is.
+ *
+ * THIS IS THE TWIN, AND IT IS NOT A SECOND COPY OF THE SHADER (E-V6g). The
+ * arithmetic lives once, in src/core/sky-ramp.js, and is imported by
+ * src/core/sky.js on one side and by this line on the other. The reason is
+ * written out in that file and it is worth repeating here, because this
+ * function is where the damage would land: THE CLOUD BAKE SUBTRACTS WHAT THIS
+ * RETURNS AND THE FRAGMENT ADDS BACK WHAT THE SHADER RETURNS, so any
+ * disagreement between the two arrives in the frame as a halo around every
+ * cloud. Two implementations that agree today are a halo waiting for the first
+ * time one of them is edited; one implementation cannot disagree with itself.
+ *
+ * (The old comment here claimed check-dome.mjs measures the two against each
+ * other on the running page and fails past a thousandth. It does not, and it
+ * never did — it is an offline self-consistency check with no page and no
+ * target in it. The claim is removed rather than corrected: what actually holds
+ * the two together is now the shared module, which is stronger than a check.)
+ *
+ * WHICH SKY, AND WHY IT IS DECIDED HERE RATHER THAN BY EACH CALLER. A preset
+ * that carries a `ramp` is drawn by the ramp, because that is what the frame
+ * does with it — sky.json's `day` carries one, so every production consumer of
+ * this module (check-dome, bake-environment, the cloud chain) now measures the
+ * sky that is actually drawn, without any of them being edited. A preset with
+ * no `ramp` is drawn by the retired physical model, which keeps
+ * tools/grade/grade-sky.mjs working unchanged: it builds its own preset through
+ * dayPreset(), which emits no ramp, and it is not this session's file to touch.
+ *
+ * That last point is a DECLARED RESIDUE and not a tidy ending: re-running
+ * grade-sky.mjs would rewrite sky.json from dayPreset() and drop `day.ramp` on
+ * the floor, after which setSkyPreset throws and the page does not start.
+ * dayPreset() has to learn to carry a ramp through before that file is next
+ * run. Whoever owns it is told; nothing here can fix it from this side.
+ *
+ * @param {object} preset an entry of sky.json of the shape `day` has
+ * @param {number[]} direction  unit vector, y up, -z north
+ * @param {number} sharpness how much of the sun survives
+ */
+export function domeRadiance(preset, direction, out = [0, 0, 0], sharpness = 1) {
+  if (preset.ramp) return rampRadiance(preset, direction, out, sharpness);
+  return physicalDomeRadiance(preset, direction, out, sharpness);
 }
 
 /** The dome for a bearing and a height, for the tools that think in angles. */

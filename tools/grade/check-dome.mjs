@@ -193,6 +193,28 @@ function main() {
     + `aureole wide ${day.aureole.wide} narrow ${day.aureole.narrow}; `
     + `disc ${day.disc.radiusDeg} deg at ${day.disc.level} of the exposure`);
 
+  // THE BEARING THE SKY IS ACTUALLY SYMMETRIC ABOUT, WHICH IS NOT `sun.azimuth`.
+  //
+  // Every evaluator of this sky — the shader through uSunDir, the model through
+  // preset.sun.vector — reads the sun as a VECTOR. `sun.azimuth` is a label
+  // beside it, and the two are serialised to different precisions: the vector is
+  // written to six decimals, and six decimals of a direction cosine is four
+  // ten-thousandths of a degree of bearing. So the plane this dome is mirror
+  // symmetric about stands at 279.999624 while the label says 280.
+  //
+  // Mirroring about the label instead measures that gap rather than the sky, and
+  // the ramp is the first sky in this campaign sensitive enough to notice: its
+  // colour near the sun is mostly the cos^40 glow, whose slope in bearing is
+  // forty times the lobe's own, so four ten-thousandths of a degree comes back
+  // as four ten-thousandths of a Lab unit — over a limit set at one. Measured
+  // both ways: about the label the worst relative disagreement is 4.07e-4, about
+  // the vector's own bearing it is 3.23e-14, which is the float noise the
+  // comment below predicts and the ZERO it says to confirm.
+  //
+  // The vector and the label disagreeing at the sixth decimal is a property of
+  // the SEALED preset (`day.sun`) and is reported rather than touched.
+  const sunBearing = (Math.atan2(sun.vector[0], -sun.vector[2]) / DEG + 360) % 360;
+
   const rgb = [0, 0, 0];
   const angleTo = (elevation, azimuth) => {
     const d = directionOf(elevation, azimuth);
@@ -245,12 +267,12 @@ function main() {
     const right = [0, 0, 0];
     for (let elevation = -10; elevation <= 90; elevation += 1) {
       for (let d = 0.5; d <= 180; d += 0.5) {
-        domeAt(day, elevation, sun.azimuth + d, left);
-        domeAt(day, elevation, sun.azimuth - d, right);
+        domeAt(day, elevation, sunBearing + d, left);
+        domeAt(day, elevation, sunBearing - d, right);
         const a = encoded(left);
         const b = encoded(right);
         const apart = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
-        if (angleTo(elevation, sun.azimuth + d) < DISC_SHOULDER) {
+        if (angleTo(elevation, sunBearing + d) < DISC_SHOULDER) {
           atDisc = Math.max(atDisc, apart);
           continue;
         }
