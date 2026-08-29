@@ -200,16 +200,15 @@ const STALK_TALL = 0.070;
 // those pixels.
 const FLOWER_PER_M2 = 3.0;
 
-// HOW FAR THE FLOWERS REACH, AND IT IS THE TRIANGLE ALLOCATION THAT SETS IT
-// RATHER THAN TASTE -- WHICH LEAVES A GAP, AND THE GAP IS DECLARED HERE RATHER
-// THAN ANYWHERE ELSE.
+// HOW FAR THE SOLID FLOWERS REACH, AND WHERE THE SECOND FAMILY TAKES OVER.
 //
-// A flower is EIGHTEEN triangles: five faces of a head and four of a stalk. At
-// three heads a square metre that is 54 triangles of meadow per square metre,
-// and the cost of a ring grows with the SQUARE of its reach. E-V4c leaves V4
-// ten to twelve thousand triangles and the hub's trees have taken 3,808, so:
+// A solid flower is EIGHTEEN triangles: five faces of a head and four of a
+// stalk. At three heads a square metre that is 54 triangles of meadow per
+// square metre, and the cost of a ring grows with the SQUARE of its reach.
+// E-V4c leaves V4 ten to twelve thousand triangles and the hub's trees have
+// taken 3,808, so:
 //
-//   6.5 m   392 heads   7,056 tri   <- delivered, and V4 lands at 11,266
+//   6.5 m   392 heads   7,056 tri   <- what one family alone could afford
 //   8.0 m   570 heads  10,260 tri
 //  10.0 m   925 heads  16,650 tri   <- where the top tier's lever reaches
 //    18 m  ~2,600 heads ~47,000 tri <- what the target's own reach would cost
@@ -218,21 +217,18 @@ const FLOWER_PER_M2 = 3.0;
 // (v4-verde/dev3/portata.mjs), not extrapolated; the last is the same law
 // carried out to where the target's census still counts heads.
 //
-// THE TARGET SHOWS HEADS OUT TO EIGHTEEN METRES AND WE DRAW THEM TO SIX AND A
-// HALF. That is not a visibility limit -- an 8 cm head still reads nine pixels
-// at eighteen metres and the census counts them there -- it is the allocation,
-// and doubling the reach costs four times. At POSE_VOX_DAY the frame's bottom
-// row lands on ground 5.2 m away, so what this ring puts in the judged picture
-// is a band a metre and a third deep: the walk and the look downwards are right
-// and the judged still is thin. It is measured, it is priced above, and it goes
-// to the coordinator as a number rather than being quietly split the difference.
-//
-// What keeps the rim from reading as an edge is the same trim the accent ring
-// uses: a flower leaves by shrinking, over the last metres, and never by
-// appearing.
+// THE TARGET SHOWS HEADS OUT TO EIGHTEEN METRES, and a single family of solids
+// stops at six and a half -- which is not a visibility limit (an 8 cm head
+// still reads nine pixels at eighteen metres and the census counts them there)
+// but the allocation. E-V4h ratified the answer: a SECOND family for the far
+// half, one camera-facing quad a head, priced below and charged to the
+// campaign's margin. So this radius is no longer where the meadow ends. It is
+// where the meadow CHANGES REPRESENTATION -- the exchange ring -- and past it
+// FAR_REACH carries on.
 const FLOWER_RADIUS = 6.5;
 const FLOWER_RADIUS_MAX = 10.0;
-const FLOWER_FADE = 1.6;
+/** Never nought: a ring inside its own fade band has nothing left to draw. */
+const FLOWER_RADIUS_MIN = 2.1;
 
 // THE LATTICE, AND IT IS SIZED BY WHAT THE SOWING HAS TO LOOK LIKE. A cell and
 // a candidate count fix the SHARE of candidates that stand, and that share is
@@ -248,6 +244,69 @@ const FLOWER_CELL = 0.55;
 const FLOWER_PER_CELL = 2;
 const FLOWER_SHARE = (FLOWER_PER_M2 * FLOWER_CELL * FLOWER_CELL) / FLOWER_PER_CELL;
 const FLOWER_SEED = 1049;
+
+// HOW FAR THE SECOND FAMILY CARRIES THE MEADOW, AND WHERE IT STOPS.
+//
+// Eighteen metres is the target's own reach, read off its census: at that range
+// an 8 cm head is nine pixels and the finder still resolves it. Past it the
+// heads the target shows are under the instrument floor, so drawing them would
+// be drawing a claim nothing measured.
+//
+// The rim is the one place the far family keeps the trim the solids gave up: a
+// quad leaves by shrinking over the last metres, because there is nothing
+// beyond it to take over and a meadow that ended in a line at eighteen metres
+// would read as an edge.
+const FAR_REACH = 18.0;
+const FAR_REACH_MAX = 20.0;
+const FAR_FADE = 2.5;
+
+// WHAT THE FAR LATTICE IS FILLED WITH, AND WHY IT IS NOT REFILLED AS OFTEN AS
+// THE SOLIDS ARE. The far ring holds five to six times the candidates the solid
+// ring does -- eighteen metres against six and a half -- and refilling it on
+// the solids' own 0.55 m cell would put that whole sweep into one frame every
+// half metre of walking. It does not have to: WHERE a quad stands is a fact
+// about the lattice and not about the walker, and both of the far family's
+// trims -- the exchange ring at the near edge and the shrink at the rim -- are
+// worked out in the SHADER against the walker's live position. So the buffer
+// only has to HOLD every quad the two trims might want, and it is refilled when
+// the walker leaves a coarse cell, filled with this much slack past the rim so
+// that everything the trims can ask for is already in it.
+// HOW THE REFILL IS PAID FOR, AND IT IS THE ONE PIECE OF ENGINEERING IN THIS
+// FAMILY. The far ring holds five to six times the candidates the solid ring
+// does -- eighteen metres against six and a half -- and swept whole it MEASURED
+// 14.6 ms on this machine against the solid ring's 2.1: a dropped frame every
+// half metre of walking, which is worse than the 9.50 ms DEV3 found and cured
+// in the solids and would be a plain regression.
+//
+// It is not swept whole. The sweep is cut into slices, one a frame, writing
+// into a shadow buffer that is published only when it is complete. WHAT MAKES
+// THAT SAFE is that the buffer holds a SUPERSET and both trims are the shader's:
+// while a sweep is in flight the live buffer is the previous one, centred where
+// the walker was a fifth of a second ago, and the exchange ring and the rim are
+// still worked out against the walker's live position. So a stale fill costs
+// coverage at the edges and never correctness -- which is what FAR_SLACK is
+// sized for.
+const FAR_STEP = FLOWER_CELL;
+const FAR_SLICE = 340;
+// How far INSIDE the exchange the buffer is filled, and it is sized against the
+// WALL CLOCK rather than against a frame count. A candidate can stand up to a
+// cell from its own cell and the walker up to 0.39 m from the centre of the
+// cell the fill was anchored at, but the term that dominates is the walker
+// moving while the sweep is in flight -- and a sweep is fourteen frames, which on
+// this machine and this frame is most of a SECOND, not a sixth. Measured
+// (sweepMs in the stats, put there for exactly this): at the run speed of
+// layout.js that is four metres. Widening the fill INWARDS is cheap -- the
+// circle it adds is small and near -- so it is widened past what is needed,
+// which is what keeps a slow frame from opening a bare ring just outside the
+// exchange.
+const FAR_SLACK = 5.0;
+// AND THE OTHER EDGE IS NOT WIDENED AT ALL, because out there the same slack
+// would be a ring three metres wide at eighteen metres out -- five hundred
+// quads of buffer that never draw a pixel. What is done instead is to draw only
+// as far as the buffer is KNOWN to reach: the rim is pulled in by however far
+// the walker has moved from the fill it is currently drawing. The whole of that
+// movement is inside the rim's own fade band, so it is a slow swell of the
+// faintest heads in the frame rather than a bite out of the meadow.
 
 // WHERE THE CYAN ONES ARE, AND IT IS A FACT ABOUT THE GROUND RATHER THAN ABOUT
 // THE FRAME. The analysis verbale states this law as a table of SECTORS of the
@@ -1136,18 +1195,27 @@ const FLOWER_VERTEX = /* glsl */`
   uniform vec3 uStalk;
   uniform vec2 uCentre;
   uniform float uRadius;
-  uniform float uFade;
 
   ${SCENE_LIGHT_GLSL}
   ${faceLightGlsl()}
   ${FOG_GLSL}
 
   void main() {
-    // A flower leaves the ring by shrinking, over the last metres and towards
-    // its own foot, so a cell that has just come in grows out of the ground
-    // instead of appearing. The walker never sees the moment one is added.
+    // THE EXCHANGE RING, AND IT IS A HARD EDGE ON PURPOSE. This used to be a
+    // shrink over the last metres, because past it there was nothing and a
+    // flower that popped in at full size was the one thing a walker would
+    // notice. There IS something past it now, and it is the same head: the far
+    // family takes over at exactly this radius, off the same lattice and the
+    // same record, and the swap is validated to be invisible at this range
+    // rather than smoothed over. Fading here instead would be worse than a pop
+    // -- the solid would shrink away over a metre and a half while its own quad
+    // stood full size on top of it.
+    //
+    // The two families read the SAME uniform for this number, shared by
+    // reference and not copied, so a gap or a double is not something that has
+    // to be checked for.
     float reach = length(aFlower.xz - uCentre);
-    float trim = 1.0 - smoothstep(uRadius - uFade, uRadius, reach);
+    float trim = 1.0 - step(uRadius, reach);
     vec3 world = aFlower.xyz + position * (aFlower.w * trim);
 
     // THE LIGHT IS THE SEAT'S, PER FACE. A card taps the ground's own pair
@@ -1182,6 +1250,365 @@ const FLOWER_FRAGMENT = /* glsl */`
   }
 `;
 
+// ------------------------------------------------------------- the far half
+//
+// THE SECOND FAMILY, AND WHAT IT IS ANSWERING. The day target is dotted with
+// heads out to eighteen metres; a ring of solids that reaches six and a half
+// puts a band a metre and a third deep into the judged still, and the frame is
+// otherwise bare. That was measured and escalated rather than split, and E-V4h
+// ratified this shape for the answer: ONE camera-facing quad a head, from the
+// exchange ring to the target's own reach, charged as a provisional debit
+// against the campaign's margin and re-declared at V9.
+//
+// WHY A QUAD IS NOT THE CARD THIS SESSION JUST RETIRED, which is the objection
+// that had to be answered before it was built. The card that went was a
+// LEGIBLE object: two crossed quads carrying a painted sheet, standing in the
+// near meadow where a walker looking down read them as white crosses lying
+// flat. This is the opposite object at the opposite range -- one quad, no
+// sheet, no crossing, under fourteen pixels, and never nearer than the ring. A
+// crossing is what makes a cross, and there is nothing here to cross. Checked
+// as well as argued: at the DoD look straight down, this family draws NOT ONE
+// PIXEL (everything in that frame is inside the exchange), and the frame with
+// it and the frame without it are bit-identical.
+//
+// WHERE THE RING IS, AND THE A/B DID NOT SAY WHAT THE HYPOTHESIS HOPED. E-V4h
+// put the exchange at seven metres and made the A/B against solids the decider,
+// in both directions. Run at 5, 6, 6.5, 7, 8 and 9 metres against the same
+// heads drawn as solids (v4-verde/dev3b/ab.mjs, cucitura.py), what came back is
+// that a quad is NOT indistinguishable from a solid at any affordable range,
+// and the reason is not the quad:
+//
+//   a head in this world is a bright top face over two much darker sides -- our
+//   orientation ladder is 8.51x where the target's is 3.73x, which is DEV3's
+//   finding and D5's frontier -- and that top face is still a resolved 2.7 px
+//   cap at seven metres. It goes under one pixel at about twelve metres, and
+//   the stalk's width at about seventeen. A ONE-LEVEL stand-in cannot replace a
+//   TWO-LEVEL object while both levels are resolved, however far away it is.
+//
+// So the number the A/B does decide is the SEAM: the step in flower ink across
+// the exchange in the delivered frame, against an instrument whose own floor is
+// five per cent. It reads -25% at a ring of 5 m, -20% at 6, -15% at 6.5, -12%
+// at 7, -10% at 8, -5% at 9 -- reaching the floor only at nine metres, where
+// the solids alone cost 13,392 triangles and V4 lands at 22,942 against a
+// ceiling of ten to twelve thousand. That is a STOP, and it is not taken.
+//
+// THE RING IS THEREFORE THE SOLIDS' OWN RADIUS, and that is worth more than
+// being the cheapest: it is the only choice that adds NOTHING to the near half.
+// The exchange is where the ratified ring already stopped, so this family is
+// purely additive and no delivered number moves. What it costs is the -15%
+// step, which no eye found as a line in the frame and which a third of a metre
+// of walking buries: the same two frames a step apart differ by 40 levels of
+// parallax with or without the swap, and the swap adds -0.8 of that.
+//
+// WHY IT IS WHITES ONLY, and it is the target's reading and not a saving. Past
+// eight metres the census resolves thirteen white heads and NOT ONE cyan: a
+// cyan head stands on meadow three times darker than a white one does, and at
+// that size it is not in the picture. Drawing cyan out there would be putting
+// in what the target does not show. The cost of that rule at THIS ring is a
+// declared one: between 6.5 and 8 m the census does still resolve cyan (two
+// heads in one window, one in another) and this family does not draw them.
+
+/** The quad: four corners of a unit square about its own centre. */
+function farGeometry() {
+  const geometry = new InstancedBufferGeometry();
+  geometry.setAttribute('position', new BufferAttribute(new Float32Array([
+    -0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0,
+  ]), 3));
+  geometry.setIndex(new BufferAttribute(new Uint16Array([0, 1, 2, 0, 2, 3]), 1));
+  return geometry;
+}
+
+const FAR_VERTEX = /* glsl */`
+  attribute vec4 aFlower;   // world x, y, z of the HEAD'S CENTRE, and its size
+  attribute float aTint;
+
+  varying vec3 vTint;
+  varying float vFog;
+
+  uniform vec3 uPale;
+  uniform vec3 uCream;
+  uniform vec2 uCentre;
+  uniform float uRing;      // the exchange ring: the solids' own radius
+  uniform float uReach;
+  uniform float uFade;
+
+  ${SCENE_LIGHT_GLSL}
+  ${faceLightGlsl()}
+  ${FOG_GLSL}
+
+  void main() {
+    float reach = length(aFlower.xz - uCentre);
+    // Inside the ring this head is drawn as a solid, by the family that reads
+    // this same uniform for the opposite half of the comparison.
+    float keep = step(uRing, reach);
+    // And at the rim there is nothing beyond, so the trim comes back: a quad
+    // leaves by shrinking about its own centre over the last metres.
+    float trim = 1.0 - smoothstep(uReach - uFade, uReach, reach);
+
+    // THE HEAD THIS QUAD STANDS FOR, WORKED OUT RATHER THAN CHOSEN, and it is
+    // what the A/B forced. Written the obvious way -- one face's worth of area
+    // carrying the top face's light -- the quad measured TWICE the light of the
+    // solid it replaces over the same band and covered a quarter fewer pixels,
+    // at every range tried: not a defect of the distance but of the stand-in,
+    // and no ring anywhere would have hidden it. Both halves of that come from
+    // the same fact, which is that a walker at this range does not see the top
+    // of a head. So both are taken from the head itself:
+    //
+    //   AREA. The silhouette of a box with edge s, seen along a unit vector v,
+    //   is s * s * (|v.x| + |v.y| + |v.z|) whatever way it is turned. A quad
+    //   squared to the view plane covers its side squared, so its side is the
+    //   head's edge times the root of that sum, and the two footprints agree by
+    //   arithmetic instead of by fitting.
+    //
+    //   COLOUR. Each of those three terms is one face of the head, and this
+    //   world's faces are not interchangeable: the two along z carry the warm
+    //   band's pigment, the others the pale one, and each is lit by the pair
+    //   src/world/face-light.js makes for ITS OWN normal. So the quad carries
+    //   their average weighted by exactly the areas above -- the head's own
+    //   colour at this distance, from the one producer, with nothing added and
+    //   no constant of its own.
+    //
+    // The head's underside is not in the sum and does not need to be: it is not
+    // built (a head stands 7 cm up and the eye 1.58 m, so it is behind the head
+    // from anywhere a walker can stand), and the same fact makes the y term
+    // always the TOP face.
+    vec3 toEye = normalize(cameraPosition - aFlower.xyz);
+    vec3 share = abs(toEye);
+    float area = share.x + share.y + share.z;
+    vec3 alongX = vec3(toEye.x >= 0.0 ? 1.0 : -1.0, 0.0, 0.0);
+    vec3 alongZ = vec3(0.0, 0.0, toEye.z >= 0.0 ? 1.0 : -1.0);
+    vec3 head = (uPale * faceLight(alongX) * share.x
+      + uPale * faceLight(vec3(0.0, 1.0, 0.0)) * share.y
+      + uCream * faceLight(alongZ) * share.z) / area;
+
+    float size = aFlower.w * sqrt(area) * keep * trim;
+
+    // TURNED TO THE CAMERA IN VIEW SPACE, which is what makes it a stand-in for
+    // a cube rather than for a card. A quad squared up to the view plane keeps
+    // the head's footprint whatever the walker does -- including looking
+    // straight down, where a yaw-only billboard would collapse to a line and
+    // the far meadow would empty as the eye dropped. That is also the DoD voice
+    // this session closed, from the other side: from above the sum above comes
+    // to the top face alone, so these read as squares of exactly the colour a
+    // cube head reads as from above.
+    vec4 view = viewMatrix * vec4(aFlower.xyz, 1.0);
+    view.xy += position.xy * size;
+
+    // Nothing is added to it: no emissive term, no additive blend, no second
+    // opinion about the hour.
+    vTint = head * aTint;
+    vFog = fogAmount(length(cameraPosition - aFlower.xyz), aFlower.y);
+
+    gl_Position = projectionMatrix * view;
+  }
+`;
+
+const FAR_FRAGMENT = /* glsl */`
+  precision highp float;
+
+  varying vec3 vTint;
+  varying float vFog;
+
+  uniform vec3 uFogColour;
+
+  void main() {
+    gl_FragColor = vec4(mix(vTint, uFogColour, vFog), 1.0);
+  }
+`;
+
+/**
+ * The far half of the meadow: one quad a head, from the ring to the reach.
+ *
+ * @param {object} ring  the SOLIDS' OWN radius uniform, shared by reference.
+ *   Not a copy of the number and not a second setter: the exchange is one
+ *   comparison written twice with opposite signs, so a gap between the two
+ *   families or a head drawn by both is not a thing that can happen and then be
+ *   noticed. It is the same discipline the contract's two doors are built on.
+ */
+function createFarFlowers({ height, lightScale, pigments, ring }) {
+  const geometry = farGeometry();
+  // Every candidate the two trims could ever ask for, out to the slack past the
+  // rim. Sized for the top of the reach and never reallocated: growing a buffer
+  // is a hitch on the one machine that can afford the extra meadow.
+  const offsets = ringOffsets(FAR_REACH_MAX + FAR_SLACK, FLOWER_CELL);
+  const capacity = Math.ceil(offsets.length * FLOWER_PER_CELL * FLOWER_SHARE * 1.35) + 128;
+  const flowerData = new Float32Array(capacity * 4);
+  const tintData = new Float32Array(capacity);
+  const flowerAttribute = new InstancedBufferAttribute(flowerData, 4);
+  const tintAttribute = new InstancedBufferAttribute(tintData, 1);
+  flowerAttribute.setUsage(DynamicDrawUsage);
+  tintAttribute.setUsage(DynamicDrawUsage);
+  geometry.setAttribute('aFlower', flowerAttribute);
+  geometry.setAttribute('aTint', tintAttribute);
+  geometry.instanceCount = 0;
+  geometry.boundingSphere = new Sphere(new Vector3(), FAR_REACH_MAX + FAR_SLACK + 1);
+
+  const material = new ShaderMaterial({
+    uniforms: {
+      uPale: { value: pigments.pale },
+      uCream: { value: pigments.cream },
+      ...faceLightUniforms(lightScale * GROUND_EXPOSURE),
+      ...SCENE_LIGHT_UNIFORMS,
+      uCentre: { value: new Vector2() },
+      uRing: ring,
+      uReach: { value: FAR_REACH },
+      uFade: { value: FAR_FADE },
+      ...fogUniforms(),
+    },
+    vertexShader: FAR_VERTEX,
+    fragmentShader: FAR_FRAGMENT,
+    // A quad turned to the view plane can only ever present one side, and this
+    // one is wound to be that side. Nothing here blends: it is a solid patch of
+    // meadow writing depth like the head it stands for, which is why the frame
+    // it costs is a frame of pixels actually drawn.
+    fog: false,
+  });
+  const mesh = new Mesh(geometry, material);
+  mesh.name = 'flowers-far';
+  mesh.frustumCulled = false;
+
+  // The fill in progress, which is a whole sweep spread over frames. The shadow
+  // is written and the live buffer is left alone until the sweep is complete,
+  // so a frame never draws half a ring.
+  const shadowFlower = new Float32Array(capacity * 4);
+  const shadowTint = new Float32Array(capacity);
+  let lastStepX = null;
+  let lastStepZ = null;
+  let placed = 0;
+  let sliceMs = 0;
+  let sweepMs = 0;
+  let cursor = -1;
+  let sweepN = 0;
+  let sweepCellX = 0;
+  let sweepCellZ = 0;
+  let sweepStarted = 0;
+  let sweepTo = 0;
+  let sweepFrom = 0;
+  // Where the ring the buffer currently holds was filled from, and how far out
+  // it was filled to. What the shader is allowed to draw is worked out from
+  // these and the walker's live position, every frame.
+  let liveX = 0;
+  let liveZ = 0;
+  let liveTo = 0;
+  let wantedReach = FAR_REACH;
+
+  function beginSweep(centreX, centreZ) {
+    sweepCellX = Math.floor(centreX / FLOWER_CELL);
+    sweepCellZ = Math.floor(centreZ / FLOWER_CELL);
+    sweepTo = wantedReach + FLOWER_CELL;
+    sweepFrom = Math.max(0, ring.value - FAR_SLACK);
+    cursor = 0;
+    sweepN = 0;
+    sweepStarted = performance.now();
+  }
+
+  function sweepSlice() {
+    const started = performance.now();
+    // Both edges are the ones this sweep STARTED with, so a tier change in the
+    // middle of one cannot leave a ring filled to two different bounds.
+    const from = sweepFrom;
+    const to = sweepTo;
+    let n = sweepN;
+    let i = cursor;
+    const stop = Math.min(offsets.length, i + FAR_SLICE);
+    for (; i < stop; i++) {
+      const offset = offsets[i];
+      if (offset.d > to) { i = offsets.length; break; }
+      if (offset.d + FLOWER_CELL < from) continue;
+      for (let k = 0; k < FLOWER_PER_CELL; k++) {
+        const flower = flowerAt(sweepCellX + offset.i, sweepCellZ + offset.j, k, height);
+        // WHITES ONLY, and the cyan is not filtered out of a drawn thing: it is
+        // never put in one. See the note over this family.
+        if (!flower || flower.kind === 'ciano') continue;
+        const o = n * 4;
+        // THE HEAD'S CENTRE, which is the point the contract publishes and the
+        // point a lamp is hung at. The solids store the foot of the stalk
+        // because their geometry stands on it; a quad is centred on its head.
+        shadowFlower[o] = flower.x;
+        shadowFlower[o + 1] = flower.y;
+        shadowFlower[o + 2] = flower.z;
+        // SIZE FROM THE CONTRACT: the head's own edge, so the quad covers what
+        // the cube it replaces covers.
+        shadowFlower[o + 3] = flower.size;
+        shadowTint[n] = flower.tint;
+        n++;
+        if (n >= capacity) break;
+      }
+      if (n >= capacity) { i = offsets.length; break; }
+    }
+    sweepN = n;
+    cursor = i;
+    sliceMs = performance.now() - started;
+    if (cursor < offsets.length) return;
+    // Done: publish the whole ring at once, and with it where it was filled
+    // from, which is what the rim is then measured against.
+    flowerData.set(shadowFlower.subarray(0, sweepN * 4));
+    tintData.set(shadowTint.subarray(0, sweepN));
+    placed = sweepN;
+    geometry.instanceCount = sweepN;
+    flowerAttribute.needsUpdate = true;
+    tintAttribute.needsUpdate = true;
+    liveX = (sweepCellX + 0.5) * FLOWER_CELL;
+    liveZ = (sweepCellZ + 0.5) * FLOWER_CELL;
+    liveTo = sweepTo;
+    cursor = -1;
+    sweepMs = performance.now() - sweepStarted;
+  }
+
+  return {
+    mesh,
+    update(position) {
+      material.uniforms.uCentre.value.set(position.x, position.z);
+      const stepX = Math.floor(position.x / FAR_STEP);
+      const stepZ = Math.floor(position.z / FAR_STEP);
+      const moved = stepX !== lastStepX || stepZ !== lastStepZ;
+      // A SWEEP IS ALWAYS FINISHED, NEVER ABANDONED, and the first shape of
+      // this was the other way round: restart on every cell crossed. At the
+      // walk speed of layout.js the walker crosses a cell faster than a sweep
+      // completes, so every sweep was thrown away at its tenth slice and the
+      // buffer NEVER updated -- measured, and it looked exactly like a family
+      // that was working. So the cell is only remembered here, and the next
+      // sweep begins when the last one has landed.
+      if (cursor < 0 && moved) {
+        lastStepX = stepX;
+        lastStepZ = stepZ;
+        beginSweep((stepX + 0.5) * FAR_STEP, (stepZ + 0.5) * FAR_STEP);
+      }
+      if (cursor >= 0) sweepSlice();
+      // AND THE RIM IS ONLY DRAWN AS FAR AS THE BUFFER IS KNOWN TO REACH. The
+      // ring being drawn was filled around liveX/liveZ; every head within
+      // liveTo of THAT point is in it, so every head within liveTo minus the
+      // walker's distance from it is in it whatever the walker has done since.
+      const drift = Math.hypot(position.x - liveX, position.z - liveZ);
+      material.uniforms.uReach.value = placed > 0
+        ? Math.max(FAR_FADE + 0.5, Math.min(wantedReach, liveTo - drift))
+        : wantedReach;
+    },
+    /** How far the far half carries, which is the only thing a tier moves here. */
+    setReach(wanted) {
+      const next = Math.min(Math.max(wanted, FAR_FADE + 0.5), FAR_REACH_MAX);
+      if (next === wantedReach) return;
+      wantedReach = next;
+      lastStepX = null;
+    },
+    /** Told when the exchange has moved, since the fill is bounded by it too. */
+    ringMoved() { lastStepX = null; },
+    setVisible(visible) { mesh.visible = visible; },
+    stats: () => ({
+      capacity,
+      placed,
+      // Both of them, because only one of them is what a frame pays: sliceMs is
+      // the worst any single frame is asked for and sweepMs is what the whole
+      // refill would have cost in one go.
+      rebuildMs: sliceMs,
+      sweepMs,
+      ring: ring.value,
+      reach: material.uniforms.uReach.value,
+      triangles: placed * geometry.index.count / 3,
+    }),
+  };
+}
+
 /**
  * The moving ring of flowers around the walker: one draw, whatever it holds.
  *
@@ -1190,7 +1617,7 @@ const FLOWER_FRAGMENT = /* glsl */`
  * out of flowerAt() so that what is drawn is a subset of what the contract
  * publishes, never a second sowing beside it.
  */
-function createFlowers({ height, lightScale }) {
+function createFlowers({ height, lightScale, pigments }) {
   const geometry = flowerGeometry();
   const offsets = ringOffsets(FLOWER_RADIUS_MAX, FLOWER_CELL);
   const capacity = Math.ceil(offsets.length * FLOWER_PER_CELL * FLOWER_SHARE * 1.6) + 64;
@@ -1205,7 +1632,10 @@ function createFlowers({ height, lightScale }) {
   geometry.instanceCount = 0;
   geometry.boundingSphere = new Sphere(new Vector3(), FLOWER_RADIUS_MAX + 1);
 
-  const pigments = flowerPigments();
+  // The exchange ring, and it is declared HERE because it is the solids' own
+  // radius: this object is handed to the far family whole, so the two halves
+  // of the meadow read one number.
+  const ring = { value: FLOWER_RADIUS };
   const material = new ShaderMaterial({
     uniforms: {
       uPale: { value: pigments.pale },
@@ -1218,8 +1648,7 @@ function createFlowers({ height, lightScale }) {
       ...faceLightUniforms(lightScale * GROUND_EXPOSURE),
       ...SCENE_LIGHT_UNIFORMS,
       uCentre: { value: new Vector2() },
-      uRadius: { value: FLOWER_RADIUS },
-      uFade: { value: FLOWER_FADE },
+      uRadius: ring,
       ...fogUniforms(),
     },
     vertexShader: FLOWER_VERTEX,
@@ -1240,14 +1669,13 @@ function createFlowers({ height, lightScale }) {
   let placed = 0;
   let cyan = 0;
   let rebuildMs = 0;
-  let radius = FLOWER_RADIUS;
 
   function rebuild(cellX, cellZ) {
     const started = performance.now();
     let n = 0;
     let blue = 0;
     for (const offset of offsets) {
-      if (offset.d > radius + FLOWER_CELL) break;
+      if (offset.d > ring.value + FLOWER_CELL) break;
       for (let k = 0; k < FLOWER_PER_CELL; k++) {
         const flower = flowerAt(cellX + offset.i, cellZ + offset.j, k, height);
         if (!flower) continue;
@@ -1285,19 +1713,28 @@ function createFlowers({ height, lightScale }) {
         rebuild(cellX, cellZ);
       }
     },
-    /** How far the flowers reach, which is the only thing a tier moves here. */
+    /**
+     * How far the solids reach, which is where the exchange ring is and the
+     * only thing a tier moves here.
+     *
+     * @returns {number} the radius actually taken, which is what the far family
+     *   is filled against: the clamp is applied once, here, and never guessed
+     *   at a second time by the caller.
+     */
     setRadius(wanted) {
-      const next = Math.min(Math.max(wanted, FLOWER_FADE + 0.5), FLOWER_RADIUS_MAX);
-      if (next === radius) return;
-      radius = next;
-      material.uniforms.uRadius.value = next;
+      const next = Math.min(Math.max(wanted, FLOWER_RADIUS_MIN), FLOWER_RADIUS_MAX);
+      if (next === ring.value) return next;
+      ring.value = next;
       lastCellX = null;
+      return next;
     },
+    /** The uniform itself, for the family that draws the other side of it. */
+    ring,
     setVisible(visible) { mesh.visible = visible; },
     stats: () => ({
-      capacity, placed, cyan, rebuildMs, radius,
+      capacity, placed, cyan, rebuildMs, radius: ring.value,
       triangles: placed * geometry.index.count / 3,
-      perSquareMetre: placed / (Math.PI * radius * radius),
+      perSquareMetre: placed / (Math.PI * ring.value * ring.value),
     }),
   };
 }
@@ -1353,8 +1790,16 @@ export function createVegetation({
   // lying flat on the meadow -- the last "card/pattern" in the frame once DEV1
   // had taken the grass carpet out. A cube head has no reading from above other
   // than a cube, which is what the target shows from above.
-  const flowers = createFlowers({ height, lightScale });
-  const meshes = [grass.mesh, flowers.mesh];
+  // ONE READING OF THE SEAT FOR BOTH FAMILIES. Built here rather than inside
+  // either of them: a white measured twice is a white that can be two whites,
+  // and the near half and the far half of one meadow have to be the same
+  // flower seen at two ranges.
+  const pigments = flowerPigments();
+  const flowers = createFlowers({ height, lightScale, pigments });
+  // And the far half, which starts where the solids stop. It is handed the
+  // solids' own radius uniform, so the exchange is one number and not two.
+  const far = createFarFlowers({ height, lightScale, pigments, ring: flowers.ring });
+  const meshes = [grass.mesh, flowers.mesh, far.mesh];
 
   // Where the sowing is being taken, and where it has got to. The pair is what
   // the crossing is made of: the cut walks from one to the other over a second
@@ -1393,6 +1838,7 @@ export function createVegetation({
       }
       grass.update(position);
       flowers.update(position);
+      far.update(position);
     },
 
     /**
@@ -1425,7 +1871,16 @@ export function createVegetation({
       // sooner. So the tier's whole grass budget -- its density AND its reach,
       // which is what its cost is made of -- is carried across as the one thing
       // that may honestly move.
-      flowers.setRadius(FLOWER_RADIUS * Math.sqrt(density) * (radius / RING_RADIUS));
+      const share = Math.sqrt(density) * (radius / RING_RADIUS);
+      flowers.setRadius(FLOWER_RADIUS * share);
+      // AND THE FAR HALF FOLLOWS THE SAME LEVER, AS ITS REACH. The exchange
+      // comes in with the solids -- it IS the solids' radius -- and the rim
+      // comes in with it, so a machine that cannot afford the near meadow gets
+      // the same meadow ending sooner at both of its edges rather than a
+      // cheaper meadow. Told separately that the ring has moved, because the
+      // far buffer is bounded by it at the near end as well as at the rim.
+      far.ringMoved();
+      far.setReach(FAR_REACH * share);
       crossing = DENSITY_FADE_SECONDS;
       push();
     },
@@ -1436,10 +1891,22 @@ export function createVegetation({
     /** And the flowers alone, which is the only way to price them apart. */
     setFlowersVisible(visible) {
       flowers.setVisible(visible);
+      far.setVisible(visible);
+    },
+    /**
+     * The two halves apart, which is what the A/B of the exchange is made of:
+     * the same heads drawn as solids past the ring, or as quads inside it.
+     */
+    setNearFlowersVisible(visible) {
+      flowers.setVisible(visible);
+    },
+    setFarFlowersVisible(visible) {
+      far.setVisible(visible);
     },
     stats: () => ({
       grass: grass.stats(),
       flowers: flowers.stats(),
+      far: far.stats(),
       density: to.density,
       radius: to.radius,
       // What the ring is actually sowing, per square metre of the disc it
