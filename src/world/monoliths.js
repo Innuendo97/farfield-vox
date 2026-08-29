@@ -191,6 +191,11 @@ export function createMonoliths() {
   // How lit each block is, nought to one. It is written from outside, ramped
   // there, and read back every frame by the pulse below.
   const focus = new Map();
+  // AND WHAT IS WRITTEN ON EACH ONE, held by the same rule and for the same
+  // reason. Both are things the outside says about a block BEFORE the block
+  // necessarily exists, and a seat that remembers one of them and forgets the
+  // other is the defect below.
+  const engravings = new Map();
 
   // ------------------------------------------------------------- the markers
   const quad = markerGeometry();
@@ -259,10 +264,25 @@ export function createMonoliths() {
     /**
      * A block's stone, as soon as the worker has cut it.
      *
-     * Anything already asked for while the stone was still being cut is applied
-     * here rather than lost: a walker can reach a block's face before its
-     * courses have landed, and the focus that was set then has to arrive with
-     * them.
+     * ANYTHING ALREADY SAID ABOUT THIS BLOCK IS APPLIED HERE RATHER THAN LOST,
+     * and that is the whole contract of this seat: TWO asynchronous deliveries
+     * meet at it and neither can be told to wait for the other. The stone
+     * arrives from the engine's worker, one piece per message; the writing
+     * arrives from engraveAll(), one face per frame, in order of distance from
+     * the reference pose. Nothing keeps those two queues in step.
+     *
+     * IT USED TO REMEMBER THE FOCUS AND FORGET THE WRITING, and the asymmetry
+     * cost four faces out of six. Measured at the seat before it was touched
+     * (v2-pietra/dev3/inkbind.mjs, which wraps this door and the scene and
+     * writes down which walls existed at each knock): the writing for 06, 05,
+     * 01 and 04 was handed in between 5.5 and 8.2 seconds, with NOT ONE wall
+     * yet standing, and was dropped on the floor by a `if (block)` that had
+     * nothing to put it on; 02 at 9.9 s and 03 at 16.5 s found all eight
+     * standing and were kept. That is exactly the three faces the verbale
+     * reported as `tInk` null — 01, 04, 05 — plus the one nobody could see
+     * because it is out of the reference framing.
+     *
+     * So both are held, and both are applied here.
      */
     attach(id, stone) {
       blocks.set(id, stone);
@@ -271,10 +291,19 @@ export function createMonoliths() {
         stone.material.uniforms.uInk.value = INK_GAIN
           * (1 + FOCUS_INK * held.value * (1 - FOCUS_OPEN_DIM * held.out));
       }
+      const written = engravings.get(id);
+      if (written) stone.setEngraving(written);
     },
 
-    /** Lays the engraving of one section onto its block. */
+    /**
+     * Lays the engraving of one section onto its block.
+     *
+     * HELD WHETHER OR NOT THE STONE IS THERE. A block whose courses have not
+     * landed yet is the ordinary case and not the exception — see attach() —
+     * so the texture is remembered first and applied second.
+     */
     setEngraving(id, texture) {
+      engravings.set(id, texture);
       const block = blocks.get(id);
       if (block) block.setEngraving(texture);
     },
