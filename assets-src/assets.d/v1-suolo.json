@@ -1,13 +1,14 @@
 {
   "owner": "V1",
-  "note": "The ground. The two maps of the paving travel here because today the ground's own material eats them; they are V3's to claim when the path becomes geometry of its own.",
+  "note": "The ground. The two maps of the paving travel here because today the ground's own material eats them; they are V3's to claim when the path becomes geometry of its own. SINCE D3b THE MEADOW IS NOT IN THESE MAPS: it is cubes out to the tier's radius and a snapped sheet from there to a hundred metres, and both take their colour from arithmetic in src/world/voxel/material.js. What still reads the two atlases is the PAVING and the ground under the blocks' own footprints, which is 6 145 of the bent grid's 36 481 quads. That fraction IS the fraction of the atlas with a reader, exactly, because the texture coordinate of that mesh is its own index: 16.85% of terrain-albedo and of terrain-light is still sampled and 83.15% of each is not.",
   "assets": [
     {
       "id": "terrain-albedo",
       "type": "texture",
       "role": "albedo",
       "source": "terrain/terrain-albedo.png",
-      "priority": "critical"
+      "priority": "critical",
+      "note": "The painted ground. Since D3b the meadow's colour does not come from here -- it is arithmetic in src/world/voxel/material.js on the cubes and on the sheet -- so what is still read is the paving and the ground under the blocks' footprints: 16.85% of the map. It is bent to spend its resolution near the walker, and the part that survives is the dense middle of that bend, so the unread 83.15% is also the coarse 83.15%. A rebake at the extent that is now read is a real saving and it is V3's to take with the corridor, not V1's to take alone."
     },
     {
       "id": "terrain-detail",
@@ -31,7 +32,8 @@
       "type": "texture",
       "role": "lightmap",
       "source": "terrain/terrain-light.png",
-      "priority": "critical"
+      "priority": "critical",
+      "note": "E-V4f.4 held this in the critical set until V1 retired its atlas. V1 has retired the atlas's MEADOW and CANNOT retire the atlas: what is left in it that has a reader is the paving's baked shadow, and the paving is V3's surface, unbuilt. So this stays critical and the amendment's condition is not met by D3b -- said here rather than quietly left. It leaves the day the corridor becomes V3's own geometry with its own light, and the deroga on terrain.json shared by V1 and V3 is cancelled JOINTLY by the coordinator on that day. What HAS changed is the size of the claim: 83.15% of this map now has no reader at all, so what leaves the critical set when it leaves is far more than a rebake of the same extent would be."
     }
   ]
 }
