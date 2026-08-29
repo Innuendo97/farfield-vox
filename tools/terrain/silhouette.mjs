@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import sharp from 'sharp';
 import { EYE_HEIGHT, MONOLITHS, PLATFORM, SPAWN } from '../../src/world/layout.js';
 import { FRAME, POSE, REPO_ROOT } from '../grade/lib/framing.mjs';
+import { groundHeightAt } from '../../src/world/contracts.js';
 
 // Where the blocks stand in the frame, to the pixel.
 //
@@ -26,7 +27,8 @@ function project() {
   const aspect = FRAME.width / FRAME.height;
   const tanV = Math.tan(POSE.fov * DEG / 2);
   const tanH = tanV * aspect;
-  const eye = { x: 0, y: EYE_HEIGHT, z: SPAWN.z };
+  // The sentinel resolves as the page resolves it: ground plus eye.
+  const eye = { x: 0, y: groundHeightAt(0, SPAWN.z) + EYE_HEIGHT, z: SPAWN.z };
   const cp = Math.cos(-POSE.pitch * DEG);
   const sp = Math.sin(-POSE.pitch * DEG);
 

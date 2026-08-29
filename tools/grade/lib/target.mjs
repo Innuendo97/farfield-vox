@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { FRAME, POSE, REPO_ROOT } from './framing.mjs';
+import { groundHeightAt } from '../../../src/world/contracts.js';
 
 // The reference image, and the parts of it that may be compared against a
 // render. Two things must never end up in a comparison: the interface, which is
@@ -90,7 +91,11 @@ export async function buildStoneMask(width = FRAME.width, height = FRAME.height)
   const aspect = width / height;
   const tanV = Math.tan(POSE.fov * DEG / 2);
   const tanH = tanV * aspect;
-  const eye = { x: 0, y: EYE_HEIGHT, z: SPAWN.z };
+  // EYE_HEIGHT is the walker's sentinel, not an altitude: the page resolves
+  // it as ground plus eye, and this mask must stand where the page stands --
+  // its ten pixels of margin are thinner than the twelve the bare constant
+  // mis-registers by.
+  const eye = { x: 0, y: groundHeightAt(0, SPAWN.z) + EYE_HEIGHT, z: SPAWN.z };
   const cp = Math.cos(-POSE.pitch * DEG);
   const sp = Math.sin(-POSE.pitch * DEG);
 
