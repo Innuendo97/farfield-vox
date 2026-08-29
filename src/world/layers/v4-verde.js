@@ -2,19 +2,25 @@ import { createVegetation } from '../vegetation.js';
 
 // THE GREEN. Owned by V4.
 //
-// The grass cards, the props, and the radial ring they are sown on.
+// The accents of the meadow: the rare sprays of blades sown on a ring around
+// the walker, and the loose flowers.
 //
-// WHAT V4 REPLACES IT WITH: the cards stay -- the target has blades of grass and
-// a card is what draws one -- and what changes is how a card takes its light.
-// Today it reads the ground's baked atlas at its own foot; tomorrow the ground
-// under it is cubes with no atlas at all, and the bridge is `groundLightAt` in
-// src/world/contracts.js. Voxel trees and flowers arrive with the same session.
+// WHAT V4 REPLACED. The cards used to be the meadow and they are not any more:
+// the mass of the meadow is the ground's own cubes, ratified on the census of
+// both targets (E-V4a), and what stays here is the accent the night target
+// shows inside the pool of a lamp. The far ring, the skirts around the blocks
+// and the three bushes went with the mass they were drawing -- the green that
+// climbs a block's base is the ground's own tuft standing higher against built
+// stone, which E-V4d gives to V1.
 //
-// IT ASKS FOR THE GROUND'S OWN LIGHT MAP, and that is a collision written down
-// rather than discovered: `terrain-light` belongs to the soil and is eaten here.
-// It is the four texels the plan names as the V4/V1 pair to watch. Stating the
-// need here is what makes the coupling visible in the register instead of in a
-// stack trace.
+// IT NO LONGER ASKS FOR THE GROUND'S LIGHT MAP, AND THAT IS THE HALF OF THE
+// COLLISION THIS SESSION COULD CLEAR. `terrain-light` belongs to the soil and
+// was eaten here: 2048 by 2048 of a Cycles bake, read through a function that
+// undid the power law bending the old ground's grid, to light a card standing
+// on cubes. It is now four texels of the pair src/world/face-light.js produces
+// for a face that points up, built inside vegetation.js and kept current with
+// the one sun. The asset stays critical because V1 still draws with it; what is
+// gone is V4 as a reason for it to exist.
 const layer = {
   id: 'v4-verde',
 
@@ -23,13 +29,12 @@ const layer = {
   vegetation: null,
 
   plant: {
-    needs: ['grass-atlas', 'props-atlas', 'terrain-light'],
+    needs: ['grass-atlas', 'props-atlas'],
 
     build(assets) {
       layer.vegetation = createVegetation({
         grassAtlas: assets['grass-atlas'],
         propsAtlas: assets['props-atlas'],
-        light: assets['terrain-light'],
         // Where the ground is, which the hub knows and no delivery carries.
         height: assets.height,
       });
@@ -43,7 +48,7 @@ const layer = {
     if (layer.vegetation) layer.vegetation.setQuality(grass);
   },
 
-  /** Development handle: the grass alone, so its cost can be measured. */
+  /** Development handle: the accents alone, so their cost can be measured. */
   setVisible(visible) {
     if (layer.vegetation) layer.vegetation.setGrassVisible(visible);
   },
@@ -53,8 +58,8 @@ const layer = {
     return layer.vegetation ? layer.vegetation.stats() : null;
   },
 
-  update({ eye, delta, pitchDegrees }) {
-    if (layer.vegetation && eye) layer.vegetation.update(eye, delta, pitchDegrees);
+  update({ eye, delta }) {
+    if (layer.vegetation && eye) layer.vegetation.update(eye, delta);
   },
 };
 

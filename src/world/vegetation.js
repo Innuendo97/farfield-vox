@@ -1,11 +1,13 @@
 import {
-  BufferAttribute, DoubleSide, DynamicDrawUsage, InstancedBufferAttribute,
-  InstancedBufferGeometry, Mesh, ShaderMaterial, Sphere, Vector2, Vector3,
+  BufferAttribute, DataTexture, DoubleSide, DynamicDrawUsage, InstancedBufferAttribute,
+  InstancedBufferGeometry, Mesh, RGBAFormat, ShaderMaterial, Sphere, SRGBColorSpace,
+  UnsignedByteType, Vector2, Vector3,
 } from 'three';
-import { SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS } from '../core/sky.js';
+import { SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS, SUN_DIRECTION } from '../core/sky.js';
 import { BAKED_TERMS_GLSL, FOG_GLSL, fogUniforms, GROUND_EXPOSURE } from './air.js';
+import { faceLightGlsl, faceLightUniforms } from './face-light.js';
 import {
-  clamp01, GRID, pathCoord, pathRun, smoothstep,
+  clamp01, pathCoord, pathRun, smoothstep,
 } from './terrain-field.js';
 import { MONOLITHS, PLATFORM, STAIRS } from './layout.js';
 import { ROCKS } from './rocks.js';
@@ -13,39 +15,61 @@ import TERRAIN from '../../assets-src/terrain/terrain.json' with { type: 'json' 
 import GRASS from '../../assets-src/vegetation/grass.json' with { type: 'json' };
 import PROPS from '../../assets-src/vegetation/props.json' with { type: 'json' };
 
-// The grass, the flowers and the bushes.
+// The accents of the meadow: rare sprays of blades, and the loose flowers.
 //
-// This is the only thing in the world that is not baked, and it is the one
-// place the frame can be lost: a card is cheap to submit and expensive to fill,
-// and a meadow of them seen from eye height is a stack of transparent quads
-// over the bottom third of the screen. Everything below is arranged around that
-// single fact.
+// WHAT THIS FILE STOPPED BEING, AND IT IS THE LARGEST FACT ABOUT IT. It used to
+// be the meadow. A ring of cards sown four to a cell out to twelve metres, a
+// second sparse ring out to twenty, a skirt of eighty four around every block
+// and three bushes: that was how grass got drawn, and every lever in here --
+// the thinning towards the rim, the extra thinning when the eye goes level, the
+// tier's own density -- existed because a stack of transparent quads over the
+// bottom third of the screen cost two and a fifth milliseconds of a twelve and
+// a half millisecond frame.
 //
-//  - Alpha test, never blending. A blended card has to be sorted against every
-//    other card and cannot write depth, so nothing behind it is ever rejected.
-//    The test costs a discard and buys back the depth buffer.
-//  - Multisample coverage instead of a hard cut, which keeps the rim of a blade
-//    from crawling as the walker moves. It is free: the frame is already drawn
-//    into a multisampled buffer.
-//  - The ring is filled from the walker outwards, so the near cards are
-//    submitted first and the depth test throws away the fill of the far ones
-//    before their fragments are ever shaded. That is the whole reason the
-//    lattice is kept in radial order.
-//  - A card fades by shrinking, not by going transparent. A card that fades its
-//    alpha keeps its fill cost right up to the moment it disappears, and it
-//    fights the alpha test the whole way down.
+// THE MASS OF THE MEADOW IS CUBES. Measured on both targets, in eight declared
+// windows of open meadow: the share of meadow pixels that no cube face could
+// have drawn is 0.70% against an instrument floor of 0.20%, and all sixty two
+// candidates, looked at one by one at four times, were cube corners, scraps of
+// stone and flower stalks. Not one was a blade. The ground of this world draws
+// its own grass, and a carpet of cards over it is a second, paler meadow laid
+// on the first -- which is exactly what the delivered sheet measured as.
 //
-// The colour of a card is the ground's colour: the light is read out of the
-// terrain light atlas at the foot of the instance, in the vertex shader, so a
-// tuft standing under a cloud shadow darkens with the grass around it. Nothing
-// here carries a light of its own.
+// SO WHAT IS LEFT HERE IS AN ACCENT, and the night target is the one picture
+// that shows it: inside the pool of a lamp there are four to six SPRAYS of fine
+// blades over a hundred and six square metres of ground, twenty five by fifteen
+// centimetres, and the day target's meadow census cannot find even one. Three of
+// the five families are gone with the mass they were drawing:
+//
+//  - the FAR RING (10.5 to 20 m, cards two pixels tall) existed to stop the
+//    meadow ending in a line. The meadow no longer ends: the cubes run to the
+//    rim of the disc, and an accent twenty metres out is a quarter of a metre
+//    of blade under a pixel.
+//  - the SKIRTS (84 cards around each of six footprints) existed because the
+//    reference had grass cutting across every base. It still does, and E-V4d
+//    ratified whose grass it is: the green climbing the stone is the ground's
+//    own tuft standing three to six voxels higher where it meets built stone,
+//    which is V1's. Five hundred sprays crowded onto the bases would be the
+//    opposite of rare.
+//  - the BUSHES were three fixed cards placed by hand against the reference,
+//    and the same ratification says a bush in these targets is that same raised
+//    carpet and not an object. V4 does not draw one.
+//
+// What that leaves is the near ring, which is the accent, and the loose flowers,
+// which belong to the session that is rebuilding a flower as a cube head on a
+// sub-voxel stalk. Two draws where there were five.
+//
+// The colour of a card is the GROUND'S colour, and now it is the ground's own
+// number rather than a second measurement of it: the sheet is painted at the
+// reflectance src/world/voxel/material.js publishes, and the light is the pair
+// src/world/face-light.js produces for a face that points up. Nothing here
+// carries a light of its own.
 
 const DEG = Math.PI / 180;
 
 // How far the ring reaches, and over how much of its outer edge the cards are
-// shrunk away. Twelve metres is where a tuft stops being resolvable at this
-// framing; the band is wide enough that a card is already under a pixel of
-// height by the time it is dropped.
+// shrunk away. Twelve metres is where a spray of this size stops being
+// resolvable at this framing; the band is wide enough that a card is already
+// under a pixel of height by the time it is dropped.
 const RING_RADIUS = 12.0;
 const RING_FADE = 3.4;
 
@@ -66,54 +90,44 @@ const RING_RADIUS_MAX = 16.0;
 const DENSITY_FADE_SECONDS = 1.0;
 const DENSITY_FADE_BAND = 0.12;
 
-// The thinning that answers the one framing this meadow cannot afford.
+// HOW MANY SPRAYS STAND ON A SQUARE METRE, AND IT IS BRACKETED BY TWO TARGETS.
 //
-// Seen from eye height with the eye level, the far half of the ring lies along
-// the line of sight instead of across it: the same cards cover half again as
-// much of the screen, stacked one behind another, and the ring goes from about
-// one and two thirds of a millisecond at the reference framing to about two and
-// a half. The budget is one and four fifths, so about three quarters of a
-// millisecond has to come out of a picture nobody is allowed to notice changing.
+// The night target counts 4 to 6 legible sprays over the 106 m² of ground its
+// lamp window sees, which is 0.04 to 0.06 per square metre if they are spread
+// over the whole window and more if they only ever stand in the pools. The day
+// target bounds it from the other side, and harder: its meadow census read
+// 0.17% of oblique slivers over 93,380 px of meadow -- about eleven square
+// metres -- against an instrument floor of 0.09%, and attributed every one of
+// them to something that is not a blade. One spray of this size at eight metres
+// is about 170 px of blade, so fewer than one spray fits in those eleven square
+// metres before the census would have caught it: under 0.09 per square metre.
 //
-// It comes out in two halves rather than one, because either of them alone
-// would have to be pushed hard enough to see. Most of it is the sowing: beyond
-// eight metres a share of the tufts shrinks away, ramped in from five so there
-// is no line across the meadow where it starts. The rest is a metre and a fifth
-// off the reach of the ring, which the radial fade already spends its last
-// three metres shortening — so what that takes is cards that were down to a
-// third of their height anyway. Measured at ten stations along the path with
-// the eye level, the pair takes the ring from 2.15 ms to 1.48 ms, and the near
-// field the walker actually reads the meadow in is not touched by either.
-//
-// Both are steered by the pitch of the eye and nothing else, and both are
-// nought at the pitch of the reference framing. That is why the upper edge
-// below is 4.5 and not a round number: it is the framing this whole world was
-// fitted against, and this lever must be provably absent from it.
-const HORIZON_PITCH = { from: 4.5, to: -2.0 };
-const HORIZON_FAR = { from: 5.0, to: 12.0 };
-const HORIZON_CUT = 1.15;
-const HORIZON_REACH = 1.2;
+// The two brackets overlap between 0.04 and 0.09, and this is the middle of the
+// overlap. It is a READING of two pictures and not a measurement of one, and it
+// is the number in this file most likely to be moved by somebody looking at a
+// crop: it is written here alone, in sprays per square metre, so that moving it
+// is one edit and not a search.
+const ACCENT_PER_M2 = 0.06;
 
-// The lattice the tufts stand on. Cells are anchored in the world, so a tuft is
-// always in the same place: the ring is the set of cells around whichever cell
-// the walker is standing in, and it is refilled only when that cell changes.
-const CELL = 0.72;
-const PER_CELL = 4;
-
-// The card, in metres.
+// The lattice the sprays stand on. Cells are anchored in the world, so a spray
+// is always in the same place: the ring is the set of cells around whichever
+// cell the walker is standing in, and it is refilled only when that cell
+// changes.
 //
-// Low and wide on purpose: what a card costs is its area on the screen, and a
-// tall card seen from eye height covers far more of the frame than the same
-// amount of grass laid out flat. These three numbers are also the budget lever.
-// Measured on the development machine at the reference framing, the ring cost
-// 2.1 ms of a 12.6 ms frame at a third of a metre tall; the height and the
-// spread of scales here are what bring it under the one and four fifths it is
-// allowed, and the reference grass is short anyway.
-const CARD_WIDTH = 0.58;
-const CARD_HEIGHT = 0.21;
-const CARD_SCALE = { min: 0.68, max: 1.15 };
-// How far the top of a card is carried over from its root, in metres.
-const CARD_LEAN = 0.09;
+// TWO METRES AND ONE CANDIDATE, WHICH IS SIZED FOR WHAT IS SOWN. The lattice
+// was 0.72 m with four candidates a cell, because it was sowing a carpet: that
+// is 7.7 candidates per square metre, and putting six hundredths of a spray
+// through the placement loop for each of them means six thousand rolls of the
+// dice per rebuild to stand about twenty seven sprays, four times a second.
+// A lattice one candidate to four square metres puts about a hundred and ten
+// through the same loop and stands the same sprays, and it is refilled a third
+// as often because the walker crosses its cells a third as rarely.
+const CELL = 2.0;
+const PER_CELL = 1;
+
+// What share of the candidates stands, before the ground's own density and the
+// tier are applied: the sowing above, expressed as this lattice sees it.
+const ACCENT = (ACCENT_PER_M2 * CELL * CELL) / PER_CELL;
 
 // Three quads at sixty degrees: eight triangles a card counting both faces.
 // Three and not four because the fourth adds a third more fill for a silhouette
@@ -121,64 +135,28 @@ const CARD_LEAN = 0.09;
 // quads read as a cross when the walker looks straight down at them.
 const QUADS = 3;
 
+// How much the scale of a spray varies, and how far the top of a card is
+// carried over from its root, in metres.
+const CARD_SCALE = { min: 0.68, max: 1.15 };
+const CARD_LEAN = 0.05;
+
 // Where the alpha channel is cut. Low, because the sheet is dilated under its
 // transparent texels and the mip chain thins a blade with distance: a cut at a
 // half erases the far half of the ring.
 const ALPHA_CUTOFF = 0.34;
 
-// How much the sowing is thinned out towards the rim of the ring.
+// Flowers scattered on their own, over and above the ones the sheet used to
+// carry. They exist for the first few metres, where the eye starts asking where
+// the white specks went.
 //
-// This is the second budget lever and the one that costs the least to look at.
-// Three quarters of the cells of a disc lie in its outer half, and those are
-// also the cards the eye sees stacked one behind another when it looks along
-// the meadow rather than down at it — which is where the ring is dearest, not
-// where it is nearest. Halving them out there takes a third off the count and
-// most of the stacking, and at eight metres a tuft is a few pixels tall with
-// the painted ground already carrying the texture underneath it.
-const THINNING = { from: 5.5, to: 12.0, keep: 0.42 };
-
-// And the sparse outer ring, from where the near one stops out to the blocks.
-//
-// The near ring cannot simply be made bigger: its lattice is sized for tufts
-// the walker can look into, and stretching it to twenty metres would put nine
-// thousand candidates through the placement loop every time the walker crosses
-// a cell. So the far ground gets a lattice of its own, four times as coarse and
-// thinned to a fifth, which is a few hundred cards standing between the ring
-// and the stone. They are two pixels tall out there; what they have to do is
-// stop the meadow ending in a line, and that is all.
-const FAR_RING = {
-  inner: 10.5,
-  radius: 20.0,
-  fade: 5.0,
-  cell: 1.55,
-  perCell: 2,
-  thinning: { from: 11.0, to: 19.0, keep: 0.32 },
-  scale: { min: 1.05, max: 1.72 },
-};
-
-// The skirt of tufts around every base. See createSkirts: the ring cannot
-// reach the blocks, and the reference has grass cutting across all of them.
-const SKIRT_PER_BASE = 84;
-const SKIRT_REACH = 1.15;
-const SKIRT_INSIDE = 0.18;
-const SKIRT_SCALE = { min: 0.95, max: 1.70 };
-
-// Flowers scattered on their own, over and above the ones painted into the
-// sheet. They exist for the first few metres, where a tuft is large enough on
-// the screen that the eye starts asking where the white specks went.
+// THEY ARE THE OLD FLOWERS AND THEY ARE NOT THE ANSWER. Both targets draw a
+// flower as a CUBE head on a sub-voxel stalk, 13 to 15 cm across; these are
+// crossed cards off the props sheet. They are left standing, at their own
+// draw, so the meadow is not bare of white while the session that owns the
+// flower builds the real one against the census.
 const FLOWER_RADIUS = 5.0;
 const FLOWER_CELL = 0.55;
 const FLOWER_SIZE = 0.10;
-
-// The low bushes between the blocks. Placed by hand against the reference,
-// which puts one dark mass behind the first block and another in the gap
-// between the fourth and the fifth.
-const BUSHES = [
-  { x: -11.35, z: -6.35, size: 1.75, cell: 0 },
-  { x: 6.95, z: -5.60, size: 1.55, cell: 1 },
-  { x: -6.30, z: -12.05, size: 1.35, cell: 0 },
-];
-const BUSH_HEIGHT = 0.62;
 
 const VERTEX = /* glsl */`
   attribute vec4 aOffset;   // world x, y, z, and the scale of the card
@@ -190,38 +168,27 @@ const VERTEX = /* glsl */`
   varying float vFog;
 
   uniform sampler2D tLight;
-  uniform float uLightScale;
   uniform vec2 uCentre;     // where the ring is centred, in world x and z
   uniform float uRadius;
   uniform float uFade;
   uniform float uCut;       // cards graded above this are not standing
   uniform float uBand;      // and this much below it is where they shrink away
-  uniform float uHorizon;   // how level the eye is, nought to one
-  uniform vec3 uHorizonCut; // how much the far cards give up, and over what range
   uniform vec2 uCellSize;   // one cell of the sheet, in texture units
   uniform float uColumns;
-  uniform float uGridHalf;
-  uniform float uGridBend;
-  uniform vec2 uGridCentre;
 
   ${SCENE_LIGHT_GLSL}
+  // THE ONE PRODUCER OF THE PAIR, and what a pair is worth as light, from
+  // src/world/face-light.js. This file used to write that arithmetic out for
+  // itself and had already drifted from the seat: it multiplied the terms by
+  // the exposure without passing them through the lift, so a sweep that moved
+  // the lift moved the stone and the ground and left the grass where it was.
+  ${faceLightGlsl()}
   // BILINEAR here and not the cubic, declared: this read is in the VERTEX
   // shader, once per card, and four taps a vertex would buy a card that covers
   // far more texels than it has vertices nothing at all. What it DOES need is
-  // the unpacking — the sky term lives in alpha now.
+  // the unpacking — the sky term lives in alpha.
   ${BAKED_TERMS_GLSL}
   ${FOG_GLSL}
-
-  // Where a world position lands in the ground atlas. The grid the meadow is
-  // built on is bent by a power law so its vertices crowd towards the middle of
-  // the hub, and the atlas is bent with it; reading the light at the foot of a
-  // card means undoing exactly that bend, which is why the law arrives as
-  // uniforms instead of being written out a second time.
-  vec2 groundUv(vec2 world) {
-    vec2 metres = world - uGridCentre;
-    vec2 t = pow(min(abs(metres) / uGridHalf, vec2(1.0)), vec2(1.0 / uGridBend));
-    return (sign(metres) * t + 1.0) * 0.5;
-  }
 
   void main() {
     vec3 base = aOffset.xyz;
@@ -233,14 +200,11 @@ const VERTEX = /* glsl */`
     float reach = length(base.xz - uCentre);
     float trim = 1.0 - smoothstep(uRadius - uFade, uRadius, reach);
 
-    // And how much of the sowing is standing at all. Both the tier and the
-    // pitch of the eye move the same threshold, and a card crosses it by
-    // shrinking over whatever width the wider of the two asks for. When neither
-    // is moving the width is nought and this is a plain comparison, which is
-    // the sowing the ring was filled with and nothing else.
-    float drop = max(uBand, uHorizon * uHorizonCut.x
-      * smoothstep(uHorizonCut.y, uHorizonCut.z, reach));
-    float keep = clamp((uCut - aGrade) / max(drop, 1e-5), 0.0, 1.0);
+    // And how much of the sowing is standing at all. The tier moves this
+    // threshold and a card crosses it by shrinking over whatever width the
+    // crossing asks for. At rest the width is nought and this is a plain
+    // comparison, which is the sowing the ring was filled with and nothing else.
+    float keep = clamp((uCut - aGrade) / max(uBand, 1e-5), 0.0, 1.0);
 
     float scale = aOffset.w * trim * trim * keep;
 
@@ -252,11 +216,13 @@ const VERTEX = /* glsl */`
       local.y,
       local.x * aParams.y + local.z * aParams.x);
 
-    // One tap of the ground's own light, at the foot of the card, and the two
-    // terms in it recomposed here. Taken in the vertex shader and not in the
-    // fragment one: a card is eighteen vertices and covers far more texels
-    // than that, so the whole two term world costs the grass nothing.
-    vec3 light = bakedLight(bakedTerms(tLight, groundUv(base.xz))) * uLightScale;
+    // THE BRIDGE. One tap of the ground's own light, and the pair in it turned
+    // into light by the seat that produces it. The tap is of FOUR TEXELS: a
+    // card stands on the ground and the ground faces up, so the two terms are
+    // the same everywhere on the disc and the map of them has nothing to vary
+    // over. Read in the vertex shader and not the fragment one: a card is
+    // eighteen vertices and covers far more texels than that.
+    vec3 light = faceLightOf(bakedTerms(tLight, vec2(0.5)).xy);
 
     vec2 cell = vec2(mod(aParams.z, uColumns), floor(aParams.z / uColumns));
     vUv = (cell + uv) * uCellSize;
@@ -293,6 +259,67 @@ const FRAGMENT = /* glsl */`
     gl_FragColor = vec4(colour, clamp(edge, 0.0, 1.0));
   }
 `;
+
+// ------------------------------------------------------------- the bridge
+
+/**
+ * The ground's own light, as four texels, kept current with the one sun.
+ *
+ * WHY A MAP AT ALL, WHEN IT HOLDS ONE VALUE. Because it is a map of the GROUND
+ * and that is a contract: src/world/contracts.js seats `groundLightAt` between
+ * V1, which owns what the ground's light is, and this file, which eats it. What
+ * this used to be handed was the delivered terrain light atlas -- 2048 by 2048,
+ * 326 kB of it -- read through a function that undid the power law bending the
+ * old ground's grid. That atlas is a bake of a ground this world no longer has,
+ * and reading it lit the cards off Cycles while the cubes beside them were lit
+ * analytically: the cards came out the brightest population in the frame.
+ *
+ * WHY FOUR TEXELS IS THE WHOLE OF IT TODAY. A card stands on the ground, the
+ * ground of a voxel world is flat topped, and a flat face pointing up makes the
+ * same two terms wherever it stands: the cosine the sun turns to the vertical,
+ * and a whole hemisphere of sky. There is nothing for a map to vary over, so
+ * the map is two by two and weighs sixteen bytes.
+ *
+ * AND IT IS NOT WRITTEN ONCE. The sun moves -- a preset change moves it, and
+ * the night is a preset change. Baked at build time this would go on lighting
+ * the grass at noon after the cubes beside it had gone dark, which is the same
+ * defect as the atlas and harder to see.
+ *
+ * The pair itself is face-light's, for a face whose normal is (0, 1, 0): this
+ * is the one place in the world it is written on the CPU, and it is written
+ * here because a texture has to be filled by somebody.
+ */
+function groundLightBridge() {
+  const side = 2;
+  const data = new Uint8Array(side * side * 4);
+  const texture = new DataTexture(data, side, side, RGBAFormat, UnsignedByteType);
+  texture.colorSpace = SRGBColorSpace;
+  let written = -1;
+
+  function refresh() {
+    // faceTerms(vec3(0, 1, 0)): the sun term is the cosine with the vertical,
+    // and the sky term is 0.5 + 0.5 * 1 = one, a whole hemisphere.
+    const sun = Math.max(SUN_DIRECTION.y, 0);
+    if (sun === written) return;
+    written = sun;
+    // The sun term travels through the sRGB transfer a texture tagged sRGB is
+    // decoded by, so it is encoded here the same way; the sky term travels in
+    // alpha, which no transfer touches, as its own square root -- which is what
+    // bakedTerms squares back up. A whole hemisphere is one, so alpha is full.
+    const encoded = sun <= 0.0031308 ? sun * 12.92 : 1.055 * sun ** (1 / 2.4) - 0.055;
+    const r = Math.round(Math.max(0, Math.min(1, encoded)) * 255);
+    for (let i = 0; i < side * side; i++) {
+      data[i * 4] = r;
+      data[i * 4 + 1] = r;
+      data[i * 4 + 2] = r;
+      data[i * 4 + 3] = 255;
+    }
+    texture.needsUpdate = true;
+  }
+
+  refresh();
+  return { texture, refresh };
+}
 
 /**
  * The card: quads crossed about the vertical, standing on the ground.
@@ -350,18 +377,19 @@ const FOOTPRINTS = (() => {
   const list = [];
   // Everything below is worked out once. The ring is refilled several times a
   // second while the walker moves and it asks this question for every candidate
-  // blade, so a cosine evaluated in that loop is a cosine evaluated a hundred
-  // thousand times a second.
+  // spray, so a cosine evaluated in that loop is a cosine evaluated many
+  // thousands of times a second.
   for (const m of MONOLITHS) {
     const [w, , d] = m.size;
     list.push({
       x: m.position.x, z: m.position.z, rotation: m.rotationY * DEG,
       halfX: w / 2, halfZ: d / 2,
-      // How far past the stone the grass is allowed to climb. The reference
-      // shows the meadow biting into every base and covering the joint the
-      // block makes with the ground, so the skirt is deliberately generous:
-      // this strip is the one place a baked contact shadow cannot hide a seam,
-      // and the reference does not hide it either — it grows grass over it.
+      // How far past the stone an accent is allowed to climb. Kept, and kept
+      // generous, for the same reason it always was: the targets grow green
+      // over the joint a block makes with the ground rather than stopping
+      // politely at it. What has changed is who draws the mass of that green --
+      // E-V4d gives the raised carpet to V1 -- and this only says that a spray
+      // standing there is not deleted for standing there.
       skirt: 0.95,
     });
   }
@@ -388,7 +416,7 @@ const FOOTPRINTS = (() => {
     shape.cos = Math.cos(shape.rotation);
     shape.sin = Math.sin(shape.rotation);
     // Radius past which the shape cannot possibly matter: one comparison that
-    // rejects almost every shape for almost every blade.
+    // rejects almost every shape for almost every spray.
     shape.reach = Math.sqrt(shape.halfX * shape.halfX + shape.halfZ * shape.halfZ) + shape.skirt;
     shape.reachSquared = shape.reach * shape.reach;
   }
@@ -420,11 +448,11 @@ function noise2(x, z) {
 }
 
 /**
- * How much grass stands at a point of the meadow, from nought to one.
+ * How much vegetation stands at a point of the meadow, from nought to one.
  *
- * The path and the built stone take it to nought outright, and the
- * edge of the stone is a ramp rather than a line so the tufts lean over the
- * last slab exactly as the painted albedo lets the grass eat into it.
+ * The path and the built stone take it to nought outright, and the edge of the
+ * stone is a ramp rather than a line so an accent leans over the last slab
+ * exactly as the ground's own green eats into it.
  */
 function densityAt(x, z) {
   let density = 1;
@@ -452,7 +480,7 @@ function densityAt(x, z) {
     }
   }
 
-  // Broad thin and thick patches, so the ring never reads as an even sowing.
+  // Broad thin and thick patches, so the sowing never reads as an even one.
   return clamp01(density * (0.60 + 0.75 * noise2(x * 0.085 + 31.7, z * 0.085 + 9.3)));
 }
 
@@ -462,19 +490,19 @@ function densityAt(x, z) {
  * The cells of the disc, in radial order.
  *
  * Filled outwards from the walker so the near cards are submitted first: with
- * the depth test in front of the shader, a fragment hidden behind a tuft that
+ * the depth test in front of the shader, a fragment hidden behind a spray that
  * was already drawn is thrown away before it costs anything. Sorting instances
  * every frame would cost more than it saves; sorting the lattice once costs
  * nothing at all, because the ring is always centred on the walker and the
  * distance to a cell is therefore its distance from the centre.
  */
-function ringOffsets(radius, cell, inner = 0) {
+function ringOffsets(radius, cell) {
   const reach = Math.ceil(radius / cell) + 1;
   const offsets = [];
   for (let j = -reach; j <= reach; j++) {
     for (let i = -reach; i <= reach; i++) {
       const d = Math.hypot(i, j) * cell;
-      if (d > radius + cell || d < inner - cell) continue;
+      if (d > radius + cell) continue;
       offsets.push({ i, j, d });
     }
   }
@@ -487,29 +515,27 @@ function makeMaterial({ atlas, light, lightScale, columns, rows, radius, fade: b
     uniforms: {
       tAtlas: { value: atlas },
       tLight: { value: light },
-      uLightScale: { value: lightScale * GROUND_EXPOSURE },
+      // The sun, the exposure and the two lifts, from the one seat that
+      // produces the pair they act on -- and at the GROUND's exposure, because
+      // what a card is lit by is the ground it stands on. Shared by reference
+      // with the rest of the world: src/world/voxel/material.js asks for the
+      // same line, so a cube and a spray at its foot cannot disagree.
+      ...faceLightUniforms(lightScale * GROUND_EXPOSURE),
       ...SCENE_LIGHT_UNIFORMS,
       uCentre: { value: new Vector2() },
       uRadius: { value: radius },
       uFade: { value: band },
       uCut: { value: 1 },
       uBand: { value: 0 },
-      uHorizon: { value: 0 },
-      uHorizonCut: {
-        value: new Vector3(HORIZON_CUT, HORIZON_FAR.from, HORIZON_FAR.to),
-      },
       uCellSize: { value: new Vector2(1 / columns, 1 / rows) },
       uColumns: { value: columns },
-      uGridHalf: { value: GRID.half },
-      uGridBend: { value: GRID.bend },
-      uGridCentre: { value: new Vector2(GRID.centreX, GRID.centreZ) },
       uCutoff: { value: ALPHA_CUTOFF },
       ...fogUniforms(),
     },
     vertexShader: VERTEX,
     fragmentShader: FRAGMENT,
     // Both faces: a card is a sheet with no inside, and culling one side would
-    // make half the tufts of the ring disappear depending on where the walker
+    // make half the sprays of the ring disappear depending on where the walker
     // stands.
     side: DoubleSide,
     // Never transparent. The whole plan depends on these writing depth.
@@ -542,9 +568,9 @@ function instanced(geometry, capacity) {
 function createRing({
   atlas, light, lightScale, geometry, columns, rows, cellFrom, cellCount,
   radius, maxRadius = radius, cellSize, perCell, scaleRange, height, density,
-  seed, tint, sink, thinning, inner = 0, fade: fadeBand = RING_FADE,
+  seed, tint, sink, fade: fadeBand = RING_FADE,
 }) {
-  const offsets = ringOffsets(maxRadius, cellSize, inner);
+  const offsets = ringOffsets(maxRadius, cellSize);
   const capacity = offsets.length * perCell;
   const buffers = instanced(geometry, capacity);
   // The ring follows the walker, so nothing is ever gained by testing it
@@ -569,15 +595,7 @@ function createRing({
   // what stands: filling it for less would mean refilling it to grow.
   let reach = radius;
   let sown = 1;
-  // What the tier asks the ring to reach, and how much of that the pitch of the
-  // eye is currently taking off it. They are kept apart because only the first
-  // decides what the lattice holds.
   let shown = radius;
-  let trim = 0;
-
-  function pushRadius() {
-    material.uniforms.uRadius.value = Math.max(fadeBand + 0.5, shown - trim);
-  }
 
   function rebuild(cellX, cellZ) {
     const started = performance.now();
@@ -587,22 +605,20 @@ function createRing({
       if (offset.d > reach + cellSize) break;
       const gx = cellX + offset.i;
       const gz = cellZ + offset.j;
-      const thin = thinning
-        ? 1 - (1 - thinning.keep) * smoothstep(thinning.from, thinning.to, offset.d)
-        : 1;
       for (let k = 0; k < perCell; k++) {
         const r1 = hash2(gx * 73856093 + k * 19349663, gz * 83492791 + seed);
         const r2 = hash2(gx * 19349663 + seed, gz * 73856093 + k * 83492791);
         const x = (gx + r1) * cellSize;
         const z = (gz + r2) * cellSize;
 
-        // One draw of the dice per blade against the density here, which thins
-        // the sowing out smoothly instead of switching whole cells on and off.
-        // The draw is kept, not only its verdict: it is what tells the shader
-        // where this card stands in the sowing, so a tier that wants less of it
-        // takes the same cards away every time and takes them away by degrees.
+        // One draw of the dice per candidate against the density here, which
+        // thins the sowing out smoothly instead of switching whole cells on and
+        // off. The draw is kept, not only its verdict: it is what tells the
+        // shader where this card stands in the sowing, so a tier that wants
+        // less of it takes the same cards away every time and takes them away
+        // by degrees.
         const roll = hash2(gx * 26699 + k * 7919, gz * 15485863 + seed * 31);
-        const limit = density(x, z) * thin;
+        const limit = density(x, z);
         if (limit <= 0 || roll > limit * sown) continue;
 
         const r3 = hash2(gx * 40503 + k * 65867, gz * 92083 + seed * 17);
@@ -617,8 +633,7 @@ function createRing({
         paramData[o + 1] = Math.sin(yaw);
         paramData[o + 2] = cellFrom + Math.floor(r1 * cellCount) % cellCount;
         // A card a little darker or lighter than its neighbour. Small on
-        // purpose: the light already varies across the ring, and a wide spread
-        // here reads as noise rather than as grass.
+        // purpose: a wide spread here reads as noise rather than as grass.
         paramData[o + 3] = tint.min + (tint.max - tint.min) * r2;
         gradeData[n] = roll / limit;
         n++;
@@ -660,7 +675,7 @@ function createRing({
       material.uniforms.uCut.value = cut;
       material.uniforms.uBand.value = band;
       shown = wanted;
-      pushRadius();
+      material.uniforms.uRadius.value = Math.max(fadeBand + 0.5, shown);
       if (fill !== sown || wanted > reach) {
         sown = fill;
         reach = Math.max(reach, wanted);
@@ -674,162 +689,39 @@ function createRing({
       }
     },
 
-    setHorizon(amount, reachTrim = 0) {
-      material.uniforms.uHorizon.value = amount;
-      trim = reachTrim * amount;
-      pushRadius();
-    },
-
     stats: () => ({ capacity, placed, rebuildMs, triangles: placed * geometry.index.count / 3 }),
     setVisible(visible) { mesh.visible = visible; },
   };
 }
 
 /**
- * The tufts standing at the foot of the blocks.
+ * The meadow's own accents: the ring of sprays and the loose flowers near the
+ * walker.
  *
- * They are not part of the ring and they must not be. The ring reaches twelve
- * metres because that is what the frame can afford; the blocks stand at
- * nineteen and twenty one, and in the reference framing the grass cuts across
- * every one of their bases and closes over the hoop at the foot of the fifth.
- * Left to the ring, none of that would ever be drawn — the walker would watch
- * the grass stop several metres short of the stone.
- *
- * So these are placed once, around each footprint, and always drawn. They cost
- * one draw call and a few hundred cards seen from twenty metres, where a tuft
- * is three pixels tall.
- */
-function createSkirts({ atlas, light, lightScale, height }) {
-  const shapes = [];
-  for (const m of MONOLITHS) {
-    const [w, , d] = m.size;
-    shapes.push({
-      x: m.position.x, z: m.position.z, rotation: m.rotationY * DEG,
-      halfX: w / 2, halfZ: d / 2,
-    });
-  }
-  shapes.push({
-    x: PLATFORM.x, z: PLATFORM.z, rotation: PLATFORM.rotationY * DEG,
-    halfX: PLATFORM.width / 2, halfZ: PLATFORM.depth / 2,
-  });
-
-  const geometry = cardGeometry(QUADS, CARD_WIDTH, CARD_HEIGHT, CARD_LEAN);
-  const capacity = shapes.length * SKIRT_PER_BASE;
-  const buffers = instanced(geometry, capacity);
-  const { offsetData, paramData } = buffers;
-
-  let n = 0;
-  shapes.forEach((shape, index) => {
-    const c = Math.cos(shape.rotation);
-    const s = Math.sin(shape.rotation);
-    for (let k = 0; k < SKIRT_PER_BASE; k++) {
-      const r1 = hash2(index * 8191 + k * 131, 977);
-      const r2 = hash2(index * 131 + k * 8191, 1553);
-      const r3 = hash2(index * 6151 + k * 389, 2069);
-      const r4 = hash2(index * 389 + k * 6151, 3079);
-
-      // A point in the band around the footprint, taken along the perimeter so
-      // the tufts follow the shape of the stone rather than filling a disc.
-      const t = (k + r1) / SKIRT_PER_BASE * 4;
-      const side = Math.floor(t);
-      const along = (t - side) * 2 - 1;
-      // From a little inside the stone to a little way out: the reference has
-      // the grass biting into every base, not stopping politely at it.
-      const out = -SKIRT_INSIDE + (SKIRT_REACH + SKIRT_INSIDE) * r2 * r2;
-      const lx = side % 2 === 0 ? along * (shape.halfX + out) : (side === 1 ? 1 : -1) * (shape.halfX + out);
-      const lz = side % 2 === 0 ? (side === 0 ? 1 : -1) * (shape.halfZ + out) : along * (shape.halfZ + out);
-
-      const x = shape.x + lx * c + lz * s;
-      const z = shape.z - lx * s + lz * c;
-      const yaw = r3 * Math.PI * 2;
-      const o = n * 4;
-      offsetData[o] = x;
-      offsetData[o + 1] = height(x, z) - 0.03;
-      offsetData[o + 2] = z;
-      offsetData[o + 3] = SKIRT_SCALE.min + (SKIRT_SCALE.max - SKIRT_SCALE.min) * r4;
-      paramData[o] = Math.cos(yaw);
-      paramData[o + 1] = Math.sin(yaw);
-      paramData[o + 2] = Math.floor(r1 * GRASS.cells.length) % GRASS.cells.length;
-      paramData[o + 3] = 0.88 + 0.24 * r2;
-      n++;
-    }
-  });
-
-  geometry.instanceCount = n;
-  buffers.offsetAttribute.needsUpdate = true;
-  buffers.paramAttribute.needsUpdate = true;
-  geometry.computeBoundingSphere();
-
-  const material = makeMaterial({
-    atlas, light, lightScale, columns: GRASS.columns, rows: GRASS.rows,
-    // Never faded: they belong to the blocks, not to the walker.
-    radius: 1e6, fade: 1,
-  });
-  const mesh = new Mesh(geometry, material);
-  mesh.renderOrder = 1;
-  return { mesh, count: n };
-}
-
-/** The bushes: a handful of fixed cards, placed against the reference. */
-function createBushes({ atlas, light, lightScale, height }) {
-  const geometry = cardGeometry(2, 1.0, BUSH_HEIGHT / 1.0);
-  const buffers = instanced(geometry, BUSHES.length);
-  const { offsetData, paramData } = buffers;
-
-  BUSHES.forEach((bush, i) => {
-    const o = i * 4;
-    const yaw = hash2(i * 977, 31) * Math.PI;
-    offsetData[o] = bush.x;
-    offsetData[o + 1] = height(bush.x, bush.z) - 0.05;
-    offsetData[o + 2] = bush.z;
-    offsetData[o + 3] = bush.size;
-    paramData[o] = Math.cos(yaw);
-    paramData[o + 1] = Math.sin(yaw);
-    paramData[o + 2] = PROPS.bushFrom + bush.cell;
-    paramData[o + 3] = 0.94;
-  });
-  geometry.instanceCount = BUSHES.length;
-  buffers.offsetAttribute.needsUpdate = true;
-  buffers.paramAttribute.needsUpdate = true;
-  geometry.computeBoundingSphere();
-
-  const material = makeMaterial({
-    atlas,
-    light,
-    lightScale,
-    columns: PROPS.columns,
-    rows: PROPS.rows,
-    // They never fade: they are three fixed things standing between the blocks,
-    // not a ring that follows anybody.
-    radius: 1e6,
-    fade: 1,
-  });
-  const mesh = new Mesh(geometry, material);
-  mesh.renderOrder = 1;
-  return mesh;
-}
-
-/**
- * The meadow's own vegetation: the ring of tufts, the loose flowers near the
- * walker, and the bushes standing between the blocks.
- *
- * @param {object} assets  the two sheets, the ground light atlas, and the
- *                         height of the meadow under a point
+ * @param {object} assets  the two sheets, the height of the meadow under a
+ *                         point, and the exposure the ground is lit at
  */
 export function createVegetation({
-  grassAtlas, propsAtlas, light, height, lightScale = TERRAIN.lightScale,
+  grassAtlas, propsAtlas, height, lightScale = TERRAIN.lightScale,
 }) {
-  if (!grassAtlas || !light || !height) {
+  if (!grassAtlas || !height) {
     return {
       meshes: [], update() {}, setQuality() {}, setGrassVisible() {}, stats: () => null,
     };
   }
 
+  // The card's own size in metres comes off the sheet, which is the file that
+  // knows how many centimetres of blade a texel of it holds. See the note over
+  // CARD in tools/vegetation/paint-grass.mjs: held in two places, the two drift
+  // and the drift is a sheet of blades of the wrong width with nothing saying so.
+  const card = GRASS.card;
+  const bridge = groundLightBridge();
+
   const grass = createRing({
     atlas: grassAtlas,
-    light,
+    light: bridge.texture,
     lightScale,
-    geometry: cardGeometry(QUADS, CARD_WIDTH, CARD_HEIGHT, CARD_LEAN),
+    geometry: cardGeometry(QUADS, card.width, card.height, CARD_LEAN),
     columns: GRASS.columns,
     rows: GRASS.rows,
     cellFrom: 0,
@@ -840,51 +732,24 @@ export function createVegetation({
     perCell: PER_CELL,
     scaleRange: CARD_SCALE,
     height,
-    density: densityAt,
+    density: (x, z) => densityAt(x, z) * ACCENT,
     seed: 7,
     tint: { min: 0.86, max: 1.14 },
-    thinning: THINNING,
     // Bedded a couple of centimetres into the ground, so a card standing on a
     // slope never shows daylight under its root.
     sink: 0.03,
   });
 
-  const far = createRing({
-    atlas: grassAtlas,
-    light,
-    lightScale,
-    geometry: cardGeometry(QUADS, CARD_WIDTH, CARD_HEIGHT, CARD_LEAN),
-    columns: GRASS.columns,
-    rows: GRASS.rows,
-    cellFrom: 0,
-    cellCount: GRASS.cells.length,
-    inner: FAR_RING.inner,
-    radius: FAR_RING.radius,
-    fade: FAR_RING.fade,
-    cellSize: FAR_RING.cell,
-    perCell: FAR_RING.perCell,
-    scaleRange: FAR_RING.scale,
-    height,
-    density: densityAt,
-    seed: 61,
-    tint: { min: 0.88, max: 1.12 },
-    thinning: FAR_RING.thinning,
-    sink: 0.03,
-  });
-
-  const skirts = createSkirts({
-    atlas: grassAtlas, light, lightScale, height,
-  });
-  const meshes = [grass.mesh, far.mesh, skirts.mesh];
+  const meshes = [grass.mesh];
   let flowers = null;
-  let bushes = null;
 
-  // The loose flowers and the bushes are an addition: without the props sheet
-  // the meadow still has the flowers painted into the tufts.
+  // The loose flowers are an addition and they are the old ones: without the
+  // props sheet the meadow simply has no white in it until the session that
+  // owns the flower lands its cube heads.
   if (propsAtlas) {
     flowers = createRing({
       atlas: propsAtlas,
-      light,
+      light: bridge.texture,
       lightScale,
       geometry: cardGeometry(2, FLOWER_SIZE * 2, FLOWER_SIZE * 2),
       columns: PROPS.columns,
@@ -896,34 +761,25 @@ export function createVegetation({
       perCell: 1,
       scaleRange: { min: 0.75, max: 1.5 },
       height,
-      // A fraction of the density of the grass: these are the few heads that
-      // stand clear of a tuft, not a second meadow.
+      // A fraction of the density of the ground: these are the few heads that
+      // stand clear, not a second meadow. They are NOT thinned to the accent's
+      // sowing -- a flower is not a spray of grass, and the census that made
+      // the sprays rare counted two heads to the square metre.
       density: (x, z) => densityAt(x, z) * 0.80,
       seed: 23,
       tint: { min: 0.92, max: 1.08 },
       sink: 0.0,
     });
     meshes.push(flowers.mesh);
-    bushes = createBushes({
-      atlas: propsAtlas, light, lightScale, height,
-    });
-    meshes.push(bushes);
   }
 
-  // The two rings below are the only ones any of this touches. The loose
-  // flowers are left alone on purpose: a couple of hundred heads inside five
-  // metres cost nothing measurable, and they are the white specks the reference
-  // framing is read for — thinning them would buy no milliseconds and spend
-  // identity, which is the wrong side of every trade here.
-
-  // Where the meadow is being taken, and where it has got to. The pair is what
+  // Where the sowing is being taken, and where it has got to. The pair is what
   // the crossing is made of: the cut walks from one to the other over a second
   // while the band opens and closes around it, and the lattice is filled for
   // whichever of the two asks for more.
   let from = { density: 1, radius: RING_RADIUS };
   let to = { density: 1, radius: RING_RADIUS };
   let crossing = 0;
-  let horizon = 0;
 
   function push() {
     const t = crossing <= 0 ? 1 : 1 - crossing / DENSITY_FADE_SECONDS;
@@ -932,18 +788,19 @@ export function createVegetation({
     const radius = from.radius + (to.radius - from.radius) * ease;
     // Nought at both ends of the crossing: at rest the threshold is exact.
     const band = crossing <= 0 ? 0 : DENSITY_FADE_BAND * Math.sin(Math.PI * t);
-    const sown = Math.max(from.density, to.density);
-    grass.setState({ cut, band, radius, sown });
-    far.setState({ cut, band, radius: FAR_RING.radius, sown });
+    grass.setState({ cut, band, radius, sown: Math.max(from.density, to.density) });
   }
   push();
 
   return {
     meshes,
-    update(position, delta = 0, pitchDegrees = HORIZON_PITCH.from) {
+    update(position, delta = 0) {
+      // The sun, every frame, into four texels. It writes only when the sun has
+      // actually moved, so a day that stands still costs one comparison.
+      bridge.refresh();
       if (crossing > 0) {
         crossing = Math.max(0, crossing - delta);
-        // The moment the crossing is over, where the meadow came from stops
+        // The moment the crossing is over, where the sowing came from stops
         // being a fact about it. Until this happens the lattice is still filled
         // for the denser of the two tiers, so a ring that has thinned is still
         // carrying the cards it thinned away — standing at scale nought, which
@@ -951,29 +808,20 @@ export function createVegetation({
         if (crossing === 0) from = { ...to };
         push();
       }
-      // The eye's own contribution, which is not a tier and is never stored:
-      // it follows the pitch continuously and is nought at the pitch of the
-      // reference framing, so the framing the whole world is fitted against
-      // never sees it.
-      const next = clamp01(
-        (HORIZON_PITCH.from - pitchDegrees) / (HORIZON_PITCH.from - HORIZON_PITCH.to),
-      );
-      if (next !== horizon) {
-        horizon = next;
-        // Only the near ring gives up reach: the far one is what the meadow
-        // ends in, and pulling its rim inwards would move the line where the
-        // grass stops rather than thin what is inside it.
-        grass.setHorizon(horizon, HORIZON_REACH);
-        far.setHorizon(horizon);
-      }
       grass.update(position);
-      far.update(position);
       if (flowers) flowers.update(position);
     },
 
     /**
      * How much meadow the machine can afford: a share of the sowing and how far
-     * the near ring reaches, both crossed over a second.
+     * the ring reaches, both crossed over a second.
+     *
+     * IT IS KEPT THOUGH IT NO LONGER BUYS MILLISECONDS, and that is worth
+     * saying. The tiers in src/core/quality.js hand this file a density and a
+     * radius, and at a carpet's sowing they were worth two thirds of a
+     * millisecond. At an accent's they are worth a few dozen triangles. What
+     * they still buy is the RADIUS, which is where the sprays stop, and the
+     * lever stays where the quality system already knows to find it.
      */
     setQuality({ density = 1, radius = RING_RADIUS } = {}) {
       if (density === to.density && radius === to.radius) return;
@@ -987,23 +835,20 @@ export function createVegetation({
       crossing = DENSITY_FADE_SECONDS;
       push();
     },
-    /** Development handle: the grass alone, so its cost can be measured. */
+    /** Development handle: the accents alone, so their cost can be measured. */
     setGrassVisible(visible) {
       grass.setVisible(visible);
-      far.setVisible(visible);
-      skirts.mesh.visible = visible;
       if (flowers) flowers.setVisible(visible);
-      if (bushes) bushes.visible = visible;
     },
     stats: () => ({
       grass: grass.stats(),
-      far: far.stats(),
-      skirts: skirts.count,
       flowers: flowers ? flowers.stats() : null,
-      bushes: BUSHES.length,
       density: to.density,
       radius: to.radius,
-      horizon,
+      // What the ring is actually sowing, per square metre of the disc it
+      // covers, so the reading the accent was set from can be checked in the
+      // running frame instead of trusted.
+      perSquareMetre: grass.stats().placed / (Math.PI * to.radius * to.radius),
     }),
   };
 }
