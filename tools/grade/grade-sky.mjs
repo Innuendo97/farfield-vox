@@ -17,6 +17,14 @@ import {
   ARRIVAL_SHADING, REFERENCE_SHADING_CORNER, makeLensShading, referenceShading, screenRadius,
 } from './lib/shading.mjs';
 
+// STOPPED AT THE DOOR, for now. This tool predates the ramp: its dayPreset
+// writes a sky.json without day.ramp, and day.ramp is not among the fields its
+// own refusal watches, so one run could erase the sky the world draws. The cure
+// (emitting the ramp through sky-ramp.js) belongs to the grade seat's next
+// opening; until then this early exit is the coordinator's stop, not a bug.
+console.error('grade-sky is stopped: it would erase day.ramp (see the ledger). Cure before use.');
+process.exit(1);
+
 // Bakes the clear sky the world is seen against.
 //
 // The dome carries weather no longer. What the reference shows in front of its
