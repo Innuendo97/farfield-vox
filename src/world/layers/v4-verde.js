@@ -1,9 +1,10 @@
 import { createVegetation } from '../vegetation.js';
+import { createTrees } from '../trees.js';
 
 // THE GREEN. Owned by V4.
 //
 // The accents of the meadow: the rare sprays of blades sown on a ring around
-// the walker, and the loose flowers.
+// the walker, the loose flowers, and the hub's trees.
 //
 // WHAT V4 REPLACED. The cards used to be the meadow and they are not any more:
 // the mass of the meadow is the ground's own cubes, ratified on the census of
@@ -28,7 +29,13 @@ const layer = {
 
   vegetation: null,
 
+  trees: null,
+
   plant: {
+    // The trees ask for nothing: no atlas, no sheet, no byte on the wire. Their
+    // colour is a pigment measured off the target as a ratio to the meadow's
+    // own, and their shape is arithmetic -- so they arrive with the bundle and
+    // wait for no download.
     needs: ['grass-atlas', 'props-atlas'],
 
     build(assets) {
@@ -38,7 +45,8 @@ const layer = {
         // Where the ground is, which the hub knows and no delivery carries.
         height: assets.height,
       });
-      layer.meshes = layer.vegetation.meshes;
+      layer.trees = createTrees({ height: assets.height });
+      layer.meshes = [...layer.vegetation.meshes, ...layer.trees.meshes];
       return layer.vegetation;
     },
   },
@@ -48,14 +56,21 @@ const layer = {
     if (layer.vegetation) layer.vegetation.setQuality(grass);
   },
 
-  /** Development handle: the accents alone, so their cost can be measured. */
+  /** Development handle: the whole of the green, so its cost can be measured. */
   setVisible(visible) {
     if (layer.vegetation) layer.vegetation.setGrassVisible(visible);
+    if (layer.trees) layer.trees.setVisible(visible);
   },
 
-  /** What the vegetation is currently costing, for the development panel. */
+  /** And the trees on their own, which is the only way to price them apart. */
+  setTreesVisible(visible) {
+    if (layer.trees) layer.trees.setVisible(visible);
+  },
+
+  /** What the layer is currently costing, for the development panel. */
   stats() {
-    return layer.vegetation ? layer.vegetation.stats() : null;
+    if (!layer.vegetation) return null;
+    return { ...layer.vegetation.stats(), trees: layer.trees ? layer.trees.stats() : null };
   },
 
   update({ eye, delta }) {
