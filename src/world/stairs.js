@@ -73,13 +73,23 @@ export function stepHeight(k) {
  * reaching the head of the run dropped the whole height of the platform into
  * the meadow before its footprint pushed them back out. This answers for
  * exactly the stone the treads cover, tuck included.
+ *
+ * AND IT CARRIES THE TOP STEP'S DROP, which it did not until it was measured.
+ * The top tread is drawn a centimetre below the platform so that the two are
+ * not coplanar where one runs under the other, and this answered the undropped
+ * height: over eleven thousand sampled points of the head of the run the walker
+ * stood 12.0 mm above the stone the frame draws. Twelve millimetres is not felt
+ * on a step, which is exactly why it would have stayed -- and the contract this
+ * feeds says in its own words that nothing in it may quietly become a different
+ * answer from the one the frame draws. tools/monoliths/underfoot.mjs is where
+ * that is now asked rather than assumed.
  */
 export function stairHeightAt(x, z) {
   if (Math.abs(x - STAIRS.x) > STAIRS.width / 2) return -Infinity;
   if (z < STAIRS.z - TOP_STEP_TUCK) return -Infinity;
   if (z > STAIRS.z + STAIRS.tread * STAIRS.steps) return -Infinity;
   const k = Math.min(STAIRS.steps - 1, Math.max(0, Math.floor((z - STAIRS.z) / STAIRS.tread)));
-  return stepHeight(k);
+  return stepHeight(k) - (k === 0 ? TOP_STEP_DROP : 0);
 }
 
 function quad(a, b, c, d, kind) {
