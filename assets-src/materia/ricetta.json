@@ -313,14 +313,22 @@
         "shading the photorealistic reference did.",
         "RAISED, NOT DECIDED. Whether to reproduce it is the coordinator's, and the",
         "amendment that says the targets have no vignette was written before this",
-        "measurement existed."
+        "measurement existed.",
+        "DECIDED FOR THE GATES, THOUGH, AND UNTIL V9: it is carried as a transitory",
+        "veil and refitted in V9, so every session comparison DIVIDES IT OUT or is",
+        "read as a ratio inside one band of the frame -- which is what makes a",
+        "reading of the corner eighths mean anything at all. No crop of the left or",
+        "right horizon can be judged without this rule, because the render has no",
+        "corner shading anywhere outside the spawn; whether the picture ends up",
+        "carrying the veil is the question V9 answers."
       ]
     }
   ],
 
   "architecture": [
     "Never a per-voxel property inside a vertex attribute. Measured violation: 3.0x the geometry of the world.",
-    "ONE step, 0.10 m, and no ring scale. Rings anchored to the world are false as soon as the walker moves: 11x of apparent size error, measured.",
+    "ONE step, 0.10 m, and no ring scale, ON THE WALKABLE DISC. Rings anchored to the world are false as soon as the walker moves: 11x of apparent size error, measured. The ban is on RINGS, and it stays exactly where it was written.",
+    "THE CORNICE PAST 100 m IS NOT ON THAT STEP, and the line above never meant it was. Measured on the targets, the apparent rise of a ridge is 0.16-0.37 deg, which at the distances in play is 0.3-2.7 m of cube -- a tenth of a metre would want the ridge at nineteen metres. So the far frame is built of BIGGER CUBES PLANTED IN THE WORLD, whose size is a property of the ground they stand on and not of where the walker is standing; that is what makes them not a ring scale. The distinction was always intended and was never written down, and the first session to lay a block past the shell hit it.",
     "bakedLight() stays at two terms, bit for bit, with one producer: src/world/face-light.js."
   ],
 
