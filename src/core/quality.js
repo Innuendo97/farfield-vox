@@ -25,15 +25,15 @@
 // spends its time filling the meadow, not submitting them.
 //
 // ------------------------------------------------------------------------
-// THE LEVERS THE SESSIONS WILL PULL, DECLARED NOW AND NEUTRAL TODAY.
+// THE LEVERS THE SESSIONS WILL PULL. THE FIRST OF THEM IS NOW LIVE.
 //
-// Every field below carries the same value on all four tiers, so no tier
-// behaves differently from any other, and NOTHING READS THEM YET. They are here
-// so that adding a lever is not an edit to this file by whichever session gets
-// there first — a governor is exactly the sort of shared file where two
-// sessions each add a field, each rebase, and the second one silently wins.
+// They were declared here neutral, with nothing reading them, so that adding a
+// lever would not be an edit to this file by whichever session got there first
+// — a governor is exactly the sort of shared file where two sessions each add a
+// field, each rebase, and the second one silently wins.
 //
 //   voxelDiscRadius   V1   how far the ten centimetre ground reaches, in metres
+//                          — READ, and no longer neutral. See below.
 //   grassDensity      V4   already here, as grass.density; named for the record
 //   cloudsDetail      V6   how much of the weather is drawn
 //   nightGlow         V7   how much of the night's halo is afforded
@@ -44,8 +44,42 @@
 // shrinks with the tier changes what the ground under the walker IS, so it
 // stands below the grass and not above it; a night that dims changes the
 // picture itself, so on the face of it it does not belong in this list at all.
-// Both are for the sessions that own them to measure. What is settled here is
-// only that they exist in one place.
+// Both are for the sessions that own them to measure.
+//
+// ------------------------------------------------------------------------
+// voxelDiscRadius: WHERE THESE FOUR NUMBERS COME FROM.
+//
+// Measured, at the frame the recipe is judged at, with the frozen engine
+// reproducing the page's own triangle count digit for digit on seven poses.
+// Triangles SUBMITTED TO THE BUFFER at vox-giorno, on the carpet the
+// committente chose (E-DECISIONI.1):
+//
+//     r = 10 m     85 412 tri     0.97x of the reallocated 88k
+//     r = 12 m    119 614         1.36x
+//     r = 14 m    151 470         1.72x   <- the arm that was priced and chosen
+//     r = 16 m    182 502         2.07x
+//     r = 35 m    500 610         5.69x
+//
+// SO FOURTEEN IS NOT A COMPROMISE, IT IS THE PRICE THAT WAS AGREED. The
+// committente was shown three arms and chose the one D3a priced at 1.73x; the
+// page draws it at 1.72x. Any tier above fourteen spends budget nobody granted,
+// which is E-V5i's rule, so the top two tiers do not get more reach — they get
+// the same world. `oltre` has nothing to spend here, and that is written down
+// rather than filled in: sixteen metres is measured and ready at 2.07x the day
+// the coordinator grants the headroom.
+//
+// AND E-V1a's THIRTY FIVE CANNOT BE HAD WITH THIS CARPET. Not by a margin that
+// tuning closes: 5.69x. The two decisions — the reach and the carpet — are the
+// same budget spent twice, and the committente's word bought the carpet. The
+// engine's default stays thirty five because that is what E-V1a settled and
+// what a reach argument should be re-opened against; what SHIPS is the tier.
+//
+// `basso` drops to twelve, which is the lever doing the only job it has: a
+// machine that cannot hold the agreed world gets less ground rather than a
+// different one. The disc is read ONCE, when the ground is built, so a tier
+// that moves later reaches everything else and leaves the ground the size it
+// was — see hub.setVoxelDiscRadius.
+// ------------------------------------------------------------------------
 
 export const TIERS = [
   {
@@ -59,8 +93,8 @@ export const TIERS = [
     samples: 4,
     bloom: 'half',
     grass: { density: 1.3, radius: 16 },
-    // Neutral on every tier: see the note over the levers above. Owners in
-    // brackets, so a reader knows whose number this is before touching it.
+    // Owners in brackets, so a reader knows whose number this is before
+    // touching it. The disc's reach is measured: see the block over TIERS.
     voxelDiscRadius: 14,   // [V1] metres of ten centimetre ground from the centre
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
@@ -72,8 +106,8 @@ export const TIERS = [
     samples: 4,
     bloom: 'half',
     grass: { density: 1, radius: 12 },
-    // Neutral on every tier: see the note over the levers above. Owners in
-    // brackets, so a reader knows whose number this is before touching it.
+    // Owners in brackets, so a reader knows whose number this is before
+    // touching it. The disc's reach is measured: see the block over TIERS.
     voxelDiscRadius: 14,   // [V1] metres of ten centimetre ground from the centre
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
@@ -85,8 +119,8 @@ export const TIERS = [
     samples: 4,
     bloom: 'quarter',
     grass: { density: 0.7, radius: 12 },
-    // Neutral on every tier: see the note over the levers above. Owners in
-    // brackets, so a reader knows whose number this is before touching it.
+    // Owners in brackets, so a reader knows whose number this is before
+    // touching it. The disc's reach is measured: see the block over TIERS.
     voxelDiscRadius: 14,   // [V1] metres of ten centimetre ground from the centre
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
@@ -98,8 +132,9 @@ export const TIERS = [
     samples: 2,
     bloom: 'quarter',
     grass: { density: 0.4, radius: 12 },
-    // Neutral on every tier: see the note over the levers above. Owners in
-    // brackets, so a reader knows whose number this is before touching it.
+    // Owners in brackets, so a reader knows whose number this is before
+    // touching it. TWELVE and not fourteen: the only lever this tier has on the
+    // ground is how much of it there is. 119 614 triangles against 151 470.
     voxelDiscRadius: 12,   // [V1] metres of ten centimetre ground from the centre
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
