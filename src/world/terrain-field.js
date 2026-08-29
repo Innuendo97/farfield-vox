@@ -69,6 +69,25 @@ const PATH_NEAR_Z = 8.8;
 const PATH_STAIR_X = 0.25;
 const PATH_NEAR_X = -0.74;
 
+// Where the STONE stops, which is not where the stairs are.
+//
+// These were one number, and they are two facts. The paving was run down to the
+// bottom step because nothing had been measured about where it ends; marched
+// against the night target it ends at z = -9.1, five metres short of the step,
+// and it is the meadow that covers the join. So the northing the centreline's
+// ramp is anchored at — a fact about where the path POINTS — and the northing
+// the stone dies at are stated separately.
+//
+// They have to be, and not only for tidiness: pathCentreX reads PATH_STAIR_Z as
+// one end of its ramp, and the two targets give no base for moving that line —
+// they put the corridor at the same place in the FRAME and a metre apart in the
+// WORLD. Spending PATH_STAIR_Z on where the stone ends would have moved the
+// centreline as a side effect of a measurement that says nothing about it.
+const PATH_STONE_END_Z = -9.1;
+// The length of the fade out, carried over unchanged from when it hung on the
+// stair: what moved is where the stone ends, not how quickly it lets go.
+const PATH_STONE_FADE = 2.8;
+
 export function pathCentreX(z) {
   const t = smoothstep(PATH_STAIR_Z, PATH_NEAR_Z, z);
   return PATH_STAIR_X + (PATH_NEAR_X - PATH_STAIR_X) * t;
@@ -79,9 +98,19 @@ export function pathCentreX(z) {
 // and a gully with the stone at the bottom of it.
 //
 // PATH_LIP_FROM/TO are in units of the half width, so the swell is always
-// proportional to the strip: at the narrow end of the run that is 0.60 m of
-// ground, at the wide end 1.15 m, and never less than the half metre below
-// which a rise of six centimetres would show up as an edge.
+// proportional to the strip — and the strip has just been divided by 1.613 to
+// land on the width the targets measure, which means the swell came with it.
+// AND THAT IS A REAL CONSEQUENCE, NOT A ROUNDING. Over the live run the lip is
+// now spread over 0.47 to 0.78 m of ground where it used to have 0.75 to 1.25,
+// so the steepest part of the side of the path — the pan coming back up and the
+// lip going over, crossed at right angles — went from about 40% to about 64% at
+// the middle of the run (v0-fondazione/campo/camminata.mjs, measured on the
+// path's own relief with the turf's hummocks held out of it). Eleven
+// centimetres of sink and swell over a fifth of a metre is a kerb rather than a
+// bank, and it is only ever crossed sideways: nothing along the run moved, and
+// the walk down the centreline is the same walk to the millimetre. It is
+// written down here rather than tuned away because PATH_SINK and PATH_LIP are
+// measured centimetres and this unit was given the width, not the relief.
 const PATH_SINK = 0.05;
 const PATH_LIP = 0.06;
 const PATH_LIP_FROM = 0.95;
@@ -114,25 +143,47 @@ const PATH_LIP_TO = 2.05;
 // weight was anchored on — which is the other reason the number is untouched.
 export const VERGE_OFFSET = 0.34;
 
+// EVERY NUMBER BELOW IS THE ONE THAT WAS HERE DIVIDED BY 1.613, AND THAT FACTOR
+// IS A MEASUREMENT AND NOT A TASTE.
+//
+// Marched down the run on both targets, the full width of the corridor has a
+// median of 1.14 m (day, 75 valid rows) and 1.10 m (night, 161 rows); over
+// exactly those rows this law's own weighted mean was 1.807 m. The strip was
+// 1.6 times wider than the picture it copies, which is the whole of what the
+// measurement says.
+//
+// AND THE SCALE IS ALSO ALL IT SAYS. Over the seven metres of run the targets
+// can be read on, the measured width scatters by a third of a metre from row to
+// row and carries no trend at all — so the SHAPE of this law is neither
+// supported nor refuted there, and moving it would be inventing. The taper it
+// keeps was fitted against the close reference of the paving, which nothing in
+// this measurement touches: at twelve metres out the stone reaches further from
+// the centreline than the near end of the old slope allowed, and that reading
+// still stands, one sixth of a metre narrower.
+//
+// WHERE IT LANDS, at the two rows the day target reads with every sample valid:
+// half width 0.552 m at z = 0 and 0.566 m at z = 1, which is the 0.55-0.57 the
+// median asks for.
 export function pathHalfWidth(z) {
-  // Widened at the near end against the reference: at twelve metres out the
-  // stone reaches about a metre and a half either side of the centreline, and
-  // the old slope had it at eighty centimetres, so the strip ran out from under
-  // the frame well before the reference lets it. The line the reference was
-  // measured either side of used to be called the water; there is no water, and
-  // what was measured was always the middle of the stone.
-  const w = 0.62 + 0.0225 * (z + 12);
-  return w < 0.58 ? 0.58 : w > 1.25 ? 1.25 : w;
+  const w = 0.3844 + 0.013949 * (z + 12);
+  return w < 0.3596 ? 0.3596 : w > 0.7751 ? 0.7751 : w;
 }
 
 /**
  * Half width including the irregularity of the edge, per side.
  * The centreline is fitted and stays put; only the edges wander, which is what
  * makes them bite into the grass instead of ruling a line across it.
+ *
+ * THE SECOND TERM WAS DIVIDED BY THE SAME 1.613 AS THE WIDTH, and it had to be:
+ * it is the one part of the edge stated in metres of ground rather than as a
+ * fraction of the strip, so leaving it at seven centimetres on a strip a third
+ * narrower would have made the ragged edge half again as ragged. Divided, this
+ * function is the old one over one factor at every z — the same shape of edge,
+ * on a narrower path — and pathCoord, which divides by it, is unchanged.
  */
 export function pathEdge(z, side) {
   const wobble = snoise(z * 0.33 + (side >= 0 ? 51.7 : 7.3), 3.1);
-  return pathHalfWidth(z) * (1 + 0.19 * wobble) + 0.07 * snoise(z * 0.91 + side * 13.0, 8.4);
+  return pathHalfWidth(z) * (1 + 0.19 * wobble) + 0.0434 * snoise(z * 0.91 + side * 13.0, 8.4);
 }
 
 /** Signed distance from the path centreline, normalised so 1 is the edge. */
@@ -142,12 +193,18 @@ export function pathCoord(x, z) {
 }
 
 /**
- * How much path there is at this northing: 1 along the run, falling to 0 at the
- * bottom step and again at the south rim of the field. The stone stops where
- * the stairs take over, exactly as the reference shows.
+ * How much path there is at this northing: 1 along the run, falling to 0 where
+ * the stone ends and again at the south rim of the field.
+ *
+ * IT DOES NOT REACH THE STAIRS, AND THAT IS THE READING AND NOT AN OVERSIGHT.
+ * The paving used to be run down to the bottom step at -14.3 on the assumption
+ * that stone met stair. The night target puts its last stone at -9.1 and leaves
+ * the five metres to the step under grass — so the run ends there, and what
+ * covers the join is the meadow, which is already what grows wherever this
+ * answers nought.
  */
 export function pathRun(z) {
-  return smoothstep(PATH_STAIR_Z - 0.2, PATH_STAIR_Z + 2.6, z)
+  return smoothstep(PATH_STONE_END_Z, PATH_STONE_END_Z + PATH_STONE_FADE, z)
     * (1 - smoothstep(23, 30, z));
 }
 
