@@ -94,6 +94,11 @@ export class Player {
   // Where the feet are, which follows the ground down rather than jumping to
   // it. Null until the first frame has somewhere to stand.
   #stance = null;
+  // Where a placement put the EYE, when the placement named an altitude for it
+  // rather than standing a walker somewhere; null whenever the walker's own law
+  // is the one in force. See setPose, which is the only thing that sets it, and
+  // update, which is the only thing that hands it back.
+  #placedEye = null;
   #lookRate = 0;
   // Which way the eye is turning and how fast, in degrees a second. lookRate
   // above is unsigned and includes the pitch, because what reads it is a
@@ -147,6 +152,29 @@ export class Player {
     // A pose is a placement, not a walk: whatever it stands on, it stands on
     // from the first frame.
     this.#stance = null;
+    // AND A POSE THAT NAMES AN ALTITUDE IS OBEYED AT IT, TO THE MILLIMETRE.
+    //
+    // Two different things get written into a pose's y and they were being read
+    // as one. EYE_HEIGHT is not an altitude — it is how far a walker's eye sits
+    // above his own feet — so a pose that writes it is standing a WALKER
+    // somewhere, and how high that puts his eye is the ground's business and
+    // not the pose's. The two framings fitted against the reference pictures
+    // write no such constant: they write the altitude the fit solved for, and
+    // the ground beneath them is 87 mm below zero by day and 173 mm by night,
+    // so the two readings are nowhere near each other.
+    //
+    // Until this line existed the walker's law was applied to both, and the
+    // first update after any placement put the eye back at stance + EYE_HEIGHT.
+    // At the two fitted framings that is three centimetres above the fit by day
+    // and twenty by night — outside the tolerance those framings are judged on,
+    // in every live frame the campaign has ever taken at them. The offline fits
+    // never came through here, which is the whole reason the page and the
+    // measurements could disagree for this long without either looking wrong.
+    //
+    // So an altitude is honoured literally, and deriving the eye from the
+    // stance goes back to being what it always was: the WALKER's law, and his
+    // alone. He gets it back the moment he walks, in update below.
+    this.#placedEye = pose.position.y === EYE_HEIGHT ? null : pose.position.y;
     this.#poseSerial++;
     return this;
   }
@@ -264,10 +292,26 @@ export class Player {
     this.#resolveBlockers();
     this.#refuseLedges(fromX, fromZ);
 
+    // A PLACEMENT LASTS UNTIL THE BODY WALKS OUT OF IT. Held still at a named
+    // altitude this is a camera on a tripod and the altitude is the whole of
+    // the point; one step and it is a walker again, and a walker's eye rides
+    // over his own feet. Read off the ground actually covered rather than off
+    // the keys, so that a body leaning into a wall keeps its placement and one
+    // pushed out of a footprint does not — the same epsilon the ledge rule
+    // calls standing still.
+    if (this.#placedEye !== null
+      && Math.hypot(this.position.x - fromX, this.position.z - fromZ) > 1e-6) {
+      this.#placedEye = null;
+    }
+
+    // The stance is followed either way, because it is where the FEET are, and
+    // at a named altitude those are the avatar's feet with the camera up on its
+    // own arm above them. Keeping it warm under a placement is also what lets
+    // the walker have his law back without a step in the picture.
     const ground = this.#groundHeight(this.position.x, this.position.z);
     if (this.#stance === null || ground >= this.#stance) this.#stance = ground;
     else this.#stance += (ground - this.#stance) * (1 - Math.exp(-dt / FALL_TAU));
-    this.position.y = this.#stance + EYE_HEIGHT;
+    this.position.y = this.#placedEye === null ? this.#stance + EYE_HEIGHT : this.#placedEye;
   }
 
   /**
@@ -366,6 +410,15 @@ export class Player {
     out.x = this.position.x;
     out.z = this.position.z;
     out.eyeY = this.position.y;
+    // AND WHERE THE FEET ARE, SAID RATHER THAN RECONSTRUCTED. Everything
+    // downstream that wants the stance used to get it by taking EYE_HEIGHT off
+    // the eye, which was the same number right up until a placement was allowed
+    // to name an altitude the eye stands at. It still is at every pose that
+    // stands a walker; it is not at the two fitted framings, and it will not be
+    // for a third person camera on the end of an arm. One of the two has to be
+    // published rather than derived from the other, and this is the one whose
+    // definition never moves.
+    out.stance = this.#stance === null ? this.position.y - EYE_HEIGHT : this.#stance;
     out.poseSerial = this.#poseSerial;
     return out;
   }
