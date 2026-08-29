@@ -184,18 +184,8 @@
       "priority": "high",
       "scope": "app",
       "url": "assets/textures/grass-atlas.ktx2",
-      "bytes": 691993,
-      "sourceBytes": 1115461
-    },
-    {
-      "id": "props-atlas",
-      "type": "texture",
-      "role": "albedo",
-      "priority": "high",
-      "scope": "app",
-      "url": "assets/textures/props-atlas.ktx2",
-      "bytes": 150042,
-      "sourceBytes": 180585
+      "bytes": 294205,
+      "sourceBytes": 319805
     },
     {
       "id": "cloud-sprites",
