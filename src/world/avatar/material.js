@@ -38,7 +38,7 @@ import { BODY_M, PALETTE } from './plan.js';
 //    pack, jeans, boots and skin. The obvious way to carry that is a palette
 //    index per vertex, and it is exactly the thing the recipe forbids and the
 //    guard rejects — and rightly, because it would also stop the merge that
-//    keeps him at a hundred and fifty four quads.
+//    keeps him at a hundred and fifty six quads.
 //
 //    So the palette is REBUILT IN THE FRAGMENT out of the same arithmetic the
 //    tint already is: the fragment knows which cell it is in, and which garment

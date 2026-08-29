@@ -23,25 +23,29 @@ import { CORPI, LOOK, albedos } from '../avatar/look.js';
 // reported separately in stats() rather than added into a single figure that
 // would answer neither question.
 //
-// THEY COST NOTHING TO HAVE. A hundred and fifty four quads for him and a hundred
-// and sixty three for her — three hundred and eight triangles and three hundred
-// and twenty six — against a budget of fifteen hundred for the layer with both
-// inside it, and a world that already draws a hundred and thirteen thousand. Each
-// is ONE draw, because the palette lives in the fragment: see
+// THEY COST NOTHING TO HAVE. A hundred and fifty six quads for him and a hundred
+// and sixty five for her — three hundred and twelve triangles and three hundred
+// and thirty — against a budget of fifteen hundred for the layer with both inside
+// it, and a world that already draws a hundred and thirteen thousand. Each is ONE
+// draw, because the palette lives in the fragment: see
 // src/world/avatar/material.js for why that is the recipe's rule and not a
 // saving. The earliest note in this seat guessed five hundred and sixty six
 // filled cells and two hundred and fifty five of shell — that was a figure at the
-// WORLD's step; at a third of it he is seven thousand two hundred and forty eight
-// filled with two thousand seven hundred of shell, and she is six thousand seven
-// hundred and six with two thousand five hundred and seventy. Neither number is
-// what they cost. What they cost is the merged surface, and the merge does not
-// care how many cells stand behind it.
+// WORLD's step; at a third of it he is seven thousand one hundred and forty eight
+// filled with two thousand seven hundred and twelve of shell, and she is six
+// thousand six hundred and sixteen with two thousand five hundred and eighty.
+// Neither number is what they cost. What they cost is the merged surface, and the
+// merge does not care how many cells stand behind it.
 //
-// EVERY ONE OF THOSE NUMBERS IS COUNTED TWICE, and the second count shares no
-// code with the mesher: v8-avatar/dev-c/conti-due.txt walks the lattice again for
-// BOTH bodies, counts the open faces one at a time, and checks that the merged
-// rectangles cover exactly their area — the one thing a merge that had dropped or
-// doubled a face could not do.
+// NONE OF THOSE SIX NUMBERS IS TYPED FROM MEMORY, and the reason to say so is
+// that this seat has already had to correct a set of them once: the note here
+// used to declare 135 quads where the mesher made 139, and a comment that is
+// wrong about the thing it describes is worse than no comment.
+// v8-avatar/dev-c/conti-due.txt counts them a second time by a road that shares
+// no code with the mesher — the lattice walked again for BOTH bodies, the open
+// faces counted one at a time, and the merged rectangles checked to cover exactly
+// their area, which is the one thing a merge that had dropped or doubled a face
+// could not do. It is one command, and they move whenever the plan moves.
 //
 // THE PERSONALISATION IS A FLAG AND EIGHT VECTORS. Which body is a `visible`;
 // which variant is the palette uniform, recomputed from src/world/avatar/look.js
