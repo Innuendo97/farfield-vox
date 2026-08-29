@@ -80,6 +80,81 @@ export function groundHeightAt(x, z) {
   return (a * (1 - tx) + b * tx) * (1 - tz) + (c * (1 - tx) + d * tx) * tz;
 }
 
+// ----------------------------------------------------------- the basin
+//
+// HOW FAR THE GROUND HAS FALLEN, r METRES FROM THE MIDDLE OF THE WORLD.
+//
+// WHY THERE IS ONE AT ALL. The two targets put standing water seven degrees
+// below the eye and the feet of three rings of ridge with it, and no plane at
+// height nought can be read that way from either pose: for the water to be
+// where it is drawn, the ground beyond the walkable disc has to DESCEND, by
+// 4.6 m at sixty metres, 9.6 at a hundred, 15.8 at a hundred and fifty and 29.4
+// at two hundred and sixty. That is a fact about the shape of the world and not
+// about anybody's material, which is why it is a contract: V1 models the shell
+// from 35 to 100 m against it and V5 carries it out past that, and if the two
+// answered it separately the seam between them would be six degrees of ground.
+//
+// IT IS A CONE, AND THAT IS A READING AND NOT A CHOICE OF CURVE. Fitted with a
+// straight line, the four measured depths come back within two and a half
+// centimetres over twenty-nine metres of drop, and dropping the innermost of
+// them moves the slope by two ten-thousandths. So the far basin is a plane
+// falling at 0.1239 m per metre -- just over seven degrees -- and no smooth
+// curve is needed to carry it.
+//
+// WHAT IS NOT MEASURED IS THE SHOULDER, AND IT IS SAID HERE RATHER THAN HIDDEN
+// IN AN INTERPOLATION. That cone, run back inwards, crosses zero at r = 22.7 --
+// INSIDE the walkable disc -- so it already stands a metre and a half below the
+// rim at r = 35 and cannot both pass through the measurements and meet the disc
+// at its own level. Something has to roll over between the two, the targets say
+// nothing about its shape, and the only honest answer is the tamest curve that
+// leaves the disc flat and joins the cone at the first place anybody measured:
+// a Hermite from (35, nought, level) to (60, the cone, the cone's slope). It
+// stays monotone -- checked, not assumed -- and its steepest point is 25%, at
+// r = 49.6, which makes the rim of the basin twice as steep as its flank. If
+// that reads wrong in a picture, it is this stretch that is wrong and not the
+// cone, and it is twenty-five metres of ground wide.
+//
+// AND IT DOES NOT REACH heightAt. This is stated here rather than in
+// terrain-field.js on purpose: that file IS the walkable floor, and the basin
+// is the one shape in this world that must never be added to it -- a walker who
+// found it would walk off the edge of the disc into a slope. contracts.js reads
+// terrain-field and not the other way round, so from here it cannot.
+
+/** Where the walkable disc ends and the shell begins, in metres. */
+const BASIN_SHELL_R = 35;
+/** The innermost radius anybody measured, and where the shoulder lets go. */
+const BASIN_JOIN_R = 60;
+/** Metres of fall per metre of radius, fitted on all four measured depths. */
+const BASIN_SLOPE = 0.123938;
+/** Where that fitted cone would reach height nought, in metres. */
+const BASIN_APEX_R = 22.682;
+
+/**
+ * How far the ground beyond the disc has fallen, in metres, always <= 0.
+ *
+ * Nought inside the shell's inner edge, and nought there with a level tangent,
+ * so whatever the disc does at its rim this welds onto it without a crease.
+ *
+ * PAST 260 m THIS IS AN EXTRAPOLATION and the owner of that ground should know
+ * it: nothing was measured further out, and a straight cone carried to 420 m
+ * says -49 m. It is left straight because a floor put under it here would be a
+ * number nobody measured, dressed as one that was.
+ *
+ * @param {number} r  metres from the middle of the world
+ * @returns {number} metres of fall, nought or negative
+ */
+export function basinProfile(r) {
+  if (r <= BASIN_SHELL_R) return 0;
+  const cone = -BASIN_SLOPE * (r - BASIN_APEX_R);
+  if (r >= BASIN_JOIN_R) return cone;
+  // Hermite with a level start: the two ends are the disc's rim and the cone,
+  // and both the height and the slope are continuous at each of them.
+  const span = BASIN_JOIN_R - BASIN_SHELL_R;
+  const t = (r - BASIN_SHELL_R) / span;
+  const end = -BASIN_SLOPE * (BASIN_JOIN_R - BASIN_APEX_R);
+  return end * (3 * t * t - 2 * t * t * t) - BASIN_SLOPE * span * (t * t * t - t * t);
+}
+
 // ------------------------------------------------------- the worked stone
 
 const DEG = Math.PI / 180;
@@ -214,8 +289,16 @@ export function groundLightAt() {
  * against a name instead of against V4's internals, and that the day the field
  * lands the night gets it without either session opening the other's file.
  *
- * @returns {{x: number, z: number, y: number}[]} in world metres, y at the head
- *          of the flower rather than at the ground under it
+ * THE SIGNATURE CARRIES FOUR FIELDS AND NOT THREE. This seat documented
+ * {x, z, y} and the ratified contract said {x, z, size}, which is one contract
+ * written down twice: the night needs the head of the flower to hang the lamp
+ * at AND how big the flower is to size the core and the halo against. The union
+ * is what both halves were always asking for, so it is the union that is
+ * written here.
+ *
+ * @returns {{x: number, y: number, z: number, size: number}[]} in world metres,
+ *          y at the head of the flower rather than at the ground under it,
+ *          size the width of the flower a lamp is being hung in
  */
 export function flowerLightPoints() {
   return [];
