@@ -189,7 +189,8 @@ export function builtHeightAt(x, z) {
       PLATFORM.width / 2 - Math.abs(lx),
       PLATFORM.depth / 2 - Math.abs(lz),
     );
-    return Math.max(PLATFORM.height - Math.max(0, CHAMFER - inside), stone);
+    // The chamfered lip never answers below the tread that runs under it.
+    return Math.max(PLATFORM.height - Math.max(0, CHAMFER - inside), stone, stairRunHeight(x, z));
   }
   return Math.max(stone, stairRunHeight(x, z));
 }
