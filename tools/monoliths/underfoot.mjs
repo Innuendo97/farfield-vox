@@ -1,6 +1,7 @@
+import { readFileSync } from 'node:fs';
 import { builtHeightAt, materialAt, stairHeightAt } from '../../src/world/contracts.js';
-import { stairFaces } from '../../src/world/stairs.js';
 import { PLATFORM, STAIRS } from '../../src/world/layout.js';
+import { builtStoneAt, stairSpecs, stoneSpecs } from '../../src/world/stone.js';
 
 // DOES THE FLOOR THE WALKER STANDS ON AGREE WITH THE STONE THAT IS DRAWN?
 //
@@ -8,13 +9,19 @@ import { PLATFORM, STAIRS } from '../../src/world/layout.js';
 // convenience wrapper, and that nothing in it may quietly become a different
 // answer from the one the frame draws. Nobody had ever asked. The two answers
 // come from different files -- the contract from an arithmetic footprint, the
-// picture from the quad list src/world/stairs.js hands to the runtime, to the
-// painter and to the bake -- and they are only the same answer as long as
-// somebody keeps them so.
+// picture from the geometry the runtime is handed -- and they are only the same
+// answer as long as somebody keeps them so.
 //
-// So this samples the built footprint and puts the two side by side. A walker
-// standing above the stone floats; a walker standing below it is inside it, and
-// a camera arm swung behind that walker is inside it with them.
+// AND THE PICTURE IT IS ASKED AGAINST HAS CHANGED, which is the whole of this
+// revision and the reason it could not be left alone. This tool used to read
+// stairFaces() -- the quad list src/world/stairs.js hands out -- and that WAS
+// the stair while the stair was a delivered mesh. It is not any more: the run
+// and the platform are courses of masonry cut from src/world/stone.js, and the
+// old quad list is no longer drawn by anything. Left as it was, the tool would
+// have reported 0.0000 m against a staircase nobody can see, which is worse
+// than reporting nothing: a green check on a stale reference is how a defect
+// gets a certificate. So the decks are read from the SAME specs the layer
+// builds, through the same masonryDecks() the mesh is cut from.
 //
 // VALIDATED BOTH WAYS, because a checker that has never failed has never been
 // shown to work: --self offsets the contract by a stated number of metres and
@@ -32,33 +39,16 @@ const injected = selfAt >= 0 ? Number(argv[selfAt + 1] ?? 0.05) : 0;
 const STEP = 0.02;
 const out = (text = '') => process.stdout.write(`${text}\n`);
 
-/** The horizontal faces of the built stone: what a foot can be on top of. */
-const decks = stairFaces()
-  .filter((f) => f.kind === 'tread' || f.kind === 'platform')
-  .map((f) => ({
-    kind: f.kind,
-    y: f.corners[0][1],
-    ring: f.corners.map((c) => [c[0], c[2]]),
-  }));
+// The stair and the platform as the world builds them. The spec is read the
+// way a tool reads a file, because src/world/stone.js takes it as an argument
+// rather than importing it: a bare JSON import is a thing only a bundler can
+// resolve, and this has to answer under plain node.
+const SPEC = JSON.parse(readFileSync(
+  new URL('../../assets-src/monoliths/masonry-spec.json', import.meta.url), 'utf8'));
+const BUILT = stairSpecs(SPEC);
 
-function inside(ring, x, z) {
-  let hit = false;
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    const [xi, zi] = ring[i];
-    const [xj, zj] = ring[j];
-    if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) hit = !hit;
-  }
-  return hit;
-}
-
-/** The highest drawn deck under a point, or -Infinity where none is drawn. */
-function drawnHeightAt(x, z) {
-  let best = -Infinity;
-  for (const deck of decks) {
-    if (deck.y > best && inside(deck.ring, x, z)) best = deck.y;
-  }
-  return best;
-}
+/** The highest drawn stone under a point, or -Infinity where none is drawn. */
+const drawnHeightAt = (x, z) => builtStoneAt(BUILT, x, z);
 
 // The footprint to sweep: the whole run and the whole platform with a margin,
 // so the EDGES are sampled too. A contract that is right in the middle of a
@@ -73,7 +63,8 @@ const zs = [
 const px = [PLATFORM.x - reach - MARGIN, PLATFORM.x + reach + MARGIN];
 
 out('UNDERFOOT -- the contract against the stone the frame draws\n');
-out(`  decks       ${decks.length} horizontal faces from stairFaces()`);
+out(`  decks       the masonry of ${BUILT.map((s) => s.id).join(' and ')}, `
+  + 'through masonryDecks() -- the same law the mesh is cut from');
 out(`  sweep       x ${Math.min(xs[0], px[0]).toFixed(2)} to ${Math.max(xs[1], px[1]).toFixed(2)}, `
   + `z ${zs[0].toFixed(2)} to ${zs[1].toFixed(2)}, at ${STEP} m`);
 if (injected) out(`  INJECTED    the contract is offset by ${injected} m for this run\n`);
@@ -130,6 +121,35 @@ for (let z = zs[0]; z <= zs[1]; z += STEP) {
 }
 out(`\n  stairHeightAt against builtHeightAt off the platform: `
   + `${runDisagrees} sample(s) apart`);
+
+// ------------------------------------------------- and the six, which nobody
+// has ever been able to ask about
+//
+// The contract answers -Infinity over the footprint of a monolith, because
+// while the six were blockers in the hub that was the whole truth: a walker
+// kept out of a footprint never asks what is under it. E-V8c sends V8's third
+// person arm against builtHeightAt, and an arm swung behind a walker DOES pass
+// over a footprint the walker is kept out of. So the size of the silence is
+// measured here rather than described: how much stone is drawn where the
+// contract says there is none, and how deep the deepest of it is.
+const SIX = stoneSpecs(SPEC);
+let silent = 0;
+let deepest = { y: -Infinity, x: 0, z: 0, id: null };
+for (const spec of SIX) {
+  const reach = (spec.size[0] + spec.size[2]) / 2 + 0.4;
+  for (let z = spec.position.z - reach; z <= spec.position.z + reach; z += STEP) {
+    for (let x = spec.position.x - reach; x <= spec.position.x + reach; x += STEP) {
+      const drawn = builtStoneAt([spec], x, z);
+      if (drawn === -Infinity) continue;
+      if (builtHeightAt(x, z) !== -Infinity) continue;
+      silent++;
+      if (drawn > deepest.y) deepest = { y: drawn, x, z, id: spec.id };
+    }
+  }
+}
+out(`\n  the six against the contract: ${silent} sample(s) of stone drawn where the`);
+out(`  contract answers none, the highest ${deepest.y.toFixed(3)} m on ${deepest.id}`
+  + ` at (${deepest.x.toFixed(2)}, ${deepest.z.toFixed(2)})`);
 
 const gap = Math.max(Math.abs(w1.delta), Math.abs(w2.delta));
 out(`\n${'='.repeat(66)}`);

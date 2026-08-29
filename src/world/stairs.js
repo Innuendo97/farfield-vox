@@ -1,4 +1,8 @@
 import { PLATFORM, STAIRS } from './layout.js';
+// The dressed edge, from the engine that cuts it. Out of the PURE door, because
+// this file has to answer under plain node for tools/monoliths/underfoot.mjs
+// and the page's door reaches three.js.
+import { CHAMFER } from './voxel/pure.js';
 
 // The way up to the central block.
 //
@@ -89,7 +93,28 @@ export function stairHeightAt(x, z) {
   if (z < STAIRS.z - TOP_STEP_TUCK) return -Infinity;
   if (z > STAIRS.z + STAIRS.tread * STAIRS.steps) return -Infinity;
   const k = Math.min(STAIRS.steps - 1, Math.max(0, Math.floor((z - STAIRS.z) / STAIRS.tread)));
-  return stepHeight(k) - (k === 0 ? TOP_STEP_DROP : 0);
+  const tread = stepHeight(k) - (k === 0 ? TOP_STEP_DROP : 0);
+
+  // AND IT CARRIES THE DRESSED EDGE, which the run did not have to have while
+  // it was a delivered mesh with square arrises and has to have now that it is
+  // masonry. Every course of this world is chamfered at its top edge -- real
+  // geometry, and the reference's brightest single signal comes off it -- so
+  // the last 28 mm before the rim of a tread is a facet leaning up, and the
+  // stone there stands lower than the tread by as much as the chamfer. Asked
+  // against the masonry the world now draws, the undressed answer stood the
+  // walker 28.0 mm over the stone on 3,937 sampled points, all of them on the
+  // strip of a tread a foot actually lands on.
+  //
+  // WHICH THREE EDGES ARE DRESSED IS NOT A CHOICE HERE EITHER: they are the two
+  // long sides of the run, and the NOSING -- the rim a tread overhangs the one
+  // below it by. The edge where the next tread rises is not an edge at all;
+  // the stone carries on up, and there is nothing there to dress.
+  const inside = Math.min(
+    STAIRS.width / 2 - Math.abs(x - STAIRS.x),
+    STAIRS.z + STAIRS.tread * (k + 1) - z,
+    k === 0 ? z - (STAIRS.z - TOP_STEP_TUCK) : Infinity,
+  );
+  return tread - Math.max(0, CHAMFER - inside);
 }
 
 function quad(a, b, c, d, kind) {
