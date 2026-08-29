@@ -1,9 +1,10 @@
 import {
   BackSide, BoxGeometry, DataTexture, Mesh, RepeatWrapping,
-  ShaderMaterial, Vector2, Vector3,
+  ShaderMaterial, Vector2, Vector3, Vector4,
 } from 'three';
 import SKY from '../../assets-src/sky/sky.json' with { type: 'json' };
 import SCENE_LIGHT from '../../assets-src/sky/scene-light.json' with { type: 'json' };
+import { rampBend } from './sky-ramp.js';
 
 // The sky, and everything the scene takes from it.
 //
@@ -52,9 +53,6 @@ import SCENE_LIGHT from '../../assets-src/sky/scene-light.json' with { type: 'js
 // because the cloud atlas standing in the tree was baked against them.
 
 const DAY = SKY.day;
-
-/** A number as a GLSL literal, so a constant here cannot drift from the shader's. */
-const glsl = (value, digits = 8) => value.toFixed(digits);
 
 // Depth of the analytic fog, in metres, chosen so the ground plane has fully
 // dissolved before its far edge could draw a false horizon across the frame,
@@ -111,11 +109,30 @@ export const SKY_UNIFORMS = {
   // night be this preset with three numbers turned down rather than six.
   uSkyHorizon: { value: new Vector3() },
   uSkyZenith: { value: new Vector3() },
+  // THE THIRD ANCHOR, CARRIED AS A BEND RATHER THAN AS A TINT (E-V6i).
+  //
+  // A preset may state a middle tint and the elevation it sits at. What the
+  // fragment needs is not that tint but the one vector that puts the curve
+  // through it, and the arithmetic below turns the one into the other once, on
+  // the way in, so the shader never learns there is a third anchor at all: it
+  // adds one term. A preset with no middle anchor — or with one that lies on
+  // its own segment, which is E-V6i's soft retreat — leaves this at nought and
+  // the sky is then the two-tint ramp BIT FOR BIT rather than nearly.
+  uSkyBend: { value: new Vector3() },
   // What turns the ramp's tints into this frame's light.
   uSkyExposure: { value: new Vector3() },
   // x: the knee — the power the mix rises through; y: the gain that bends the
-  // mix without moving either of its ends; z: the level of the aureole.
-  uSkyRamp: { value: new Vector3() },
+  // mix without moving either of its ends; z: the level of the aureole;
+  // w: the exponent of the aureole's lobe.
+  //
+  // THE EXPONENT IS A UNIFORM AND NOT A LITERAL, and it used not to be (E-V7i.2).
+  // It was compiled into the shader out of the DAY preset, so a night that
+  // wanted a different lobe was silently given the day's while the offline twin
+  // honoured its own — the frame and the model disagreeing about the sky, which
+  // is the one failure this file is arranged to prevent. It costs nothing: the
+  // exponent already reached pow() as a variable, because the sharpness
+  // multiplies it.
+  uSkyRamp: { value: new Vector4() },
   // x: the disc's angular radius in degrees; y: how far its edge is let go over;
   // z: how bright, as a multiple of the exposure above.
   uSunDisc: { value: new Vector3() },
@@ -143,13 +160,16 @@ export function setSkyPreset(preset) {
   const ramp = preset.ramp;
   if (!ramp) {
     throw new Error('a sky preset needs a ramp: two tints, a knee and a gain. '
-      + 'Fit one with v6-cielo/fase2/13-preset.mjs');
+      + 'Fit one with v6-cielo/fase2-dev3/21-terza.mjs');
   }
   SKY_UNIFORMS.uSunDir.value.set(...preset.sun.vector).normalize();
   SKY_UNIFORMS.uSkyHorizon.value.set(...ramp.horizon);
   SKY_UNIFORMS.uSkyZenith.value.set(...ramp.zenith);
+  SKY_UNIFORMS.uSkyBend.value.set(...rampBend(ramp));
   SKY_UNIFORMS.uSkyExposure.value.set(...preset.exposure);
-  SKY_UNIFORMS.uSkyRamp.value.set(ramp.knee, ramp.gain, ramp.glow);
+  SKY_UNIFORMS.uSkyRamp.value.set(
+    ramp.knee, ramp.gain, ramp.glow, ramp.glowExponent,
+  );
   SKY_UNIFORMS.uSunDisc.value.set(
     preset.disc.radiusDeg, preset.disc.softDeg, preset.disc.level,
   );
@@ -266,8 +286,9 @@ export const SKY_GLSL = /* glsl */`
   uniform vec3 uSunDir;
   uniform vec3 uSkyHorizon;
   uniform vec3 uSkyZenith;
+  uniform vec3 uSkyBend;
   uniform vec3 uSkyExposure;
-  uniform vec3 uSkyRamp;
+  uniform vec4 uSkyRamp;
   uniform vec3 uSunDisc;
 
   // How high a direction is, as the ramp measures height.
@@ -307,7 +328,15 @@ export const SKY_GLSL = /* glsl */`
   // than a sun.
   vec3 skyDome(vec3 direction, float sharpness) {
     vec3 d = normalize(direction);
-    vec3 base = mix(uSkyHorizon, uSkyZenith, skyMix(d.y));
+
+    // THE THIRD ANCHOR IS THIS ONE TERM (E-V6i). The preset may state a middle
+    // tint and the height it sits at; what arrives here is uSkyBend, the single
+    // vector that bends the segment through it, worked out once on the way in.
+    // At nought — no middle anchor, or a middle anchor that lies on its own
+    // segment — this is the two-tint ramp bit for bit, which is what makes the
+    // client's veto on the third tint a one-line retreat rather than a rebuild.
+    float m = skyMix(d.y);
+    vec3 base = mix(uSkyHorizon, uSkyZenith, m) + uSkyBend * (m * (1.0 - m));
 
     float c = dot(d, uSunDir);
     float forward = max(0.0, c);
@@ -323,9 +352,15 @@ export const SKY_GLSL = /* glsl */`
     // — at the roughness the stone asks for that is sixty times, and what it
     // drew was every rock and every giant in the world washed to a pale slab
     // against the sky. A blur moves light about; it does not make any.
-    const float GLOW_N = ${glsl(DAY.ramp.glowExponent, 1)};
-    float peak = GLOW_N * sharpness;
-    float glow = uSkyRamp.z * ((peak + 1.0) / (GLOW_N + 1.0)) * pow(forward, peak);
+    // THE EXPONENT COMES FROM THE PRESET AND NOT FROM THE SOURCE (E-V7i.2). It
+    // used to be compiled in as a literal off the DAY entry, which meant a
+    // night asking for a different lobe was quietly handed the day's while the
+    // offline model honoured what the file said — the frame and its twin
+    // disagreeing about the sky. It is free as a uniform: the exponent already
+    // reached pow() as a variable, because the sharpness multiplies it.
+    float glowN = uSkyRamp.w;
+    float peak = glowN * sharpness;
+    float glow = uSkyRamp.z * ((peak + 1.0) / (glowN + 1.0)) * pow(forward, peak);
 
     float spread = inversesqrt(max(1e-4, sharpness));
     float gamma = degrees(acos(clamp(c, -1.0, 1.0)));
