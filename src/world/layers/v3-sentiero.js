@@ -30,7 +30,7 @@ import {
 // src/world/path.js, and mirrored below line for line -- and the two are held
 // together at the far end rather than at the near one: the plan patch the coat
 // of paint is chosen on comes out of the seat, and the VERDICT is a real render
-// at PLAN_POSE through this fragment. The gap between them is measured and
+// at the plan's own pose through this fragment. The gap between them is measured and
 // written down rather than assumed to be nought.
 //
 // WHAT IT COSTS: one mesh, one material, one draw, 3 638 triangles of a budget

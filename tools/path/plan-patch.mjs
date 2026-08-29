@@ -17,7 +17,7 @@ import {
 // world costs a browser, a delivery and a pose; getting one out of the generator
 // costs a second. So this is the BENCH a coat of paint is chosen on, and it is
 // not the verdict: check-slabs says so itself -- the verdict is always a real
-// render at PLAN_POSE, which is the only thing that carries the shader. The gap
+// render at the plan's own pose, which is the only thing that carries the shader. The gap
 // between this and that render is measured and written down rather than assumed
 // to be nought.
 //

@@ -850,7 +850,7 @@ export const GRAIN_GAIN = 0.62;
  * rather than a design -- GLSL cannot call this -- so it is written once here in
  * the form the fragment mirrors line for line, and the two are held together at
  * the far end instead of at the near one: what check-slabs --plan gives a
- * VERDICT on is a real render at PLAN_POSE, and the offline patch is only the
+ * VERDICT on is a real render at the plan's own pose, and the offline patch is only the
  * bench a coat of paint is chosen on. The gap between the two is measured and
  * declared rather than assumed to be nought.
  *
