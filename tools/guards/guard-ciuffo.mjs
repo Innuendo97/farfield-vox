@@ -1,5 +1,16 @@
 import { TUFT_CORRELATION, TUFT_GATE, meshDisc } from '../../src/world/voxel/pure.js';
+import { TIERS } from '../../src/core/quality.js';
 import { reporter, selfTest } from './lib.mjs';
+
+// The largest disc any tier lays. The reach is governed by
+// quality.voxelDiscRadius now (E-V1a, E-V1d), so the disc a guard weighs is the
+// disc the world puts on a screen -- not the one the engine answers with when
+// nobody asks. It matters to the FIGURE and not only to the run time: q/col
+// FALLS as the radius grows, because a bigger disc is proportionally less rim,
+// so a guard reading the default while the tiers laid something smaller would
+// report a number flattering to a world nobody draws.
+const SHIPPED_RADIUS = Math.max(...TIERS.map((t) => t.voxelDiscRadius));
+
 
 // THE TWO DIALS THAT MOVE THE GEOMETRY OF THE WORLD WHILE LOOKING LIKE TASTE.
 //
@@ -43,8 +54,8 @@ if (process.argv.includes('--self')) {
     { what: 'the frozen pair passes', caught: frozen(0.30, FROZEN.TUFT_CORRELATION) && frozen(0.5, FROZEN.TUFT_GATE) },
     {
       what: 'the tuft still costs what it cost when the engine was promoted',
-      caught: Math.abs((meshDisc(null, true).quadsPerColumn
-        - meshDisc(null, false).quadsPerColumn) - AT_FOUNDATION.tuft) < 5e-4,
+      caught: Math.abs((meshDisc(null, true, SHIPPED_RADIUS).quadsPerColumn
+        - meshDisc(null, false, SHIPPED_RADIUS).quadsPerColumn) - 0.3359) < 5e-4,
     },
   ]);
 }
@@ -58,8 +69,8 @@ report.check(frozen(TUFT_GATE, FROZEN.TUFT_GATE),
   'TUFT_GATE is the value the sweep was run at',
   `${TUFT_GATE} against ${FROZEN.TUFT_GATE}`);
 
-const on = meshDisc(null, true);
-const off = meshDisc(null, false);
+const on = meshDisc(null, true, SHIPPED_RADIUS);
+const off = meshDisc(null, false, SHIPPED_RADIUS);
 const tuft = on.quadsPerColumn - off.quadsPerColumn;
 const share = tuft / off.quadsPerColumn;
 

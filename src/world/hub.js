@@ -65,7 +65,7 @@ export function buildHub() {
   // What the quality tier has asked for. It is held here rather than pushed
   // straight through because the tier is chosen before the meadow exists, and a
   // lever set on nothing has to survive until there is something to set it on.
-  const wanted = { grass: null };
+  const wanted = { grass: null, voxelDiscRadius: null };
 
   /**
    * Builds every layer that has something to build at this arrival and hangs
@@ -79,7 +79,16 @@ export function buildHub() {
   function raise(arrival, assets) {
     if (arrived[arrival]) return;
     arrived[arrival] = true;
-    const bag = { ...assets, height: meadowHeightAt, blockers };
+    const bag = {
+      ...assets,
+      height: meadowHeightAt,
+      blockers,
+      // How much ten centimetre ground this machine can hold, from the tier.
+      // It travels in the same bag as the assets for the reason written over
+      // raise(): a layer that wants it asks for it by name the way it asks for
+      // a texture, rather than reaching into the governor itself.
+      voxelDiscRadius: wanted.voxelDiscRadius,
+    };
     for (const l of layersAt(arrival)) {
       l[arrival].build(bag);
       for (const mesh of l.meshes) if (!mesh.parent) scene.add(mesh);
@@ -119,6 +128,21 @@ export function buildHub() {
     setGrassQuality(grass) {
       wanted.grass = grass;
       green.setQuality(grass);
+    },
+
+    /**
+     * How much ten centimetre ground the machine can afford, in metres.
+     *
+     * HELD AND NOT PUSHED, AND UNLIKE THE GRASS IT IS ONLY EVER READ ONCE. The
+     * disc is cut in a worker at the frame after the ground is dressed, and it
+     * is cut once: a tier that moved afterwards would have to throw the whole
+     * disc away and cut another, which is a second or more of a walker's world
+     * disappearing to save a millisecond. So this is the answer the ground asks
+     * for when it is built, and a later change of tier reaches everything else
+     * and leaves the ground the size it was. Declared here rather than found.
+     */
+    setVoxelDiscRadius(radius) {
+      wanted.voxelDiscRadius = radius;
     },
 
     /** Development handle: the grass alone, so its cost can be measured. */

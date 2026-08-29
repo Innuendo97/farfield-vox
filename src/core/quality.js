@@ -61,7 +61,7 @@ export const TIERS = [
     grass: { density: 1.3, radius: 16 },
     // Neutral on every tier: see the note over the levers above. Owners in
     // brackets, so a reader knows whose number this is before touching it.
-    voxelDiscRadius: 35,   // [V1] metres of ten centimetre ground from the centre
+    voxelDiscRadius: 14,   // [V1] metres of ten centimetre ground from the centre
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
@@ -74,7 +74,7 @@ export const TIERS = [
     grass: { density: 1, radius: 12 },
     // Neutral on every tier: see the note over the levers above. Owners in
     // brackets, so a reader knows whose number this is before touching it.
-    voxelDiscRadius: 35,   // [V1] metres of ten centimetre ground from the centre
+    voxelDiscRadius: 14,   // [V1] metres of ten centimetre ground from the centre
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
@@ -87,7 +87,7 @@ export const TIERS = [
     grass: { density: 0.7, radius: 12 },
     // Neutral on every tier: see the note over the levers above. Owners in
     // brackets, so a reader knows whose number this is before touching it.
-    voxelDiscRadius: 35,   // [V1] metres of ten centimetre ground from the centre
+    voxelDiscRadius: 14,   // [V1] metres of ten centimetre ground from the centre
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
@@ -100,7 +100,7 @@ export const TIERS = [
     grass: { density: 0.4, radius: 12 },
     // Neutral on every tier: see the note over the levers above. Owners in
     // brackets, so a reader knows whose number this is before touching it.
-    voxelDiscRadius: 35,   // [V1] metres of ten centimetre ground from the centre
+    voxelDiscRadius: 12,   // [V1] metres of ten centimetre ground from the centre
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
@@ -241,6 +241,10 @@ export function createQuality({ renderer, hub }) {
   /** Everything that can be moved without allocating anything. */
   function applySoft(tier) {
     hub.setGrassQuality(tier.grass);
+    // The first of the levers declared above to gain a reader. It is soft in
+    // the sense that matters here -- it allocates nothing and blocks nothing --
+    // but the ground reads it once, when it is built: see hub.setVoxelDiscRadius.
+    hub.setVoxelDiscRadius(tier.voxelDiscRadius);
     renderer.setBloomTier(tier.bloom);
   }
 

@@ -1,5 +1,16 @@
 import { meshDisc } from '../../src/world/voxel/pure.js';
+import { TIERS } from '../../src/core/quality.js';
 import { reporter, selfTest } from './lib.mjs';
+
+// The largest disc any tier lays. The reach is governed by
+// quality.voxelDiscRadius now (E-V1a, E-V1d), so the disc a guard weighs is the
+// disc the world puts on a screen -- not the one the engine answers with when
+// nobody asks. It matters to the FIGURE and not only to the run time: q/col
+// FALLS as the radius grows, because a bigger disc is proportionally less rim,
+// so a guard reading the default while the tiers laid something smaller would
+// report a number flattering to a world nobody draws.
+const SHIPPED_RADIUS = Math.max(...TIERS.map((t) => t.voxelDiscRadius));
+
 
 // HOW WELL THE GREEDY MESHER FUSES THE FIELD, MEASURED AND NOT CLAIMED.
 //
@@ -54,18 +65,20 @@ if (process.argv.includes('--self')) {
       caught: !verdict(0.44).disqualified && !verdict(0.44).missed,
     },
     {
-      what: 'the measurement itself still lands where the bench put it',
-      caught: Math.abs(meshDisc(null, true).quadsPerColumn - 0.5359646284913189) < 1e-12,
+      what: 'the measurement itself still lands where the amended field put it',
+      caught: Math.abs(meshDisc(null, true, SHIPPED_RADIUS).quadsPerColumn
+        - 0.5262378113909658) < 1e-12,
     },
   ]);
 }
 
 const report = reporter('guard-fusione -- quads per column on the real field, offline');
 
-const disc = meshDisc(null, true);
+const disc = meshDisc(null, true, SHIPPED_RADIUS);
 const seen = verdict(disc.quadsPerColumn);
 
-report.line(`  ${disc.chunks.length} chunks, ${disc.quads} quads over ${disc.columns} columns`);
+report.line(`  ${disc.chunks.length} chunks, ${disc.quads} quads over ${disc.columns} columns, `
+  + `at the ${SHIPPED_RADIUS} m the tiers lay`);
 report.line(`  quads per column        ${disc.quadsPerColumn.toFixed(4)}`);
 report.line(`  with the rim taken out  ${disc.insidePerColumn.toFixed(4)}`
   + `   (${disc.rim} of the walls exist because something ends there)`);

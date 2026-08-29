@@ -69,6 +69,14 @@ const canvas = document.getElementById('stage');
 const ui = document.getElementById('ui');
 const query = new URLSearchParams(window.location.search);
 
+// How far this bench lays the disc, in metres.
+//
+// THE BENCH ASKS FOR IT RATHER THAN INHERITING IT, because it is a bench: it
+// has no quality tier to read and its whole job is to price a shape before the
+// world is asked to hold it. The engine's own default answers when nobody says.
+const RADIUS = Number(query.get('raggio')) > 0
+  ? Number(query.get('raggio')) : DISC_RADIUS;
+
 const renderer = new Renderer().init(canvas);
 const camera = new PerspectiveCamera(DEFAULT_FOV, window.innerWidth / window.innerHeight, 0.1, 1400);
 const scene = new Scene();
@@ -184,7 +192,7 @@ function addChunk(chunk) {
 
 // The engine's own arithmetic, off the thread the walker is on, through the
 // one seat that knows where the worker file is.
-runInWorker({ tuft: query.get('ciuffo') !== '0' }, (message) => {
+runInWorker({ tuft: query.get('ciuffo') !== '0', radius: RADIUS }, (message) => {
   // Timed from the first statement, because this handler IS the main thread's
   // share of the work and the gate is about how long it holds the frame.
   const started = performance.now();
@@ -583,6 +591,7 @@ Promise.all(WANTED.map((id) => assets.load(id).catch((error) => {
       detail: assets.get('terrain-detail'),
       strip: assets.get('terrain-path'),
       lightScale: TERRAIN.lightScale,
+      radius: RADIUS,
     });
     for (const mesh of terrain.meshes) scene.add(mesh);
     plantWhenReady();
@@ -716,7 +725,7 @@ function repaintNote() {
   const done = build.finishedAt
     ? `${(build.finishedAt - build.startedAt).toFixed(0)} ms` : 'in corso';
   note.innerHTML = `<b>PROVA VOXEL</b> — un angolo dell'hub
-disco ${DISC_RADIUS} m a ${VOXEL * 100} cm · ${build.columns} colonne · ${build.quads} quad
+disco ${RADIUS} m a ${VOXEL * 100} cm · ${build.columns} colonne · ${build.quads} quad
 fusione ${build.quadsPerColumn.toFixed(3)} quad/colonna (dentro ${build.insidePerColumn.toFixed(3)})
 muratura 05: ${masonry ? masonry.blocks : '--'} blocchi, ${masonry ? masonry.courses : '--'} corsi
 disco pronto in ${done} · blocco peggiore ${build.worstTaskMs.toFixed(1)} ms

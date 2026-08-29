@@ -1,4 +1,4 @@
-import { chunkList, meshChunk } from './mesher.js';
+import { DISC_RADIUS, chunkList, meshChunk } from './mesher.js';
 import { buildMasonry, stoneTileData } from './courses.js';
 import { MONOLITHS } from '../layout.js';
 
@@ -23,8 +23,23 @@ import { MONOLITHS } from '../layout.js';
 // moved off, and the gate would be failed by the delivery instead of by the
 // work.
 
+// THE ENTRY CARRIES THE DISC NOW, AND THE DOOR DID NOT MOVE (E-V1d.2).
+//
+// `runInWorker(options)` hands its first message straight through, so a radius
+// asked for by the tier arrives here as DATA and not as a new argument
+// anywhere: the same widening E-V2e gave the spec of a block. What the caller
+// does not say, the engine's own default answers.
+//
+// AND THE DISC IS ALL THIS THREAD CUTS OF THE GROUND. The shell from the rim of
+// the disc out to a hundred metres is NOT here and must not come here: it is a
+// few hundred vertices of bent grid built in a millisecond on the main thread,
+// and moving it onto this one would buy nothing and cost the one thing this
+// thread is for — the disc's own arithmetic arriving as early as it can.
 self.onmessage = (event) => {
-  const { tuft = true, tile = 512, block = '05' } = event.data || {};
+  const woke = performance.now();
+  const {
+    tuft = true, tile = 512, block = '05', radius = DISC_RADIUS,
+  } = event.data || {};
 
   const tileStarted = performance.now();
   const data = stoneTileData(tile);
@@ -42,15 +57,30 @@ self.onmessage = (event) => {
     built.block.buffer, built.stone.buffer, built.indices.buffer,
   ]);
 
-  const list = chunkList();
-  self.postMessage({ kind: 'plan', chunks: list.length });
+  // THE PLAN IS ANNOUNCED BEFORE A SINGLE HEIGHT IS SAMPLED, and that is the
+  // seam the ground times against: everything before this message is startup —
+  // this thread's own module graph and the two jobs above that the ground did
+  // not ask for — and everything after it is the disc. A build time that folded
+  // the two together would be reported as the cost of the disc and is not.
+  //
+  // AND THE SPLIT IS CLOCKED HERE, ON THIS THREAD, WHICH IS THE ONLY PLACE IT
+  // IS TRUE. A main thread that is busy while this one works receives every
+  // message of the run in one burst when it comes free, so a start-to-plan
+  // measured over there reads the main thread's own backlog and calls it the
+  // worker's startup — 4.5 seconds against 240 milliseconds, measured, on the
+  // very first run of this. The receiver's stamps still say what the HANDOVER
+  // cost; these say what the WORK cost.
+  const list = chunkList(radius);
+  self.postMessage({
+    kind: 'plan', chunks: list.length, radius, startupMs: performance.now() - woke,
+  });
 
   const started = performance.now();
   let quads = 0;
   let columns = 0;
   let rim = 0;
   for (const { cx, cz } of list) {
-    const chunk = meshChunk(cx, cz, tuft);
+    const chunk = meshChunk(cx, cz, tuft, radius);
     if (chunk.quads === 0) continue;
     quads += chunk.quads;
     columns += chunk.columns;
@@ -62,6 +92,7 @@ self.onmessage = (event) => {
   }
   self.postMessage({
     kind: 'done',
+    radius,
     quads,
     columns,
     rim,

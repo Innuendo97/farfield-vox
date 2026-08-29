@@ -62,8 +62,32 @@ export const TUFT_CORRELATION = 0.30;
 // fusion number and the world's estimate two different measurements.
 export const CHUNK = 64;
 
-/** Radius of the disc the demo lays, in metres from the walkable centre. */
-export const DISC_RADIUS = 14;
+// How far the ten centimetre ground reaches, in metres from the walkable
+// centre — THE DEFAULT, and no longer the only answer there is.
+//
+// It was a frozen literal of fourteen, and fourteen was never a decision about
+// the world: it was the radius the first bench could lay while the fusion
+// figure was being argued, and every figure of the campaign was then measured
+// against it. E-V1a settled the shape — thirty five metres by default, GOVERNED
+// by quality.voxelDiscRadius, and the per tier values measured rather than
+// guessed — and E-V1d authorised the rewiring here.
+//
+// WHAT THAT MAKES THIS NUMBER, AND WHAT IT DOES NOT. It is the default the
+// engine answers with when nobody says otherwise, so a guard, an offline tool
+// and a page that asks for nothing all lay the same disc. It is NOT a second
+// opinion beside the tier: everything that ships takes the radius from the tier
+// and hands it in, and the one place a radius may be written down is
+// src/core/quality.js. A radius hardcoded anywhere else is the defect this
+// constant existed to prevent, moved rather than cured.
+//
+// AND IT IS A PARAMETER AND NOT A SETTING. It arrives as an argument, so the
+// field stays a pure function of the point and its radius: two callers asking
+// for two different discs in the same process get two right answers, and no
+// tool can read a number the page was not laid at. A module level dial set once
+// at boot would have been fewer characters and would have made the offline
+// check — the one property the whole budget rests on — unable to say WHICH disc
+// it had checked.
+export const DISC_RADIUS = 35;
 
 export const CENTRE = { x: AREA_CENTER.x, z: AREA_CENTER.z };
 
@@ -174,9 +198,9 @@ export const NO_COLUMN = -32768;
  * sitting a half step under it: the walker's own floor is the field itself and
  * the two must not part company by a systematic half voxel.
  */
-export function columnTop(ix, iz, tuft = true) {
+export function columnTop(ix, iz, tuft = true, radius = DISC_RADIUS) {
   const { x, z } = columnCentre(ix, iz);
-  if (Math.hypot(x - CENTRE.x, z - CENTRE.z) > DISC_RADIUS) return EMPTY;
+  if (Math.hypot(x - CENTRE.x, z - CENTRE.z) > radius) return EMPTY;
   if (onPaving(x, z)) return EMPTY;
   if (insideBlock(x, z)) return EMPTY;
   const step = Math.round(heightAt(x, z) / VOXEL);
@@ -184,8 +208,8 @@ export function columnTop(ix, iz, tuft = true) {
 }
 
 /** The whole disc, in chunk coordinates: every chunk with a column in it. */
-export function chunkList() {
-  const half = Math.ceil(DISC_RADIUS / VOXEL / CHUNK) + 1;
+export function chunkList(radius = DISC_RADIUS) {
+  const half = Math.ceil(radius / VOXEL / CHUNK) + 1;
   const cx0 = Math.floor(CENTRE.x / VOXEL / CHUNK);
   const cz0 = Math.floor(CENTRE.z / VOXEL / CHUNK);
   const list = [];
@@ -200,7 +224,7 @@ export function chunkList() {
       const z1 = z0 + CHUNK * VOXEL;
       const nx = Math.max(x0, Math.min(CENTRE.x, x1));
       const nz = Math.max(z0, Math.min(CENTRE.z, z1));
-      if (Math.hypot(nx - CENTRE.x, nz - CENTRE.z) <= DISC_RADIUS) list.push({ cx, cz });
+      if (Math.hypot(nx - CENTRE.x, nz - CENTRE.z) <= radius) list.push({ cx, cz });
     }
   }
   return list;
@@ -228,11 +252,21 @@ const QUAD_INDEX = [0, 1, 2, 0, 2, 3];
 /**
  * Meshes one chunk.
  *
+ * THE FOURTH ARGUMENT IS THE DISC AND NOT A NEW OPINION. The three that were
+ * here are untouched in name, order and meaning, so every call site written
+ * against this door keeps its exact behaviour; the radius is optional and its
+ * default is the engine's own, so a caller that passes three arguments lays bit
+ * for bit the disc this signature always laid. It is here rather than read off
+ * a module dial because the field has to stay a pure function of the point —
+ * see the note over DISC_RADIUS.
+ *
  * @param {number} cx chunk index along x
  * @param {number} cz chunk index along z
+ * @param {boolean} tuft whether the tuft is part of the field
+ * @param {number} radius how far the disc reaches, in metres
  * @returns {object} chunk-relative geometry, its counts and its box
  */
-export function meshChunk(cx, cz, tuft = true) {
+export function meshChunk(cx, cz, tuft = true, radius = DISC_RADIUS) {
   const n = CHUNK;
   // A skirt of one column either side, so a wall on the chunk's own edge is
   // measured against the ground beyond it rather than against nothing. Without
@@ -244,7 +278,7 @@ export function meshChunk(cx, cz, tuft = true) {
   let columns = 0;
   for (let j = 0; j < span; j++) {
     for (let i = 0; i < span; i++) {
-      const h = columnTop(ox + i - 1, oz + j - 1, tuft);
+      const h = columnTop(ox + i - 1, oz + j - 1, tuft, radius);
       top[j * span + i] = h;
       // Only the chunk's own columns are counted: the skirt belongs to its
       // neighbours and counting it would divide the quads by too many columns.
@@ -462,13 +496,13 @@ function pack(quads, columns, rim, tops, cx, cz) {
  * construction here, because neither is stored. Above 0.55 the budget for
  * geometry is nought by arithmetic and nothing further needs measuring.
  */
-export function meshDisc(onChunk, tuft = true) {
+export function meshDisc(onChunk, tuft = true, radius = DISC_RADIUS) {
   let quads = 0;
   let columns = 0;
   let rim = 0;
   const chunks = [];
-  for (const { cx, cz } of chunkList()) {
-    const chunk = meshChunk(cx, cz, tuft);
+  for (const { cx, cz } of chunkList(radius)) {
+    const chunk = meshChunk(cx, cz, tuft, radius);
     if (chunk.quads === 0) continue;
     quads += chunk.quads;
     columns += chunk.columns;

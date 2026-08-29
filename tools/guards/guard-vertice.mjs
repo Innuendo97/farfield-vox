@@ -1,5 +1,9 @@
 import { chunkList, meshChunk } from '../../src/world/voxel/pure.js';
+import { TIERS } from '../../src/core/quality.js';
 import { lineOf, read, reporter, selfTest, walk } from './lib.mjs';
+
+/** The largest disc any tier lays, which is the biggest one that ships. */
+const SHIPPED_RADIUS = Math.max(...TIERS.map((t) => t.voxelDiscRadius));
 
 // NEVER A PER-VOXEL PROPERTY IN A VERTEX ATTRIBUTE, AND THE PRICE IS MEASURED.
 //
@@ -76,8 +80,9 @@ export function uploadedFields(files) {
 }
 
 if (process.argv.includes('--self')) {
-  const list = chunkList();
-  const real = list.map(({ cx, cz }) => meshChunk(cx, cz)).filter((c) => c.quads > 0);
+  const list = chunkList(SHIPPED_RADIUS);
+  const real = list.map(({ cx, cz }) => meshChunk(cx, cz, true, SHIPPED_RADIUS))
+    .filter((c) => c.quads > 0);
   const two = [real[0], real.find((c) => c.quads !== real[0].quads)];
   const injected = two.map((c) => ({ ...c, tint: new Uint8Array(c.quads * 4) }));
   const wide = two.map((c) => ({ ...c, aCell: new Float32Array(c.quads * 4 * 3) }));
@@ -117,7 +122,15 @@ const report = reporter('guard-vertice -- nothing per voxel reaches a vertex');
 
 // Two chunks with different quad counts, taken from the real disc so the shapes
 // are the ones the world actually builds.
-const built = chunkList().map(({ cx, cz }) => meshChunk(cx, cz)).filter((c) => c.quads > 0);
+//
+// AT THE RADIUS THAT SHIPS AND NOT AT THE ENGINE'S DEFAULT. The disc's reach is
+// governed by quality.voxelDiscRadius now (E-V1a, E-V1d), so the tiers are the
+// seat that says how big it is; the default is only what the engine answers
+// when nobody asks. This check is about the SHAPE of a chunk's buffers, so any
+// real chunk would do — reading the tier costs nothing and stops the guard from
+// meshing, every run, a disc the world does not lay.
+const built = chunkList(SHIPPED_RADIUS)
+  .map(({ cx, cz }) => meshChunk(cx, cz, true, SHIPPED_RADIUS)).filter((c) => c.quads > 0);
 const pair = [built[0], built.find((c) => c.quads !== built[0].quads)].filter(Boolean);
 
 report.check(pair.length === 2, 'the disc offers two chunks of different size to compare',

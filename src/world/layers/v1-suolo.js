@@ -1,5 +1,6 @@
 import { createTerrain } from '../terrain.js';
 import { createGroundVoxel } from '../ground-voxel.js';
+import { DISC_RADIUS } from '../voxel/index.js';
 
 // THE SOIL. Owned by V1.
 //
@@ -66,13 +67,19 @@ import { createGroundVoxel } from '../ground-voxel.js';
  *   voxsuolo=1     hang the voxel disc
  *   voxdispose=0   keep the JavaScript copy of every buffer after the upload
  *   voxbound=walk  walk the vertices for the box instead of taking the worker's
+ *   voxradius=N    lay the disc at N metres instead of at the tier's, so a
+ *                  radius can be MEASURED on the page before it is written into
+ *                  a tier. It is a measuring handle and never a preference: the
+ *                  answer that ships is src/core/quality.js's.
  */
 function asked() {
   const query = new URLSearchParams(window.location.search);
+  const asAsked = Number(query.get('voxradius'));
   return {
     voxel: query.get('voxsuolo') === '1',
     dispose: query.get('voxdispose') !== '0',
     boundingFromWorker: query.get('voxbound') !== 'walk',
+    radius: Number.isFinite(asAsked) && asAsked > 0 ? asAsked : null,
   };
 }
 
@@ -107,7 +114,13 @@ const layer = {
 
       const wanted = asked();
       if (wanted.voxel) {
-        layer.voxel = createGroundVoxel(wanted);
+        // WHERE THE RADIUS COMES FROM, IN ONE PLACE AND IN THIS ORDER: what the
+        // address asked for, so a radius can be measured before it is chosen;
+        // then the TIER, which is the answer that ships; then the engine's own
+        // default, which only ever answers "nobody said". A number written in
+        // this file instead would be a fourth opinion about the size of the world.
+        const radius = wanted.radius ?? assets.voxelDiscRadius ?? DISC_RADIUS;
+        layer.voxel = createGroundVoxel({ ...wanted, radius });
         // ONE GROUP AND NOT TWENTY SIX MESHES, because the hub hangs what a
         // layer built at the moment it built it and the chunks are still being
         // cut in a worker at that moment. A group is on the scene from the

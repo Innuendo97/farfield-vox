@@ -43,11 +43,14 @@ import {
 //    Behind the opening scene this is still deep inside the orbit, so nothing is
 //    delayed that anybody sees.
 //
-// WHERE THE DISC STOPS, AND WHOSE NUMBER THAT IS. `DISC_RADIUS` is fourteen
-// metres and it is the engine's, not this file's: it is the radius every fusion
-// figure in the campaign was measured at, so a second radius written here would
-// be a second answer to the one question the pivot rests on. The shell beyond it
-// is still the bent grid, drawn by the ground this hangs beside.
+// WHERE THE DISC STOPS, AND WHOSE NUMBER THAT IS. It is the QUALITY TIER's, and
+// it reaches this file as an argument (E-V1a, E-V1d): the walker's machine says
+// how much ten centimetre ground it can hold, and the one place that answer is
+// written down is src/core/quality.js. `DISC_RADIUS` is the engine's default and
+// is used HERE only as the answer to "nobody said" — a radius decided in this
+// file would be a second opinion about the size of the world, which is exactly
+// what the constant existed to prevent. What is beyond the disc is the shell,
+// src/world/ground-shell.js, which draws from the rim out to a hundred metres.
 
 /**
  * How many frames the world is given to itself before the field is sampled.
@@ -69,11 +72,14 @@ const chunkKey = (cx, cz) => `${cx},${cz}`;
  * @param {boolean} options.boundingFromWorker  take the box the worker already
  *                                   computed. False walks the vertices here,
  *                                   which is what it costs to not do this.
+ * @param {number}  options.radius   how far the ten centimetre ground reaches,
+ *                                   in metres. The tier's, never this file's.
  * @returns {object} the group to hang, the floor the cubes make, and the numbers
  */
 export function createGroundVoxel({
   dispose = true,
   boundingFromWorker = true,
+  radius = DISC_RADIUS,
 } = {}) {
   const group = new Group();
   group.name = 'ground-voxel';
@@ -112,6 +118,13 @@ export function createGroundVoxel({
     // wall clock below because the engine's worker cuts two other things first
     // and this ground asks for neither of them.
     workerMs: 0,
+    // And what the worker spent BEFORE the disc, on its own clock: its module
+    // graph and the two jobs this ground did not ask for. The pair splits the
+    // whole run in two at the plan, which is the seam the verbale reports.
+    startupMs: 0,
+    // The radius the disc was actually laid at, said back by the thread that
+    // laid it. Asked for and answered, so the two can be compared.
+    radius: 0,
     startedAt: 0,
     // When the worker said what it was about to cut. Between this and startedAt
     // sits everything before the disc: the worker's own module graph, and the
@@ -278,6 +291,11 @@ export function createGroundVoxel({
     } else if (message.kind === 'plan') {
       build.planned = message.chunks;
       build.plannedAt = started;
+      // The worker's own clock on everything before the disc. See the note in
+      // mesher-worker.js: a busy main thread makes plannedAt - startedAt a
+      // reading about the main thread's backlog, not about the worker's boot.
+      build.startupMs = message.startupMs;
+      build.radius = message.radius;
     } else if (message.kind === 'done') {
       Object.assign(build, {
         quads: message.quads,
@@ -325,8 +343,11 @@ export function createGroundVoxel({
     // The tuft is asked for by name rather than left to the default: it is the
     // condition every fusion number of this campaign was measured under, and a
     // measurement whose conditions are a default somewhere else is a measurement
-    // that changes when somebody edits that default.
-    worker = runInWorker({ tuft: true }, receive);
+    // that changes when somebody edits that default. The radius is named for
+    // the same reason and with more force: the disc the TIER asked for is the
+    // disc the page has to lay, and a page that let the engine's default answer
+    // would draw a world nobody chose the moment the two parted company.
+    worker = runInWorker({ tuft: true, radius }, receive);
   }
 
   return {
@@ -356,8 +377,15 @@ export function createGroundVoxel({
       return top === NO_COLUMN ? null : (top + 1) * VOXEL;
     },
 
-    /** How far the ten centimetre ground reaches, for anyone drawing up to it. */
-    radius: DISC_RADIUS,
+    /**
+     * How far the ten centimetre ground reaches, for anyone drawing up to it.
+     *
+     * THE SHELL READS THIS AND NOT THE CONSTANT, which is the whole of why it
+     * is published: the two surfaces meet at one radius, and a shell that took
+     * the engine's default while the disc took the tier's would leave a ring of
+     * nothing between them exactly as wide as the tier moved.
+     */
+    radius,
 
     /** Whether the whole disc is standing. */
     ready: () => Boolean(build.finishedAt),
