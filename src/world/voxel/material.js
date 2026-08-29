@@ -68,7 +68,29 @@ export function voxelSettings() {
     // hue the target also demands, that floor IS the saturation ceiling. That
     // residue is the tone curve's and the grade's; neither is this file's, and
     // the frontier is declared with its measurements rather than closed.
-    albedo: new Vector3(0.282, 0.453, 0.0),
+    //
+    // AND THE RED CAME DOWN A HUNDREDTH, WHICH IS THE WHOLE OF THE WARMTH.
+    // The amendment handed this file a number -- the cube's red is forty per
+    // cent warmer than the target's, the blue agreeing to two -- and the number
+    // does not reproduce. Read again at the REFITTED poses, over cube sized
+    // regions, on the four windows that are meadow in BOTH pictures, and read
+    // in the CHANNELS the claim is phrased in rather than through a hue that
+    // mixes the red and the blue into one number:
+    //
+    //     R/G   target 0.854   render 0.864     +1.1%
+    //     B/G   target 0.195   render 0.404   +107.5%
+    //
+    // The red is right and the BLUE is the entry that is out -- and for a green
+    // the saturation is one minus B/G almost exactly, so the blue and the
+    // saturation gap are the same number, which is the frontier above and not a
+    // second finding. The correction that survives is therefore the small one:
+    // the red over the green comes down 1.1%, which is 0.282 -> 0.272 through
+    // the chain with the LEVEL and the RED held as walls and the blue left where
+    // the crosstalk puts it. It is the MEDIAN of the four windows and not their
+    // mean, so that no window is overshot: the four disagree by 1.1 / 1.5 / 3.4
+    // / 3.4 per cent and all four have the same sign, where the target's own
+    // window to window spread is 1.2% and this render's is 0.3%.
+    albedo: new Vector3(0.272, 0.452, 0.0),
     // How far the tint of one cube may stand from its neighbour's. This is the
     // sixty per cent of the effect and it costs a hash — the reference has no
     // texture at all on grass, it has a strong voxel to voxel spread of tint,
