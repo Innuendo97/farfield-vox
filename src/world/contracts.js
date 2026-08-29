@@ -1,6 +1,7 @@
 import { FIELD, heightAt, pathCoord, pathRun } from './terrain-field.js';
 import { stairHeightAt as stairRunHeight } from './stairs.js';
 import { PLATFORM } from './layout.js';
+import { pathHoleAt } from './path.js';
 
 // THE CONTRACTS BETWEEN THE SESSIONS, AND THE ONLY DOOR BETWEEN THEM.
 //
@@ -233,13 +234,13 @@ export function materialAt(x, z) {
  * into the ground's albedo and cut into the height field, so there is no hole
  * anywhere and saying otherwise would be a lie the walker could fall through.
  *
- * When the corridor becomes geometry of its own, V3 turns this on over its own
- * footprint and V1's disc stops laying columns where it answers true. That is
- * the whole of the agreement between those two sessions, and it is one function
- * rather than a conversation.
+ * V3 fills this: the corridor is the meadow's one hole, and V1's disc stops
+ * laying columns where it answers true. That is the whole of the agreement
+ * between those two sessions, and it is one function rather than a
+ * conversation. See src/world/path.js.
  */
-export function groundHoleAt() {
-  return false;
+export function groundHoleAt(x, z) {
+  return pathHoleAt(x, z);
 }
 
 /**
