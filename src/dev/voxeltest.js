@@ -563,7 +563,7 @@ const assets = new Assets(import.meta.env.BASE_URL).setRenderer(renderer);
 // already counted, so criticalBytes cannot move whatever this page does.
 const WANTED = [
   'terrain-albedo', 'terrain-light', 'terrain-detail', 'terrain-path',
-  'grass-atlas', 'props-atlas',
+  'grass-atlas',
 ];
 
 Promise.all(WANTED.map((id) => assets.load(id).catch((error) => {
@@ -632,7 +632,6 @@ function plantWhenReady() {
   if (vegetation || !build.finishedAt || !assets.get('grass-atlas')) return;
   vegetation = createVegetation({
     grassAtlas: assets.get('grass-atlas'),
-    propsAtlas: assets.get('props-atlas'),
     // The bridge, not the delivered atlas: see groundLight() above.
     light: groundLight(),
     // PLANTED ON THE CUBES AND NOT ON THE FIELD, which is the whole question
