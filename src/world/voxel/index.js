@@ -16,7 +16,15 @@
 //                                face-light.js, the air from air.js, and
 //                                bakedLight() from sky.js. It composes those
 //                                three and adds no fourth opinion.
-//   buildMasonry(spec)           a block of layout.js as courses of stone.
+//   buildMasonry(spec)           a block of layout.js as courses of stone. It
+//                                reads spec.size and spec.rotationY as it always
+//                                did, and now spec.masonry as well: the rise,
+//                                the cell, how often a cell boundary is a block
+//                                edge, how far a course strays and where the
+//                                head steps all arrive DOWN THE SAME ARGUMENT
+//                                as data. The constants behind them stay
+//                                exported and stay the defaults, so a spec with
+//                                no masonry block builds what it always built.
 //   runInWorker(options)         the same arithmetic, off the thread the walker
 //                                is on.
 //

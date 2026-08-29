@@ -24,7 +24,9 @@ import { MONOLITHS } from '../layout.js';
 // work.
 
 self.onmessage = (event) => {
-  const { tuft = true, tile = 512, block = '05' } = event.data || {};
+  const {
+    tuft = true, tile = 512, blocks = MONOLITHS, disc = true,
+  } = event.data || {};
 
   const tileStarted = performance.now();
   const data = stoneTileData(tile);
@@ -32,15 +34,35 @@ self.onmessage = (event) => {
     kind: 'tile', side: tile, data, elapsedMs: performance.now() - tileStarted,
   }, [data.buffer]);
 
-  const spec = MONOLITHS.find((m) => m.id === block);
-  const masonryStarted = performance.now();
-  const built = buildMasonry(spec);
-  self.postMessage({
-    kind: 'masonry', id: block, built, elapsedMs: performance.now() - masonryStarted,
-  }, [
-    built.positions.buffer, built.normals.buffer,
-    built.block.buffer, built.stone.buffer, built.indices.buffer,
-  ]);
+  // THE SIX, ONE BLOCK PER MESSAGE, and the second half of that is not a
+  // formality. Cutting all six is 47 ms of arithmetic here and nothing on the
+  // thread the walker is on; handing them over in ONE message would put the
+  // whole of the receiving side — six geometries, six materials, six programs
+  // — into a single task on exactly the thread the work was moved off, and the
+  // eight millisecond gate would be failed by the delivery instead of by the
+  // work. So each block is posted the moment it is cut, and the wall the walker
+  // sees first is standing before the last one is started.
+  //
+  // The specs come down the message and are not read out of the plan here. What
+  // a wall of this world is MADE of is a measurement V2 owns and carries in
+  // spec.masonry; the engine's job is to cut what it is handed. Given nothing,
+  // it cuts the six of the plan at the constants above, which is the wall this
+  // file has always cut.
+  for (const spec of blocks) {
+    const masonryStarted = performance.now();
+    const built = buildMasonry(spec);
+    self.postMessage({
+      kind: 'masonry', id: spec.id, built, elapsedMs: performance.now() - masonryStarted,
+    }, [built.positions.buffer, built.normals.buffer, built.indices.buffer]);
+  }
+
+  // The disc, if it was asked for. A caller that only wants stone — the hub
+  // does, because its meadow is still the delivered ground — would otherwise
+  // pay tens of milliseconds of field arithmetic and post twenty megabytes of
+  // buffers to a main thread with no reader for them. Left on by default: the
+  // disc is why this worker exists, and a switch that is off unless asked for
+  // is a switch nobody notices is off.
+  if (!disc) return;
 
   const list = chunkList();
   self.postMessage({ kind: 'plan', chunks: list.length });

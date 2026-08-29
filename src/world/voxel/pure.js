@@ -33,12 +33,32 @@ export {
   tuftAt,
 } from './mesher.js';
 
+// AND THE LAW OF A WALL, which is new and is the door being widened rather than
+// moved. buildMasonry(spec) still takes one argument; what it now also reads is
+// spec.masonry, and the four functions under the constants are the law that
+// block is written in. They are exported because the wall is drawn TWICE — once
+// as geometry here and once in the fragment, which is what a merged rectangle
+// costs — and a guard that cannot walk the law offline cannot check that the
+// two are the same wall.
 export {
   COURSE,
   LENGTHS,
   CHAMFER,
   STONE_METRES,
+  RUN_CUT,
+  CELL_JITTER,
+  WANDER,
+  WANDER_SPAN,
   buildMasonry,
   masonryCensus,
+  masonryDecks,
+  masonryLaw,
+  countBlocks,
+  stoneHash,
+  wanderAt,
+  courseY,
+  cellPhase,
+  cellEdge,
+  isCut,
   stoneTileData,
 } from './courses.js';

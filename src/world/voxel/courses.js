@@ -7,6 +7,48 @@ import { MONOLITHS } from '../layout.js';
 // plain node instead of only through a browser. src/core/sky.js cannot be
 // imported outside the bundler — it reads its preset out of a bare JSON import
 // — so anything that has to answer offline has to stand clear of it.
+//
+// THE DOOR IS WIDER THAN IT WAS AND ITS SIGNATURE IS NOT. buildMasonry(spec)
+// still takes one argument and still reads spec.size and spec.rotationY; what
+// is new is that it also reads spec.masonry, and everything the measurement of
+// the two targets had to say about this wall travels in there AS DATA. The
+// numbers themselves live in assets-src/monoliths/masonry-spec.json, which is
+// V2's reading of one picture; the constants below stay exported, stay the
+// DEFAULTS, and stay what anybody measures against. A spec with no masonry
+// block builds the wall this file has always built.
+//
+// WHY THE LAW OF A COURSE CHANGED, AND IT IS NOT A TASTE. A block used to be
+// drawn by walking along a course picking one of three lengths at random. That
+// walk cannot be undone: to know which block a point on the wall belongs to you
+// have to replay the whole course from its corner. So every block had to hand
+// its own coordinate to its own four corners — a per-block property in a vertex
+// attribute — and a wall of blocks could never be merged into anything.
+//
+// The law here is a LATTICE instead of a walk: cells of one width, a stagger
+// that is a phase of that lattice, and a block that is a run of cells with the
+// boundaries between them suppressed at a stated rate. Three properties fall
+// out of that and all three are why it is worth the change:
+//
+//   1. A POINT CAN NAME ITS OWN BLOCK. floor() and a hash, in constant time, so
+//      the tint and the joint are rebuilt in the fragment out of the fragment's
+//      own position and NOTHING per block is ever stored. The mesh below hands
+//      back positions, normals and indices and no fourth thing.
+//   2. THE FACES OF A COURSE MERGE. Adjacent cells of one course are one
+//      rectangle, so a wall is a handful of quads instead of two per block.
+//      What breaks a run is what SHOULD break it: the head stepping down, a
+//      recess, the end of the wall.
+//   3. IT IS WHAT THE MEASUREMENT SAYS. A run of cells with the boundaries
+//      suppressed independently gives GEOMETRIC block lengths, and the pooled
+//      histogram in v2-pietra/an/out/blocchi.txt is geometric: 17% of blocks
+//      wider than one cell and 3.1% wider than two, against the 17% and 2.9%
+//      one rate predicts. The old uniform pick over three lengths does not
+//      produce that tail, and the tail is measured.
+//
+// AND THE COURSES ARE NOT LINES. The same file measures a course wandering 30 mm
+// across a face and the course-to-course spacing scattering by 44 mm, and those
+// are ONE fact and not two: if a course line strays by s at a point, the gap
+// between two of them there strays by s*sqrt(2). So there is one amplitude, and
+// tools/monoliths/spec.mjs checks that it lands on both readings at once.
 
 const DEG = Math.PI / 180;
 
@@ -28,10 +70,72 @@ export const CHAMFER = 0.028;
 /** How many metres of wall one repeat of the stone tile covers. */
 export const STONE_METRES = 1.6;
 
+// How often the boundary between two cells is a real block edge.
+//
+// One over the mean length of a block in cells, so a half is a mean block of
+// two cells — 0.44 m, which is exactly the mean the old walk over the three
+// lengths above cut. That is why it is the default and not a taste: it holds
+// the block census of the six inside the band the chapter declares while the
+// LAW under it changes from a walk to a lattice. The rate this wall actually
+// shows is a measurement and travels in spec.masonry.runCut.
+export const RUN_CUT = 0.5;
+
+// How far the width of one cell may stray, in fractions of a cell, and how far
+// a course line strays from level, in metres. Both nought by default: a wall
+// nobody has measured is a ruled one, and every number that makes it stop being
+// ruled comes out of a target through the spec.
+export const CELL_JITTER = 0;
+export const WANDER = 0;
+
+/** How far along a wall the wander is resampled, in metres. */
+export const WANDER_SPAN = 1.2;
+
 export function hash(x, y, seed) {
   let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(seed, 1442695041)) >>> 0;
   h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+// THE HASH THE WALL IS LAID ON, AND WHY IT IS NOT THE ONE ABOVE.
+//
+// The one above is integer arithmetic and there is no integer arithmetic in the
+// shader this world compiles: three.js hands a WebGL2 context a GLSL ES 1.00
+// program, which has no unsigned type and no shift. So the wall's own hash is
+// the one src/world/voxel/material.js already dithers the meadow with — three
+// multiplies, a dot and two fracts, all in single precision — and THE SAME
+// ARITHMETIC IS DONE HERE, rounded to single precision at every step with
+// Math.fround, so this file and the fragment agree bit for bit rather than
+// nearly.
+//
+// It matters in exactly one place and it is worth saying which. The GEOMETRY
+// below depends on the hash only through the wander, which is continuous: a
+// disagreement of one part in a million moves a course line by a nanometre.
+// What depends on a THRESHOLD — where a block ends, which tint it takes — is
+// drawn in the fragment and nowhere else, so there is no second answer to
+// compare against and nothing to drift.
+const f = Math.fround;
+
+function fract(v) {
+  return f(v - Math.floor(v));
+}
+
+/**
+ * Two decorrelated draws from three numbers, in single precision.
+ *
+ * @param {number} x  a whole number: a course, a cell, a lattice node
+ * @param {number} y  another
+ * @param {number} z  and the third
+ * @returns {number[]} two values in [0, 1)
+ */
+export function stoneHash(x, y, z) {
+  let px = fract(f(x * 0.1031));
+  let py = fract(f(y * 0.1030));
+  let pz = fract(f(z * 0.0973));
+  const d = f(f(px * f(py + 33.33)) + f(f(py * f(pz + 33.33)) + f(pz * f(px + 33.33))));
+  px = f(px + d);
+  py = f(py + d);
+  pz = f(pz + d);
+  return [fract(f(f(px + py) * pz)), fract(f(f(py + pz) * px))];
 }
 
 function smooth(t) {
@@ -128,133 +232,495 @@ export function stoneTileData(side = 512) {
   return data;
 }
 
+// ------------------------------------------------------------------ the law
+//
+// Four functions, and the fragment carries the same four. They are exported so
+// that a guard, a counter or a contract can ask the wall where its blocks are
+// without a second implementation of the answer.
+
+/**
+ * How far the line of course `c` strays from level at a point of the plan.
+ *
+ * A value noise over the block's own x and z, so the two walls that meet at a
+ * corner are handed the SAME number there and a course cannot step as it turns
+ * the corner. One amplitude carries both readings the targets give: the 30 mm a
+ * course wanders across a face is this field's own spread, and the 44 mm the
+ * spacing between two courses scatters is that spread times root two, because
+ * the two lines stray independently.
+ */
+export function wanderAt(course, x, z, amplitude, span) {
+  if (!amplitude) return 0;
+  const u = x / span;
+  const v = z / span;
+  const iu = Math.floor(u);
+  const iv = Math.floor(v);
+  // BILINEAR AND NOT SMOOTHED, and that is the one place this field is not
+  // free to be pretty. The mesh follows this line as a polyline with a vertex
+  // at every node of the lattice, so between two nodes the GEOMETRY is a chord;
+  // a smoothed field would put the fragment's idea of where a course line is up
+  // to a centimetre off the edge the geometry was actually cut at. Linear here
+  // means the two are the same line exactly, along any wall that runs on one
+  // axis — which is every wall there is.
+  const fu = u - iu;
+  const fv = v - iv;
+  const at = (a, b) => stoneHash(a, b, course * 7 + 3)[0];
+  const a = at(iu, iv);
+  const b = at(iu + 1, iv);
+  const c = at(iu, iv + 1);
+  const d = at(iu + 1, iv + 1);
+  const value = (a * (1 - fu) + b * fu) * (1 - fv) + (c * (1 - fu) + d * fu) * fv;
+  return amplitude * (value - 0.5);
+}
+
+/** Where the line of course `c` stands at a point of the plan, in metres up. */
+export function courseY(course, x, z, law) {
+  if (course <= 0) return 0;
+  return course * law.rise + wanderAt(course, x, z, law.wander, law.wanderSpan);
+}
+
+/** The stagger of course `c`: how far its lattice of cells is shifted along. */
+export function cellPhase(course, law) {
+  return stoneHash(course, 17, 5)[1] * law.cell;
+}
+
+/**
+ * Where the boundary between cell `i-1` and cell `i` stands along a wall.
+ *
+ * The jitter is half a cell at most, so the boundaries stay in order however
+ * they are drawn and a point can find its own cell by rounding and then looking
+ * at the two neighbours.
+ */
+export function cellEdge(course, i, law) {
+  const jitter = law.jitter * law.cell;
+  return i * law.cell + cellPhase(course, law)
+    + jitter * (stoneHash(course, i, 29)[0] - 0.5);
+}
+
+/** Whether the boundary between cell `i-1` and cell `i` is a block edge. */
+export function isCut(course, i, law) {
+  return stoneHash(course, i, 41)[1] < law.runCut;
+}
+
+/**
+ * The law of a wall, with every default in one place.
+ *
+ * @param {object} spec an entry of src/world/layout.js, optionally with a
+ *                      `masonry` block of measured numbers on it
+ */
+export function masonryLaw(spec) {
+  const m = spec.masonry || {};
+  const height = spec.size[1];
+  const rise = m.rise ?? COURSE;
+  return {
+    rise,
+    courses: Math.max(1, m.courses ?? Math.round(height / rise)),
+    cell: m.cell ?? LENGTHS[0],
+    runCut: m.runCut ?? RUN_CUT,
+    jitter: m.jitter ?? CELL_JITTER,
+    wander: m.wander ?? WANDER,
+    wanderSpan: m.wanderSpan ?? WANDER_SPAN,
+    chamfer: m.chamfer ?? CHAMFER,
+    tile: m.tile ?? STONE_METRES,
+    head: m.head ?? null,
+    recesses: m.recesses ?? [],
+  };
+}
+
+/**
+ * The head of a block, as runs along its own width with a course count each.
+ *
+ * One run covering everything when the spec says nothing, which is the flat lid
+ * this file has always cut.
+ */
+function headRuns(law, width) {
+  const runs = law.head && law.head.length ? law.head : [{ from: 0, to: 1, courses: law.courses }];
+  const out = [];
+  let at = -width / 2;
+  for (let i = 0; i < runs.length; i++) {
+    const run = runs[i];
+    const x1 = i === runs.length - 1 ? width / 2 : -width / 2 + run.to * width;
+    out.push({
+      x0: at,
+      x1,
+      courses: Math.max(1, Math.round(run.courses)),
+      drop: run.drop || 0,
+    });
+    at = x1;
+  }
+  return out;
+}
+
+
 /**
  * The skin of one block, course by course, as flat arrays.
  *
  * Skin and not solid: nothing inside a wall is ever seen, and a generator that
  * filled it would pay for a hundred times the blocks to draw the same picture.
  *
- * @param {object} spec an entry of src/world/layout.js
+ * MERGED, AND THE MERGE IS THE BUDGET. Every face of one course of one wall is
+ * coplanar with the face beside it, so the run of them is ONE rectangle: what
+ * is submitted for a wall is a couple of quads a course rather than two a
+ * block. A run is broken where the wall is broken — the head stepping down, a
+ * recess, the wall's own end — and along it by the wander, because a course
+ * that strays is a polyline and a polyline is not one rectangle. That last is
+ * the only place the merge is paid for, and what it buys is that the courses of
+ * this wall are not ruled lines.
+ *
+ * NOTHING PER BLOCK LEAVES HERE. Positions, normals and indices, and no fourth
+ * buffer: where a fragment stands inside its own block, which block that is and
+ * how the tile lies on the wall are all rebuilt in the fragment out of the
+ * fragment's own position. That is what a merged rectangle costs and what it is
+ * worth.
+ *
+ * @param {object} spec an entry of src/world/layout.js, with an optional
+ *                      `masonry` block of measured numbers on it
  */
 export function buildMasonry(spec) {
-  const [width, height, depth] = spec.size;
-  const courses = Math.max(1, Math.round(height / COURSE));
-  const rise = height / courses;
+  const [width, , depth] = spec.size;
+  const law = masonryLaw(spec);
+  const { rise, chamfer } = law;
+  const runs = headRuns(law, width);
+  const courses = Math.max(...runs.map((r) => r.courses));
+  const height = courses * rise;
 
   const positions = [];
   const normals = [];
-  const block = [];   // where in its own block a fragment stands, nought to one
-  const stone = [];   // and where on the wall, in metres, for the tile
   const indices = [];
-  let blocks = 0;
+  let quads = 0;
+  let fused = 0;   // how many cell faces the merged rectangles stood for
 
-  const quad = (n, corners, uv, metres) => {
+  const quad = (n, corners) => {
     const base = positions.length / 3;
     for (let i = 0; i < 4; i++) {
       positions.push(corners[i][0], corners[i][1], corners[i][2]);
       normals.push(n[0], n[1], n[2]);
-      block.push(uv[i][0], uv[i][1]);
-      stone.push(metres[i][0], metres[i][1]);
     }
     indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    quads++;
   };
 
-  // The four walls, each with the axis it runs along and the outward normal.
-  const walls = [
-    { n: [0, 0, 1], span: width, at: depth / 2, axis: 'x' },
-    { n: [0, 0, -1], span: width, at: -depth / 2, axis: 'x' },
-    { n: [1, 0, 0], span: depth, at: width / 2, axis: 'z' },
-    { n: [-1, 0, 0], span: depth, at: -width / 2, axis: 'z' },
+  // The four walls of the skin, each with the way its own coordinate runs, so
+  // that the outward normal falls out of the winding instead of being fixed up
+  // afterwards: a wall is walked from (x0, z0) along (dx, dz), and that step
+  // crossed with up IS the outward normal.
+  const skin = [
+    { key: 'front', n: [0, 0, 1], x0: -width / 2, z0: depth / 2, dx: 1, dz: 0, span: width },
+    { key: 'back', n: [0, 0, -1], x0: width / 2, z0: -depth / 2, dx: -1, dz: 0, span: width },
+    { key: 'right', n: [1, 0, 0], x0: width / 2, z0: depth / 2, dx: 0, dz: -1, span: depth },
+    { key: 'left', n: [-1, 0, 0], x0: -width / 2, z0: -depth / 2, dx: 0, dz: 1, span: depth },
   ];
 
-  for (let c = 0; c < courses; c++) {
-    const y0 = c * rise;
-    const y1 = y0 + rise;
-    const yFace = y1 - CHAMFER;
-    for (let w = 0; w < walls.length; w++) {
-      const wall = walls[w];
-      const half = wall.span / 2;
-      // The stagger, which is what makes this masonry rather than a grid: a
-      // course starts part of a block along from the one under it, so no
-      // vertical joint runs up more than a course or two.
-      let t = -LENGTHS[0] * (0.35 + 0.55 * hash(c, w, 5));
-      while (t < wall.span) {
-        const pick = LENGTHS[Math.floor(
-          hash(c * 97 + w, Math.round(t * 100), 13) * LENGTHS.length,
-        )];
-        const a = Math.max(0, t);
-        const b = Math.min(wall.span, t + pick);
-        t += pick;
-        if (b - a < 0.02) continue;
-        blocks++;
-        const p = (u, y, inset) => {
-          // A point on this wall: `u` along its own axis from the near corner,
-          // `inset` how far back from the outer plane the chamfer has pulled it.
-          const out = wall.at - Math.sign(wall.at) * inset;
-          const along = u - half;
-          return wall.axis === 'x' ? [along, y, out] : [out, y, along];
-        };
-        // The face of the block, stopped short of the top by the chamfer. The
-        // two ends are wound so the outward normal is the one above.
-        const flip = wall.at < 0;
-        const f0 = flip ? b : a;
-        const f1 = flip ? a : b;
-        quad(wall.n,
-          [p(f0, y0, 0), p(f1, y0, 0), p(f1, yFace, 0), p(f0, yFace, 0)],
-          [[0, 0], [1, 0], [1, 1], [0, 1]],
-          [[a, y0], [b, y0], [b, yFace], [a, yFace]]);
-        // And the dressed edge over it, leaning up and out: it is lit as the
-        // facet it is, which is where the reference's bright arris comes from
-        // with nothing fitted to make its brightness and its blue agree.
-        const lean = [wall.n[0] * 0.7071, 0.7071, wall.n[2] * 0.7071];
-        quad(lean,
-          [p(f0, yFace, 0), p(f1, yFace, 0), p(f1, y1, CHAMFER), p(f0, y1, CHAMFER)],
-          [[0, 0.86], [1, 0.86], [1, 1], [0, 1]],
-          [[a, yFace], [b, yFace], [b, y1], [a, y1]]);
+  /** The head run standing over a point of the width. */
+  const runAt = (x) => {
+    for (const run of runs) if (x <= run.x1 + 1e-9) return run;
+    return runs[runs.length - 1];
+  };
+
+  /** Where the head of a run stands over a point of the plan, in metres up. */
+  const headY = (run, x, z) => courseY(run.courses, x, z, law) - run.drop;
+
+  /**
+   * Where the cell boundaries of one course fall along a wall, in metres.
+   *
+   * The stagger is a PHASE of the lattice, which is what makes this masonry
+   * rather than a grid: a course starts part of a cell along from the one under
+   * it, so no vertical joint runs up more than a course or two. It is the same
+   * phase the fragment applies, so the joint the fragment draws lands on the
+   * boundary the geometry was broken at.
+   */
+  const edgesOf = (course, span) => {
+    const phase = cellPhase(course, law);
+    const first = Math.floor(-phase / law.cell) - 1;
+    const last = Math.ceil((span - phase) / law.cell) + 1;
+    const out = [0];
+    for (let i = first; i <= last; i++) {
+      const u = cellEdge(course, i, law);
+      if (u > 1e-6 && u < span - 1e-6) out.push(u);
+    }
+    out.push(span);
+    return out;
+  };
+
+  /**
+   * One wall, course by course: merged along each course, split only where a
+   * cell is missing or the wander asks for a new node.
+   *
+   * @param {object}   wall   one of the four above, or a step face of the head
+   * @param {Function} topFor the head run standing at a distance u along it
+   * @param {number}   from   the lowest course this wall carries
+   * @param {object[]} holes  the stretches {course, u0, u1} it does not carry
+   */
+  const buildWall = (wall, topFor, from = 0, holes = []) => {
+    const at = (u) => [wall.x0 + wall.dx * u, wall.z0 + wall.dz * u];
+    let top = 0;
+    for (let u = 0; u <= wall.span + 1e-9; u += Math.min(law.cell, wall.span) / 2) {
+      top = Math.max(top, topFor(u).courses);
+    }
+    for (let c = from; c < top; c++) {
+      const edges = edgesOf(c, wall.span);
+      const merges = [];
+      let open = null;
+      for (let k = 0; k + 1 < edges.length; k++) {
+        const u0 = edges[k];
+        const u1 = edges[k + 1];
+        if (u1 - u0 < 1e-6) continue;
+        const mid = (u0 + u1) / 2;
+        const stands = c < topFor(mid).courses
+          && !holes.some((h) => h.course === c && mid > h.u0 && mid < h.u1);
+        // GREEDY: a present cell joins the run beside it, and only what is
+        // actually absent breaks one.
+        if (!stands) { if (open) merges.push(open); open = null; continue; }
+        if (open) { open[1] = u1; open[2] += 1; } else open = [u0, u1, 1];
       }
+      if (open) merges.push(open);
+
+      for (const run of merges) {
+        fused += run[2];
+        // WHICH HEAD THIS RUN STANDS UNDER, asked ONCE and at the MIDDLE of the
+        // run. Asked at the ends instead it is asked exactly on a cell boundary,
+        // where a head that steps down answers with the run on the other side —
+        // and the top course of the wall came out as a wedge sloping from one
+        // level to the next, which is what it looked like.
+        const cap = topFor((run[0] + run[1]) / 2);
+        // Split along the run wherever the wander is resampled, because a
+        // course line that strays is a polyline. With no wander declared this
+        // is one segment and the whole course is one rectangle.
+        const nodes = [run[0]];
+        if (law.wander) {
+          // At the NODES OF THE FIELD and not at a spacing of its own: between
+          // two nodes the field is linear, so a segment that starts and ends on
+          // nodes is the field exactly and one that does not never is.
+          const s = law.wanderSpan;
+          const c0 = wall.dx ? wall.x0 + wall.dx * run[0] : wall.z0 + wall.dz * run[0];
+          const c1 = wall.dx ? wall.x0 + wall.dx * run[1] : wall.z0 + wall.dz * run[1];
+          for (let k = Math.ceil(Math.min(c0, c1) / s); k * s < Math.max(c0, c1); k++) {
+            const u = wall.dx ? (k * s - wall.x0) * wall.dx : (k * s - wall.z0) * wall.dz;
+            if (u > run[0] + 1e-6 && u < run[1] - 1e-6) nodes.push(u);
+          }
+          nodes.sort((a, b) => a - b);
+        }
+        nodes.push(run[1]);
+        for (let k = 0; k + 1 < nodes.length; k++) {
+          const [ax, az] = at(nodes[k]);
+          const [bx, bz] = at(nodes[k + 1]);
+          const y0a = courseY(c, ax, az, law);
+          const y0b = courseY(c, bx, bz, law);
+          const y1a = Math.min(courseY(c + 1, ax, az, law), headY(cap, ax, az));
+          const y1b = Math.min(courseY(c + 1, bx, bz, law), headY(cap, bx, bz));
+          quad(wall.n, [
+            [ax, y0a, az], [bx, y0b, bz], [bx, y1b - chamfer, bz], [ax, y1a - chamfer, az],
+          ]);
+          // The dressed edge over it, leaning up and out: it is lit as the
+          // facet it is, which is where the reference's bright arris comes from
+          // with nothing fitted to make its brightness and its blue agree.
+          const inx = wall.n[0] * chamfer;
+          const inz = wall.n[2] * chamfer;
+          quad([wall.n[0] * 0.7071, 0.7071, wall.n[2] * 0.7071], [
+            [ax, y1a - chamfer, az], [bx, y1b - chamfer, bz],
+            [bx - inx, y1b, bz - inz], [ax - inx, y1a, az - inz],
+          ]);
+        }
+      }
+    }
+  };
+
+  // Where a block is left out of a course: the targets show one, a dark socket
+  // on the west flank of 01. Turned into an interval of its own wall ONCE, so
+  // the run that is broken and the socket that is cut are the same stretch of
+  // stone rather than two answers about where the hole is.
+  const sockets = [];
+  for (const r of law.recesses) {
+    const wall = skin.find((w) => w.key === r.wall);
+    if (!wall) continue;
+    const u = wall.dx !== 0 ? (r.at - wall.x0) * wall.dx : (r.at - wall.z0) * wall.dz;
+    const i = Math.round((u - cellPhase(r.course, law)) / law.cell);
+    const u0 = cellEdge(r.course, i, law);
+    const u1 = cellEdge(r.course, i + 1, law);
+    if (u0 < 0 || u1 > wall.span) continue;
+    sockets.push({ wall, course: r.course, u0, u1, depth: r.depth ?? law.cell * 0.35 });
+  }
+
+  for (const wall of skin) {
+    const along = wall.dx !== 0;
+    buildWall(
+      wall,
+      (u) => runAt(along ? wall.x0 + wall.dx * u : wall.x0),
+      0,
+      sockets.filter((s) => s.wall === wall),
+    );
+  }
+
+  // The steps of the head, as walls of their own. A head that drops six courses
+  // over part of its width shows six courses of stone on the riser between the
+  // two levels, and drawing that as one blank face would be the one place in
+  // the block where the masonry stopped.
+  for (let i = 0; i + 1 < runs.length; i++) {
+    const a = runs[i];
+    const b = runs[i + 1];
+    if (a.courses === b.courses) continue;
+    const high = a.courses > b.courses ? a : b;
+    const low = a.courses > b.courses ? b : a;
+    const east = a.courses > b.courses;
+    buildWall(
+      east
+        ? { key: 'step', n: [1, 0, 0], x0: a.x1, z0: depth / 2, dx: 0, dz: -1, span: depth }
+        : { key: 'step', n: [-1, 0, 0], x0: a.x1, z0: -depth / 2, dx: 0, dz: 1, span: depth },
+      () => high,
+      low.courses,
+    );
+  }
+
+  // The cap of each head run, inset all round by the same dressed edge the
+  // walls carry, so the top edge of the last course IS the rim of the cap and
+  // no facet is drawn twice. It follows the wander with the wall it belongs to:
+  // a flat lid over a top course that strays would open a crack at the head,
+  // which is the one silhouette in the frame the eye finds first.
+  for (let r = 0; r < runs.length; r++) {
+    const run = runs[r];
+    // Inset where the cap has an OUTSIDE to be dressed against: the end of the
+    // block, or a neighbour standing lower — which on the stair is the nosing,
+    // the one thing that actually reads on a tread. Where the neighbour stands
+    // higher the stone carries on up and there is no edge to dress.
+    const before = r > 0 ? runs[r - 1] : null;
+    const after = r + 1 < runs.length ? runs[r + 1] : null;
+    const x0 = run.x0 + (!before || before.courses < run.courses ? chamfer : 0);
+    const x1 = run.x1 - (!after || after.courses < run.courses ? chamfer : 0);
+    const z0 = -depth / 2 + chamfer;
+    const z1 = depth / 2 - chamfer;
+    const cuts = [x0];
+    if (law.wander) {
+      const s = law.wanderSpan;
+      for (let k = Math.ceil(x0 / s); k * s < x1; k++) if (k * s > x0) cuts.push(k * s);
+    }
+    cuts.push(x1);
+    for (let s = 0; s + 1 < cuts.length; s++) {
+      const a = cuts[s];
+      const b = cuts[s + 1];
+      // The wander is read AT THE WALL and not at the inset corner: the rim of
+      // the cap and the chamfer under it have to be the same line to the last
+      // micron, and a field read half a chamfer away is not the same line.
+      const ya0 = headY(run, a, -depth / 2);
+      const ya1 = headY(run, a, depth / 2);
+      const yb0 = headY(run, b, -depth / 2);
+      const yb1 = headY(run, b, depth / 2);
+      quad([0, 1, 0], [
+        [a, ya0, z0], [a, ya1, z1], [b, yb1, z1], [b, yb0, z0],
+      ]);
     }
   }
 
-  // The cap, inset all round by the same dressed edge, and the four facets that
-  // run to it. Without them the head of the block is a sharp arris against the
-  // sky, which is the one edge in the whole frame the eye finds first.
-  const hx = width / 2 - CHAMFER;
-  const hz = depth / 2 - CHAMFER;
-  const top = height;
-  quad([0, 1, 0],
-    [[-hx, top, -hz], [-hx, top, hz], [hx, top, hz], [hx, top, -hz]],
-    [[0, 0], [0, 1], [1, 1], [1, 0]],
-    [[0, 0], [0, depth], [width, depth], [width, 0]]);
-  const brim = top - CHAMFER;
-  const rim = [
-    { n: [0, 0.7071, 0.7071], a: [-width / 2, brim, depth / 2], b: [width / 2, brim, depth / 2], c: [hx, top, hz], d: [-hx, top, hz] },
-    { n: [0, 0.7071, -0.7071], a: [width / 2, brim, -depth / 2], b: [-width / 2, brim, -depth / 2], c: [-hx, top, -hz], d: [hx, top, -hz] },
-    { n: [0.7071, 0.7071, 0], a: [width / 2, brim, depth / 2], b: [width / 2, brim, -depth / 2], c: [hx, top, -hz], d: [hx, top, hz] },
-    { n: [-0.7071, 0.7071, 0], a: [-width / 2, brim, -depth / 2], b: [-width / 2, brim, depth / 2], c: [-hx, top, hz], d: [-hx, top, -hz] },
-  ];
-  for (const r of rim) {
-    quad(r.n, [r.a, r.b, r.c, r.d], [[0, 0.86], [1, 0.86], [1, 1], [0, 1]],
-      [[0, brim], [1, brim], [1, top], [0, top]]);
+  // And the sockets themselves, cut back rather than removed.
+  for (const s of sockets) {
+    const { wall } = s;
+    const at = (u, back) => [
+      wall.x0 + wall.dx * u - wall.n[0] * back,
+      wall.z0 + wall.dz * u - wall.n[2] * back,
+    ];
+    const [ax, az] = at(s.u0, s.depth);
+    const [bx, bz] = at(s.u1, s.depth);
+    const [ox, oz] = at(s.u0, 0);
+    const [px, pz] = at(s.u1, 0);
+    const y0 = courseY(s.course, ax, az, law);
+    const y1 = courseY(s.course + 1, ax, az, law) - chamfer;
+    quad(wall.n, [[ax, y0, az], [bx, y0, bz], [bx, y1, bz], [ax, y1, az]]);
+    const side = [wall.n[2], 0, -wall.n[0]];
+    quad(side, [[ox, y0, oz], [ax, y0, az], [ax, y1, az], [ox, y1, oz]]);
+    quad([-side[0], 0, -side[2]], [[bx, y0, bz], [px, y0, pz], [px, y1, pz], [bx, y1, bz]]);
+    quad([0, -1, 0], [[ox, y1, oz], [ax, y1, az], [bx, y1, bz], [px, y1, pz]]);
+    quad([0, 1, 0], [[ox, y0, oz], [px, y0, pz], [bx, y0, bz], [ax, y0, az]]);
   }
 
   return {
     positions: new Float32Array(positions),
     normals: new Float32Array(normals),
-    block: new Float32Array(block),
-    stone: new Float32Array(stone),
     indices: indices.length > 65535 ? new Uint32Array(indices) : new Uint16Array(indices),
-    blocks,
+    blocks: countBlocks(spec),
     courses,
     rise,
-    quads: indices.length / 6,
+    height,
+    law,
+    runs,
+    quads,
+    fused,
     vertices: positions.length / 3,
     angle: spec.rotationY * DEG,
   };
 }
 
+/**
+ * The horizontal faces of a built block: what a foot can stand on top of.
+ *
+ * The head of a block is not a lid any more, it is one to four levels at
+ * different heights, so anything that has to answer where the built stone is
+ * under a point has to read the levels rather than the box. Given in the
+ * block's OWN frame, in metres: whoever asks turns them.
+ */
+export function masonryDecks(spec) {
+  const [width, , depth] = spec.size;
+  const law = masonryLaw(spec);
+  const runs = headRuns(law, width);
+  return runs.map((run, r) => {
+    const before = r > 0 ? runs[r - 1] : null;
+    const after = r + 1 < runs.length ? runs[r + 1] : null;
+    return {
+      x0: run.x0,
+      x1: run.x1,
+      z0: -depth / 2,
+      z1: depth / 2,
+      y: run.courses * law.rise - run.drop,
+      // Which of the four edges of this level is a DRESSED one. An edge with a
+      // higher neighbour behind it is not an edge at all — the stone carries on
+      // up — and the chamfer that a foot feels is only on the others.
+      dressed: {
+        x0: !before || before.courses < run.courses,
+        x1: !after || after.courses < run.courses,
+        z0: true,
+        z1: true,
+      },
+      chamfer: law.chamfer,
+    };
+  });
+}
+
+/**
+ * How many blocks the skin of one spec is laid from.
+ *
+ * A CENSUS AND NOT A SEAT. Where a block begins is decided in the fragment, out
+ * of the fragment's own position, and this walks the same law with the same
+ * arithmetic to count them. Nothing draws from it: it is here so the cost of a
+ * wall can be stated in blocks as well as in triangles, and so the law can be
+ * checked against the histogram the targets give.
+ */
+export function countBlocks(spec) {
+  const [width, , depth] = spec.size;
+  const law = masonryLaw(spec);
+  const runs = headRuns(law, width);
+  const walls = [
+    { span: width, along: true, at: 0 },
+    { span: width, along: true, at: 0 },
+    { span: depth, along: false, at: width / 2 },
+    { span: depth, along: false, at: -width / 2 },
+  ];
+  const runAt = (x) => runs.find((r) => x <= r.x1 + 1e-9) || runs[runs.length - 1];
+  let blocks = 0;
+  for (const wall of walls) {
+    for (let c = 0; c < law.courses; c++) {
+      // How much of this wall this course actually stands over, in metres.
+      const standing = wall.along
+        ? runs.filter((r) => r.courses > c).reduce((s, r) => s + (r.x1 - r.x0), 0)
+        : (runAt(wall.at).courses > c ? wall.span : 0);
+      const cells = Math.max(0, Math.round(standing / law.cell));
+      let count = cells ? 1 : 0;
+      for (let i = 1; i < cells; i++) if (isCut(c, i, law)) count += 1;
+      blocks += count;
+    }
+  }
+  return blocks;
+}
+
 /** Every block of the hub, for the estimate the demo's one block scales to. */
-export function masonryCensus() {
-  return MONOLITHS.map((spec) => {
+export function masonryCensus(specs = MONOLITHS) {
+  return specs.map((spec) => {
     const built = buildMasonry(spec);
     return {
       id: spec.id, blocks: built.blocks, courses: built.courses, quads: built.quads,
