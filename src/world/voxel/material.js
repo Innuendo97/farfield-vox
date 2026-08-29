@@ -33,13 +33,42 @@ export function voxelSettings() {
     // baked atlas would carry the texel noise that a four tap reconstruction
     // filter had to exist to fight.
     //
-    // FITTED ON THE RENDER against the target's own meadow, not chosen: swept
-    // in level and in hue with the delivered cards taken off, until a top face
-    // reads what the target's top faces read. It lands at 126,132,74 encoded
-    // against the target's 138,148,64. It is the PIGMENT that was fitted and
-    // nothing else — the exposure and the two light colours are the campaign's
-    // and were not touched, which is why the ladder below still misses.
-    albedo: new Vector3(0.310, 0.405, 0.045),
+    // SOLVED AGAINST THE TARGET'S OWN DISTRIBUTION, not swept and not chosen.
+    // The amendment E-V4e says the target's carpet is more saturated and warmer
+    // than ours; measured over cube sized regions with no clustering, on the
+    // window the campaign fixed its numbers on, that is
+    //
+    //   the lit half     target  H 71.6  S 0.820  V 0.429
+    //                    render  H 69.0  S 0.529  V 0.409
+    //
+    // so the WARMTH was already there -- this render was three degrees warmer
+    // than the target, not colder -- and the whole of the amendment is CHROMA.
+    // The same is true of the shaded half, which is the reading that prices the
+    // third channel: 0.906 against 0.677. Both of the target's populations ask
+    // for less blue and neither asks for more.
+    //
+    // THE THREE ARE SOLVED THROUGH THIS FRAME'S OWN CHAIN and the difference,
+    // not the value, is what enters: tools/lighting/render-chain.mjs predicts
+    // ONE top face while the measurement is a median over a whole window, and on
+    // the level the two disagree by a tenth. Quoting the target's absolute value
+    // at the model would have darkened the meadow to fix the instrument. So the
+    // want is the model's own reading plus what the two pictures differ by --
+    // the construction guard-scala's self test already uses.
+    //
+    // AND THE HUE AND THE LEVEL ARE WALLS, NOT TERMS. This render already lands
+    // both within the estimator's own agreement; only the saturation misses. A
+    // least squares over all three buys saturation by darkening a meadow whose
+    // level is right, and "where the two disagree the target wins" is not "where
+    // they agree, spend it".
+    //
+    // WHERE IT LANDS AND WHAT IT CANNOT REACH. H 70.8, V 0.520, S 0.691 against
+    // a want of 0.811: four fifths of the amendment, and the last fifth is not
+    // here. With the third channel at nought the chain still puts eleven per cent
+    // of blue on the pixel -- AgX's own crosstalk, then the grade -- and at the
+    // hue the target also demands, that floor IS the saturation ceiling. That
+    // residue is the tone curve's and the grade's; neither is this file's, and
+    // the frontier is declared with its measurements rather than closed.
+    albedo: new Vector3(0.282, 0.453, 0.0),
     // How far the tint of one cube may stand from its neighbour's. This is the
     // sixty per cent of the effect and it costs a hash — the reference has no
     // texture at all on grass, it has a strong voxel to voxel spread of tint,
@@ -51,7 +80,34 @@ export function voxelSettings() {
     // the other, and the measured spread stops moving: swept, it goes 7.8% at
     // 1.30 and 9.2% at 1.80 and then no further, against the 18.7% the target
     // reads under the same estimator. The rest of that gap is not here.
+    //
+    // AND THE CEILING HAS A THIRD CAUSE, MEASURED SINCE: the LADDER. Carried
+    // through this frame's own chain at every point of the sweep, the estimator's
+    // brightest family does keep widening past 1.60 -- but only because the
+    // k-means has stopped cutting by orientation and started cutting by
+    // brightness, and the bottom rung falls out of guard-scala's gate as it does
+    // it. 1.60 is where the spread stops rising for a reason the gate accepts.
+    // v1-suolo/misure/tinta.mjs section 3 is the table.
     tint: 1.30,
+    // THE SHAPE OF THE DRAW, WHICH IS THE HALF NOBODY HAD SWEPT.
+    //
+    // Every number above moves the WIDTH of the tint and none of them moves its
+    // DENSITY, and the target's own reading says the density is the thing: 37.9%
+    // of its cube sized regions sit inside half a standard deviation of the mean,
+    // where a UNIFORM draw puts 29% there and this render measured 32.7%. That
+    // column is the whole of what "reads as a chequer and not as a meadow" means
+    // once it is a number both pictures can be asked for -- a uniform draw has as
+    // many cubes at its extremes as at its centre, and a meadow has a middle.
+    //
+    // Nought is the uniform draw, bit for bit: the term below reduces to the
+    // shipped one and this setting can be swept from a delivery without changing
+    // what a delivery is. One is the same range and the same two ends with the
+    // mass pulled to the middle.
+    //
+    // A BLEND AND NOT A POWER, because a power is a log and an exponent in every
+    // fragment of the meadow to buy a shape a single multiply already reaches.
+    // The file's other two shape knobs are blends for the same reason.
+    tintShape: 0.0,
     // A little of that spread in hue as well as in level, because a meadow
     // varies in both and a pure luminance jitter reads as dirt on one colour.
     hue: 0.22,
@@ -131,6 +187,7 @@ const FRAGMENT = /* glsl */`
   uniform float uVoxel;
   uniform vec3 uAlbedo;
   uniform float uTint;
+  uniform float uTintShape;
   uniform float uHue;
   uniform float uJoint;
   uniform float uJointPixels;
@@ -164,7 +221,14 @@ const FRAGMENT = /* glsl */`
 
     // ------------------------------------------------------------ the tint
     vec2 draw = cellHash(cell);
-    float tint = 1.0 + uTint * (draw.x - 0.5);
+    // THE WIDTH AND THE SHAPE, and they are two things. The draw is uniform, so
+    // as many cubes land at its extremes as at its centre unless it is bent:
+    // multiplying by its own distance from the middle keeps both ends and the
+    // range and moves the mass inward. At uTintShape nought this is the bare
+    // draw, exactly, which is what lets the setting be swept against a delivery.
+    float spread = draw.x - 0.5;
+    spread *= mix(1.0, abs(2.0 * spread), uTintShape);
+    float tint = 1.0 + uTint * spread;
     // A little of it in hue: green against the two either side of it, which is
     // the axis a meadow actually varies along.
     vec3 shift = vec3(1.0 - uHue * (draw.y - 0.5), 1.0 + uHue * (draw.y - 0.5),
@@ -238,6 +302,7 @@ export function voxelMaterial(voxel, settings) {
       uVoxel: { value: voxel },
       uAlbedo: { value: settings.albedo },
       uTint: { value: settings.tint },
+      uTintShape: { value: settings.tintShape },
       uHue: { value: settings.hue },
       uJoint: { value: settings.joint },
       uJointPixels: { value: settings.jointPixels },
@@ -263,6 +328,7 @@ export function voxelMaterial(voxel, settings) {
     const u = material.uniforms;
     u.uAlbedo.value.copy(settings.albedo);
     u.uTint.value = settings.tint;
+    u.uTintShape.value = settings.tintShape;
     u.uHue.value = settings.hue;
     u.uJoint.value = settings.joint;
     u.uJointPixels.value = settings.jointPixels;
