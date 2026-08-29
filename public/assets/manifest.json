@@ -5,37 +5,27 @@
     "skyBytes": 4194304,
     "skyNote": "everything a visitor downloads for the sky, whatever its priority: the sum over the shipped entries whose id begins \"cloud-\". Counted here and not in a verbale because a weight nobody builds is a weight that comes back — two and a third megabytes of generated relighting table were streamed and thrown away by every visitor of the plate delivery, and no first-frame budget could see it, because none of it is critical"
   },
-  "criticalBytes": 5164093,
+  "criticalBytes": 6146440,
   "assets": [
     {
-      "id": "cloud-sprites",
-      "type": "texture",
-      "role": "cloud",
-      "priority": "high",
-      "scope": "app",
-      "url": "assets/textures/cloud-sprites.ktx2",
-      "bytes": 1098341,
-      "sourceBytes": 2039856
+      "id": "baketest-scene",
+      "type": "model",
+      "role": null,
+      "priority": "deferred",
+      "scope": "dev",
+      "url": "assets/models/baketest-scene.glb",
+      "bytes": 10400,
+      "sourceBytes": 24204
     },
     {
-      "id": "cloud-cover",
+      "id": "baketest-lightmap",
       "type": "texture",
-      "role": "coverage",
-      "priority": "high",
-      "scope": "app",
-      "url": "assets/textures/cloud-cover.ktx2",
-      "bytes": 506351,
-      "sourceBytes": 366460
-    },
-    {
-      "id": "cloud-equirect",
-      "type": "texture",
-      "role": "cloud",
-      "priority": "high",
-      "scope": "app",
-      "url": "assets/textures/cloud-equirect.ktx2",
-      "bytes": 113867,
-      "sourceBytes": 225675
+      "role": "lightmap",
+      "priority": "deferred",
+      "scope": "dev",
+      "url": "assets/textures/baketest-lightmap.ktx2",
+      "bytes": 3743,
+      "sourceBytes": 8836
     },
     {
       "id": "terrain-albedo",
@@ -158,6 +148,36 @@
       "sourceBytes": 1116026
     },
     {
+      "id": "path-joint",
+      "type": "texture",
+      "role": "coverage",
+      "priority": "critical",
+      "scope": "app",
+      "url": "assets/textures/path-joint.ktx2",
+      "bytes": 630377,
+      "sourceBytes": 384731
+    },
+    {
+      "id": "path-tone",
+      "type": "texture",
+      "role": "coverage",
+      "priority": "critical",
+      "scope": "app",
+      "url": "assets/textures/path-tone.ktx2",
+      "bytes": 130852,
+      "sourceBytes": 66910
+    },
+    {
+      "id": "path-grain",
+      "type": "texture",
+      "role": "coverage",
+      "priority": "critical",
+      "scope": "app",
+      "url": "assets/textures/path-grain.ktx2",
+      "bytes": 221118,
+      "sourceBytes": 185436
+    },
+    {
       "id": "grass-atlas",
       "type": "texture",
       "role": "albedo",
@@ -178,24 +198,34 @@
       "sourceBytes": 180585
     },
     {
-      "id": "baketest-scene",
-      "type": "model",
-      "role": null,
-      "priority": "deferred",
-      "scope": "dev",
-      "url": "assets/models/baketest-scene.glb",
-      "bytes": 10400,
-      "sourceBytes": 24204
+      "id": "cloud-sprites",
+      "type": "texture",
+      "role": "cloud",
+      "priority": "high",
+      "scope": "app",
+      "url": "assets/textures/cloud-sprites.ktx2",
+      "bytes": 1098341,
+      "sourceBytes": 2039856
     },
     {
-      "id": "baketest-lightmap",
+      "id": "cloud-cover",
       "type": "texture",
-      "role": "lightmap",
-      "priority": "deferred",
-      "scope": "dev",
-      "url": "assets/textures/baketest-lightmap.ktx2",
-      "bytes": 3743,
-      "sourceBytes": 8836
+      "role": "coverage",
+      "priority": "high",
+      "scope": "app",
+      "url": "assets/textures/cloud-cover.ktx2",
+      "bytes": 506351,
+      "sourceBytes": 366460
+    },
+    {
+      "id": "cloud-equirect",
+      "type": "texture",
+      "role": "cloud",
+      "priority": "high",
+      "scope": "app",
+      "url": "assets/textures/cloud-equirect.ktx2",
+      "bytes": 113867,
+      "sourceBytes": 225675
     }
   ]
 }
