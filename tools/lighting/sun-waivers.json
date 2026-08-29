@@ -45,11 +45,6 @@
       "note": "shared atlas (ground+path): cleared jointly at the second delivery"
     },
     {
-      "consumer": "assets-src/monoliths/monoliths.json",
-      "owner": "V2",
-      "note": "scheduled for replacement: the stone is rebuilt as courses of masonry"
-    },
-    {
       "consumer": "assets-src/rocks/rocks-bake.json",
       "owner": "V2",
       "note": "scheduled for replacement: the rocks are rebuilt as cubes"

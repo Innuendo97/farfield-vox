@@ -76,7 +76,6 @@ const CONSUMERS = [
   'assets-src/clouds/plates.json',
   'tools/clouds/cloud-pieces.mjs',
   'assets-src/terrain/terrain.json',
-  'assets-src/monoliths/monoliths.json',
   'assets-src/rocks/rocks-bake.json',
 ];
 
@@ -243,7 +242,6 @@ if (!sourcesOnly) {
   console.log('\nthe light that has actually been baked');
   const baked = [
     ['assets-src/terrain/terrain.json', 'the ground and the stair'],
-    ['assets-src/monoliths/monoliths.json', 'the stone (src/world/monoliths.js uSun reads this)'],
     ['assets-src/rocks/rocks-bake.json', 'the rocks'],
   ];
   for (const [path, what] of baked) {
