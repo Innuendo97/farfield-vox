@@ -1,8 +1,8 @@
 import {
   ClampToEdgeWrapping, DataTexture, DepthTexture, HalfFloatType, LinearFilter,
   LinearSRGBColorSpace, Mesh, NearestFilter, NoBlending, NoToneMapping, OrthographicCamera,
-  PlaneGeometry, RGBAFormat, Scene, ShaderMaterial, Texture, UnsignedByteType, UnsignedIntType,
-  Vector2, Vector3, Vector4, WebGLRenderTarget,
+  FloatType, PlaneGeometry, RGBAFormat, RedFormat, Scene, ShaderMaterial, Texture,
+  UnsignedByteType, UnsignedIntType, Vector2, Vector3, Vector4, WebGLRenderTarget,
 } from 'three';
 
 // The frame is assembled here and nowhere else.
@@ -66,10 +66,14 @@ const PREFILTER_FRAGMENT = /* glsl */`
   precision highp float;
   varying vec2 vUv;
   uniform sampler2D tSource;
+  // The additive layer, which is drawn apart and has to be a source of the halo
+  // like anything else that glows. A lamp whose halo did not bloom would be a
+  // lamp fitted against a reference that blooms.
+  uniform sampler2D tGlow;
   uniform float uThreshold;
   uniform float uKnee;
   void main() {
-    vec3 c = texture2D(tSource, vUv).rgb;
+    vec3 c = texture2D(tSource, vUv).rgb + texture2D(tGlow, vUv).rgb;
     float brightness = max(c.r, max(c.g, c.b));
     float soft = clamp(brightness - uThreshold + uKnee, 0.0, 2.0 * uKnee);
     soft = soft * soft / (4.0 * uKnee + 0.0001);
@@ -146,10 +150,21 @@ const UP_FRAGMENT = /* glsl */`
 //     the ciliary muscle does;
 //   * and clamping how near and how far the eye will accommodate becomes a
 //     clamp of one number between two, instead of two cases.
-const DEPTH_GLSL = /* glsl */`
+// HOW FAR THE WORLD IS AT A PIXEL, AND THERE IS ONE PRODUCER OF IT.
+//
+// Split out of the chunk below because it stopped being the defocus's private
+// arithmetic: the depth service at the foot of this file lifts the same number
+// into a buffer of its own so that an additive material can read it, and a
+// second copy of these five lines would be a second opinion about where the
+// world is. Four readers in this file and every soft particle in the world now
+// stand on this one reconstruction.
+//
+// The distance is RADIAL rather than along the view axis, so the metre it works
+// in is the metre every fog law in this world works in — and, now, the metre a
+// material compares its own `length(viewPosition)` against.
+const RAY_DISTANCE_GLSL = /* glsl */`
   uniform vec2 uCameraRange;   // near and far plane
   uniform vec2 uTanHalf;       // half the field of view, as a tangent, across and down
-  uniform float uFocusSpread;  // dioptres to circle of confusion
 
   float rayDistance(float depth, vec2 at) {
     float ndc = depth * 2.0 - 1.0;
@@ -160,13 +175,22 @@ const DEPTH_GLSL = /* glsl */`
     return viewZ * length(vec3(plane, 1.0));
   }
 
-  /** Where this pixel is, as a reciprocal of metres. The sky is at the far plane. */
-  float dioptresAt(float depth, vec2 at) {
+  /** Metres to the world at this pixel. The sky wrote no depth and is at the far plane. */
+  float sceneDistanceAt(float depth, vec2 at) {
     // The sky writes no depth, so it is still standing at the far plane; read
     // literally that is the distance it is at, and an eye leaning on a stone
     // two metres off does have a soft sky behind it.
-    float d = depth >= 0.999999 ? uCameraRange.y : rayDistance(depth, at);
-    return 1.0 / max(d, 0.05);
+    return depth >= 0.999999 ? uCameraRange.y : rayDistance(depth, at);
+  }
+`;
+
+const DEPTH_GLSL = /* glsl */`
+${RAY_DISTANCE_GLSL}
+  uniform float uFocusSpread;  // dioptres to circle of confusion
+
+  /** Where this pixel is, as a reciprocal of metres. The sky is at the far plane. */
+  float dioptresAt(float depth, vec2 at) {
+    return 1.0 / max(sceneDistanceAt(depth, at), 0.05);
   }
 
   float circleOfConfusion(float dioptres, float planeDioptres) {
@@ -576,6 +600,7 @@ const COMPOSITE_FRAGMENT = /* glsl */`
   precision highp float;
   varying vec2 vUv;
   uniform sampler2D tScene;
+  uniform sampler2D tGlow;
   uniform sampler2D tBloom;
   uniform sampler2D tLut;
   uniform sampler2D tDepth;
@@ -1489,7 +1514,14 @@ ${DEPTH_GLSL}
       bead = drop.z;
     }
 
-    vec3 scene = texture2D(tScene, uv).rgb;
+    // THE SCENE AND WHAT WAS ADDED TO IT APART. The additive layer is
+    // accumulated in a buffer of its own -- see the depth service at the foot of
+    // this file -- and added here, before the exposure and before either grade,
+    // which is the only place it can go: a glow added after the curve is a glow
+    // fitted against a different picture. Adding is exact rather than
+    // approximate, because what is in that buffer was blended additively into
+    // black and addition does not care in what order it is done.
+    vec3 scene = texture2D(tScene, uv).rgb + texture2D(tGlow, uv).rgb;
     vec3 halo = stage(1.0) ? texture2D(tBloom, uv).rgb * uBloomStrength : vec3(0.0);
 
     // How much of the scene's own grade this pixel takes, and what glows.
@@ -1884,7 +1916,19 @@ function identityLut(size = LUT_SIZE) {
 // number: it runs for the sun as well as for the focus, so charging it to `eye`
 // would make the defocus's stage read non-zero on a frame that is drawing no
 // defocus at all, and "nought when it is off" would stop being checkable.
-const CLOCK_STAGES = ['prepass', 'scene', 'bloom', 'probe', 'eye', 'rays', 'composite'];
+// `depth` is the depth service's one added pass and NOTHING ELSE: the lift, the
+// full screen quad that turns the scene buffer's depth attachment into metres a
+// material can read. It is beside `scene` rather than inside it because the
+// whole question this service was opened on is what the extra pass costs, and a
+// cost folded into the pass it stands beside is not a cost anybody can quote.
+// `soft` is the layer that reads it, drawn back over the world. Those draws are
+// not new — they used to happen inside `scene`, in the same frame, against the
+// same buffer — but they are apart now because the split put them there anyway,
+// and a consumer that can read what its own additive layer costs without
+// building a bench is worth the line.
+const CLOCK_STAGES = [
+  'prepass', 'scene', 'depth', 'soft', 'bloom', 'probe', 'eye', 'rays', 'composite',
+];
 
 /**
  * The GPU's own clock, when the driver hands one out.
@@ -1934,7 +1978,8 @@ function createGpuClock(gl) {
   let live = 0;
   let open = null;
   const last = {
-    prepass: 0, scene: 0, bloom: 0, probe: 0, eye: 0, rays: 0, composite: 0, total: 0,
+    prepass: 0, scene: 0, depth: 0, soft: 0, bloom: 0, probe: 0, eye: 0, rays: 0,
+    composite: 0, total: 0,
   };
   let fresh = false;
   // Why a frame went untimed, so the answer is a number rather than a theory.
@@ -2065,6 +2110,250 @@ function makeTarget(width, height, { samples }) {
   });
   return target;
 }
+
+// ===================================================================== ========
+//                    THE DEPTH SERVICE, FOR THE ADDITIVES
+// =============================================================================
+//
+// WHAT IT IS FOR. An additive glow is a billboard: one quad turned to the eye,
+// so every fragment of it stands at very nearly ONE distance — the emitter's.
+// The world it is drawn against does not: the meadow under a lamp rises towards
+// the eye pixel by pixel, and a few tenths of a metre below the lamp it has come
+// nearer than the lamp is. The depth test answers that in one step, so the
+// bottom of every halo is bitten off along the line where the ground crosses the
+// emitter's depth, and the tufts make that line ragged. THAT is the defect
+// E-V7k found by eye and named: aloni affettati dai ciuffi, tagliati a semicupole.
+//
+// AND THE CURE IS NOT "SWITCH THE TEST OFF", WHICH WAS REFUSED. A lamp with no
+// depth test and nothing in its place is a lamp that shines through a monolith:
+// a sliced halo traded for a hole in the world. What this service hands over is
+// the number that makes the difference — how far the world is at this fragment's
+// own pixel — and the fade built on it,
+//
+//   softDepthFade = clamp((worldDistance - ownDistance) / fade, 0, 1)
+//
+// SUBSUMES the test rather than sitting on top of it. Where the world is behind
+// the fragment by more than `fade` it is one, and the glow is whole. Where the
+// world comes up to meet it, it RAMPS to nothing over those few centimetres
+// instead of stopping at a line — which is the sliced halo, cured. And where the
+// world is in FRONT it is clamped hard at nought, over the monolith's whole
+// depth: a lamp behind a monolith is exactly as dark as the depth test made it,
+// and that is the case the hard cure could not answer.
+//
+// So a material here may put its hardware test down and let the fade do both
+// jobs, which is what a sliced halo needs; or keep the test and use the fade
+// only on the far side. This file does not choose. It produces the metre.
+//
+// WHY IT IS ONE SEAT AND NOT ONE COPY PER MATERIAL. The same reason
+// src/world/face-light.js is: eight sessions will add glowing things to this
+// world, and if each reconstructs the world's distance for itself they will
+// disagree about where a surface is by a few centimetres — which looks like a
+// fitting error in a frame and gets fitted against. There is one producer of
+// the metre, in RAY_DISTANCE_GLSL above, and one buffer that carries it.
+//
+// WHY IT COSTS A PASS, WHICH WAS ASKED BEFORE IT WAS SPENT. The scene's own
+// render target has carried a DepthTexture since the composite needed to know
+// which pixels were sky, and four passes in this file already read it — so the
+// obvious hope was that a material could read it too, from inside the very pass
+// that writes it, for nothing. THE DRIVER SAYS NO, and it says it in two
+// different ways depending on the tier, which is why this was asked of the
+// driver rather than of the specification (v0-fondazione/profondita/ricircolo.*,
+// on ANGLE over D3D11, AMD Radeon):
+//
+//   samples 0  — the texture is the bound framebuffer's own depth attachment,
+//                the draw is a feedback loop, and it comes back INVALID_OPERATION
+//                with a fragment carrying 1.44 m for a wall standing at 3.00;
+//   samples 4  — the bound framebuffer's depth is a multisampled RENDERBUFFER
+//                and the texture is only its resolve target, so the read is
+//                LEGAL and SILENT — and it hands out the depth of the PREVIOUS
+//                pass, because the resolve happens when the pass ends.
+//
+// The second is the dangerous one: no error, a plausible picture, and a frame of
+// lag that only shows when the eye turns. Neither is a service anybody should
+// stand on. So the depth is LIFTED out into a buffer of its own, and that lift
+// is the one pass this costs.
+//
+// The lift earns more than legality. It hands the consumer METRES, so a material
+// that wants to fade needs no near plane, no far plane, no field of view and no
+// matrix — one texture, one texel size, and a distance it already has.
+//
+// AND WHY THE LAYER IS NOT DRAWN BACK INTO THE SCENE BUFFER, WHICH IS THE
+// EXPENSIVE THING THIS UNIT FOUND. The obvious shape for all of this is to split
+// the world's render in two — everything, then the lift, then the additives back
+// over the same buffer with the clear off. It was built that way first, and it
+// costs 2.8 MILLISECONDS on a stage that draws nothing at all. The cause is in
+// three.js and is not negotiable from here: WebGLRenderer.render() resolves a
+// multisampled target at the END OF EVERY CALL, so a world drawn in two calls
+// pays a full 54 MB resolve of colour and depth TWICE. Measured across the tier
+// with nothing on the layer (v0-fondazione/profondita/uscite/campioni.json):
+//
+//   samples 4 → 2.84 ms      samples 2 → 2.98 ms      samples 0 → 0.0008 ms
+//
+// Exactly nought where there is nothing to resolve, which is the whole of the
+// proof. So the world is still drawn in ONE call, as it always was, and the
+// additive layer goes into a buffer of its OWN — unmultisampled, with no depth
+// attachment at all — which is then added to the frame in the two places the
+// frame reads the scene: the bloom's prefilter and the composite. Additive
+// blending is associative, so a glow accumulated apart and added afterwards is
+// the same glow to the last bit; and the buffer standing outside the scene
+// target is what keeps the resolve at one.
+//
+// WHICH MAKES THE FADE THE OCCLUSION, NOT AN ORNAMENT ON IT. There is no depth
+// buffer on that target, so a material there has no hardware depth test to fall
+// back on. It does not need one — the clamp at nought IS the test, over the
+// whole depth of whatever stands in front — but it is a contract and not an
+// implementation detail: a material on this layer that did not multiply by the
+// fade would shine through every monolith in the world.
+
+/**
+ * The layer a material joins to be drawn AFTER the world, with the depth ready.
+ *
+ * `mesh.layers.set(SOFT_DEPTH_LAYER)` and nothing else. The chain takes the
+ * layer off the camera for the world's own pass and draws it, and only it, into
+ * a buffer of its own once the depth has been lifted; the composite adds that
+ * buffer back, and the bloom takes it in as a source like any other glow.
+ *
+ * WHAT JOINING IT COSTS A MATERIAL, and both of these are the price of the
+ * frame not paying for a second resolve:
+ *
+ *   NO HARDWARE DEPTH TEST. That buffer has no depth attachment. Multiply by
+ *   softDepthFade or shine through the world — there is no third outcome.
+ *   NO MULTISAMPLING. The scene's four samples do not reach it. What is drawn
+ *   here has to be something with no geometric edge in it: a glow, a glare, a
+ *   pool of light. It is the same argument this file already makes for putting
+ *   the sun's rays at an eighth of the frame, and it is why this is a layer for
+ *   ADDITIVES and not a general seat.
+ *
+ * Layer 1, because nothing in this world has ever set a layer and 0 is where
+ * everything already is.
+ */
+export const SOFT_DEPTH_LAYER = 1;
+
+/**
+ * THE seat. Nothing else in this world may hold the world's distance.
+ *
+ * Shared BY REFERENCE the way src/world/face-light.js shares the sun: the chain
+ * writes these two once a frame and every material that asked for them sees the
+ * new value, because there is one object behind every copy. A material that
+ * held its own would keep reading the buffer at the size the window used to be.
+ */
+/**
+ * The world at rest: one texel, infinitely far away.
+ *
+ * WHAT THE SERVICE LOOKS LIKE WHEN IT IS NOT RUNNING, and the reason a consumer
+ * needs no branch and no flag. A fade against a world that is a million metres
+ * behind everything is exactly one, everywhere — so a material that multiplies
+ * by `softDepthFade` draws precisely what it drew before this file had a depth
+ * service, on any frame where the service is off, without knowing that it is.
+ *
+ * That is not a convenience, it is what makes the null honest: switching the
+ * service off has to leave THE SAME PICTURE WITH THE SAME CONTENT, or the two
+ * frames a measurement stands between are not two versions of one thing.
+ */
+const SOFT_DEPTH_REST = new DataTexture(new Float32Array([1e6]), 1, 1, RedFormat, FloatType);
+SOFT_DEPTH_REST.needsUpdate = true;
+
+/** And the layer's own buffer at rest: one black texel, adding nothing. */
+const SOFT_GLOW_REST = new DataTexture(new Float32Array([0, 0, 0, 1]), 1, 1, RGBAFormat, FloatType);
+SOFT_GLOW_REST.needsUpdate = true;
+
+const SOFT_DEPTH_SEAT = {
+  tSceneDepth: { value: SOFT_DEPTH_REST },
+  uSceneDepthTexel: { value: new Vector2(1, 1) },
+};
+
+// How many materials have sat down. The service is not a switch somebody has to
+// remember to throw: a chain nobody reads from does not allocate the buffer, does
+// not lift, does not split the render, and reports its stage as exactly nought.
+let softDepthSeats = 0;
+
+/**
+ * The two uniforms SOFT_DEPTH_GLSL declares, and the act of asking for them is
+ * what turns the service on.
+ *
+ * @returns {{tSceneDepth: object, uSceneDepthTexel: object}} the chain's own,
+ *   by reference — spread into a material's uniforms, never copied by value.
+ */
+export function softDepthUniforms() {
+  softDepthSeats++;
+  return { ...SOFT_DEPTH_SEAT };
+}
+
+/**
+ * The vertex half: it carries the fragment's own distance down to where the
+ * comparison happens.
+ *
+ * `carrySoftDepth` takes a VIEW SPACE position because that is the one form
+ * every material already has — `(modelViewMatrix * vec4(position, 1.0)).xyz` —
+ * and because a billboard may want to hand it the EMITTER'S centre rather than
+ * the corner of its own quad. Which of the two is right is the material's
+ * business; producing the metre is not.
+ */
+export const SOFT_DEPTH_VERTEX_GLSL = /* glsl */`
+  varying float vSoftDistance;
+
+  void carrySoftDepth(vec3 viewPosition) {
+    vSoftDistance = length(viewPosition);
+  }
+`;
+
+/**
+ * The fragment half. Two lines of arithmetic and no camera at all.
+ *
+ * `softDepthFade(fadeM)` is one where this fragment stands `fadeM` metres clear
+ * of the world, ramps to nought as the world comes up to meet it, and is CLAMPED
+ * at nought for every metre the world is in front of it. That last clamp is not
+ * a detail: it is the occlusion, and it is why a material that multiplies by
+ * this may put its hardware depth test down without its glow appearing through a
+ * monolith.
+ *
+ * The fade distance is the material's, not this file's. A halo of 0.13 m and a
+ * pool on the grass do not want the same ramp, and a service that chose one for
+ * both would be a second opinion about how big a glow is.
+ */
+export const SOFT_DEPTH_GLSL = /* glsl */`
+  uniform sampler2D tSceneDepth;   // metres to the world, from the pass just drawn
+  uniform vec2 uSceneDepthTexel;   // one over the scene buffer, across and down
+  varying float vSoftDistance;
+
+  /** How far the world is at this fragment's own pixel, in metres. */
+  float softSceneDistance() {
+    return texture2D(tSceneDepth, gl_FragCoord.xy * uSceneDepthTexel).x;
+  }
+
+  /** One where this fragment stands clear of the world, nought where it meets it. */
+  float softDepthFade(float fadeM) {
+    return clamp((softSceneDistance() - vSoftDistance) / max(fadeM, 1e-4), 0.0, 1.0);
+  }
+`;
+
+// The lift itself: the scene buffer's depth attachment, read once, written out
+// as metres along the eye ray. One channel, sixteen bit float, at the full
+// resolution of the frame.
+//
+// FULL RESOLUTION AND NOT A HALF OF IT. Every other reduced buffer in this file
+// is reduced because what it carries has no edges in it. This one is nothing but
+// edges: it is read exactly where a silhouette crosses a glow, and a half
+// resolution depth puts a halo of wrong distances one pixel wide around every
+// tuft in the meadow — which is the defect this service exists to remove, drawn
+// smaller.
+//
+// SIXTEEN BIT FLOAT, AND WHAT IT COSTS IN METRES. Half float carries about one
+// part in two thousand, so the world's distance is good to 1.5 mm at three
+// metres, 20 mm at forty and 150 mm at three hundred. A halo's ramp is a tenth
+// of a metre wide, so the near lamps — the ones with a legible halo and a pool
+// on the grass — get forty steps across their fade, and the far ones, which are
+// a glare on an angular floor and a few pixels across, get a gradient no coarser
+// than the pixels it is drawn into.
+const SOFT_DEPTH_LIFT = /* glsl */`
+${RAY_DISTANCE_GLSL}
+  uniform sampler2D tDepth;
+  varying vec2 vUv;
+
+  void main() {
+    gl_FragColor = vec4(sceneDistanceAt(texture2D(tDepth, vUv).x, vUv), 0.0, 0.0, 1.0);
+  }
+`;
 
 export function createPostPipeline(gl) {
   // The scene is drawn in light units and stays that way until the composite;
@@ -2490,11 +2779,20 @@ export function createPostPipeline(gl) {
 
   const prefilter = pass(PREFILTER_FRAGMENT, {
     tSource: { value: null },
+    tGlow: { value: SOFT_GLOW_REST },
     uThreshold: { value: params.bloomThreshold },
     uKnee: { value: params.bloomKnee },
   });
   const down = pass(DOWN_FRAGMENT, { tSource: { value: null }, uHalfPixel: { value: new Vector2() } });
   const up = pass(UP_FRAGMENT, { tSource: { value: null }, uHalfPixel: { value: new Vector2() } });
+  // The depth service's one pass. Compiled with everything else and never drawn
+  // until a material sits down: a program that is not used costs its compile
+  // once, and this file would rather pay that at start-up than in a walk.
+  const lift = pass(SOFT_DEPTH_LIFT, {
+    tDepth: { value: null },
+    uCameraRange: { value: new Vector2(0.1, 1000) },
+    uTanHalf: { value: new Vector2(1, 1) },
+  });
   // The one pixel that carries the accommodation and the sun's occlusion
   // forward in time. Two draws of one fragment; see PROBE_FRAGMENT.
   const probeAf = pass(PROBE_FRAGMENT, {
@@ -2547,6 +2845,7 @@ export function createPostPipeline(gl) {
     tFocus: { value: null },
     tRays: { value: null },
     tProbe: { value: null },
+    tGlow: { value: SOFT_GLOW_REST },
     uExposure: { value: params.exposure },
     uBloomStrength: { value: params.bloomStrength },
     uLutIntensity: { value: params.lutIntensity },
@@ -2613,6 +2912,27 @@ export function createPostPipeline(gl) {
   let bloomTargets = [];
   let focusTargets = [];
   let raysTargets = [];
+  // The depth service's two buffers, and null for as long as nobody reads from
+  // them: the world's distance in metres, and the layer that reads it.
+  let softDepthTarget = null;
+  let softGlowTarget = null;
+  // Which of the two forms the driver actually granted, so a reading of this
+  // pass's cost can say what it was paid in.
+  let softFormat = null;
+  // Forced on or off by a bench or a null; null means the seats decide, which is
+  // what ships.
+  let softForced = null;
+  // How far the service's two buffers are stepped down from the frame. ONE, and
+  // it is a tier's lever rather than a default to be argued with: what is drawn
+  // there has no geometric edge in it, so it takes a reduction the way the sun's
+  // rays take an eighth. Measured at both, in v0-fondazione/profondita/.
+  let softScale = 1;
+  // How many times the lift is drawn. ONE in every frame anybody looks at. This
+  // is a measuring instrument and not a proposal: the pass costs a few hundredths
+  // of a millisecond, which is under the noise floor of the machine this world is
+  // fitted on, so it is read as the SLOPE of frame time against this number
+  // rather than as the difference of two frames. See v0-fondazione/profondita/.
+  let softPasses = 1;
   // The one pixel, twice: this frame's and last frame's. Allocated once for the
   // life of the page rather than with the frame — it does not depend on the
   // size of anything, and a resize that threw away the accommodation would rack
@@ -2820,6 +3140,75 @@ export function createPostPipeline(gl) {
     raysTargets = [make(), make()];
   }
 
+  /**
+   * The buffer the world's distance is lifted into, in metres.
+   *
+   * ONE CHANNEL. Sixteen bit float over one channel is two bytes a pixel, a
+   * quarter of what the scene buffer costs to write and a quarter of what it
+   * would cost to read back — and this is a full resolution copy, so the
+   * bandwidth is the whole of what the pass is. R16F is only colour renderable
+   * where the driver hands out the float buffer extension; the same driver has
+   * already had to hand it out for the scene's own half float target, so this
+   * asks and then CHECKS, in the manner of probeTarget above, and falls back to
+   * the four channel form the rest of this file uses rather than trusting that
+   * the two entitlements travel together.
+   *
+   * NEAREST, and for the reason the depth attachment itself is nearest: a
+   * distance interpolated across a silhouette is a distance nothing in the world
+   * is at, and the one place this is read is exactly the edge of a tuft.
+   */
+  function allocateSoftDepth() {
+    for (const target of [softDepthTarget, softGlowTarget]) if (target) target.dispose();
+    const w = Math.max(1, Math.floor(width / softScale));
+    const h = Math.max(1, Math.floor(height / softScale));
+    const context = gl.getContext();
+    const make = (format) => new WebGLRenderTarget(w, h, {
+      type: HalfFloatType,
+      format,
+      colorSpace: LinearSRGBColorSpace,
+      minFilter: NearestFilter,
+      magFilter: NearestFilter,
+      depthBuffer: false,
+      stencilBuffer: false,
+    });
+    softDepthTarget = null;
+    for (const format of [RedFormat, RGBAFormat]) {
+      const target = make(format);
+      while (context.getError() !== context.NO_ERROR) { /* drain */ }
+      gl.setRenderTarget(target);
+      gl.clear();
+      const complete = context.checkFramebufferStatus(context.FRAMEBUFFER) === context.FRAMEBUFFER_COMPLETE;
+      const clean = context.getError() === context.NO_ERROR;
+      gl.setRenderTarget(null);
+      if (complete && clean) {
+        softDepthTarget = target;
+        softFormat = format === RedFormat ? 'R16F' : 'RGBA16F';
+        break;
+      }
+      target.dispose();
+    }
+    if (!softDepthTarget) throw new Error('no usable buffer for the depth service');
+
+    // AND THE LAYER'S OWN BUFFER, WHICH IS WHERE THE ADDITIVES LAND.
+    //
+    // No depth attachment, because the fade is the occlusion and a depth buffer
+    // here would be a second opinion about it that nothing writes. Not
+    // multisampled, because it is not in the scene target and the scene target
+    // is where the samples are. LINEAR, unlike the distance beside it: the
+    // composite may read this at a different resolution from the one it was
+    // drawn at, and what is in it is a glow, which is the one thing in this file
+    // that the hardware's own filter enlarges correctly.
+    softGlowTarget = new WebGLRenderTarget(w, h, {
+      type: HalfFloatType,
+      format: RGBAFormat,
+      colorSpace: LinearSRGBColorSpace,
+      minFilter: LinearFilter,
+      magFilter: LinearFilter,
+      depthBuffer: false,
+      stencilBuffer: false,
+    });
+  }
+
   return {
     setSize(nextWidth, nextHeight) {
       width = Math.max(1, Math.floor(nextWidth));
@@ -2829,6 +3218,9 @@ export function createPostPipeline(gl) {
       allocateBloom();
       allocateFocus();
       allocateRays();
+      // Only once somebody has sat down. A window that changes shape while the
+      // service is idle allocates nothing at all.
+      if (softDepthTarget) allocateSoftDepth();
       if (probeTargets.length !== 2) allocateProbe();
     },
 
@@ -2865,13 +3257,73 @@ export function createPostPipeline(gl) {
         prepass(gl);
       }
 
+      // WHETHER THE WORLD IS DRAWN IN ONE PIECE OR TWO, and it is one until a
+      // material asks for the depth. Nothing below this line runs on a frame
+      // nobody reads from: no buffer, no lift, no second render, and the two
+      // stages of the clock come back as an exact nought rather than as a small
+      // number — the same contract the defocus and the rays are held to.
+      const softing = softForced === null ? softDepthSeats > 0 : softForced;
+      if (softing && softDepthTarget === null) allocateSoftDepth();
+      // Saved and put back rather than assumed: the camera belongs to the walker
+      // and this pass is a guest in it.
+      const cameraLayers = worldCamera.layers.mask;
+
       if (slot) clock.begin(slot, 'scene');
       gl.setRenderTarget(sceneTarget);
+      // Taken out of the world's pass when there is somewhere else to put it,
+      // and PUT BACK INTO IT when there is not — so a material that joined the
+      // layer never silently stops being drawn. With the service off it lands
+      // where it always landed, in this one render, reading the world at rest.
+      if (softing) worldCamera.layers.disable(SOFT_DEPTH_LAYER);
+      else {
+        worldCamera.layers.enable(SOFT_DEPTH_LAYER);
+        SOFT_DEPTH_SEAT.tSceneDepth.value = SOFT_DEPTH_REST;
+      }
+      // ONE CALL, AND IT STAYS ONE CALL. See the depth service's own comment:
+      // a second render into this target costs a second full resolve of it.
       gl.render(worldScene, worldCamera);
+      worldCamera.layers.mask = cameraLayers;
+
+      // ------------------------------------------------- THE DEPTH SERVICE
+      //
+      // THE LIFT. The scene target is not bound now — this draws into the
+      // service's own buffer — and that is the whole reason this pass exists:
+      // the depth attachment of a BOUND framebuffer cannot be sampled by a draw
+      // into it, and where the driver allows it anyway (multisampled, where the
+      // attachment is a renderbuffer and the texture is only its resolve) what
+      // comes back is the previous pass. Both readings are in
+      // v0-fondazione/profondita/uscite/ricircolo.json.
+      if (slot && softing) clock.begin(slot, 'depth');
+      if (softing) {
+        lift.uniforms.tDepth.value = sceneTarget.depthTexture;
+        lift.uniforms.uCameraRange.value.set(worldCamera.near, worldCamera.far);
+        const liftTanHalf = Math.tan(worldCamera.fov * Math.PI / 360);
+        lift.uniforms.uTanHalf.value.set(liftTanHalf * worldCamera.aspect, liftTanHalf);
+        // Once in a frame anybody looks at. See `softPasses`.
+        for (let i = 0; i < softPasses; i++) draw(lift, softDepthTarget);
+        SOFT_DEPTH_SEAT.tSceneDepth.value = softDepthTarget.texture;
+        SOFT_DEPTH_SEAT.uSceneDepthTexel.value.set(
+          1 / softDepthTarget.width, 1 / softDepthTarget.height,
+        );
+      }
+
+      // AND THE LAYER, INTO A BUFFER OF ITS OWN. Cleared by the render — the
+      // additives are accumulated from black and added back at the composite,
+      // which is exact — and never into the scene target, which is what keeps
+      // that target's resolve at one for the frame.
+      if (slot && softing) clock.begin(slot, 'soft');
+      if (softing) {
+        worldCamera.layers.set(SOFT_DEPTH_LAYER);
+        gl.setRenderTarget(softGlowTarget);
+        gl.render(worldScene, worldCamera);
+        worldCamera.layers.mask = cameraLayers;
+      }
+      const glowTexture = softing ? softGlowTarget.texture : SOFT_GLOW_REST;
 
       if (slot) clock.begin(slot, 'bloom');
       if (stages.bloom) {
         prefilter.uniforms.tSource.value = sceneTarget.texture;
+        prefilter.uniforms.tGlow.value = glowTexture;
         prefilter.uniforms.uThreshold.value = params.bloomThreshold;
         prefilter.uniforms.uKnee.value = params.bloomKnee;
         draw(prefilter, bloomTargets[0]);
@@ -3072,6 +3524,7 @@ export function createPostPipeline(gl) {
 
       if (slot) clock.begin(slot, 'composite');
       composite.uniforms.tScene.value = sceneTarget.texture;
+      composite.uniforms.tGlow.value = glowTexture;
       composite.uniforms.tBloom.value = bloomTargets[0].texture;
       composite.uniforms.tDepth.value = sceneTarget.depthTexture;
       composite.uniforms.tFocus.value = focusTargets.length === 2 ? focusTargets[1].texture : null;
@@ -3280,6 +3733,84 @@ export function createPostPipeline(gl) {
       return Boolean(prepass);
     },
 
+    /**
+     * Forces the depth service on or off, over what the seats asked for.
+     *
+     * FOR A NULL AND FOR A BENCH. What ships is `null`: the service is on
+     * exactly when a material has asked for its uniforms, which is a decision no
+     * caller has to remember to make. Handed `false` it draws the world in one
+     * piece again, with the layer and everything on it drawn where it always
+     * was — which is the null this pass has to be measured against, and the only
+     * honest one, because it is the same frame with the same content.
+     *
+     * @param {?boolean} on true, false, or null to go back to the seats
+     */
+    setSoftDepth(on) {
+      softForced = on === null || on === undefined ? null : Boolean(on);
+      return softForced === null ? softDepthSeats > 0 : softForced;
+    },
+
+    /**
+     * How many times the lift is drawn in a frame. ONE, in any frame anybody
+     * looks at.
+     *
+     * A MEASURING INSTRUMENT, NOT A PROPOSAL, and it is here for the reason
+     * setPrepass is: the pass costs a few hundredths of a millisecond and this
+     * machine jitters by more than a whole one between two readings seconds
+     * apart, so the difference of two frames is not a small number, it is no
+     * number. Drawn k times and read as the SLOPE of milliseconds against k, the
+     * marginal cost of one pass falls out of a regression that averages the
+     * jitter over every point instead of standing on two of them. The k values
+     * are visited in a MIXED order by whoever drives this — a monotone sweep
+     * absorbs the machine's own drift into the slope and quotes it as cost.
+     *
+     * @param {number} k at least one
+     */
+    setSoftDepthPasses(k) {
+      softPasses = Math.max(1, Math.round(k) || 1);
+      return softPasses;
+    },
+
+    /**
+     * How far the service's two buffers are stepped down from the frame.
+     *
+     * A TIER'S LEVER, and the same one this file already pulls twice: the
+     * defocus is at a quarter and the sun's rays are at an eighth, both because
+     * what is in them has no edge in it. What is in these has none either — a
+     * distance, read only where a glow meets a surface, and a glow. Two halves
+     * the bandwidth of the whole service and quarters the fill of the layer.
+     *
+     * One is what ships until a measurement says otherwise, because the one
+     * thing a reduction here CAN show is a silhouette: a monolith's shoulder
+     * cutting a halo is drawn at this resolution and enlarged by the composite's
+     * bilinear filter.
+     *
+     * @param {number} divisor 1 or 2; the buffers are reallocated, which is a
+     *   hitch, so this is moved standing still like the sample count is.
+     */
+    setSoftDepthScale(divisor) {
+      const next = Math.max(1, Math.round(divisor) || 1);
+      if (next === softScale) return false;
+      softScale = next;
+      if (softDepthTarget) allocateSoftDepth();
+      return true;
+    },
+
+    /** What the depth service is doing, for a bench and for a verbale. */
+    softDepth() {
+      return {
+        seats: softDepthSeats,
+        forced: softForced,
+        live: softForced === null ? softDepthSeats > 0 : softForced,
+        layer: SOFT_DEPTH_LAYER,
+        format: softFormat,
+        width: softDepthTarget ? softDepthTarget.width : 0,
+        height: softDepthTarget ? softDepthTarget.height : 0,
+        scale: softScale,
+        passes: softPasses,
+      };
+    },
+
     setLut(texture) {
       composite.uniforms.tLut.value = texture;
       composite.uniforms.uLutSize.value = texture.image.height;
@@ -3325,9 +3856,13 @@ export function createPostPipeline(gl) {
       for (const target of focusTargets) target.dispose();
       for (const target of raysTargets) target.dispose();
       for (const target of probeTargets) target.dispose();
+      for (const target of [softDepthTarget, softGlowTarget]) if (target) target.dispose();
+      softDepthTarget = null;
+      softGlowTarget = null;
+      SOFT_DEPTH_SEAT.tSceneDepth.value = SOFT_DEPTH_REST;
       fallbackLut.dispose();
       quad.geometry.dispose();
-      for (const material of [prefilter, down, up, probeAf, defocus, sunrays, composite]) {
+      for (const material of [prefilter, down, up, lift, probeAf, defocus, sunrays, composite]) {
         material.dispose();
       }
     },
