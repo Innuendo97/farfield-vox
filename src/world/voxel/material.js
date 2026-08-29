@@ -159,6 +159,64 @@ export function voxelSettings() {
     // cent of the estimator's own family sd and pays for it in the joint, the
     // arris ratio and the bottom rung, all three of which improve.
     tintShape: 1.0,
+    // THE PALE MINORITY -- HOW MUCH BRIGHTER IT IS, AND HOW MUCH OF IT THERE IS.
+    //
+    // `pale` is the whole of the switch: at nought the term is exactly nought
+    // and the meadow is the one the previous delivery ships, bit for bit, so
+    // this can be swept against a delivery the way tintShape was.
+    //
+    // WHAT IT IS FOR, in the two numbers that say it. The estimator reads the
+    // spread inside its brightest family at 18.7% on the target and at 8.1%
+    // here, and the last unit measured that no width can close the gap. The
+    // reason is in the other column of the same reading: the target's brightest
+    // family is a TENTH of its faces and ours is a third. Read across the four
+    // windows that are meadow in both pictures the target traces the relation
+    // out on its own --
+    //
+    //     window          the target's bright family      its spread
+    //     prato-est                 4.7% of faces             15.7%
+    //     finestra-demo            10.1%                      18.7%
+    //     prato-ovest              21.9%                      15.3%
+    //     fascia-8-15              42.2%                      10.5%
+    //
+    // -- where it is a minority the spread is wide, and where it is nearly half
+    // the faces the spread falls to 10.5%, which is where ours already stands.
+    // So the lever is the SHARE and not the width, and this is the share.
+    //
+    // BOTH ARE SWEPT ON THE PAGE AND NEITHER IS CHOSEN. Twenty arms through one
+    // browser, the shipped meadow taken first and again last as the harness's
+    // own null, read by the estimator on the four windows at once. At the window
+    // the campaign judges on:
+    //
+    //     pale  share   family sd   its share   middle rung   bottom rung
+    //     0.00   --          8.2%       33.8%          0.74          0.34
+    //     1.20  0.08        10.4%       35.2%          0.72          0.34
+    //     1.50  0.08        10.9%       35.0%          0.72          0.34
+    //     1.75  0.08        11.4%       35.2%          0.72          0.34
+    //     2.00  0.08        11.5%       30.5%          0.75          0.33
+    //     1.50  0.12        10.0%       18.6%          0.77          0.31
+    //     2.00  0.10        11.0%       18.3%          0.76          0.31
+    //     3.00  0.10        12.9%       16.2%          0.74          0.30
+    //     the target        18.7%       10.1%          0.65          0.36
+    //
+    // 1.50 AT A TWELFTH IS THE LAST ROW WHERE EVERY WINDOW MOVES THE RIGHT WAY
+    // TOGETHER: the spread rises on all four -- 8.2 to 10.9, 7.5 to 9.4, 7.7 to
+    // 9.0, 8.0 to 8.1 -- and no bottom rung moves at the judged window or in the
+    // far band. Past 1.75 the far band's spread turns round and goes back down,
+    // and past 2.00 something else happens that looks like a win and is not: the
+    // estimator's brightest family CHANGES IDENTITY. It stops being the top of
+    // the tint's own draw and becomes this minority, so the share falls to 18%
+    // -- the right direction, read off a different population -- and the bottom
+    // rung goes with it, 0.34 to 0.31 to 0.30, against a target of 0.36 and an
+    // entry this file already lands.
+    //
+    // SO THE GAP IS NOT CLOSED AND THAT IS REPORTED RATHER THAN PAID FOR: 8.2 to
+    // 10.9 is a third of the way to 18.7 and the rest is not reachable from this
+    // knob without the ladder. What the knob DOES close is the other column, on
+    // the windows where the target's own family is a minority: 41.6% to 23.5%
+    // against a target of 21.9% at prato-ovest, and 37.9% to 18.0% at prato-est.
+    pale: 1.50,
+    paleShare: 0.08,
     // A little of that spread in hue as well as in level, because a meadow
     // varies in both and a pure luminance jitter reads as dirt on one colour.
     hue: 0.22,
@@ -267,6 +325,16 @@ const FRAGMENT = /* glsl */`
   uniform float uArris;
   uniform float uArrisPixels;
   uniform float uArrisLean;
+  uniform float uPale;
+  uniform float uPaleShare;
+
+  // The height the pale family's draw is taken at, and it is not a taste: the
+  // disc's cube tops straddle the field from five centimetres under it to
+  // twenty five over, so every cell of this carpet has a whole-number height
+  // within a couple of voxels of nought. Any plane well clear of that band
+  // makes the column's draw a different call from the cube's with certainty
+  // rather than with luck, and the hash is measured decorrelated at it.
+  const float PALE_PLANE = 512.0;
 
   ${SCENE_LIGHT_GLSL}
   ${FACE_LIGHT_GLSL}
@@ -302,6 +370,35 @@ const FRAGMENT = /* glsl */`
     float spread = draw.x - 0.5;
     spread *= mix(1.0, abs(2.0 * spread), uTintShape);
     float tint = 1.0 + uTint * spread;
+
+    // ------------------------------------------------- the pale minority
+    // WHY A SECOND DRAW AND NOT A WIDER FIRST ONE, which is the whole of why
+    // this term exists. The target's brightest family is 95 faces out of 944
+    // and carries a spread of 18.7% INSIDE ITSELF; the draw above, opened as
+    // far as its own ceiling allows, hands the estimator 418 out of 1258 and
+    // 8.1%. A draw that is symmetric about its middle cannot make a minority
+    // however wide it is made -- that is a statement about the SHAPE of a
+    // population and not about its width -- so the minority is drawn as one.
+    //
+    // AND THE TARGET'S IS MEADOW, taken apart before it was chased: inside that
+    // family the regions that are a CUBE'S OWN SIZE are 61 of the 95 and carry
+    // 20.5% on their own, so the spread is not the white flowers of C9 and not
+    // three pixel slivers of arris. It is V1's to build.
+    //
+    // DRAWN PER COLUMN. A pale patch of meadow is pale from its top face to its
+    // foot; a per cube draw would pale the top of a stack and leave its flank,
+    // which is a stripe and not a family. The column is this cell with its
+    // height taken out, hashed on a plane no cube of this carpet can stand at,
+    // so this draw and the tint's are never the same call on the same argument.
+    vec2 paleDraw = cellHash(vec3(cell.x, PALE_PLANE, cell.z));
+    // The membership is a STEP and not a ramp, because a family has an edge and
+    // because a step is one instruction. What varies inside it is the LIFT,
+    // taken from the second component of the same draw: that is what makes this
+    // a minority with a spread rather than a second flat level, and the spread
+    // inside is the half of the target's reading a plain brightening misses.
+    // At uPale nought the term is exactly nought and this is the shipped meadow
+    // bit for bit, which is what lets the setting be swept against a delivery.
+    tint *= 1.0 + step(paleDraw.x, uPaleShare) * uPale * (0.5 + paleDraw.y);
     // A little of it in hue: green against the two either side of it, which is
     // the axis a meadow actually varies along.
     vec3 shift = vec3(1.0 - uHue * (draw.y - 0.5), 1.0 + uHue * (draw.y - 0.5),
@@ -376,6 +473,8 @@ export function voxelMaterial(voxel, settings) {
       uAlbedo: { value: settings.albedo },
       uTint: { value: settings.tint },
       uTintShape: { value: settings.tintShape },
+      uPale: { value: settings.pale },
+      uPaleShare: { value: settings.paleShare },
       uHue: { value: settings.hue },
       uJoint: { value: settings.joint },
       uJointPixels: { value: settings.jointPixels },
@@ -402,6 +501,8 @@ export function voxelMaterial(voxel, settings) {
     u.uAlbedo.value.copy(settings.albedo);
     u.uTint.value = settings.tint;
     u.uTintShape.value = settings.tintShape;
+    u.uPale.value = settings.pale;
+    u.uPaleShare.value = settings.paleShare;
     u.uHue.value = settings.hue;
     u.uJoint.value = settings.joint;
     u.uJointPixels.value = settings.jointPixels;
