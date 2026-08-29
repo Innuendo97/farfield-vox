@@ -91,11 +91,11 @@ export const POSE_RIM_BACK = {
 
 // THE TWO THE CAMPAIGN IS JUDGED AT: the framings of the two target pictures.
 //
-// FITTED, NOT CHOSEN. Six numbers -- where the eye is, where it looks, how wide
-// it sees -- were solved against the SILHOUETTES of the five blocks in each
-// picture. The blocks themselves did not move: they are the least squares
-// reconstruction layout.js already carried, and letting them move would have
-// been fitting the world to the camera instead of the camera to the world.
+// FITTED, NOT CHOSEN. Five numbers -- where the eye stands on the plane, where
+// it looks, how wide it sees -- were solved against the SILHOUETTES of the five
+// blocks in each picture. The blocks themselves did not move: they are the least
+// squares reconstruction layout.js already carried, and letting them move would
+// have been fitting the world to the camera instead of the camera to the world.
 //
 // The residual is part of the pose and is written down with it. It is not small
 // because these pictures are not renders of this world: block 04 is drawn
@@ -105,29 +105,48 @@ export const POSE_RIM_BACK = {
 // is what these two poses are for. The CONTENT will differ; that is the
 // campaign's work and not the pose's.
 //
-// Neither is at EYE_HEIGHT, and that is the pictures talking: both were drawn
-// from about 2.75 m with an avatar in front of the eye, which is the third
-// person the committente chose. A first person walk at these framings is the
-// same numbers with the height brought back down.
+// THE SIXTH NUMBER IS NOT FITTED, BECAUSE IT CANNOT BE. The blocks stand fifteen
+// to thirty metres out, and over two metres of camera altitude they say the same
+// thing: lower the eye and the camera walks backwards and narrows its field to
+// match, and the residual does not move. So the pictures cannot say how high the
+// camera was; and since the figure in front of it is only ever measured against
+// that camera, they cannot say how tall the figure is either.
+//
+// SO THE FIGURE IS FIXED FROM OUTSIDE, AT 1.80 m, AND IT PINS THE CAMERA. It is
+// the walker's own body: his eye is at EYE_HEIGHT and his crown one world cell
+// above it, which is eighteen cells to the top of the head and fifty four of the
+// finer cells the figure itself is built from. First and third person are the
+// same body, which is why the height is a decision taken once and not a reading
+// taken twice.
+//
+// With the figure held there the altitude is no longer free: it is the one that
+// makes the span between the crown row and the sole row of each picture measure
+// 1.80 m. It is read off the TREND of figure height against camera altitude
+// across a swept window rather than off any single fit, because the residual is
+// flat along that window and the difference between neighbouring fits is the
+// search's own noise -- which leaves the altitude good to about a centimetre by
+// day and two and a half by night, and no better. A 1.80 m box standing where
+// each pose puts the figure then spans 0.381 (day) and 0.384 (night) of the
+// frame, against the 0.383 both pictures draw.
 
 export const POSE_VOX_DAY = {
   name: 'vox-giorno',
-  // rms 7.78 px, median 4.5 px, over 92 silhouette points on the five blocks
-  position: { x: 0.915, y: 2.733, z: 11.357 },
-  yaw: 2.506,
-  pitch: 1.009,
-  fov: 51.342,
+  // rms 8.02 px, median 6.4 px, over 81 silhouette points on the five blocks
+  position: { x: 0.599, y: 1.583, z: 14.215 },
+  yaw: 1.818,
+  pitch: 4.124,
+  fov: 44.199,
 };
 
 export const POSE_VOX_NIGHT = {
   name: 'vox-notte',
-  // rms 8.38 px, median 5.7 px, over 84 points. Fitted with its own thresholds:
+  // rms 6.78 px, median 3.9 px, over 82 points. Fitted with its own thresholds:
   // the night target's sky reads 10 to 30 where the day's reads 70 to 200, so a
   // silhouette there is a step of a dozen levels and not of a hundred.
-  position: { x: -0.732, y: 2.772, z: 11.697 },
-  yaw: -0.819,
-  pitch: 1.047,
-  fov: 52.710,
+  position: { x: -1.750, y: 1.330, z: 14.921 },
+  yaw: -2.854,
+  pitch: 4.543,
+  fov: 44.462,
 };
 
 /**
