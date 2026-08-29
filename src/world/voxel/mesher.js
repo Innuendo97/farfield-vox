@@ -216,12 +216,48 @@ export function tuftAt(x, z, gate = TUFT_GATE) {
  */
 export const CARPET_GRAIN = 0.45;
 
+// HOW WIDE A PILE IS, AND WHY IT IS NOT HOW TALL IT IS.
+//
+// A pile is three to six voxels tall by census. How WIDE it is was, until this
+// reading, nobody's decision: 0.42 m was the correlation the prototype happened
+// to be swept at, and the census of risers -- the only instrument the campaign
+// had on the carpet's geometry -- CANNOT SEE the difference between a tower and
+// a terrace. It says so itself: a wall of four voxels reads as a wall of four
+// voxels whether one column climbs it alone or eight climb it together.
+//
+// So the eye read it instead, on the crops, and read the same thing at two
+// distances: our three-and-over stand as SINGLE COLUMN TOWERS with their flanks
+// in shadow where the target lifts broad shouldered MASSES and bright
+// horizontal layers. That is a statement about shape, and it is now measured
+// rather than only seen -- v1-suolo/analisi/forma-scan.mjs reads the crest of
+// every mass in columns and the drawn faces in square metres, both validated in
+// both directions:
+//
+//   the crest of a mass       2.20 columns  ->  3.60      (median 2 -> 3)
+//   the flank's share of face 64.4%         ->  58.2%     (bare ground: 14.3%)
+//   the mean seam             2.26 voxels   ->  1.69
+//
+// AND THE WIDTH IS THE BAND. 0.85 m is already in this object: it is how far
+// out from a stone a mound may sit. A clump as wide as that band is a mound
+// that is ONE mass in its band instead of a speckle inside it, so the term has
+// one length rather than two unrelated ones. What it costs is measured below
+// and it costs nothing: the price FALLS.
 /** The pile: how far it reaches from the stone, how coarse it is, how tall. */
 export const MOUND = {
   band: 0.85,   // how far out from the stone a mound may sit, in metres
-  clump: 0.42,  // how big one clump of piled carpet is, in metres
+  clump: 0.85,  // how big one clump of piled carpet is, in metres
   gate: 0.56,   // how much of that band is piled and how much stays meadow
-  meadowGate: 0.70, // and how much of the OPEN meadow is, which is far less
+  // AND HOW MUCH OF THE OPEN MEADOW IS PILED, which is far less.
+  //
+  // 0.80 AND NOT 0.70, AND THE PRICE GOES DOWN. The arm was tuned on A1-bis's
+  // reading of the day target at the OLD poses -- thirteen to fourteen per cent
+  // of its risers three voxels or more. D3a re-read the same target at the
+  // fitted poses and got 10.46%, writing that the direction survives the refit
+  // and the figure does not. This gate is what closes that difference, and it
+  // closes it by piling LESS meadow, not more: 1.72x of the reallocated budget
+  // becomes 1.59x with the clump above. A price that falls is declared and not
+  // asked for; one that rose would need the committente's word first.
+  meadowGate: 0.80,
   low: 3,       // the census E-V4d names: three voxels ...
   high: 6,      // ... to six.
 };

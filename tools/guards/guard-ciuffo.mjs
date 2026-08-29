@@ -54,8 +54,25 @@ const AT_FOUNDATION = { on: 0.5360, off: 0.1985, tuft: 0.3375 };
 // And what the CARPET cost on the day the committente was shown its price and
 // chose it (E-DECISIONI.1), at the radius the tiers lay: 1.5362 q/col over a
 // bare field of 0.1903, measured offline and reproduced by the page digit for
-// digit. This is the yardstick a drift is read against from here on.
-const AT_TODAY = { on: 1.5362, off: 0.1903, carpet: 1.3459 };
+// digit. THIS ROW IS A RECORD AND IS NEVER RE-BASED: it is what he approved,
+// and the distance from it is printed on every run for as long as the two
+// differ, in whichever direction they differ.
+const AT_APPROVED = { on: 1.5362, off: 0.1903, carpet: 1.3459 };
+
+// AND WHAT IT COSTS NOW, WHICH IS LESS.
+//
+// The orchestrator judged the crops and passed everything except the SHAPE of
+// the carpet: our three-and-over stood as single column towers with their
+// flanks in shadow where the target lifts broad shouldered masses. The two
+// dials that answer that are in mesher.js -- MOUND.clump 0.42 -> 0.85 and
+// MOUND.meadowGate 0.70 -> 0.80 -- and BOTH OF THEM PILE LESS MEADOW, so the
+// bill went DOWN: 1.72x of the reallocated budget at vox-giorno became 1.59x.
+// A price that falls is declared and shipped; one that rose would have needed
+// the committente's word before a line was written.
+//
+// This is the yardstick a DRIFT is read against, because a drift is something
+// nobody meant. The line above is the yardstick a DECISION is read against.
+const AT_TODAY = { on: 1.4129, off: 0.1903, carpet: 1.2226 };
 
 /** Whether a constant is still the frozen one. Bit for bit: these are dials. */
 export const frozen = (actual, expected) => actual === expected;
@@ -67,9 +84,13 @@ if (process.argv.includes('--self')) {
     { what: 'a gate moved from thirds to halves is caught', caught: !frozen(0.3333, FROZEN.TUFT_GATE) },
     { what: 'the frozen pair passes', caught: frozen(0.30, FROZEN.TUFT_CORRELATION) && frozen(0.5, FROZEN.TUFT_GATE) },
     {
-      what: 'the carpet still costs what it cost when the committente was shown its price',
+      what: 'the carpet still costs what this file says it ships at',
       caught: Math.abs((meshDisc(null, true, SHIPPED_RADIUS).quadsPerColumn
         - meshDisc(null, false, SHIPPED_RADIUS).quadsPerColumn) - AT_TODAY.carpet) < 5e-4,
+    },
+    {
+      what: 'a yardstick left behind by a dial that moved is caught',
+      caught: Math.abs(1.3459 - AT_TODAY.carpet) >= 5e-4,
     },
   ]);
 }
@@ -97,10 +118,23 @@ report.line(`  THE CARPET ALONE         ${carpet.toFixed(4)} q/col`
   + `   (at the foundation, when it was only the tuft, ${AT_FOUNDATION.tuft.toFixed(4)})`
   + `, ${(share * 100).toFixed(0)}% of the rest`);
 
+// WHAT THE COMMITTENTE APPROVED, BESIDE WHAT IS ON THE CARD, EVERY RUN. Not a
+// gate: the price is his to move and V1's to spend. What this refuses to allow
+// is that the two part company QUIETLY, so the gap is printed whichever way it
+// points and the direction is named, because a bill that fell and a bill that
+// rose are two different conversations to have with him.
+const approved = carpet - AT_APPROVED.carpet;
+if (Math.abs(approved) >= 5e-4) {
+  report.line(`  against the price the committente approved (${AT_APPROVED.carpet.toFixed(4)} q/col, `
+    + `E-DECISIONI.1): ${approved > 0 ? '+' : ''}${approved.toFixed(4)} q/col, the bill has `
+    + `${approved > 0 ? 'RISEN -- his word is needed' : 'FALLEN -- declare it, do not ask'}`);
+}
+
 const drift = Math.abs(carpet - AT_TODAY.carpet);
 if (drift >= 5e-4) {
-  report.note(`the carpet's share has moved ${drift.toFixed(4)} q/col from the reading the `
-    + 'committente was priced at -- the constants are frozen, so what moved is the field under them');
+  report.note(`the carpet's share has moved ${drift.toFixed(4)} q/col from what this file says `
+    + 'ships -- either a dial in mesher.js moved without this file moving with it, or the '
+    + 'field underneath the dials moved on its own');
 }
 
 report.end();

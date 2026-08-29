@@ -60,10 +60,23 @@ const SHIPPED_RADIUS = Math.max(...TIERS.map((t) => t.voxelDiscRadius));
 //
 // SO THE WALL IS PUT BACK WHERE IT WAS, RELATIVE TO WHAT SHIPS. E-V1b records
 // the old margin exactly: 0.55 against a shipped 0.5262 is 4.3%. The same
-// margin over the approved 1.5362 is 1.602, and the wall is 1.60 -- 4.15%. It
+// margin over the approved 1.5362 is 1.602, and the wall was 1.60 -- 4.15%. It
 // is the same guard doing the same job against a different decision, and it is
 // NOT a wall raised to let a change through: the change was priced, put to the
 // committente in three arms, and chosen before a line of it was written.
+//
+// AND THEN IT CAME DOWN, BY THE SAME ARITHMETIC AND IN THE OTHER DIRECTION.
+// The orchestrator's eye passed everything of that arm except the SHAPE of the
+// carpet -- towers where the target lifts broad masses -- and the two dials
+// that answer it (MOUND.clump 0.42 -> 0.85, MOUND.meadowGate 0.70 -> 0.80)
+// both pile LESS meadow: the disc ships at 1.4129 q/col, not 1.5362. A wall
+// left at 1.60 would sit 13% above what ships and would not notice the carpet
+// growing a tenth of itself back. So the SAME 4.15% margin is taken over the
+// new figure -- 1.4715 -- and the wall is 1.47. Lowering a wall to follow a
+// bill that fell is the opposite of the move E-V1b warns about, and it is
+// written here rather than left implicit precisely because the two look alike
+// from a distance: what is forbidden is moving the wall so a number can pass,
+// and what is done here is moving it so a number could no longer hide.
 //
 // AND THE METRIC ITSELF IS ALREADY RETIRED, WHICH IS WHY THIS IS PROVISIONAL.
 // E-V1b: q/col rewards the wrong move -- taking the radius from 14 to 35
@@ -76,8 +89,8 @@ const SHIPPED_RADIUS = Math.max(...TIERS.map((t) => t.voxelDiscRadius));
 // lands, this whole block is replaced rather than adjusted.
 // ------------------------------------------------------------------------
 
-/** D1's wall, moved to E-DECISIONI.1's allocation. Provisional: see above. */
-const DISQUALIFY = 1.60;
+/** D1's wall, at the same margin over what ships. Provisional: see above. */
+const DISQUALIFY = 1.47;
 // D1's target. E-V1b retired it as an imposed number -- the absolute floor
 // under any partition of this field is 0.5035, so 0.45 is unreachable in any
 // world and the target's own meadow reads 1.54 -- but it is left printing,
@@ -96,19 +109,23 @@ export function verdict(perColumn) {
 if (process.argv.includes('--self')) {
   selfTest('guard-fusione', [
     { what: 'a disc at 1.70 q/col is disqualified', caught: verdict(1.70).disqualified },
-    { what: 'a disc at 1.6000001 q/col is disqualified', caught: verdict(1.6000001).disqualified },
+    { what: 'a disc at 1.4700001 q/col is disqualified', caught: verdict(1.4700001).disqualified },
     {
-      what: 'a disc at 1.50 q/col passes but is declared short of the target',
-      caught: !verdict(1.50).disqualified && verdict(1.50).missed,
+      what: 'the arm the committente approved would no longer pass this wall',
+      caught: verdict(1.5362).disqualified,
+    },
+    {
+      what: 'a disc at 1.45 q/col passes but is declared short of the target',
+      caught: !verdict(1.45).disqualified && verdict(1.45).missed,
     },
     {
       what: 'a disc at 0.44 q/col passes with nothing to declare',
       caught: !verdict(0.44).disqualified && !verdict(0.44).missed,
     },
     {
-      what: 'the measurement itself still lands where the committente was priced',
+      what: 'the measurement itself still lands where the shape correction put it',
       caught: Math.abs(meshDisc(null, true, SHIPPED_RADIUS).quadsPerColumn
-        - 1.536229886641629) < 1e-12,
+        - 1.4128966681597355) < 1e-12,
     },
   ]);
 }
