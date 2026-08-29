@@ -1,9 +1,9 @@
-import { ShaderMaterial, Vector3 } from 'three';
+import { ShaderMaterial, Vector4 } from 'three';
 import { SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS } from '../../core/sky.js';
 import { FACE_LIGHT_GLSL, faceLightUniforms } from '../face-light.js';
 import { FOG_GLSL, GROUND_EXPOSURE, fogUniforms } from '../air.js';
 import TERRAIN from '../../../assets-src/terrain/terrain.json';
-import { BODY, PALETTE } from './plan.js';
+import { BODY_M, PALETTE } from './plan.js';
 
 // THE FIGURE'S MATTER, AND IT IS THE WORLD'S.
 //
@@ -38,7 +38,7 @@ import { BODY, PALETTE } from './plan.js';
 //    pack, jeans, boots and skin. The obvious way to carry that is a palette
 //    index per vertex, and it is exactly the thing the recipe forbids and the
 //    guard rejects — and rightly, because it would also stop the merge that
-//    keeps him at a hundred and thirty nine quads.
+//    keeps him at a hundred and fifty four quads.
 //
 //    So the palette is REBUILT IN THE FRAGMENT out of the same arithmetic the
 //    tint already is: the fragment knows which cell it is in, and which garment
@@ -124,7 +124,22 @@ export function avatarSettings() {
     arris: 0.034,
     arrisPixels: 2.2,
     arrisLean: 1.0,
-    palette: PALETTE.map((p) => new Vector3(...p.albedo)),
+    // THE JUNCTION UNDER A STEP, and where its two numbers come from. Read down
+    // the spine of the day reference (v8-avatar/dev-c/stacco.mjs, and the raw
+    // column in sonda-colonna.mjs) the band under the pack's lid runs 11 px —
+    // 1.65 of his cells — and sits at a QUARTER of the luminance of the lid face
+    // above it. The page, before this, had about one cell at four fifths.
+    //
+    // A quarter is what the picture reads; 0.40 is what is applied, because the
+    // reference's quarter is the whole of that shadow — the light that does not
+    // arrive AND the surface turning away under a folded flap the plan draws as
+    // a square step. Taking the full three quarters out of a square step would
+    // put a black line on him where the reference has a soft one. The residual is
+    // declared rather than pushed: after it the band reads about half, against a
+    // quarter, and what is left belongs to the flap's shape.
+    overhang: 0.40,
+    overhangCells: 1.65,
+    palette: PALETTE.map((p) => new Vector4(...p.albedo, p.grain)),
   };
 }
 
@@ -149,22 +164,37 @@ const HASH_GLSL = /* glsl */`
  * Eight named uniforms cost nothing and are reachable by a live sweep, which is
  * how the pigments get fitted.
  */
-function garmentGlsl() {
-  const uniforms = PALETTE.map((p, i) => `  uniform vec3 uPal${i};   // ${p.id}`).join('\n');
-  const tests = BODY.map((b) => {
+function garmentGlsl(body) {
+  const uniforms = PALETTE.map((p, i) => `  uniform vec4 uPal${i};   // ${p.id}: rgb = albedo, a = grain`).join('\n');
+  const box = (b) => {
     const lo = `vec3(${b.x0.toFixed(1)}, ${b.y0.toFixed(1)}, ${b.z0.toFixed(1)})`;
     const hi = `vec3(${b.x1.toFixed(1)}, ${b.y1.toFixed(1)}, ${b.z1.toFixed(1)})`;
-    return `    if (all(greaterThanEqual(c, ${lo})) && all(lessThanEqual(c, ${hi}))) g = uPal${b.palette};`;
-  }).join('\n');
+    return `all(greaterThanEqual(c, ${lo})) && all(lessThanEqual(c, ${hi}))`;
+  };
+  const tests = body.map((b) => `    if (${box(b)}) g = uPal${b.palette};`).join('\n');
+  // FILLED IS A SEPARATE WALK AND IT RETURNS EARLY. garmentOf has to reach the
+  // LAST box that contains the cell, because order is what lets the face be laid
+  // into the head; "is anything here at all" does not care which box answers, so
+  // the first one ends it. On a solid cell that is a handful of tests rather than
+  // thirty, and the cells it is asked about are mostly solid.
+  const filled = body.map((b) => `    if (${box(b)}) return 1.0;`).join('\n');
   return `${uniforms}
 
   // Generated from src/world/avatar/plan.js, in the plan's own order: a cell
   // belongs to the LAST box that contains it, which is what lets the head be a
-  // solid of hair with a face laid into the front of it.
-  vec3 garmentOf(vec3 c) {
-    vec3 g = uPal0;
+  // solid of hair with a face laid into the front of it. The fourth channel is
+  // that garment's own grain, so which garment a pixel is on and how much its
+  // voxels vary are ONE lookup and cannot come apart.
+  vec4 garmentOf(vec3 c) {
+    vec4 g = uPal0;
 ${tests}
     return g;
+  }
+
+  // Is any part of the body in this cell? Same list, same order, first answer wins.
+  float filledAt(vec3 c) {
+${filled}
+    return 0.0;
   }
 `;
 }
@@ -198,7 +228,7 @@ const VERTEX = /* glsl */`
   }
 `;
 
-function fragment() {
+function fragment(body) {
   return /* glsl */`
   precision highp float;
 
@@ -216,12 +246,14 @@ function fragment() {
   uniform float uArris;
   uniform float uArrisPixels;
   uniform float uArrisLean;
+  uniform float uOverhang;
+  uniform float uOverhangCells;
 
   ${SCENE_LIGHT_GLSL}
   ${FACE_LIGHT_GLSL}
   ${HASH_GLSL}
   ${FOG_GLSL}
-  ${garmentGlsl()}
+  ${garmentGlsl(body)}
 
   void main() {
     vec3 n = normalize(vNormal);
@@ -240,9 +272,17 @@ function fragment() {
     float onScreen = uVoxel / pixel;
 
     // ------------------------------------------------- which garment, and its tint
-    vec3 base = garmentOf(cell);
+    //
+    // THE SPREAD IS THE GARMENT'S OWN, which is R8's whole point: one number for
+    // the figure paid for a jacket that varied too little with hair that varied
+    // far too little and reported the average as a success. The ceiling is not a
+    // taste either — at an amplitude of two a cell reaches albedo nought, which is
+    // a hole and not a colour, so plan.js holds the grains under it.
+    vec4 garment = garmentOf(cell);
+    vec3 base = garment.rgb;
     vec2 draw = cellHash(cell);
-    float tint = 1.0 + uTint * (draw.x - 0.5);
+    float spread = uTint * garment.a;
+    float tint = 1.0 + spread * (draw.x - 0.5);
     vec3 shift = vec3(1.0 - uHue * (draw.y - 0.5), 1.0,
                       1.0 + uHue * (draw.y - 0.5));
     vec3 albedo = base * tint * shift;
@@ -257,6 +297,35 @@ function fragment() {
     float joint = 1.0 - uJoint * (1.0 - smoothstep(0.0, width, border))
       * smoothstep(2.5, 5.0, onScreen);
     albedo *= joint;
+
+    // ------------------------------------------------ the junction, under a step
+    //
+    // THE ONE PIECE OF MICRO-OCCLUSION THE REFERENCE HAS AND THE JOINT CANNOT DO.
+    // The joint is a LINE at every cell border, the same on a flat panel as on a
+    // corner. What the two pictures also show — FASE 0 names it, "micro-AO solo
+    // alle giunzioni (gomiti, sotto-zaino), mai pozzi" — is a band UNDER a step:
+    // read down the spine of the day reference (v8-avatar/dev-c/stacco.mjs) the
+    // pack's lid is followed by 11 px, a cell and two thirds, at a quarter of the
+    // luminance of the face above it. The page had one cell at four fifths.
+    //
+    // A step is where the cell ABOVE this one, one place further OUT along this
+    // face's own normal, is solid: that cell's floor overhangs this face. Two
+    // cells are asked, so the band can fall off over the depth the picture shows
+    // rather than stopping dead at one. It costs two walks of the plan that end at
+    // the first box that answers.
+    //
+    // IT IS NOT A WELL. It only ever darkens what a solid actually hangs over, it
+    // reaches uOverhang at the lip and nothing a cell and a half below, and on a
+    // flat panel — which is most of him — both lookups come back empty and the
+    // term is exactly one.
+    vec3 out1 = vec3(0.0, 1.0, 0.0) + local;
+    float lip = filledAt(cell + out1);
+    float lip2 = filledAt(cell + out1 + vec3(0.0, 1.0, 0.0));
+    float upIn = fract(p.y / uVoxel);
+    float under = lip > 0.5 ? (1.0 - upIn)
+      : (lip2 > 0.5 ? (2.0 - upIn) : 99.0);
+    albedo *= 1.0 - uOverhang * max(0.0, 1.0 - under / uOverhangCells)
+      * (1.0 - abs(local.y)) * smoothstep(2.5, 5.0, onScreen);
 
     // ----------------------------------------------------------- the light
     vec3 light = faceLight(n);
@@ -287,7 +356,7 @@ function fragment() {
  * @param {object} settings  from avatarSettings(), held by reference so a sweep
  *                           on the page moves the frame without a rebuild
  */
-export function avatarMaterial(voxel, settings) {
+export function avatarMaterial(voxel, settings, body = BODY_M) {
   const uniforms = {
     uVoxel: { value: voxel },
     uTint: { value: settings.tint },
@@ -297,6 +366,8 @@ export function avatarMaterial(voxel, settings) {
     uArris: { value: settings.arris },
     uArrisPixels: { value: settings.arrisPixels },
     uArrisLean: { value: settings.arrisLean },
+    uOverhang: { value: settings.overhang },
+    uOverhangCells: { value: settings.overhangCells },
     // The sun, the exposure and the lifts, from the one seat that produces the
     // pair they act on. THE EXPOSURE IS THE GROUND'S, INHERITED AND NOT FITTED:
     // he stands on that ground, in that air, under that sun, and the campaign
@@ -311,7 +382,7 @@ export function avatarMaterial(voxel, settings) {
   const material = new ShaderMaterial({
     uniforms,
     vertexShader: VERTEX,
-    fragmentShader: fragment(),
+    fragmentShader: fragment(body),
     fog: false,
   });
 
@@ -324,6 +395,8 @@ export function avatarMaterial(voxel, settings) {
     u.uArris.value = settings.arris;
     u.uArrisPixels.value = settings.arrisPixels;
     u.uArrisLean.value = settings.arrisLean;
+    u.uOverhang.value = settings.overhang;
+    u.uOverhangCells.value = settings.overhangCells;
     settings.palette.forEach((colour, i) => { u[`uPal${i}`].value.copy(colour); });
   };
 

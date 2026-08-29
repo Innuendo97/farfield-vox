@@ -2,7 +2,7 @@ import { BufferAttribute, BufferGeometry, Mesh, Sphere, Vector3 } from 'three';
 import { VOXEL } from '../voxel/pure.js';
 import { build } from './mesher.js';
 import { avatarMaterial, avatarSettings } from './material.js';
-import { SUBDIVISION } from './plan.js';
+import { BODIES, SUBDIVISION } from './plan.js';
 
 // THE DOOR. Everything above this line is arithmetic that runs under plain node;
 // this is the one file that knows there is a scene to put him in.
@@ -27,9 +27,11 @@ export const AVATAR_VOXEL = VOXEL / SUBDIVISION;
  * the layer. This returns the body and the numbers that were true of it when it
  * was built, so that a budget can be quoted from the same object the frame draws.
  */
-export function buildAvatar() {
+export function buildAvatar(kind = 'm') {
+  const plan = BODIES[kind];
+  if (!plan) throw new Error(`no such body: ${kind}`);
   const settings = avatarSettings();
-  const body = build(AVATAR_VOXEL);
+  const body = build(AVATAR_VOXEL, plan);
 
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new BufferAttribute(body.positions, 3));
@@ -41,9 +43,9 @@ export function buildAvatar() {
     new Vector3(body.sphere.x, body.sphere.y, body.sphere.z), body.sphere.radius,
   );
 
-  const material = avatarMaterial(AVATAR_VOXEL, settings);
+  const material = avatarMaterial(AVATAR_VOXEL, settings, plan);
   const mesh = new Mesh(geometry, material);
-  mesh.name = 'v8-avatar';
+  mesh.name = `v8-avatar-${kind}`;
   mesh.frustumCulled = true;
   // He is never in the first person's frame, and the switch is a flag rather
   // than an add and a remove: taking a mesh out of a scene and putting it back
@@ -51,6 +53,7 @@ export function buildAvatar() {
   mesh.visible = false;
 
   return {
+    kind,
     mesh,
     material,
     settings,

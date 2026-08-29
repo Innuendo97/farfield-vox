@@ -20,7 +20,7 @@
 // leaves as one quad. Nothing is welded afterwards: a quad brings its own four
 // corners, so triangles are twice the quads and vertices four times them, and
 // there is no shared-vertex pass to go wrong.
-import { BODY, CELLS, paletteAt } from './plan.js';
+import { BODY_M, CELLS, paletteAt } from './plan.js';
 
 /**
  * The occupancy lattice, one byte a cell, with the palette in it.
@@ -30,12 +30,12 @@ import { BODY, CELLS, paletteAt } from './plan.js';
  * personalisation — should not have to walk the box list a second time and risk
  * walking it differently. Empty is -1.
  */
-export function fill(bounds) {
+export function fill(bounds, body = BODY_M) {
   const nx = bounds.x1 - bounds.x0 + 1;
   const ny = bounds.y1 - bounds.y0 + 1;
   const nz = bounds.z1 - bounds.z0 + 1;
   const cells = new Int8Array(nx * ny * nz).fill(-1);
-  for (const b of BODY) {
+  for (const b of body) {
     if (!b.solid) continue;
     for (let j = b.y0; j <= b.y1; j++) {
       for (let k = b.z0; k <= b.z1; k++) {
@@ -50,7 +50,7 @@ export function fill(bounds) {
   // loop above already gives — but only for solid boxes. Anything that colours
   // without filling is applied here, over cells that already exist, so that the
   // one answer in the plan stays the one answer.
-  for (const b of BODY) {
+  for (const b of body) {
     if (b.solid) continue;
     for (let j = b.y0; j <= b.y1; j++) {
       for (let k = b.z0; k <= b.z1; k++) {
@@ -226,19 +226,19 @@ export function surface(grid, cell) {
 }
 
 /** Everything about the figure that can be known without a browser. */
-export function build(cell) {
+export function build(cell, body = BODY_M) {
   const b = (() => {
     const out = {
       x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity, z0: Infinity, z1: -Infinity,
     };
-    for (const part of BODY) {
+    for (const part of body) {
       out.x0 = Math.min(out.x0, part.x0); out.x1 = Math.max(out.x1, part.x1);
       out.y0 = Math.min(out.y0, part.y0); out.y1 = Math.max(out.y1, part.y1);
       out.z0 = Math.min(out.z0, part.z0); out.z1 = Math.max(out.z1, part.z1);
     }
     return out;
   })();
-  const grid = fill(b);
+  const grid = fill(b, body);
   return { grid, census: census(grid), ...surface(grid, cell) };
 }
 
