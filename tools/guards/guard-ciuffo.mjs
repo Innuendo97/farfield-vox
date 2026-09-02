@@ -109,7 +109,10 @@ const AT_APPROVED = { on: 1.5362, off: 0.1903, carpet: 1.3459 };
 // U-V1-F (E-V1i) replaced the per-column grain with a floor and placed
 // mounds: the carpet now costs 0.4404 q/col over the bare field, and the full
 // disc reads 0.6323. The approved row above stays as the ceiling it became.
-const AT_TODAY = { on: 0.6323, off: 0.1919, carpet: 0.4404 };
+// U-V1-F2 (E-V1k): one earth bank per mound, the floor's grain kept off its
+// back, and the corridor's verge turned to ground: 0.5334 with the carpet,
+// 0.1900 bare, 0.3434 for the carpet alone.
+const AT_TODAY = { on: 0.5334, off: 0.1900, carpet: 0.3434 };
 
 /** Whether a constant is still the frozen one. Bit for bit: these are dials. */
 export const frozen = (actual, expected) => actual === expected;

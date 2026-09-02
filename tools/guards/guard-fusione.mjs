@@ -82,7 +82,8 @@ setGroundHole(groundHoleAt);
 //   clump 0.85 alone (grana 0.45)   ships 1.4442   wall 1.50
 //   grana 0.53 on top of it         ships 1.5261   wall 1.59
 //   the corridor's own hole         ships 1.5270   wall 1.59
-//   a floor with placed mounds      ships 0.6323   wall 0.66   <- now (E-V1i)
+//   a floor with placed mounds      ships 0.6323   wall 0.66   (E-V1i)
+//   one bank per mound, verge       ships 0.5334   wall 0.56   <- now (E-V1k)
 //
 // THE LAST ROW MOVED THE SHIP AND DID NOT MOVE THE WALL, and that is worth
 // saying rather than leaving to be noticed. The disc stopped laying 923 columns
@@ -124,8 +125,8 @@ setGroundHole(groundHoleAt);
 // ------------------------------------------------------------------------
 
 /** D1's wall, at the same margin over what ships. Provisional: see above.
- * Moved with U-V1-F (E-V1i): the disc ships at 0.6323 q/col, 4.15% over is 0.66. */
-const DISQUALIFY = 0.66;
+ * Moved with U-V1-F2 (E-V1k): the disc ships at 0.5334 q/col, 4.15% over is 0.56. */
+const DISQUALIFY = 0.56;
 // D1's target. E-V1b retired it as an imposed number -- the absolute floor
 // under any partition of this field is 0.5035, so 0.45 is unreachable in any
 // world and the target's own meadow reads 1.54 -- but it is left printing,
@@ -155,8 +156,8 @@ if (process.argv.includes('--self')) {
         - Number((meshDisc(null, true, SHIPPED_RADIUS).quadsPerColumn * 1.0415).toFixed(2))) < 5e-3,
     },
     {
-      what: 'a disc at 0.60 q/col passes but is declared short of the target',
-      caught: !verdict(0.60).disqualified && verdict(0.60).missed,
+      what: 'a disc at 0.50 q/col passes but is declared short of the target',
+      caught: !verdict(0.50).disqualified && verdict(0.50).missed,
     },
     {
       what: 'a disc at 0.44 q/col passes with nothing to declare',
@@ -165,7 +166,7 @@ if (process.argv.includes('--self')) {
     {
       what: 'the measurement itself still lands where the shape and grain put it',
       caught: Math.abs(meshDisc(null, true, SHIPPED_RADIUS).quadsPerColumn
-        - 0.6322847189398316) < 1e-12,
+        - 0.5334103601001348) < 1e-12,
     },
   ]);
 }
