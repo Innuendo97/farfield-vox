@@ -504,7 +504,12 @@ export function bareRaisedAt(x, z) {
  */
 export function moundAt(x, z) {
   const { near, anchor } = toStone(x, z);
-  if (!anchor || near < 0 || near > anchor.band) return 0;
+  if (!anchor || near > anchor.band) return 0;
+  // Under the stone the bank stays at its own top rather than falling away.
+  // Nobody sees those columns -- the masonry is drawn over them -- but the
+  // walker's own floor is read there, and a bank that dropped to nothing at the
+  // footprint would put a six voxel cliff along every block in the world.
+  if (near < 0) return anchor.peak;
   // Ramped and not piled: one voxel a terrace, from nothing at the band's own
   // edge up to the stone. What stood here before put a wall three voxels tall
   // at that edge, which is a thing no meadow does and no walker can climb.
@@ -681,7 +686,12 @@ export function columnTop(ix, iz, tuft = true, radius = DISC_RADIUS) {
   // two after it are the masses he calls «alture sparse». Not one of the three
   // is a height drawn per column against its neighbours, which is the whole of
   // what he named as wrong.
-  return step + tuftAt(x, z) + moundAt(x, z) + meadowMoundAt(x, z);
+  // THE TALLEST THING THAT CLAIMS A COLUMN, AND NOT THE SUM OF THEM. A mound
+  // that reached into a bank used to ADD to it, which put a mass ten voxels
+  // tall against a stone and a step the walker's body cannot damp beside it.
+  // Neither term is a quantity of earth to be totalled: each one says how high
+  // the ground stands here, and where two say it the answer is the higher.
+  return step + tuftAt(x, z) + Math.max(moundAt(x, z), meadowMoundAt(x, z));
 }
 
 /** The whole disc, in chunk coordinates: every chunk with a column in it. */
