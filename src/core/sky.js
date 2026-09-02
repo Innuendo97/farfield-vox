@@ -42,7 +42,30 @@ const glsl = (value, digits = 8) => value.toFixed(digits);
 // Depth of the analytic fog, in metres, chosen so the ground plane has fully
 // dissolved before its far edge could draw a false horizon across the frame,
 // and so nothing inside the walkable area is tinted.
-const FOG_DENSITY = 0.013;
+//
+// AND NOW ALSO FITTED, because that first reading was of a horizon and the
+// monoliths are what the frame is about. It was 0.013, and at 0.013 the stone
+// thirty metres out was more than half air: the fraction of pure air in the far
+// face read 0.45 against the 0.031 to 0.211 the reference carries over the same
+// depths, its level 89.8 against 38.2, its chroma 19.6 against 8.5. The whole
+// of the blue haze on the standing stones was this one number — switching the
+// air off took that chroma to 9.9 on its own.
+//
+// FITTED AGAINST THREE READINGS AT ONCE, and it is the value whose WORST one is
+// smallest. The fraction of air by depth now lands inside the reference's band
+// at every window; the level and the chroma of the near face end 11.8 per cent
+// under and 11.9 per cent over, and they are equal there because they pull
+// against each other. Meeting both exactly is not possible from here: the air
+// this sky puts on a face is 37 levels darker than the reference's, so the
+// amount of it that brings a face up to the right level brings too much of its
+// colour up with it. That difference belongs to the ramp and not to this.
+//
+// The density enters the integral SQUARED, so a factor here is a much larger
+// factor on the haze, and it carries the whole of the shape with distance: the
+// height scale beside it moves the fitted window by half a level over thirty to
+// eighty metres, and the far frame past a hundred metres never reaches this at
+// all, because it carries its own measured share of air per vertex.
+const FOG_DENSITY = 0.0059;
 
 // ------------------------------------------------------------- the preset
 //
