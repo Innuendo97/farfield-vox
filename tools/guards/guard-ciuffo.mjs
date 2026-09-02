@@ -106,7 +106,10 @@ const AT_APPROVED = { on: 1.5362, off: 0.1903, carpet: 1.3459 };
 // stone -- and a ratio that loses its cheapest denominator goes up while the
 // bill goes down. The bill is 1 356 quads and 2 712 triangles, in the same file.
 // A row left behind at 1.3358 would have called a decided change a drift.
-const AT_TODAY = { on: 1.5270, off: 0.1919, carpet: 1.3351 };
+// U-V1-F (E-V1i) replaced the per-column grain with a floor and placed
+// mounds: the carpet now costs 0.4404 q/col over the bare field, and the full
+// disc reads 0.6323. The approved row above stays as the ceiling it became.
+const AT_TODAY = { on: 0.6323, off: 0.1919, carpet: 0.4404 };
 
 /** Whether a constant is still the frozen one. Bit for bit: these are dials. */
 export const frozen = (actual, expected) => actual === expected;
