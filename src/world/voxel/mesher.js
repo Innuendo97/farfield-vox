@@ -1,5 +1,5 @@
 import { heightAt, pathCoord, pathRun, smoothstep } from '../terrain-field.js';
-import { AREA_CENTER, MONOLITHS } from '../layout.js';
+import { AREA_CENTER, MONOLITHS, PLATFORM, STAIRS } from '../layout.js';
 // The plan and not the meshes: where the boulders stand is a number in a file,
 // and rocks.js -- which is where they become geometry -- reaches three.js. The
 // import attribute is what lets the same line be read by node and by the
@@ -165,145 +165,198 @@ export function tuftAt(x, z, gate = TUFT_GATE) {
 }
 
 // ======================================================================
-// THE CARPET, AS THE TARGET DRAWS IT -- and it is the committente's word
-// and not a taste taken here (E-DECISIONI.1: «A - come il target»).
+// THE MEADOW IS A FLOOR WITH MOUNDS PUT ON IT, and that is the committente's
+// own reading of the target rather than a taste taken here (E-DECISIONI4):
 //
-// WHAT THE TUFT ABOVE CANNOT DO, MEASURED RATHER THAN ARGUED. A1-bis read the
-// day target's own meadow in seven windows that hold no stone at all and found
-// the census of its risers to be 59 / 26 / 14 -- fourteen per cent of them are
-// THREE VOXELS OR MORE. The tuft is plus or minus one voxel, so its tallest
-// possible wall is two: it cannot make that fourteen per cent at any
-// correlation length and at any gate. Shortening the correlation does not get
-// there either; it reaches two thirds of the target's step density and then
-// RESONATES, because at 0.10 m the noise's own lattice lands exactly on the
-// voxel lattice. That is a wall and not a tuning problem.
+//   «UN CAMPO PIANEGGIANTE DI BASE con voxel d'erba e fiori qua e la'» and
+//   «PICCOLE E MEDIE ALTURE SPARSE ... composizioni, cumuli ben orchestrati
+//   che risultano veri e belli», against what stood here before it, which he
+//   named too: «voxel ingiustificati come se ognuno dovesse avere per forza
+//   una differenza di altezza con quelli accanto».
 //
-// SO THE CARPET IS THREE TERMS, AND EACH ONE ANSWERS A READING:
+// WHAT THAT REPLACES, AND WHY THE READING IT REPLACES WAS NOT WRONG SO MUCH AS
+// BLIND. The carpet this file used to lay was a STATISTIC. A share of columns
+// took their step from their own hash -- the grain -- and piles three to six
+// voxels tall were drawn from a noise over the whole meadow. It was fitted to
+// a census of RISERS read off the day target, fourteen per cent of them three
+// voxels or more, and that census is true: it was read correctly, twice, by
+// two units. What a census of risers CANNOT say is whether those risers stand
+// apart, one column at a time, or together, as the flanks of a few masses. It
+// said so about itself in the verbale of D3b. They stand together.
 //
-//   THE GRAIN      a share of columns take their state from their own hash
-//                  instead of from the smooth tuft, which is what
-//                  "uncorrelated" means for a carpet. It carries the step
-//                  density, and it keeps the amplitude at exactly one voxel
-//                  either way.
-//   THE MOUNDS     E-V4d: what the targets draw as "bushes" against the stone
-//                  are not plants, they are the carpet PILED UP, three to six
-//                  voxels of it, banked on a block's foot or a boulder's flank.
-//                  The stone they lean on is V2's and is not touched here.
-//   THE MEADOW     and the same pile in the OPEN meadow, which is where the
-//                  three-voxel risers of the target's own census actually are.
-//                  E-V1b settled the attribution: they are V1's, because V4's
-//                  accents are seeded at 0.04-0.09 per square metre and cannot
-//                  make fourteen per cent of the risers of anything.
+// SO THE ARITHMETIC IS A PLACEMENT AND NOT A DISTRIBUTION. It is still a FIELD
+// -- a pure function of the point, defined everywhere, identical wherever it is
+// evaluated, reproducible by a second implementation -- so the two rules at the
+// top of this file survive whole: nothing per voxel ever reaches a vertex, and
+// the step is one everywhere except where a mound means it not to be.
 //
-// EVERY ONE OF THEM IS A FIELD -- a pure function of the point, defined
-// everywhere, reproducible by a second implementation -- so the two rules at the
-// top of this file survive intact: the step is still ONE, and nothing per voxel
-// ever reaches a vertex. What changes is the arithmetic of columnTop and
-// nothing else in the file.
+//   THE FLOOR    the field, quantised, and the smooth tuft. Measured over the
+//                whole disc: 99.36% of neighbouring pairs stand within ONE
+//                voxel of each other and not one column in the meadow stands
+//                two proud of all four of its neighbours.
+//   THE MOUNDS   discrete masses on a lattice, one seat to a cell, jittered
+//                inside it: a flat top, terraced flanks, two to four voxels.
+//   THE BANK     E-V4d: what the targets draw as "bushes" against the stone is
+//                the meadow PILED UP against it. One mass to a block and to a
+//                boulder, PLACED and terraced, where a noise used to be.
 //
-// AND THE PRICE WAS PAID BEFORE THE CODE WAS WRITTEN. D3a priced this arm at
-// 1.73x of the reallocated budget with the frozen engine reproducing the page
-// digit for digit, the committente was asked, and the committente chose it.
+// AND THE LATTICE IS WHAT MAKES «MAI DUE ATTACCATI» A PROPERTY AND NOT A HOPE.
+// A seat's whole reach is bounded to stay inside its own cell -- the jitter it
+// is allowed is the cell's half minus the largest reach it can draw -- so a
+// point belongs to at most ONE seat, finding it is a single cell lookup rather
+// than a search over nine, and two masses can never meet. None of that came out
+// of a sweep: it is arithmetic, and it is the same arithmetic that makes the
+// term cost three hashes.
 
 /**
- * How many columns take the grain instead of the smooth tuft, as a share.
+ * The mounds, and the bank against the stone: every number the shape has.
  *
- * A THIRD DIAL ON THE GEOMETRY WEARING THE CLOTHES OF AN ART CHOICE, like the
- * two above it, and the largest of the three: it is most of the difference
- * between a meadow that costs 0.53 quads a column and one that costs 1.54.
- * A1-bis swept it and 0.45 was where the field statistic landed on the target's
- * own, read by the same estimator on both. It was not fitted to a budget.
+ * THE THREE THE COMMITTENTE WAS ASKED ABOUT LIVE HERE AS DATA, which is the
+ * whole reason this object has the fields it has. His word on any of the three
+ * is a number in this object and not a change of mechanism:
  *
- * 0.45 -> 0.53, AND THIS ONE WAS ASKED FOR RATHER THAN DECLARED.
+ *   D-F1  how many mounds there are           `density`
+ *   D-F2  which flanks show bare earth        `EARTH` below
+ *   D-F3  how tall they are in the open       `height`, and `bank` at the stone
  *
- * The shape correction above -- the clump as wide as its band -- fixed the
- * flank and the crest, and it CANNOT touch the DOUBLE STEP: gathering the same
- * piled meadow into fewer, broader masses changes where the edge is, not how
- * many risers stand two voxels tall. The double step is the second bucket of
- * the target's own distribution (21.51%) and the one the carpet stands
- * furthest from, and THIS is the only dial that moves it. 0.53 buys 16.50% ->
- * 17.31% on the field, 11.32% -> 12.41% on the painting, and it lands the
- * flank share at 62.04% against the target's 62.58%: half a point.
- *
- * WHAT IT COSTS AND WHY IT IS THIS NUMBER AND NOT A ROUNDER ONE. It is a bill
- * that ROSE -- 1.62x -> 1.71x of the reallocated budget at vox-giorno -- so it
- * was priced before it was taken, and the first value proposed was REFUSED:
- * 0.57 draws 154 220 triangles, 1.752x against a ceiling of 1.73x, measured on
- * the page through the green gate and not modelled. 0.53 is the largest value
- * that fits under that ceiling: 150 710 triangles, 1.7126x, 1 530 triangles of
- * margin. A price that falls is declared; this one rose, and the word for it
- * was given before a line was written.
+ * The defaults are how the target reads (F.1), and they are in force until he
+ * says otherwise.
  */
-export const CARPET_GRAIN = 0.53;
-
-// HOW WIDE A PILE IS, AND WHY IT IS NOT HOW TALL IT IS.
-//
-// A pile is three to six voxels tall by census. How WIDE it is was, until this
-// reading, nobody's decision: 0.42 m was the correlation the prototype happened
-// to be swept at, and the census of risers -- the only instrument the campaign
-// had on the carpet's geometry -- CANNOT SEE the difference between a tower and
-// a terrace. It says so itself: a wall of four voxels reads as a wall of four
-// voxels whether one column climbs it alone or eight climb it together.
-//
-// So the eye read it instead, on the crops, and read the same thing at two
-// distances: our three-and-over stand as SINGLE COLUMN TOWERS with their flanks
-// in shadow where the target lifts broad shouldered MASSES and bright
-// horizontal layers. That is a statement about shape, and it is now measured
-// rather than only seen -- v1-suolo/analisi/forma-scan.mjs reads the crest of
-// every mass in columns and the drawn faces in square metres, both validated in
-// both directions:
-//
-//   the crest of a mass       2.20 columns  ->  4.30      (median 2 -> 4)
-//   the flank's share of face 65.3%         ->  60.9%     (bare ground: 14.3%)
-//   the mean seam             2.25 voxels   ->  1.78
-//
-// AND THE WIDTH IS THE BAND. 0.85 m is already in this object: it is how far
-// out from a stone a mound may sit. A clump as wide as that band is a mound
-// that is ONE mass in its band instead of a speckle inside it, so the term has
-// one length rather than two unrelated ones. What it costs is measured below
-// and it costs nothing: the price FALLS.
-/** The pile: how far it reaches from the stone, how coarse it is, how tall. */
 export const MOUND = {
-  band: 0.85,   // how far out from the stone a mound may sit, in metres
-  clump: 0.85,  // how big one clump of piled carpet is, in metres
-  gate: 0.56,   // how much of that band is piled and how much stays meadow
-  // AND HOW MUCH OF THE OPEN MEADOW IS PILED, which is far less.
-  //
-  // IT WENT TO 0.80 AND CAME BACK, AND THE ROUND TRIP IS THE MEASUREMENT.
-  //
-  // Raising it was meant to close a difference of readings: the arm was tuned on
-  // A1-bis's count of the day target at the OLD poses, thirteen to fourteen per
-  // cent of its risers three voxels or more, and D3a re-read the same target at
-  // the fitted poses and got 10.46%. At the clump this object used to carry,
-  // 0.80 landed the tail on that figure and cost less.
-  //
-  // AT THE CLUMP ABOVE IT DOES NOT, AND THE TWO DIALS TURN OUT TO CUT THE SAME
-  // THING. The three-and-over risers of a mass ARE its outer edge. Widening the
-  // clump gathers the same piled meadow into half as many masses, so it removes
-  // edge; raising this gate removes masses, so it removes edge too. Together
-  // they took the tail from 12.66% of the painted risers to 2.65%, against a
-  // target of 10.46% -- past the mark and out the other side. Measured, both
-  // arms rendered at the fitted camera and read with the same estimator:
-  //
-  //                          flank   tail   double step   price
-  //   gate 0.80, clump 0.85  58.28%  2.65%    10.66%      1.59x
-  //   gate 0.70, clump 0.85  61.16%  5.82%    11.32%      1.62x   <- this
-  //   the day target         62.58% 10.46%    21.51%
-  //
-  // So the gate is back at the value the committente chose and the WIDTH does
-  // the shape work alone. Both figures in that table are at CARPET_GRAIN 0.45,
-  // which is where they were read; the grain then went to 0.53 for the double
-  // step alone -- see its own note -- and carried the flank to 62.04% and the
-  // price to 1.71x. The gate is not what moved.
-  meadowGate: 0.70,
-  low: 3,       // the census E-V4d names: three voxels ...
-  high: 6,      // ... to six.
+  // The lattice a seat may stand in. Five metres holds one mass to about
+  // forty-five square metres at the density below, which is the target's own
+  // spacing: F.1 counts its masses at three to six metres apart and the fork's
+  // eye read one to every thirty to fifty square metres of meadow in frame.
+  cell: 4.5,
+  // How many of those cells carry a mass at all. D-F1: the same everywhere,
+  // which is the default because it is how the target reads and because a
+  // meadow that thinned with distance would be a decision about ground the
+  // picture never shows.
+  density: 0.62,
+  // How far one mass reaches, in metres, before the lean below is applied.
+  // 1.7 to 3.8 metres across, against the 1.5 to 3.5 the fork read.
+  reach: { low: 0.80, high: 1.45 },
+  // HOW FAR FROM ROUND IT IS ALLOWED TO BE, and it is not a decoration: a
+  // circle is the one shape a meadow never draws, and a field of circles reads
+  // as a field of circles at the first glance from any pose. The mass is
+  // stretched along its own bearing and squeezed across it, which costs one
+  // rotation and keeps the area it covers the same.
+  lean: 0.22,
+  // How much of the reach is flat top. The target's masses have a CROWN --
+  // «cima piatta o a due terrazze» -- and a cone has none.
+  plateau: 0.40,
+  // Whole voxels, in the open field. D-F3 = A: three to four is what the fork
+  // read in the foreground, and six is only allowed against the stone.
+  height: { low: 2, high: 4 },
+  // How many terraces the flank falls in. Two terraces on a four voxel mass
+  // give a step of two -- which is the flank the target shows bare earth on --
+  // and three give steps of one. Both are in the target and both are here.
+  terraces: { low: 2, high: 3 },
+  // ------------------------------------------------- and against the stone
+  // How far out from a block or a boulder the bank reaches, in metres. Wider
+  // than the old band because this one has to RAMP: the meadow climbs to the
+  // stone in one-voxel steps instead of standing up in a wall at the band's
+  // edge, which is what a pile drawn from a noise did.
+  band: 1.15,
+  // How tall it stands where it meets the stone. E-V4d's own census.
+  bank: { low: 3, high: 6 },
 };
 
-// Where the ground already rises against the stone, which is where the piles
-// are anchored: the blocks that stand in grass, and the boulders whose places
-// were traced back onto the meadow off the target's own pixels. Nothing here is
-// a position invented for the carpet.
+/**
+ * Which faces of a mound show bare earth rather than grass.
+ *
+ * D-F2, AS DATA. The default is A -- what the target draws and what the fork
+ * read: earth only where the ground rises MORE THAN ONE VOXEL AT ONCE, and only
+ * on the flanks that face the eye or the corridor. Grass everywhere else, and
+ * grass on every crown.
+ *
+ * `minStep` is the whole of "steep": a flank that climbs one voxel is a step in
+ * a meadow and keeps its grass; one that climbs two is a cut bank and shows
+ * what it is cut into. Setting it to one is answer B, all the flanks.
+ */
+export const EARTH = {
+  // How tall a flank has to be, in voxels, before it shows what it is cut into.
+  //
+  // ONE, AND IT IS A CORRECTION TO THE READING THIS MANDATE CAME WITH. The fork
+  // read the target's bare banks as standing where the ground «sale piu' di un
+  // voxel di colpo», which is two, and that is what was built first. Measured
+  // against the target's own picture it does not hold: at two the meadow shows
+  // bare earth on 2.05% of its faces where the target shows it on 9.3% of the
+  // ground it draws outside the corridor (F.1, v1-suolo/forma/f1/f1.json), and
+  // read at the cubes themselves the target's brown faces are ONE cube tall
+  // with grass on top of them. So the threshold is one, the number it was
+  // measured against is written here beside it, and it stays a number: D-F2's
+  // answer B is this at one with `toEye`/`toPath` both off, and C is a term
+  // this file does not have yet.
+  minStep: 1,
+  // Toward the eye, which in this world is south: the reference camera stands
+  // at z 14 and looks north, so a face whose outward bearing is +z is a face
+  // the picture is of. And toward the corridor, which is the other thing the
+  // target shows earth against -- read off pathCoord's own sign, so the two
+  // sides of the path answer opposite ways and neither is a number typed here.
+  toEye: true,
+  toPath: true,
+};
+
+
+/**
+ * Whether a flank of this bearing, standing here, shows bare earth.
+ *
+ * TWO BEARINGS AND NEITHER IS A NUMBER TYPED HERE. South is the eye: the pose
+ * the whole campaign judges on stands at z 14 and looks north, so a face whose
+ * outward bearing is +z is a face the picture is OF, and it is the one the
+ * target draws its bare banks on. The other is the corridor, and which lateral
+ * face turns toward it is read off pathCoord's OWN SIGN -- so the two sides of
+ * the path answer opposite ways, the answer follows the path where the path
+ * wanders, and nothing here has to know where it runs.
+ *
+ * @param {number} face one of FACE
+ * @param {number} x
+ * @param {number} z
+ */
+export function earthFacing(face, x, z) {
+  if (EARTH.toEye && face === FACE.SOUTH) return true;
+  if (!EARTH.toPath) return false;
+  const side = pathCoord(x, z);
+  return (side > 0 && face === FACE.WEST) || (side < 0 && face === FACE.EAST);
+}
+
+// ------------------------------------------------------------- the seats
+//
+// One cell of the lattice, answered from its own indices and nothing else, so
+// the same cell answers the same way in every run and in every implementation.
+
+/** The mass a lattice cell carries, or null where it carries none. */
+function moundSeat(cx, cz) {
+  if (hash2(cx * 7 + 19, cz * 13 + 5) >= MOUND.density) return null;
+  const reach = MOUND.reach.low
+    + hash2(cx * 53 + 811, cz * 97 + 43) * (MOUND.reach.high - MOUND.reach.low);
+  // THE BOUND THAT MAKES TWO MASSES UNABLE TO TOUCH. Whatever the jitter draws,
+  // the mass stays inside its own cell, so a point is inside at most one of
+  // them. It is why this term is one cell lookup rather than nine.
+  const jitter = MOUND.cell / 2 - reach * (1 + MOUND.lean);
+  const ang = 2 * Math.PI * hash2(cx * 71 + 17, cz * 5 + 907);
+  const rise = MOUND.height.low + Math.min(MOUND.height.high - MOUND.height.low,
+    Math.floor(hash2(cx * 3 + 101, cz * 29 + 61)
+      * (MOUND.height.high - MOUND.height.low + 1)));
+  const steps = MOUND.terraces.low + Math.min(MOUND.terraces.high - MOUND.terraces.low,
+    Math.floor(hash2(cx * 37 + 7, cz * 11 + 251)
+      * (MOUND.terraces.high - MOUND.terraces.low + 1)));
+  return {
+    x: (cx + 0.5) * MOUND.cell + (hash2(cx * 17 + 3, cz * 23 + 71) * 2 - 1) * jitter,
+    z: (cz + 0.5) * MOUND.cell + (hash2(cx * 41 + 59, cz * 19 + 13) * 2 - 1) * jitter,
+    c: Math.cos(ang),
+    s: Math.sin(ang),
+    reach,
+    rise,
+    steps,
+  };
+}
+
+// Where the stone stands, which is the one thing in this world a mound may not
+// grow on and the one thing it is meant to lean against. The blocks that stand
+// in grass and the boulders whose places were traced back onto the meadow off
+// the target's own pixels: nothing here is a position invented for the carpet.
 const GRASS_BLOCKS = MONOLITHS.filter((m) => m.baseY === 0).map((m) => ({
   x: m.position.x,
   z: m.position.z,
@@ -311,8 +364,51 @@ const GRASS_BLOCKS = MONOLITHS.filter((m) => m.baseY === 0).map((m) => ({
   s: Math.sin(m.rotationY * Math.PI / 180),
   hx: m.size[0] / 2,
   hz: m.size[2] / 2,
+  // HOW BIG A BANK A STONE EARNS, and it is the stone's own size that says so.
+  // E-V4d's three to six voxels was read against the BLOCKS, which are metres
+  // of masonry; a boulder is half a metre across, and the same bank drawn round
+  // one would bury it. So a block gets the census's own top and a boulder gets
+  // its floor, over a band no wider than the boulder itself.
+  band: MOUND.band,
+  peak: MOUND.bank.high,
+  // AND THE MASONRY KEEPS ITS GRASS. The target draws the meadow BITING the
+  // blocks -- «erba che morde la pietra» -- and bare ground only under the two
+  // stone compositions, which stand on boulders. So a block's bank is grass to
+  // the last cube and a boulder's is not.
+  bare: false,
 }));
-const BOULDERS = ROCK_PLAN.rocks.map((r) => ({ x: r.x, z: r.z, radius: r.radius }));
+const BOULDERS = ROCK_PLAN.rocks.map((r) => ({
+  x: r.x,
+  z: r.z,
+  radius: r.radius,
+  band: Math.min(MOUND.band, r.radius * 2.2),
+  peak: MOUND.bank.low,
+  bare: true,
+}));
+
+// AND THE WAY IN STAYS CLEAR. The committente's reading names it twice -- the
+// seven steps are all in view in the target and none of them in ours -- so the
+// stair run and the platform are not a place a mound may stand. They are boxes
+// in the layout and they are read from there rather than restated.
+const PLATFORM_ANGLE = PLATFORM.rotationY * Math.PI / 180;
+const CLEAR = [
+  {
+    x: PLATFORM.x,
+    z: PLATFORM.z,
+    c: Math.cos(PLATFORM_ANGLE),
+    s: Math.sin(PLATFORM_ANGLE),
+    hx: PLATFORM.width / 2,
+    hz: PLATFORM.depth / 2,
+  },
+  {
+    x: STAIRS.x,
+    z: STAIRS.z,
+    c: 1,
+    s: 0,
+    hx: STAIRS.width / 2,
+    hz: STAIRS.steps * STAIRS.tread,
+  },
+];
 
 /** Distance from a point to the outside of a block's footprint, in metres. */
 function toBlock(b, x, z) {
@@ -323,59 +419,88 @@ function toBlock(b, x, z) {
   return Math.hypot(Math.max(lx, 0), Math.max(lz, 0)) + Math.min(Math.max(lx, lz), 0);
 }
 
-/** Whole voxels of pile, from a clump field read at a strength. Nought or 3..6. */
-function pile(x, z, seedX, seedZ, gate, weight) {
-  const n = noise2(x / MOUND.clump + seedX, z / MOUND.clump + seedZ) * weight;
-  if (n <= gate) return 0;
-  const t = (n - gate) / (1 - gate);
-  return MOUND.low + Math.min(MOUND.high - MOUND.low,
-    Math.floor(t * (MOUND.high - MOUND.low + 1)));
-}
-
 /**
- * Extra whole voxels of carpet banked against the stone. Nought almost everywhere.
+ * How near the nearest stone is, and WHICH stone it is.
+ *
+ * The name comes back with the distance because the bank's height is the
+ * STONE'S and not the point's: one block, one bank, the same all the way round
+ * it. A height drawn from the point would speckle a single mass into a dozen.
  */
-export function moundAt(x, z) {
+function toStone(x, z) {
   let near = Infinity;
+  let anchor = null;
   for (const b of GRASS_BLOCKS) {
     const d = toBlock(b, x, z);
-    if (d >= 0 && d < near) near = d;
+    if (d < near) { near = d; anchor = b; }
   }
   for (const r of BOULDERS) {
     const d = Math.hypot(x - r.x, z - r.z) - r.radius;
-    if (d >= 0 && d < near) near = d;
+    if (d < near) { near = d; anchor = r; }
   }
-  if (near > MOUND.band) return 0;
-  return pile(x, z, 91.3, 27.1, MOUND.gate, 1 - smoothstep(0, MOUND.band, near));
+  return { near, anchor };
 }
 
 /**
- * And the same pile standing in the open meadow, which is where the target's
- * own three-voxel risers are. A separate seed, so the two never line up.
+ * Whole voxels of mound standing on the floor at a point. Nought almost
+ * everywhere, and never anything at all where somebody else owns the ground.
+ *
+ * THE CROWN IS FLAT AND THE FLANK IS TERRACED, which is the shape the target
+ * draws and the shape a walker can climb: every terrace is a whole number of
+ * voxels and every one of them is a step he can take.
  */
 export function meadowMoundAt(x, z) {
-  return pile(x, z, 313.7, 57.9, MOUND.meadowGate, 1);
+  const seat = moundSeat(Math.floor(x / MOUND.cell), Math.floor(z / MOUND.cell));
+  if (!seat) return 0;
+  const dx = x - seat.x;
+  const dz = z - seat.z;
+  // Stretched along its own bearing and squeezed across it: the same area, and
+  // not a circle.
+  const u = (dx * seat.c + dz * seat.s) / (1 + MOUND.lean);
+  const w = (-dx * seat.s + dz * seat.c) * (1 + MOUND.lean);
+  const d = Math.hypot(u, w);
+  if (d >= seat.reach) return 0;
+  // Nothing grows on the way in, on the stone, or where a stone's own bank is
+  // already doing this job -- and the test is on the SEAT and not on the point,
+  // so a mass is either wholly there or wholly not and never sliced in half.
+  for (const box of CLEAR) if (toBlock(box, seat.x, seat.z) < seat.reach * (1 + MOUND.lean)) return 0;
+  if (toStone(seat.x, seat.z).near < MOUND.band + seat.reach * (1 + MOUND.lean) * 0.4) return 0;
+  const flat = seat.reach * MOUND.plateau;
+  if (d <= flat) return seat.rise;
+  const t = (seat.reach - d) / (seat.reach - flat);
+  const ring = Math.max(1, Math.ceil(t * seat.steps));
+  return Math.max(1, Math.round(seat.rise * ring / seat.steps));
 }
 
 /**
- * The three states of the grain, drawn straight from the column's own hash.
+ * Whether the ground here is RAISED and of the kind that shows what it is made
+ * of: a mound of the open meadow, or the bank under a boulder.
  *
- * A HASH AND NOT A RANDOM: the same column answers the same way in every run,
- * in every implementation, forever -- which is what makes this a field and not
- * a texture that would have to be stored somewhere and handed to a vertex.
- * Symmetric about nought at the frozen gate, for the same reason the tuft is.
+ * The floor never is, however it steps: a one-voxel terrace in a meadow is a
+ * meadow. Neither is a block's own bank, for the reason written over the blocks.
  */
-export function grainAt(ix, iz, gate = TUFT_GATE) {
-  const p = (1 - gate) / 2;
-  const u = hash2(ix * 3 + 7, iz * 5 + 13);
-  if (u < p) return -1;
-  if (u > 1 - p) return 1;
-  return 0;
+export function bareRaisedAt(x, z) {
+  if (meadowMoundAt(x, z) > 0) return true;
+  const { near, anchor } = toStone(x, z);
+  return Boolean(anchor && anchor.bare && near >= 0 && near <= anchor.band);
 }
 
-/** Whether this column takes the grain instead of the smooth tuft. */
-function takesGrain(ix, iz) {
-  return hash2(ix * 11 + 3, iz * 17 + 29) < CARPET_GRAIN;
+/**
+ * Whole voxels of meadow banked against the stone, and nought away from it.
+ *
+ * E-V4d, AS A PLACEMENT. It used to be a noise inside a band, which put a wall
+ * three voxels tall at the band's own edge and speckled the rest; this ramps,
+ * one voxel at a time, from the edge of the band up to the stone. How tall it
+ * gets is the stone's own, drawn once from where the stone stands, so a block
+ * has ONE bank and not a different one on each of its sides.
+ */
+export function moundAt(x, z) {
+  const { near, anchor } = toStone(x, z);
+  if (!anchor || near < 0 || near > anchor.band) return 0;
+  // Ramped and not piled: one voxel a terrace, from nothing at the band's own
+  // edge up to the stone. What stood here before put a wall three voxels tall
+  // at that edge, which is a thing no meadow does and no walker can climb.
+  const t = 1 - near / anchor.band;
+  return Math.min(anchor.peak, Math.max(1, Math.ceil(t * anchor.peak)));
 }
 
 // ======================================================================
@@ -502,16 +627,17 @@ const EMPTY = -1e9;
 // side pass for why it exists at all.
 //
 // TWO CLOSED THE SEAM WHEN THE TALLEST THING A COLUMN COULD DO WAS STAND ONE
-// STEP PROUD OF THE FIELD. The piles of the carpet stand up to six, and a
-// curtain that still only reached two would leave up to forty centimetres of
-// daylight under every mound that happens to sit on the rim of the disc or on
-// a bank of the paving. So the drop is the pile's own height plus the two that
-// closed it before.
+// STEP PROUD OF THE FIELD. The tallest thing on this meadow is the bank against
+// the stone, and a curtain that still only reached two would leave up to forty
+// centimetres of daylight under any of it that happens to sit on the rim of the
+// disc or on a bank of the paving. So the drop is that height plus the two that
+// closed it before -- and it is read off the object rather than copied, because
+// a number copied here is a number that stays behind when the shape moves.
 //
 // IT COSTS NOT ONE QUAD. A wall is a single rectangle whatever its height: what
 // this buys is the height of four corners and nothing else. The overdraw is a
 // strip along the rim and the two banks, behind ground that is already drawn.
-const SKIRT = 2 + MOUND.high;
+const SKIRT = 2 + MOUND.bank.high;
 
 // What a missing column reads as in the handed-back height map. The smallest
 // value the type holds, so no arithmetic on a real top can ever reach it.
@@ -524,7 +650,7 @@ export const NO_COLUMN = -32768;
  * sitting a half step under it: the walker's own floor is the field itself and
  * the two must not part company by a systematic half voxel.
  *
- * WHAT `tuft` MEANS NOW IS THE WHOLE CARPET AND NOT ONLY THE TUFT, and the name
+ * WHAT `tuft` MEANS IS THE WHOLE CARPET AND NOT ONLY THE TUFT, and the name
  * is kept because it is the third argument of a door four other sessions call
  * through. False is the BARE voxelised ground -- the field rounded to the step
  * and nothing added -- which is what every reader of that flag has always
@@ -540,14 +666,13 @@ export function columnTop(ix, iz, tuft = true, radius = DISC_RADIUS) {
   if (insideBlock(x, z)) return EMPTY;
   const step = Math.round(heightAt(x, z) / VOXEL);
   if (!tuft) return step;
-  // The grain REPLACES the smooth tuft on the columns it takes, it does not add
-  // to it: that is what keeps the amplitude at exactly one voxel whichever of
-  // the two a column drew from, and it is why the carpet's tallest wall is
-  // still the field's own step plus one -- before the piles, which are the term
-  // that is meant to be taller.
-  const grained = takesGrain(ix, iz);
-  return step + (grained ? grainAt(ix, iz) : tuftAt(x, z))
-    + moundAt(x, z) + meadowMoundAt(x, z);
+  // THE FLOOR FIRST AND THEN WHAT STANDS ON IT, in that order and as two
+  // separate terms, because that is what the committente is looking at: the
+  // field with the smooth tuft is the floor he calls «pianeggiante», and the
+  // two after it are the masses he calls «alture sparse». Not one of the three
+  // is a height drawn per column against its neighbours, which is the whole of
+  // what he named as wrong.
+  return step + tuftAt(x, z) + moundAt(x, z) + meadowMoundAt(x, z);
 }
 
 /** The whole disc, in chunk coordinates: every chunk with a column in it. */
@@ -589,6 +714,24 @@ export function chunkList(radius = DISC_RADIUS) {
 // none of them can split a merge. Handing the tint to a vertex attribute
 // instead costs three times the geometry of the world, which is the whole
 // budget, and it is one line of shader that does it.
+//
+// SO WHERE DOES THE SECOND MATERIAL GO. The target's mounds show BARE EARTH on
+// their steep flanks and grass on their crowns (E-DECISIONI4.3), which is a
+// second family and not a second tint -- and a family per face is exactly the
+// per-voxel property the rule above forbids putting in a vertex.
+//
+// IT GOES IN A SECOND MESH, and that is the cheapest honest place there is. The
+// earth quads are gathered here, into their own three buffers -- corners, an
+// orientation, an index, and nothing else, so the rule holds bit for bit -- and
+// the page hangs the whole disc's worth of them as ONE mesh with the earth's
+// own material. The cost is one draw call for the whole world and a merge that
+// stops at the boundary between the two families, which is a boundary the
+// picture has anyway.
+//
+// The alternative was a field the fragment could evaluate for itself, which
+// costs no draw and cannot be exact: the mound field is thresholded, and a
+// threshold decided in float64 on this thread and in float32 on the card
+// disagrees on the columns that sit on it. Here the mesher decides once.
 
 const QUAD_INDEX = [0, 1, 2, 0, 2, 3];
 
@@ -645,7 +788,23 @@ export function meshChunk(cx, cz, tuft = true, radius = DISC_RADIUS) {
     }
   }
 
+  // Which of the chunk's own columns stand on raised ground that shows what it
+  // is made of, sampled once. The bearing is not in here: a column is on such a
+  // mass or it is not, and WHICH of its four faces turns its bare side to the
+  // picture is the bearing's own question, asked once per bearing below.
+  const raised = new Uint8Array(n * n);
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
+      const { x, z } = columnCentre(ox + i, oz + j);
+      raised[j * n + i] = bareRaisedAt(x, z) ? 1 : 0;
+    }
+  }
+
   const quads = [];
+  // The same, for the faces that are bare earth rather than grass. Kept apart
+  // from the first list all the way down so that neither family can merge into
+  // the other, which is the whole of what makes them two families.
+  const earth = [];
   // How many of the walls exist only because something ends here — the rim of
   // the disc, or a bank of the paving — rather than because the field stepped.
   // Counted apart because it is the one part of this number that does NOT scale
@@ -653,8 +812,10 @@ export function meshChunk(cx, cz, tuft = true, radius = DISC_RADIUS) {
   // nearly all middle, so a fusion figure that mixed them would understate the
   // world it is being read as evidence for.
   let rim = 0;
-  const push = (face, ax, ay, az, bx, by, bz, cx2, cy, cz2, dx, dy, dz) => {
-    quads.push([face, ax, ay, az, bx, by, bz, cx2, cy, cz2, dx, dy, dz]);
+  const push = (face, ax, ay, az, bx, by, bz, cx2, cy, cz2, dx, dy, dz, bare = false) => {
+    (bare ? earth : quads).push(
+      [face, ax, ay, az, bx, by, bz, cx2, cy, cz2, dx, dy, dz],
+    );
   };
 
   // ------------------------------------------------------------- the tops
@@ -691,6 +852,20 @@ export function meshChunk(cx, cz, tuft = true, radius = DISC_RADIUS) {
   // wall stands on and the inner loop walks the axis it runs along, so a run of
   // columns sharing a top and a floor is one rectangle whatever its length.
   const wall = (face, along, dix, diz) => {
+    // Whether the wall this column raises toward this bearing is bare earth.
+    //
+    // THREE CONDITIONS AND EACH ONE IS A SENTENCE OF THE READING. It has to
+    // stand on a mass -- the floor's own one-voxel terraces are meadow and stay
+    // meadow. It has to be STEEP: a flank that climbs one voxel is a step in a
+    // meadow, one that climbs `minStep` is a cut bank and shows what it is cut
+    // into. And it has to FACE the eye or the corridor, which is where the
+    // target shows its bare ground and nowhere else.
+    const bare = (i, j, h, floor) => {
+      if (raised[j * n + i] !== 1) return false;
+      if (floor === EMPTY || h - floor < EARTH.minStep) return false;
+      const centre = columnCentre(ox + i, oz + j);
+      return earthFacing(face, centre.x, centre.z);
+    };
     for (let a = 0; a < n; a++) {
       let b = 0;
       while (b < n) {
@@ -701,6 +876,7 @@ export function meshChunk(cx, cz, tuft = true, radius = DISC_RADIUS) {
         const floor = at(i + dix, j + diz);
         const bottom = floor === EMPTY ? -1e9 : floor;
         if (h <= bottom) { b++; continue; }
+        const soil = bare(i, j, h, floor);
         // How far this exact pair of levels carries. A neighbour that is not
         // there ends the run: its floor is not a number this can be compared
         // against and a wall built to it would have no bottom.
@@ -713,6 +889,11 @@ export function meshChunk(cx, cz, tuft = true, radius = DISC_RADIUS) {
           const f2 = at(i2 + dix, j2 + diz);
           if ((f2 === EMPTY) !== (floor === EMPTY)) break;
           if (f2 !== EMPTY && f2 !== floor) break;
+          // AND THE FAMILY ENDS A RUN. Two rectangles of two materials cannot
+          // be one rectangle, and pretending otherwise is how a family becomes
+          // a stripe. It is the only new thing that can split a merge here, and
+          // what it costs is measured rather than assumed.
+          if (bare(i2, j2, h2, f2) !== soil) break;
           run++;
         }
         // A wall with nothing beyond it — the rim of the disc, and both banks
@@ -732,13 +913,13 @@ export function meshChunk(cx, cz, tuft = true, radius = DISC_RADIUS) {
         // The face sits on the boundary the neighbour is across, and the two
         // corners are taken so the winding turns the front of it outwards.
         if (face === FACE.EAST) {
-          push(face, x1, yLow, z0, x1, yTop, z0, x1, yTop, z1, x1, yLow, z1);
+          push(face, x1, yLow, z0, x1, yTop, z0, x1, yTop, z1, x1, yLow, z1, soil);
         } else if (face === FACE.WEST) {
-          push(face, x0, yLow, z1, x0, yTop, z1, x0, yTop, z0, x0, yLow, z0);
+          push(face, x0, yLow, z1, x0, yTop, z1, x0, yTop, z0, x0, yLow, z0, soil);
         } else if (face === FACE.SOUTH) {
-          push(face, x1, yLow, z1, x1, yTop, z1, x0, yTop, z1, x0, yLow, z1);
+          push(face, x1, yLow, z1, x1, yTop, z1, x0, yTop, z1, x0, yLow, z1, soil);
         } else {
-          push(face, x0, yLow, z0, x0, yTop, z0, x1, yTop, z0, x1, yLow, z0);
+          push(face, x0, yLow, z0, x0, yTop, z0, x1, yTop, z0, x1, yLow, z0, soil);
         }
         b += run;
       }
@@ -751,7 +932,41 @@ export function meshChunk(cx, cz, tuft = true, radius = DISC_RADIUS) {
   wall(FACE.SOUTH, true, 0, 1);
   wall(FACE.NORTH, true, 0, -1);
 
-  return pack(quads, columns, rim, tops, cx, cz);
+  const packed = pack(quads, columns, rim, tops, cx, cz);
+  packed.earth = packFaces(earth);
+  return packed;
+}
+
+/**
+ * The bare earth's own three buffers: corners, an orientation, an index.
+ *
+ * The same shape as a chunk's and deliberately no more than that. Nothing here
+ * is per voxel and nothing here says what the family IS -- the family is which
+ * MESH the rectangles end up in, and that is the page's to hang.
+ */
+function packFaces(quads) {
+  const count = quads.length;
+  const positions = new Float32Array(count * 12);
+  const normals = new Int8Array(count * 12);
+  const indices = count * 4 > 65535
+    ? new Uint32Array(count * 6) : new Uint16Array(count * 6);
+  for (let q = 0; q < count; q++) {
+    const it = quads[q];
+    const face = it[0];
+    const nx = face === FACE.EAST ? 127 : face === FACE.WEST ? -127 : 0;
+    const nz = face === FACE.SOUTH ? 127 : face === FACE.NORTH ? -127 : 0;
+    for (let v = 0; v < 4; v++) {
+      const o = q * 12 + v * 3;
+      positions[o] = it[1 + v * 3];
+      positions[o + 1] = it[2 + v * 3];
+      positions[o + 2] = it[3 + v * 3];
+      normals[o] = nx;
+      normals[o + 1] = 0;
+      normals[o + 2] = nz;
+    }
+    for (let k = 0; k < 6; k++) indices[q * 6 + k] = q * 4 + QUAD_INDEX[k];
+  }
+  return { positions, normals, indices, quads: count };
 }
 
 /**
