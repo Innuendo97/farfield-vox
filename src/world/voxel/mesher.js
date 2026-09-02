@@ -394,6 +394,25 @@ export const EARTH = {
   // sides of the path answer opposite ways and neither is a number typed here.
   toEye: true,
   toPath: true,
+  // THE VERGE OF THE CORRIDOR, and it is answer C of the margin question
+  // (E-V1j) as a datum: false is answer A, the band as it stands.
+  //
+  // WHAT THE BAND ACTUALLY IS, MEASURED AND NOT SUPPOSED. Where the corridor
+  // runs, this engine lays no column -- the contract's own groundHoleAt says so
+  // out to 1.28 half widths -- and the first ring of meadow beside that hole
+  // therefore raises a wall with NOTHING beyond it, which the rule below drops
+  // to the bent grid two steps under. That curtain is the grey-dark band the
+  // fork's eye reported on both verges: it is not a kerb (the kerb died at D4b)
+  // and it is not relief, it is the side of the meadow seen where the paving has
+  // faded out from over it.
+  //
+  // The target draws that lembo as ground and not as a shadow -- stone giving
+  // way to brown earth at the level of the slabs -- and with the earth family
+  // now existing the way there is one flag: the curtain joins it. Nothing about
+  // the corridor is touched to do it, which matters because V3 is closed: the
+  // only thing asked of the path is where its own hole is, which this engine is
+  // already told.
+  verge: true,
 };
 
 
@@ -1052,8 +1071,18 @@ export function meshChunk(cx, cz, tuft = true, radius = DISC_RADIUS) {
     // into. And it has to FACE the eye or the corridor, which is where the
     // target shows its bare ground and nowhere else.
     const bare = (i, j, h, floor) => {
+      // THE VERGE FIRST, because it is the one bare face whose floor is not
+      // there at all. A wall with nothing beyond it is either the rim of the
+      // disc -- the edge of a piece, and no part of the world -- or the bank of
+      // the corridor, and the engine can tell the two apart by asking the same
+      // predicate it laid the columns with. Only the second is ground.
+      if (floor === EMPTY) {
+        if (!EARTH.verge) return false;
+        const beyond = columnCentre(ox + i + dix, oz + j + diz);
+        return groundHole(beyond.x, beyond.z);
+      }
       if (raised[j * n + i] !== 1) return false;
-      if (floor === EMPTY || h - floor < EARTH.minStep) return false;
+      if (h - floor < EARTH.minStep) return false;
       const centre = columnCentre(ox + i, oz + j);
       return earthFacing(face, centre.x, centre.z);
     };
