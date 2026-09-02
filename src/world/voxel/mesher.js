@@ -151,6 +151,17 @@ function noise2(x, z) {
 export const TUFT_GATE = 0.5;
 
 /**
+ * The patches the tuft is allowed on, and the length of a course between them.
+ *
+ * TWO NUMBERS AND BOTH ARE DATA. `correlation` is how big a patch is, in
+ * metres; `share` is how much of the meadow carries one. At `share` = 1 the
+ * gate admits everything and this object does nothing at all, which is the
+ * state the previous delivery shipped in and the state this file returns to if
+ * the committente says the floor was better before.
+ */
+export const TUFT_PATCH = { correlation: 1.20, share: 1.00 };
+
+/**
  * The tuft, in whole voxels: minus one, nought or plus one.
  *
  * Symmetric about nought so the field neither rises nor sinks on average. A
@@ -162,6 +173,36 @@ export function tuftAt(x, z, gate = TUFT_GATE) {
   if (n < -gate) return -1;
   if (n > gate) return 1;
   return 0;
+}
+
+/**
+ * Where the tuft is admitted at all: the patches, and the courses between them.
+ *
+ * WHY A SECOND FIELD AND NOT A SECOND DIAL ON THE FIRST. The tuft's own two
+ * numbers say how OFTEN the floor changes state and how MUCH of its range it
+ * spends changing; neither of them can say that the changes should stand
+ * TOGETHER. At a correlation of 0.30 m -- three columns -- a bump lands every
+ * three or four cubes in every direction, which is the committente's own
+ * complaint in his own words: «voxel ingiustificati come se ognuno dovesse
+ * avere per forza una differenza di altezza con quelli accanto». The target
+ * does the opposite: long courses of cubes at one level, and the steps it does
+ * take gathered into the hems and flanks of something.
+ *
+ * SO THE GATE IS OVER THE TUFT AND NOT INSIDE IT. A second field, four times
+ * longer, decides whether this patch of meadow is tufted at all; where it says
+ * no the floor is the quantised field and nothing else, and a course runs until
+ * the patch does. It is a DATUM and not a mechanism -- at `share` one it admits
+ * the tuft everywhere and the floor is bit for bit the one that shipped -- and
+ * it leaves both of the engine's own dials frozen where the sweep set them.
+ *
+ * AND IT DOES NOT MOVE THE GROUND UNDER THE WALKER. The tuft is symmetric about
+ * nought, so a patch of meadow with no tuft on it sits at the same mean height
+ * as one with: what changes is where the steps are, never where the floor is.
+ */
+export function tuftPatchAt(x, z) {
+  if (TUFT_PATCH.share >= 1) return true;
+  return noise2(x / TUFT_PATCH.correlation + 907.3, z / TUFT_PATCH.correlation + 311.5)
+    < TUFT_PATCH.share;
 }
 
 // ======================================================================
@@ -245,13 +286,61 @@ export const MOUND = {
   // How much of the reach is flat top. The target's masses have a CROWN --
   // «cima piatta o a due terrazze» -- and a cone has none.
   plateau: 0.40,
+  // HOW MUCH OF A MASS'S OWN RIM TURNS THE FULL BANK, as a share of its
+  // perimeter, and it is the dial that says how much bare earth the meadow
+  // shows without saying anything new about its shape.
+  //
+  // Half is the least it can be and still mean «the side that faces the eye»:
+  // below that the bank is a lip rather than a flank. Above it the bank wraps
+  // round toward the sides, which is what the target draws on the masses that
+  // stand across the corridor from the camera -- their bare ground carries on
+  // past the point where the eye stops being square to them.
+  bankArc: 0.70,
+  // HOW WIDE A HEM ROUND A MASS THE FLOOR STOPS TEXTURING ITSELF IN, in metres,
+  // and it is the walker's number rather than a look.
+  //
+  // The tuft is the FLOOR's own grain, and a mass set down on the floor is not
+  // grained by it: where a mound or a bank stands, and for this much ground
+  // round it, the floor is the quantised field and nothing else. Two things
+  // follow and both are measured. The bank stays ONE riser instead of a saw --
+  // a tuft that steps along a rim turns a clean two-voxel bank into a run of
+  // one, two and three, which is what the fork's eye read as a picket of
+  // sticks. And the worst step in the world stays the bank's OWN height: with
+  // the grain still running over the rim, a scarp of three and a tuft that fell
+  // the other way made a single edge of 0.50 m, which is 0.20 m past
+  // TUNING.ground.maxM and a step the body cannot damp.
+  halo: 0.25,
   // Whole voxels, in the open field. D-F3 = A: three to four is what the fork
   // read in the foreground, and six is only allowed against the stone.
   height: { low: 2, high: 4 },
-  // How many terraces the flank falls in. Two terraces on a four voxel mass
-  // give a step of two -- which is the flank the target shows bare earth on --
-  // and three give steps of one. Both are in the target and both are here.
-  terraces: { low: 2, high: 3 },
+  // HOW TALL THE ONE RISER OF THE STEEP FLANK IS, in whole voxels, and it is
+  // the number that makes a mound an OBJECT rather than a patch of the floor's
+  // own noise.
+  //
+  // What stood here was `terraces`: two or three terraces down the flank, which
+  // on a mass three voxels tall is three steps of one -- the same step the tuft
+  // takes all round it, so nothing separated the mass from the meadow and the
+  // eye could not point at a single mound in frame. The target draws the other
+  // shape: one bank of two or three voxels AT ONCE, of bare earth, running five
+  // to fifteen columns, with a flat crown of grass over it. The single terraces
+  // survive on the GENTLE side, which is what the target draws there too.
+  //
+  // AND THE HEIGHT IS THE WALKER'S AND NOT A TASTE, WHICH IS WHY IT IS TWO AND
+  // NOT THREE. The bank is not the only thing under his foot at the rim: the
+  // quantised field steps there too, and where the two agree the edge is the
+  // bank PLUS one. Measured over the 113 358 edges of the shipped disc
+  // (v1-suolo/analisi/d4-passo.mjs): at a bank of three the worst edge in the
+  // world is 0.40 m on six of them, which is 0.10 m past TUNING.ground.maxM in
+  // src/core/presence.js and a step his body does not damp; at two it is
+  // 0.30 m, which is exactly maxM, on eighteen. Three is inside the fork's
+  // «2-3 voxel» and it is what the committente's word would buy at the price
+  // of those six edges -- so the number lives here and the price is declared.
+  scarp: 2,
+  // HOW THE CROWN IS FINISHED. Nought is a flat top, which is how the target
+  // reads under the compass and is the default; one puts a second terrace a
+  // voxel below it over the outer half of the crown. It is the taste question
+  // the fork raised and it lives here as a number, not as a mechanism.
+  crownStep: 0,
   // ------------------------------------------------- and against the stone
   // How far out from a block or a boulder the bank reaches, in metres. Wider
   // than the old band because this one has to RAMP: the meadow climbs to the
@@ -348,9 +437,7 @@ function moundSeat(cx, cz) {
   const rise = MOUND.height.low + Math.min(MOUND.height.high - MOUND.height.low,
     Math.floor(hash2(cx * 3 + 101, cz * 29 + 61)
       * (MOUND.height.high - MOUND.height.low + 1)));
-  const steps = MOUND.terraces.low + Math.min(MOUND.terraces.high - MOUND.terraces.low,
-    Math.floor(hash2(cx * 37 + 7, cz * 11 + 251)
-      * (MOUND.terraces.high - MOUND.terraces.low + 1)));
+
   return {
     x: (cx + 0.5) * MOUND.cell + (hash2(cx * 17 + 3, cz * 23 + 71) * 2 - 1) * jitter,
     z: (cz + 0.5) * MOUND.cell + (hash2(cx * 41 + 59, cz * 19 + 13) * 2 - 1) * jitter,
@@ -358,7 +445,6 @@ function moundSeat(cx, cz) {
     s: Math.sin(ang),
     reach,
     rise,
-    steps,
   };
 }
 
@@ -453,13 +539,57 @@ function toStone(x, z) {
  * Whole voxels of mound standing on the floor at a point. Nought almost
  * everywhere, and never anything at all where somebody else owns the ground.
  *
- * THE CROWN IS FLAT AND THE FLANK IS TERRACED, which is the shape the target
- * draws and the shape a walker can climb: every terrace is a whole number of
- * voxels and every one of them is a step he can take.
+ * THE CROWN IS FLAT, THE FLANK THE EYE SEES IS ONE BANK, AND THE FAR SIDE IS
+ * TERRACED. That asymmetry is the whole of what makes a mound READ as an
+ * object, and it is read off the target rather than chosen: the masses in
+ * frame turn a continuous bare bank of two or three voxels toward the camera
+ * and fall away in single steps behind, so the side the picture is OF has one
+ * hard edge and the side it is not has none.
+ *
+ * HOW THE TWO SIDES ARE ONE FUNCTION AND NOT TWO. The bank is not a sector
+ * pasted onto a cone: what the bearing chooses is the height of the FIRST
+ * riser, from one voxel due north to the seat's own scarp due south, and the
+ * rest of the mass's height is spent in single terraces above it. Two
+ * neighbouring bearings therefore differ by at most one voxel anywhere on the
+ * flank -- there is no seam down the east and west sides, which a pasted
+ * sector would have left, and which the walker would have had to climb.
+ *
+ * Every terrace is a whole number of voxels and the tallest riser in the world
+ * is `scarp.high` = 0.30 m = TUNING.ground.maxM, so every step is one his body
+ * already damps.
  */
 export function meadowMoundAt(x, z) {
+  return moundProfile(x, z).height;
+}
+
+/**
+ * Whether a point stands on a mound's own BANK: the outermost riser, the one
+ * the eye meets, and the only place a mound is cut rather than grown.
+ *
+ * WHY THE FAMILY NEEDED THIS AND WHY A HEIGHT COULD NOT SAY IT. Bare earth used
+ * to be «anywhere on a raised mass», and the mesher then kept whichever of those
+ * faces happened to climb two voxels. On a crown, which is flat, that is never
+ * the mound: it is the FIELD underneath -- the quantised terrain slopes, the
+ * tuft steps -- borrowing the mound's permission for a wall it built itself.
+ * Measured on the disc that is where nine bands in ten came from: 313 bands of
+ * which 280 were one or two columns, sprinkled over the tops and the far sides
+ * of masses, which is exactly the picket of sticks the fork's eye reported and
+ * the exact opposite of the target's continuous bank.
+ *
+ * So the family is the BANK and not the mass: the outermost band of the flank,
+ * which is the one riser the shape puts there on purpose. What the mesher does
+ * with it is unchanged -- it still has to be steep and still has to face the
+ * eye or the corridor -- but it can no longer be lent to the floor.
+ */
+export function moundBankAt(x, z) {
+  return moundProfile(x, z).bank;
+}
+
+/** One evaluation of a mound at a point: how high it stands, and on what. */
+function moundProfile(x, z) {
+  const none = { height: 0, bank: false, halo: false };
   const seat = moundSeat(Math.floor(x / MOUND.cell), Math.floor(z / MOUND.cell));
-  if (!seat) return 0;
+  if (!seat) return none;
   const dx = x - seat.x;
   const dz = z - seat.z;
   // Stretched along its own bearing and squeezed across it: the same area, and
@@ -467,17 +597,54 @@ export function meadowMoundAt(x, z) {
   const u = (dx * seat.c + dz * seat.s) / (1 + MOUND.lean);
   const w = (-dx * seat.s + dz * seat.c) * (1 + MOUND.lean);
   const d = Math.hypot(u, w);
-  if (d >= seat.reach) return 0;
+  if (d >= seat.reach) return none;
   // Nothing grows on the way in, on the stone, or where a stone's own bank is
   // already doing this job -- and the test is on the SEAT and not on the point,
   // so a mass is either wholly there or wholly not and never sliced in half.
-  for (const box of CLEAR) if (toBlock(box, seat.x, seat.z) < seat.reach * (1 + MOUND.lean)) return 0;
-  if (toStone(seat.x, seat.z).near < MOUND.band + seat.reach * (1 + MOUND.lean) * 0.4) return 0;
+  for (const box of CLEAR) {
+    if (toBlock(box, seat.x, seat.z) < seat.reach * (1 + MOUND.lean)) return none;
+  }
+  if (toStone(seat.x, seat.z).near < MOUND.band + seat.reach * (1 + MOUND.lean) * 0.4) return none;
   const flat = seat.reach * MOUND.plateau;
-  if (d <= flat) return seat.rise;
+  if (d <= flat) {
+    // The crown. Flat by default; the second terrace of answer B takes the
+    // outer half of it and never the middle, so a crown is never a point.
+    if (!MOUND.crownStep) return { height: seat.rise, bank: false, halo: true };
+    return {
+      height: d <= flat / 2 ? seat.rise : Math.max(1, seat.rise - MOUND.crownStep),
+      bank: false,
+      halo: true,
+    };
+  }
+  // WHICH WAY THIS POINT LOOKS OUT, as a share: one due south, nought due
+  // north. South is the eye -- the pose the campaign judges on stands at z 14
+  // and looks north -- and it is the bearing the target banks its earth on.
+  const out = Math.hypot(dx, dz) || 1;
+  const southness = 0.5 * (1 + dz / out);
+  // The first riser, which is the one the eye meets: the seat's whole scarp
+  // where the mass faces the camera, one voxel where it faces away, and never
+  // more than the mass is tall.
+  const arc = southness >= 1 - MOUND.bankArc ? 1 : 0;
+  const first = Math.min(seat.rise, Math.max(1, 1 + (MOUND.scarp - 1) * arc));
+  // Everything above that first riser is spent one voxel at a time.
+  const bands = 1 + (seat.rise - first);
   const t = (seat.reach - d) / (seat.reach - flat);
-  const ring = Math.max(1, Math.ceil(t * seat.steps));
-  return Math.max(1, Math.round(seat.rise * ring / seat.steps));
+  const band = Math.min(bands - 1, Math.floor(t * bands));
+  return { height: Math.min(seat.rise, first + band), bank: band === 0, halo: true };
+}
+
+/** Whether a point is on a mass, or inside the hem the floor leaves round one. */
+function underMass(x, z) {
+  const seat = moundSeat(Math.floor(x / MOUND.cell), Math.floor(z / MOUND.cell));
+  if (seat) {
+    const dx = x - seat.x;
+    const dz = z - seat.z;
+    const u = (dx * seat.c + dz * seat.s) / (1 + MOUND.lean);
+    const w = (-dx * seat.s + dz * seat.c) * (1 + MOUND.lean);
+    if (Math.hypot(u, w) < seat.reach + MOUND.halo) return true;
+  }
+  const { near, anchor } = toStone(x, z);
+  return Boolean(anchor && near <= anchor.band + MOUND.halo);
 }
 
 /**
@@ -488,7 +655,7 @@ export function meadowMoundAt(x, z) {
  * meadow. Neither is a block's own bank, for the reason written over the blocks.
  */
 export function bareRaisedAt(x, z) {
-  if (meadowMoundAt(x, z) > 0) return true;
+  if (moundBankAt(x, z)) return true;
   const { near, anchor } = toStone(x, z);
   return Boolean(anchor && anchor.bare && near >= 0 && near <= anchor.band);
 }
@@ -691,7 +858,12 @@ export function columnTop(ix, iz, tuft = true, radius = DISC_RADIUS) {
   // tall against a stone and a step the walker's body cannot damp beside it.
   // Neither term is a quantity of earth to be totalled: each one says how high
   // the ground stands here, and where two say it the answer is the higher.
-  return step + tuftAt(x, z) + Math.max(moundAt(x, z), meadowMoundAt(x, z));
+  const mass = Math.max(moundAt(x, z), meadowMoundAt(x, z));
+  // AND THE GRAIN STOPS AT THE HEM OF A MASS. See MOUND.halo: the tuft belongs
+  // to the floor, the mass is set on the floor, and letting the one run over the
+  // other is what turned a bank into a saw and a 0.30 m step into a 0.50 m one.
+  const grain = underMass(x, z) || !tuftPatchAt(x, z) ? 0 : tuftAt(x, z);
+  return step + grain + mass;
 }
 
 /** The whole disc, in chunk coordinates: every chunk with a column in it. */

@@ -19,6 +19,7 @@ export {
   VOXEL,
   TUFT_CORRELATION,
   TUFT_GATE,
+  TUFT_PATCH,
   MOUND,
   EARTH,
   CHUNK,
@@ -32,12 +33,14 @@ export {
   columnTop,
   earthFacing,
   meadowMoundAt,
+  moundBankAt,
   meshChunk,
   meshDisc,
   moundAt,
   onPaving,
   setGroundHole,
   tuftAt,
+  tuftPatchAt,
 } from './mesher.js';
 
 export {
