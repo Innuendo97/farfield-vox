@@ -265,6 +265,58 @@ export function voxelSettings() {
   };
 }
 
+/**
+ * THE SECOND FAMILY: BARE EARTH, and the whole of it is a colour.
+ *
+ * WHY THERE IS A SECOND SETTINGS OBJECT AND NOT A SECOND SHADER. What separates
+ * earth from grass in the targets is the pigment and nothing else: the same
+ * cubes, the same joint, the same lightened arris, the same analytic light on
+ * the same constant normal. So the earth is this file's own material asked for
+ * twice with two albedos -- one program, one extra draw, and every term of the
+ * recipe reaching both families by construction rather than by being copied.
+ *
+ * AND THE COLOUR IS A RESIDUE ON A LOCAL GROUND, NOT AN ABSOLUTE. The target's
+ * bare ground reads 121/105/77 where the grass BESIDE IT reads 71.5/86.8/23.0
+ * (F.1, 27 925 pixels outside the corridor, v1-suolo/forma/f1/f1.json). Quoting
+ * the first triple at this material would be quoting the target's light and the
+ * target's grade as well as its earth, and this render's grass does not stand
+ * where the target's does. What travels is the RATIO -- the method E-V7i put on
+ * the campaign's table -- so it is the ratio that is carried, taken in LINEAR
+ * light rather than in the coded values it was read in:
+ *
+ *              coded            linear          this albedo
+ *     red     121 / 71.5        x 3.12          0.272 -> 0.849
+ *     green   105 / 86.8        x 1.51          0.452 -> 0.683
+ *     blue     77 / 23.0        x 14.3          0.000 -> see below
+ *
+ * THE BLUE CANNOT BE A RATIO, because the grass's own is nought: the meadow's
+ * eleven per cent of blue on the pixel is the tone curve's crosstalk and not an
+ * albedo (see the note over `albedo` above). So the earth's blue is taken from
+ * the TARGET'S OWN earth, as its blue over its green in linear light -- 0.506 --
+ * applied to the green solved on the line above. Bare ground is not a green with
+ * more red in it; it is a colour, and this is the one place its third channel
+ * can come from.
+ *
+ * FIRST VALUE AND NOT A FIT. The pigment pass is D5 and the light's third term
+ * is fit 2 of the window; both come AFTER the shape, by the committente's own
+ * order of work (E-DECISIONI4). What is here is the honest first reading, with
+ * the pixels it was read on named, so that the fit has somewhere to start.
+ */
+export function earthSettings() {
+  return {
+    ...voxelSettings(),
+    albedo: new Vector3(0.849, 0.683, 0.346),
+    // NO PALE MINORITY ON THE EARTH. The bright family the meadow needed is a
+    // reading of the target's GRASS -- a tenth of its faces carrying a spread
+    // of 18.7% inside themselves -- and nothing in the target says bare ground
+    // has one. A term switched on where it was not measured is decoration.
+    pale: 0,
+    // And less of the hue jitter, for the same reason: what a meadow varies
+    // along is green against the two either side of it, and earth does not.
+    hue: 0.10,
+  };
+}
+
 // Two decorrelated draws from three whole numbers, without a transcendental.
 //
 // The same shape as the pair the dome and the weather dither with, and for the

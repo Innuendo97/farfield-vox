@@ -3,7 +3,7 @@ import {
 } from 'three';
 import {
   CHUNK, DISC_RADIUS, NO_COLUMN, VOXEL,
-  runInWorker, voxelMaterial, voxelSettings,
+  earthSettings, runInWorker, voxelMaterial, voxelSettings,
 } from './voxel/index.js';
 
 // THE MEADOW AS CUBES, STANDING IN THE WORLD RATHER THAN ON A BENCH.
@@ -110,6 +110,19 @@ export function createGroundVoxel({
   // chunk. Where each chunk stands is already in its own model matrix.
   const material = voxelMaterial(VOXEL, settings);
 
+  // AND ONE MORE FOR THE BARE EARTH -- one for the WHOLE DISC and not one a
+  // chunk, which is the whole reason the earth is gathered instead of hung as
+  // it arrives. Twenty six chunks each hanging a second mesh would be twenty
+  // six more draws against a budget of twenty two; one mesh carrying every bare
+  // face in the world is ONE, and it is small enough that the frustum has
+  // nothing to gain by cutting it up (v1-suolo/forma/f1/f2-campo.json: the bare
+  // family is 6.5% of the faces).
+  const earthTune = earthSettings();
+  const earthMaterial = voxelMaterial(VOXEL, earthTune);
+  // The bare faces as they arrive, chunk by chunk, in the chunk's own frame:
+  // they are moved into the world's when the last one has landed.
+  const soil = [];
+
   // Every chunk's own height map, by its chunk key: what the cubes make of the
   // floor, kept because the mesher already has the answer and asking the field
   // again costs 926 ns a point.
@@ -119,6 +132,9 @@ export function createGroundVoxel({
     planned: 0,
     landed: 0,
     quads: 0,
+    // How many of the faces of the disc are the bare earth of the mounds, which
+    // is the second family and the one extra draw.
+    earthQuads: 0,
     columns: 0,
     rim: 0,
     quadsPerColumn: 0,
@@ -236,7 +252,51 @@ export function createGroundVoxel({
   /**
    * Hangs one chunk, and times what doing so costs the thread it happens on.
    */
-  function land(chunk) {
+  /**
+   * The whole disc's bare earth, hung as one mesh once the last chunk is in.
+   *
+   * IN THE WORLD'S OWN FRAME, and that is not a detail: the material rebuilds a
+   * cube's tint out of `floor(position / voxel) + chunk`, so a mesh standing at
+   * the origin with world coordinates in it lands on exactly the cell indices
+   * the grass meshes land on. The two families therefore draw the SAME hash for
+   * the same cube, and the joint between them cannot show a seam.
+   */
+  function landEarth() {
+    let quads = 0;
+    for (const piece of soil) quads += piece.earth.quads;
+    if (!quads) return;
+    const positions = new Float32Array(quads * 12);
+    const normals = new Int8Array(quads * 12);
+    const indices = quads * 4 > 65535
+      ? new Uint32Array(quads * 6) : new Uint16Array(quads * 6);
+    let v = 0;
+    let q = 0;
+    for (const piece of soil) {
+      const ox = piece.cx * CHUNK * VOXEL;
+      const oz = piece.cz * CHUNK * VOXEL;
+      const { earth } = piece;
+      for (let k = 0; k < earth.quads * 4; k++) {
+        positions[(v + k) * 3] = earth.positions[k * 3] + ox;
+        positions[(v + k) * 3 + 1] = earth.positions[k * 3 + 1];
+        positions[(v + k) * 3 + 2] = earth.positions[k * 3 + 2] + oz;
+        normals[(v + k) * 3] = earth.normals[k * 3];
+        normals[(v + k) * 3 + 1] = earth.normals[k * 3 + 1];
+        normals[(v + k) * 3 + 2] = earth.normals[k * 3 + 2];
+      }
+      for (let k = 0; k < earth.quads * 6; k++) indices[q + k] = earth.indices[k] + v;
+      v += earth.quads * 4;
+      q += earth.quads * 6;
+    }
+    const chunk = {
+      cx: 0, cz: 0, positions, normals, indices, sphere: null, tops: null,
+    };
+    land(chunk, earthMaterial, 'ground-earth');
+    build.earthQuads = quads;
+    build.bytes += positions.byteLength + normals.byteLength + indices.byteLength;
+    soil.length = 0;
+  }
+
+  function land(chunk, use = material, name = null) {
     const geometry = new BufferGeometry();
     geometry.setAttribute('position', new BufferAttribute(chunk.positions, 3));
     geometry.setAttribute('normal', new BufferAttribute(chunk.normals, 3, true));
@@ -248,7 +308,7 @@ export function createGroundVoxel({
     // seventeen the reference pose draws, and a ring test written beside it
     // would be a second opinion about what is on screen.
     const boundingStarted = performance.now();
-    if (boundingFromWorker) {
+    if (boundingFromWorker && chunk.sphere) {
       geometry.boundingSphere = new Sphere(
         new Vector3(chunk.sphere.x, chunk.sphere.y, chunk.sphere.z), chunk.sphere.radius,
       );
@@ -259,8 +319,8 @@ export function createGroundVoxel({
     build.boundingMs += boundingMs;
     if (boundingMs > build.worstBoundingMs) build.worstBoundingMs = boundingMs;
 
-    const mesh = new Mesh(geometry, material);
-    mesh.name = `ground-voxel-${chunk.cx},${chunk.cz}`;
+    const mesh = new Mesh(geometry, use);
+    mesh.name = name || `ground-voxel-${chunk.cx},${chunk.cz}`;
     // Where the chunk stands, as a whole number of voxels. The material reads it
     // straight off this matrix, which is why nothing per chunk has to be a
     // uniform and why one material can serve the whole disc.
@@ -285,7 +345,7 @@ export function createGroundVoxel({
     }
 
     group.add(mesh);
-    tops.set(chunkKey(chunk.cx, chunk.cz), chunk.tops);
+    if (chunk.tops) tops.set(chunkKey(chunk.cx, chunk.cz), chunk.tops);
     build.bytes += chunk.positions.byteLength + chunk.normals.byteLength
       + chunk.indices.byteLength;
     build.landed++;
@@ -297,6 +357,12 @@ export function createGroundVoxel({
     const started = performance.now();
     if (message.kind === 'chunk') {
       land(message.chunk);
+      // The bare faces are KEPT rather than hung: see landEarth.
+      if (message.chunk.earth && message.chunk.earth.quads) {
+        soil.push({
+          cx: message.chunk.cx, cz: message.chunk.cz, earth: message.chunk.earth,
+        });
+      }
     } else if (message.kind === 'plan') {
       build.planned = message.chunks;
       build.plannedAt = started;
@@ -306,6 +372,7 @@ export function createGroundVoxel({
       build.startupMs = message.startupMs;
       build.radius = message.radius;
     } else if (message.kind === 'done') {
+      landEarth();
       Object.assign(build, {
         quads: message.quads,
         columns: message.columns,
@@ -366,6 +433,7 @@ export function createGroundVoxel({
     group,
     settings,
     material,
+    earthMaterial,
     build,
     longTasks,
 

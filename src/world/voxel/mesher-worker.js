@@ -103,9 +103,14 @@ self.onmessage = (event) => {
     quads += chunk.quads;
     columns += chunk.columns;
     rim += chunk.rim;
+    // The bare earth's three buffers travel with the chunk's own and are
+    // handed over the same way: they are the same three things -- corners, an
+    // orientation, an index -- for the faces of the second family.
     self.postMessage({ kind: 'chunk', chunk }, [
       chunk.positions.buffer, chunk.normals.buffer, chunk.faces.buffer,
       chunk.indices.buffer, chunk.tops.buffer,
+      chunk.earth.positions.buffer, chunk.earth.normals.buffer,
+      chunk.earth.indices.buffer,
     ]);
   }
   self.postMessage({

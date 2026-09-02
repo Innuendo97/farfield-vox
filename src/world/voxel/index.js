@@ -42,7 +42,7 @@
 
 export * from './pure.js';
 
-export { voxelMaterial, voxelSettings } from './material.js';
+export { earthSettings, voxelMaterial, voxelSettings } from './material.js';
 export { createMasonry, stoneTile } from './masonry.js';
 
 /**
