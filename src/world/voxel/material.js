@@ -297,6 +297,32 @@ export function voxelSettings() {
  * more red in it; it is a colour, and this is the one place its third channel
  * can come from.
  *
+ * AND THE FIRST VALUE DID NOT SURVIVE ITS OWN RENDER, which is worth writing
+ * down rather than quietly correcting. Solved straight off those ratios the
+ * albedo comes out at 0.849 / 0.683 / 0.346, and on the frame that produces it
+ * the bare family reads 61.8 / 70.0 / 55.4 -- GREENER THAN IT IS RED, where the
+ * target's earth reads 1.153 red over green. The cause is not the pigment and
+ * is measurable: this family lives ONLY on flanks that face the eye, the sun in
+ * this world stands at bearing -9.5 degrees, and a south face therefore takes
+ * almost nothing from it and is lit by the sky alone -- which is blue. Chasing
+ * the target's warmth from here asks for a red albedo of 1.52, and an albedo
+ * over one is the signature of a light being fixed with a pigment.
+ *
+ * SO THE RED GOES TO THE TOP OF ITS OWN RANGE AND THE REST IS DECLARED. 0.900
+ * is as red as a surface may be; the green and the blue come down with it so
+ * the level holds and the hue turns. Read on the frame, over the 38 490 pixels
+ * this family actually draws:
+ *
+ *                        red / green    blue / green
+ *     solved off ratios      0.883          0.792
+ *     this albedo            0.965          0.718
+ *     the day target         1.153          0.728
+ *
+ * The blue arrives. The red closes half of what it was short by and stops,
+ * and the rest of it is E-LUCE1's fourth finding -- the third term of
+ * face-light.js, 0.259 against the target's 0.362 -- which is FIT 2 of the
+ * window and belongs to the coordinator, not here.
+ *
  * FIRST VALUE AND NOT A FIT. The pigment pass is D5 and the light's third term
  * is fit 2 of the window; both come AFTER the shape, by the committente's own
  * order of work (E-DECISIONI4). What is here is the honest first reading, with
@@ -305,7 +331,7 @@ export function voxelSettings() {
 export function earthSettings() {
   return {
     ...voxelSettings(),
-    albedo: new Vector3(0.849, 0.683, 0.346),
+    albedo: new Vector3(0.900, 0.580, 0.240),
     // NO PALE MINORITY ON THE EARTH. The bright family the meadow needed is a
     // reading of the target's GRASS -- a tenth of its faces carrying a spread
     // of 18.7% inside themselves -- and nothing in the target says bare ground

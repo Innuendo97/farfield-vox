@@ -277,18 +277,27 @@ export const MOUND = {
 export const EARTH = {
   // How tall a flank has to be, in voxels, before it shows what it is cut into.
   //
-  // ONE, AND IT IS A CORRECTION TO THE READING THIS MANDATE CAME WITH. The fork
-  // read the target's bare banks as standing where the ground «sale piu' di un
-  // voxel di colpo», which is two, and that is what was built first. Measured
-  // against the target's own picture it does not hold: at two the meadow shows
-  // bare earth on 2.05% of its faces where the target shows it on 9.3% of the
-  // ground it draws outside the corridor (F.1, v1-suolo/forma/f1/f1.json), and
-  // read at the cubes themselves the target's brown faces are ONE cube tall
-  // with grass on top of them. So the threshold is one, the number it was
-  // measured against is written here beside it, and it stays a number: D-F2's
-  // answer B is this at one with `toEye`/`toPath` both off, and C is a term
-  // this file does not have yet.
-  minStep: 1,
+  // TWO, AND THE ROUND TRIP IS THE MEASUREMENT AND NOT A PREFERENCE.
+  //
+  // The fork read the target's bare banks as standing where the ground «sale
+  // piu' di un voxel di colpo», which is two. Counted in QUADS that looked far
+  // too little -- two draws 1.05% of the disc's faces where the target shows
+  // bare ground over 9.3% of the ground it draws outside the corridor -- so it
+  // was moved to one, and then the same share was counted in PIXELS, which is
+  // what a share of a picture actually means. Read as the difference between
+  // the frame with the second mesh and the frame without it, at the pose the
+  // campaign judges on:
+  //
+  //     minStep 1     150 508 px    37.4% of the ground drawn
+  //     minStep 2      38 819 px     9.66%
+  //     the day target                9.3%   (F.1, corridor taken out)
+  //
+  // A quad is not a pixel and at this camera it is nowhere near one: a flank
+  // near the eye is twenty rows tall and a top is three, so a family that lives
+  // ONLY on flanks takes several times its share of the faces. The first count
+  // was the wrong unit for the question, the reading it overturned was right,
+  // and it is back. D-F2's answer B is this at one.
+  minStep: 2,
   // Toward the eye, which in this world is south: the reference camera stands
   // at z 14 and looks north, so a face whose outward bearing is +z is a face
   // the picture is of. And toward the corridor, which is the other thing the
