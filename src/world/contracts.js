@@ -3,7 +3,9 @@ import { stairHeightAt as stairRunHeight } from './stairs.js';
 import { flowerField } from './vegetation.js';
 import { PLATFORM } from './layout.js';
 import { pathHoleAt } from './path.js';
-import { CENTRE, DISC_RADIUS, VOXEL, columnTop } from './voxel/mesher.js';
+import {
+  CENTRE, DISC_RADIUS, VOXEL, bareRaisedAt, columnTop,
+} from './voxel/mesher.js';
 
 // THE CONTRACTS BETWEEN THE SESSIONS, AND THE ONLY DOOR BETWEEN THEM.
 //
@@ -278,6 +280,9 @@ export function materialAt(x, z) {
     && Math.abs(dx * PLATFORM_SIN + dz * PLATFORM_COS) <= PLATFORM.depth / 2) return 'piattaforma';
   if (stairRunHeight(x, z) !== -Infinity) return 'scalinata';
   if (pathRun(z) > 0.5 && Math.abs(pathCoord(x, z)) <= 1) return 'sentiero';
+  // The steep flank of a mound shows the earth it is made of (E-DECISIONI4):
+  // the same seat the mesher paints from, so the foot and the eye agree.
+  if (bareRaisedAt(x, z)) return 'terra';
   return 'erba';
 }
 
