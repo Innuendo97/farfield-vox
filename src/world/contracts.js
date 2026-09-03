@@ -3,7 +3,7 @@ import { stairHeightAt as stairRunHeight } from './stairs.js';
 import { flowerField } from './vegetation.js';
 import { PLATFORM } from './layout.js';
 import {
-  CENTRE, DISC_RADIUS, MATERIAL, VOXEL, columnSpec, columnTop,
+  BASE_STEP, CENTRE, DISC_RADIUS, MATERIAL, NO_COLUMN, VOXEL, chunkColumns, matAt, topAt,
 } from './voxel/mesher.js';
 
 // THE CONTRACTS BETWEEN THE SESSIONS, AND THE ONLY DOOR BETWEEN THEM.
@@ -42,20 +42,32 @@ import {
 // the field walks through ground he can see (v1-suolo/analisi/d4-cuciture.json).
 // The picture is not wrong; this was.
 //
-// IT IS THE CARPET'S FIELD AND NOT THE CARPET'S MESH, and that is the whole of
-// why it can be here at all. `columnTop` is a pure function of a point: it is
-// what the worker meshes FROM, so it answers before a single chunk has been
-// cut, off the main thread, on a page whose disc is still being built, and in a
-// node harness with no page at all. Reading the delivered height maps instead
-// -- ground-voxel's own topAt -- would have made the walker's floor depend on
-// whether a download had finished, which is the one thing a contract may never
-// do.
+// AND IT IS THE STORE NOW AND NOT THE LAW, WHICH IS A-3 LANDING. Until this
+// step the seat read `columnTop` -- the generator's own arithmetic, a pure
+// function of a point -- and that was right while the pipeline was the whole of
+// the world: what the law said and what the store held were the same by
+// construction, and guard-piano asserted it on every column of a chunk. It
+// stops being right the day one edit lands that is not part of the pipeline,
+// and the store is where such an edit would land. A floor read from the law
+// would then be a floor nobody draws.
 //
-// AND IT COSTS WHAT IT COSTS, MEASURED RATHER THAN FEARED: 1 165 ns a call
-// against the grid's 46, which is 7.0 microseconds a frame at the six calls a
-// step takes, against sixteen thousand (v1-suolo/analisi/d4-costo.json). The
-// grid was justified in this file by the walker asking every frame; the walker
-// is not what makes this expensive and never was.
+// SO IT READS THE FOUR ARRAYS, THROUGH THE SAME DOOR THE WORKER MESHES FROM.
+// The store is cut per chunk by `chunkColumns`, which is PURE ARITHMETIC -- no
+// page, no download, no worker -- so the property that let the law be here
+// survives untouched: this answers on a page whose disc is still being built,
+// off the main thread, and in a node harness with no page at all. What it must
+// NOT read is the delivered height maps of ground-voxel: those arrive when a
+// download finishes, and a walker's floor may never depend on that.
+//
+// AND IT COSTS WHAT IT COSTS, MEASURED RATHER THAN FEARED, TWICE.
+// E-V1g measured the law at 1 165 ns a call and 7.0 microseconds a frame at the
+// six calls a step takes. Re-measured on the world that ships (the bench is
+// fondazione/lav/contratto-ms.mjs, a walk up the corridor and back at the pace
+// a body keeps): the law came to 1.85 microseconds a frame warm, and the store
+// comes to a FIFTH of that. What the store pays instead is the first touch of
+// a chunk -- 4 356 columns of law, once -- and that price is named here rather
+// than hidden: it lands the first time the walker sets foot in a chunk of the
+// disc and never again while he is on it.
 
 // How far the ten centimetre ground reaches, in metres.
 //
@@ -78,62 +90,123 @@ let discRadius = DISC_RADIUS;
  */
 export function setGroundDiscRadius(radius) {
   discRadius = radius > 0 ? radius : DISC_RADIUS;
+  // AND THE CACHED TILES GO WITH IT. A store is cut at a radius -- the rim of
+  // the disc is where it lays no column -- so a tile kept across a change of
+  // radius would answer for a disc nobody laid.
+  tiles.clear();
   return discRadius;
 }
 
-// What columnTop hands back where no column stands. The engine keeps the value
-// to itself, so it is recognised by size and not by equality: no top of any
-// real column is within a decade of it, and matching on the magnitude cannot
-// break the day the engine picks a different sentinel.
-const NO_TOP = -1e8;
+// -------------------------------------------------------- the store, one tile at a time
+//
+// A FIFO OF TILES AND NOT A DISC. The walker asks about six points a frame and
+// all six fall in one tile nearly always, so what a cache has to hold is the
+// tile he is on and the ones he has just left. It is FIFO rather than
+// least-recently-used on purpose: a walk is a path, so the oldest tile in the
+// map is the one furthest behind him, and an LRU would pay a reorder per call
+// to sort a queue the walk already sorts.
+//
+// AND THE TILE IS SIXTEEN COLUMNS AND NOT THE MESHER'S SIXTY FOUR, WHICH IS THE
+// ONE NUMBER HERE THAT WAS SWEPT RATHER THAN REASONED. Cutting a store is
+// running the law over its columns once, and a tile is paid for the first time
+// a foot lands in it: at 64 that first touch is 4 356 columns and 2.6 ms, which
+// is a sixth of a frame and the kind of hitch a walk shows; at 16 it is 324 and
+// 0.16 ms, which is nothing. Measured on the bench, over a walk up the corridor
+// and back (microseconds a frame, six calls a step):
+//
+//   tile  8  cache 16    first lap 16.0   warm 6.79   -- the cache thrashes
+//   tile 16  cache 16    first lap 21.0   warm 8.21   -- and thrashes harder
+//   tile 16  cache 64    first lap 11.2   warm 0.50
+//   tile 32  cache 64    first lap 21.2   warm 0.48
+//   tile 64  cache 16    first lap 36.1   warm 0.51
+//
+// Nothing about the STORE changes with the number: it is `chunkColumns` with
+// its own `n`, the same arithmetic through the same doors, cut smaller. What
+// changes is how much of it is paid at once.
+//
+// SIXTY FOUR TILES, AND THE NUMBER IS THE WALK'S. Below the walk's own span the
+// cache thrashes and the warm figure collapses -- the two rows above are that,
+// measured. The corridor is 24 m end to end, which is fifteen tiles of z alone,
+// so a cache that is to stay warm over a lap has to hold rather more than the
+// nine around one foot. At 1 620 bytes a tile, sixty four of them are 104 KB,
+// against the 2.45 MB a resident disc would be.
+const TILE = 16;
+const CACHED_TILES = 64;
+const tiles = new Map();
+
+/**
+ * The store the column (ix, iz) lives in, cut if it has not been cut yet.
+ *
+ * IT IS THE SAME ARITHMETIC THE WORKER MESHES FROM, through the same door and
+ * the same four arrays, so the floor the walker stands on and the floor the
+ * frame draws are one store and not two readings of one law.
+ */
+function storeAt(ix, iz) {
+  const cx = Math.floor(ix / TILE);
+  const cz = Math.floor(iz / TILE);
+  const key = `${cx},${cz}`;
+  let store = tiles.get(key);
+  if (store === undefined) {
+    store = chunkColumns(cx, cz, TILE, true, discRadius);
+    if (tiles.size >= CACHED_TILES) tiles.delete(tiles.keys().next().value);
+    tiles.set(key, store);
+  }
+  return store;
+}
 
 /**
  * Height of the ground under a point, in metres.
  *
- * V1 FILLS THIS, and it is three grounds behind one name because the world has
- * three and the walker may stand on all of them:
+ * V1 FILLS THIS, AND ON THE DISC IT IS ONE GROUND BEHIND ONE NAME. It was
+ * three, and the two that are gone were not simplified away -- each died on the
+ * step that removed the thing it answered for:
  *
- *   1. WHERE THE CORRIDOR OWNS THE GROUND the answer is the field, and it is
- *      the field EXACTLY rather than resampled. groundHoleAt is true over
- *      precisely the footprint V3's surface covers, that surface is laid on the
- *      ground rather than on a column, and a cube answered here would put the
- *      walker on a lip the paving is drawn over. Measured on the corridor, the
- *      exact field stands 26.4 mm from the ground as drawn at worst against the
- *      grid's 28.8 -- the rest of that gap is the meadow's own triangulation
- *      and belongs to whoever chose it, which is said in full in the verbale.
- *   2. INSIDE THE DISC the top of the column, which is what the frame draws.
- *      Where the disc lays none -- a block's own footprint -- the bent grid is
- *      still what draws, so the field answers there too.
- *   3. BEYOND THE DISC the sheet, SNAPPED THE WAY THE SHEET SNAPS. This is not
- *      a flourish: the walker's hard radius is 21 m and the disc reaches 14, so
- *      seven metres of what he can walk on are sheet, and an unsnapped answer
- *      there would have him riding a smooth field over terraced ground for a
- *      third of his own range.
+ *   THE CORRIDOR'S OWN FIELD died at step 4. It read the field exactly wherever
+ *   the paving owned the column, because the paving was a surface laid over a
+ *   HOLE in the meadow and a cube answered there would have put the walker on a
+ *   lip drawn over. The corridor is columns now, so the one branch below
+ *   answers for it -- and it answers the same number to the millimetre: the
+ *   paving's top is one voxel under the meadow's floor, so its drawn face lands
+ *   on BASE_LEVEL, which is what the field said. The 26.4 mm of E-V1g die here.
+ *   THE BLOCK'S OWN FOOTPRINT dies at this step. Inside the disc, where the
+ *   generator lays no column, the answer used to be the field again -- the bent
+ *   grid was what drew there. What stands there is a MONOLITH: 595 columns,
+ *   measured, under a piece of masonry the walker is kept out of by the
+ *   blockers of src/world/hub.js and not by his floor. So the floor there is
+ *   the floor of the meadow around it, which is the plane -- one number, and no
+ *   second reading of a field for ground nobody stands on. It is stated rather
+ *   than left implicit that this is NOT builtHeightAt's seat: that one answers
+ *   for the platform and the stair run, which are surfaces a foot really
+ *   travels, and it answers -Infinity over all 595 of these.
  *
- * The arithmetic of 3 is ground-shell.js's shellHeight, RE-DECLARED and not
- * imported, and that is a debt this unit is naming rather than hiding: the
- * sheet is built in a session file and the contract cannot import a layer
- * without the layer's whole dependency graph following it into every tool that
- * reads a height. The two are pinned together by guard-lift's own leg rather
- * than by an import -- see the note there.
+ * WHAT IS LEFT IS THE DISC AND THE SHEET. BEYOND THE DISC the sheet, SNAPPED
+ * THE WAY THE SHEET SNAPS -- not a flourish: the walker's hard radius is 21 m
+ * and the disc reaches 14, so seven metres of what he can walk on are sheet,
+ * and an unsnapped answer there would have him riding a smooth field over
+ * terraced ground for a third of his own range. That branch is step 7's, when
+ * the shell inside 35 m becomes the plane too.
+ *
+ * The arithmetic of the sheet is ground-shell.js's shellHeight, RE-DECLARED and
+ * not imported, and that is a debt named rather than hidden: the sheet is built
+ * in a session file and the contract cannot import a layer without the layer's
+ * whole dependency graph following it into every tool that reads a height. The
+ * two are pinned together by guard-lift's own leg rather than by an import --
+ * see the note there.
  */
 export function groundHeightAt(x, z) {
-  // 1. THE BRANCH THAT WAS FIRST IS GONE, AND IT COST NOTHING TO LOSE. It read
-  //    the field exactly wherever the corridor owned the column, because the
-  //    paving was laid on the field and a cube answered there would have put
-  //    the walker on a lip drawn over. The corridor is columns now: the branch
-  //    below answers for it, and it answers the SAME NUMBER -- the paving's top
-  //    is one voxel under the meadow's floor, so its drawn face is at
-  //    (BASE_STEP - 1 + 1) * VOXEL = BASE_LEVEL, which is what the field said.
-  //    The walker's floor over the whole corridor is unmoved to the millimetre
-  //    and one of the three grounds is gone. The 26.4 mm of E-V1g die here.
-  // 2. The carpet, from the arithmetic the worker meshes from.
-  const top = columnTop(Math.floor(x / VOXEL), Math.floor(z / VOXEL), true, discRadius);
-  if (top > NO_TOP) return (top + 1) * VOXEL;
+  const ix = Math.floor(x / VOXEL);
+  const iz = Math.floor(z / VOXEL);
+  // THE ONE BRANCH: the top of the column, out of the store the frame is cut
+  // from. `(top + 1) * VOXEL` is the mesher's own arithmetic for where the face
+  // of that column is drawn, and it is written the same way in both places
+  // because it IS the same statement.
+  const top = topAt(storeAt(ix, iz), ix, iz);
+  if (top !== NO_COLUMN) return (top + 1) * VOXEL;
   const r = Math.hypot(x - CENTRE.x, z - CENTRE.z);
-  //    Inside the disc with no column: a block's footprint, where the grid draws.
-  if (r <= discRadius) return heightAt(x, z);
-  // 3. The sheet.
+  // Inside the disc with no column: the masonry's own footprint. The floor
+  // there is the plane the meadow around it stands on -- see above.
+  if (r <= discRadius) return (BASE_STEP + 1) * VOXEL;
+  // And beyond it, the sheet.
   return Math.round((heightAt(x, z) + basinProfile(r)) / VOXEL) * VOXEL;
 }
 
@@ -277,8 +350,12 @@ export const stairHeightAt = stairRunHeight;
  *
  * V1, V2 AND V3 ALL REACH THIS. In a voxel world the category is the material of
  * the column, which is a cleaner answer than this one and not a different one.
+ *
+ * @returns {'piattaforma'|'scalinata'|'sentiero'|'terra'|'pietra'|'erba'}
  */
 export function materialAt(x, z) {
+  const ix = Math.floor(x / VOXEL);
+  const iz = Math.floor(z / VOXEL);
   const dx = x - PLATFORM.x;
   const dz = z - PLATFORM.z;
   if (Math.abs(dx * PLATFORM_COS - dz * PLATFORM_SIN) <= PLATFORM.width / 2
@@ -297,42 +374,48 @@ export function materialAt(x, z) {
   // and drew as grass.
   //
   // Now it reads the material of the top of the column, which is the one place
-  // in this world that says what is at a point. It is the LAW and not the store
-  // -- columnSpec, the same door columnTop comes through -- so it stays O(1) and
-  // needs no chunk built to answer for one footfall.
-  const spec = columnSpec(Math.floor(x / VOXEL), Math.floor(z / VOXEL), true, discRadius);
-  if (spec.mat === MATERIAL.PATH) return 'sentiero';
-  if (spec.mat === MATERIAL.EARTH) return 'terra';
+  // in this world that says what is at a point -- and it reads it out of the
+  // STORE, through the same door and the same cached chunk the floor above
+  // comes through. It does not CALCULATE what is underfoot any more: it looks.
+  //
+  // AND THE FIFTH NAME IS THE MASONRY'S OWN FOOTPRINT. Where the generator lays
+  // no column because a block stands there, the store says so -- MATERIAL.STONE
+  // is the reason it wrote down -- and a foot there is on stone. The platform
+  // and the stair answer above this line and keep their own two names, because
+  // they are built things with their own heights and not columns of the meadow.
+  const mat = matAt(storeAt(ix, iz), ix, iz);
+  if (mat === MATERIAL.PATH) return 'sentiero';
+  if (mat === MATERIAL.EARTH) return 'terra';
+  if (mat === MATERIAL.STONE) return 'pietra';
   return 'erba';
 }
 
 // ------------------------------------------------------------- the two noughts
 
-/**
- * Whether the ground is cut away here, because something else owns this column.
- *
- * IT ANSWERS NO, EVERYWHERE, AND THAT IS THE TRUTH AGAIN RATHER THAN A
- * PLACEHOLDER -- for the second time in this seat's life and for the opposite
- * reason.
- *
- * It answered no while the path was painted into the ground's albedo, because
- * there was nothing anywhere that was not the ground. Then the corridor became
- * a surface of its own and this became the one agreement between two sessions:
- * V3 said where its stone was and V1's disc laid no column under it. The
- * corridor is COLUMNS now -- the same store, the same pass, PATH and EARTH on
- * top of them (see PATH in src/world/voxel/worldgen.js) -- so once more there is
- * nothing in this world that is not the ground.
- *
- * AND IT IS KEPT RATHER THAN WITHDRAWN, with its three readers and its
- * signature, because "is any of this ground somebody else's" is a question the
- * world will ask again: the day a bridge, a floor or a pool is laid over the
- * meadow, this is the seat it goes in, and the readers are already wired to it.
- * What is NOT kept is anything that behaved as though the answer might be yes --
- * see the branch that used to open groundHeightAt.
- */
-export function groundHoleAt() {
-  return false;
-}
+// THE SEAT THAT ASKED WHETHER THE GROUND WAS CUT AWAY IS WITHDRAWN, AND THE
+// GREP IS THE REASON.
+//
+// `groundHoleAt` answered whether something else owned a column. It was the one
+// agreement between two sessions while the corridor was a surface of its own:
+// V3 said where its stone was and V1's disc laid no column under it. Step 4
+// made the corridor COLUMNS -- the same store, the same pass, PATH and EARTH on
+// top of them -- and from that day the answer was `false`, unconditionally,
+// everywhere.
+//
+// U-FOND-3 kept it anyway, and wrote down why: "with its three readers and its
+// signature", because the day a bridge or a pool is laid over the meadow this
+// is the seat it goes in. The three readers went with the hole. Grepped over
+// src and tools at this step, the only call left in the world was the one
+// `groundLightAt` made to it three lines below -- a seat asking itself a
+// question whose answer it had written into its own body. A contract that
+// exists so that a caller can read a nought from a seat that exists is worth
+// keeping; a contract with no caller at all is a name that has to be kept true
+// by everyone who touches this file, in exchange for nothing.
+//
+// So it is gone, and what took its place is the truth it was standing in for:
+// there is nothing in this world that is not the ground. The day a bridge is
+// laid, the seat comes back with the reader that needs it, in the same
+// commit -- which is how it should have arrived the first time.
 
 /**
  * The two terms of the ground's own light at a point, or null where the ground
@@ -369,18 +452,18 @@ export function groundHoleAt() {
  * day an occlusion term lands it is this seat that stops being constant, with
  * V4's own code unchanged.
  *
- * NULL WHERE THE GROUND IS CUT AWAY, which is the one place the answer is not
- * the meadow's: over the corridor V3 draws its own surface with its own tilt,
- * and handing back a flat top face there would light a blade on the paving by a
- * ground that is not under it. src/world/path.js answers for that footprint,
- * with the same three fields, and its own fallback is what runs there.
+ * AND IT IS NEVER NULL ANY MORE, which is the corridor's doing and not a
+ * loosening. The exception written here was that over the corridor V3 drew its
+ * own surface with its own tilt, so a flat top face handed back there would
+ * light a blade on the paving by a ground that is not under it. The corridor is
+ * columns of this same meadow now and its top face is the same (0, +1, 0) as
+ * every other, so the exception has nothing left to except.
  *
  * @param {number[]} sun  the sun's direction, from the one seat that holds it;
  *                        the sun term is null without it rather than invented
  * @returns {{sun: number|null, sky: number, normal: number[]}|null}
  */
 export function groundLightAt(x, z, sun = null) {
-  if (groundHoleAt(x, z)) return null;
   // n = (0, 1, 0), so the cosine to the beam IS the sun's own vertical and the
   // sky share is exactly one. Written out rather than dotted, because a dot
   // product against a constant normal is a way of hiding which number it is.
