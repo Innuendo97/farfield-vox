@@ -80,7 +80,10 @@ const AT_APPROVED = { on: 1.5362, off: 0.1903, carpet: 1.3459 };
 // stone went to nought (the masses stand on the bare plane, so `off` rose) and
 // bare earth entered the count: 0.3505 grained, 0.0478 bare, 0.3027 for the
 // grain alone. Against the approved price (1.3459) the carpet is 1.0432 lower.
-const AT_TODAY = { on: 0.3505, off: 0.0478, carpet: 0.3027 };
+// U-FOND-3 (E-FOND-PIANO6): the corridor is a phase of the store, one voxel
+// under the meadow with earth verges, so the disc lost the grain those columns
+// carried: 0.3278 grained, 0.0410 bare, 0.2868 for the grain alone.
+const AT_TODAY = { on: 0.3278, off: 0.0410, carpet: 0.2868 };
 
 /** Whether a constant is still the frozen one. Bit for bit: these are dials. */
 export const frozen = (actual, expected) => actual === expected;
