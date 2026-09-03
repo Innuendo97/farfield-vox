@@ -239,6 +239,92 @@ export const MOUND = {
 };
 
 /**
+ * THE MASSES THE REFERENCE PUTS IN FRAME, AS A DATUM READ OFF IT.
+ *
+ * WHY A TABLE AND NOT A DIAL. Five steps of this rebuilding put the meadow's
+ * masses on a lattice, and a lattice is the right law for ground nobody has
+ * looked at: it gives a spacing, a size band and a density that are all
+ * measured, and it answers everywhere. What it cannot do is put a mass WHERE
+ * THE PICTURE HAS ONE. Measured at step 5: in the wedge of meadow the fitted
+ * camera looks at from six to nine metres, the reference carries TWO masses and
+ * the lattice had TWO CELLS there -- the corridor takes one, the other rolled
+ * nought -- so the part of the frame that decides carried none at all. Three
+ * dials would have moved it and every one of the three would have been a single
+ * picture's fit, which is the one thing this architecture exists not to do.
+ *
+ * So the composition IN FRAME is a datum, read off the reference, written down,
+ * and stated with its provenance. The lattice stays the LAW everywhere it is
+ * still the only thing there is: out of frame, and in frame wherever a cell is
+ * free of these seats.
+ *
+ * THE PROVENANCE, WHICH IS THE WHOLE OF WHY THESE NUMBERS MAY BE HERE.
+ * `fondazione/lav/sedi.mjs`, on farfield-day-voxel-target.png, through
+ * POSE_VOX_DAY of src/core/poses.js -- the fit of the frame on the silhouettes
+ * of the five blocks -- read against the plane y = 0, which is where A 1.1
+ * measures the reference's own walkable surface and where U-FOND-1 put ours.
+ * Two signals, and each is one the reference itself names:
+ *
+ *   THE RISER. Every step of two and a half voxels or more the resolved windows
+ *   find, placed on that plane and gathered by single link at 0.75 m. This is
+ *   the reading U-FOND-4 0.3 already took and reported -- it is what found the
+ *   two foreground masses in the first place -- carried to the end instead of
+ *   stopping at a pair of half-metre buckets.
+ *   THE BANK. A patch of bare brown off the corridor, which is what A 1.2 says
+ *   a mass shows: one flank that drops two or three voxels in one go, and that
+ *   flank is bare brown earth. Filtered by two measurements and nothing else:
+ *   1.5 m from the corridor's edge, because 83.2 % of the reference's own earth
+ *   risers stand inside that (0.3) and belong to the verge; and 2.5 m from a
+ *   block, because NONE of its risers stand inside that (0.3, E-FOND-PIANO2.1).
+ *
+ * AND IT REACHES AS FAR AS THE INSTRUMENT DOES AND NOT ONE ROW FURTHER. Both
+ * signals stop where one voxel stops reading fourteen rows, which is the
+ * boundary every measurement of this campaign is taken at and the one E-V1k
+ * showed the painted grain wins past. That is why this table is FOUR seats and
+ * not the dozen the frame holds: the rest of the reference's meadow is drawn at
+ * a scale where a step and a brush stroke are the same size, and a seat put out
+ * there would be a position nobody measured. Out there the lattice answers,
+ * which is what a law is for.
+ *
+ * AND ONLY WHAT THE ESTIMATOR AGREES WITH ITSELF ABOUT IS WRITTEN DOWN. Swept
+ * over its own dials -- the riser floor at 2.0 and at 2.5 voxels, the link at
+ * 0.75 and at 1.0 m, the bank's smallest area and smallest width, the
+ * corridor's own exclusion at 1.0 and at 1.5 m -- it returns three or four
+ * seats, and THREE of them are in every run within 0.2 m of these positions.
+ * The fourth is not one seat: at the default it reads at (1.77, 5.92) with
+ * twelve risers behind it, at a looser link it is absorbed into the first, and
+ * at a lower riser floor it is not there at all and a different one appears at
+ * (-2.32, 7.09). A position the instrument moves by two metres when a dial of
+ * its own moves is not a position, so it is reported and NOT carried -- and
+ * what carrying it did was measured before it was dropped: seated, it merged
+ * with the first mass and made one object 3.50 m across, at the very top of the
+ * 1.5-3.5 m the reference reads.
+ *
+ * EACH ROW IS WHAT WAS MEASURED AND NOT WHAT WAS DERIVED. `zFoot` is where the
+ * cut flank stands on the floor -- the eye is at z 14 and looks north, so the
+ * flank it meets is the one at the largest z, and its foot is the one part of a
+ * mass a picture shows without ambiguity. `width` is how far that flank runs
+ * across. `rise` is how many voxels of mass stand over the floor. The seat's
+ * centre, its reach and its bank are worked out from those three by the shape's
+ * own arithmetic, so that a re-reading of the picture lands here and nowhere
+ * else.
+ */
+export const FRAMED = [
+  // The right foreground mass: the one A-10 shows with its brown flank turned
+  // to the corridor, and the widest thing the reading resolves.
+  { x: 2.14, zFoot: 8.19, width: 1.53, rise: 4 },
+  // The left foreground mass, and it stands closest of the four to the
+  // corridor: 0.61 m of clear ground between its centre and the paving's
+  // nominal edge. It is the one seat the rule below has to push, and the push
+  // is 0.18 m -- which lands it at x -2.36, where the same estimator reads it
+  // when its link is loosened to a metre. The correction and the measurement
+  // agree to two centimetres.
+  { x: -2.18, zFoot: 7.77, width: 0.21, rise: 3 },
+  // The right field, found by its bank rather than by its risers -- the one
+  // seat of the three the colour signal contributes on its own.
+  { x: 5.08, zFoot: 5.92, width: 1.14, rise: 3 },
+];
+
+/**
  * Which faces of a mound show bare earth rather than grass.
  *
  * D-F2, AS DATA. The default is A -- what the target draws and what the fork
@@ -550,7 +636,7 @@ function toStone(x, z) {
 /** One evaluation of a mound at a point: how high it stands, and on what. */
 function moundProfile(x, z) {
   const none = { height: 0, bank: false, halo: false, cut: 0 };
-  const seat = moundSeat(Math.floor(x / MOUND.cell), Math.floor(z / MOUND.cell));
+  const seat = seatAt(x, z);
   if (!seat) return none;
   const dx = x - seat.x;
   const dz = z - seat.z;
@@ -568,11 +654,16 @@ function moundProfile(x, z) {
   if (z > seat.z + seat.zHalf * (1 - MOUND.cut)) return none;
   // Nothing grows on the way in, on the stone, or inside a stone's own band --
   // and the test is on the SEAT and not on the point, so a mass is either
-  // wholly there or wholly not and never sliced in half.
-  for (const box of CLEAR) {
-    if (toBlock(box, seat.x, seat.z) < seat.reach * (1 + MOUND.lean)) return none;
+  // wholly there or wholly not and never sliced in half. A seat read off the
+  // reference was asked all of this once, where it was built, and carries the
+  // answer: see buildFramed.
+  if (!seat.framed) {
+    for (const box of CLEAR) {
+      if (toBlock(box, seat.x, seat.z) < seat.reach * (1 + MOUND.lean)) return none;
+    }
+    if (toStone(seat.x, seat.z).near
+      < MOUND.band + seat.reach * (1 + MOUND.lean) * 0.4) return none;
   }
-  if (toStone(seat.x, seat.z).near < MOUND.band + seat.reach * (1 + MOUND.lean) * 0.4) return none;
   const flat = seat.reach * MOUND.plateau;
   if (d <= flat) {
     // The crown. Flat by default; the second terrace of answer B takes the
@@ -644,14 +735,8 @@ export function moundCutAt(x, z) {
 
 /** Whether a point is on a mass, or inside the hem the grain leaves round one. */
 function underMass(x, z) {
-  const seat = moundSeat(Math.floor(x / MOUND.cell), Math.floor(z / MOUND.cell));
-  if (seat) {
-    const dx = x - seat.x;
-    const dz = z - seat.z;
-    const u = (dx * seat.c + dz * seat.s) / (1 + MOUND.lean);
-    const w = (-dx * seat.s + dz * seat.c) * (1 + MOUND.lean);
-    if (Math.hypot(u, w) < seat.reach + MOUND.halo) return true;
-  }
+  const seat = seatAt(x, z, MOUND.halo);
+  if (seat && insideSeat(seat, x, z, MOUND.halo)) return true;
   if (!MOUND.bank.high && !MOUND.bank.low) return false;
   const { near, anchor } = toStone(x, z);
   return Boolean(anchor && near <= anchor.band + MOUND.halo);
@@ -848,6 +933,174 @@ function corridorAt(x, z) {
 /** Whether a point stands on the corridor at all, stone or verge. */
 export function onPaving(x, z) {
   return corridorAt(x, z) >= 0;
+}
+
+// ======================================================================
+// THE SEATS THE PICTURE HAS, TURNED INTO SEATS THE MEADOW'S OWN ARITHMETIC
+// UNDERSTANDS.
+//
+// FRAMED above is a READING -- where a flank stands, how wide it runs, how tall
+// it is. A seat is what moundProfile evaluates: a centre, a bearing, a reach, a
+// rise and a bank. This is the one place the first becomes the second, and
+// every step of it is the shape's own arithmetic rather than a number written
+// down twice.
+//
+// AND IT IS NOT ONE SEAT TO A CELL, WHICH IS WHY THIS IS NOT THE LATTICE. A
+// lattice seat is bounded to stay inside its own cell, so a point belongs to at
+// most one and a single lookup finds it. The reference does not lay its masses
+// on a lattice of 3.8 m: three of these four fall in ONE cell. So the store
+// below keeps a LIST to a cell, a seat is registered in every cell its
+// footprint touches, and the cells around them are registered as REFUSALS so
+// the lattice cannot seat a mass that would touch one. The lookup stays O(1) in
+// the size of the table and costs, where a cell is empty, one map miss.
+//
+// AND IT IS BUILT LAZILY BECAUSE OF THE ORDER OF THIS FILE AND NOT ITS COST:
+// the clearance below reads PATH, which is declared under the corridor, and a
+// module that built this at load would read a constant before its own line ran.
+
+/** Cell key to what the reference says about that cell, or nothing. */
+let framedCells = null;
+
+/** What became of the reference's seats, so a table that misses is not silent. */
+export const framedTally = {
+  laid: 0, pushed: 0, dropped: 0, cells: 0, refused: 0,
+};
+
+/**
+ * The half width of a mass's cut chord, as a share of its reach.
+ *
+ * READ OFF THE SHAPE AND NOT MEASURED ANYWHERE. moundProfile takes the southern
+ * cap off the footprint at a line of constant z, `MOUND.cut` of the way in from
+ * its southern extent; the flank a picture then shows is the ellipse's own
+ * width at that line. So a flank measured `width` metres across belongs to a
+ * mass of `width / (2 * CHORD)` of reach, and the reading and the shape are
+ * tied together by the dials rather than by a factor.
+ */
+const CHORD = (1 + MOUND.lean) * Math.sqrt(1 - (1 - MOUND.cut) * (1 - MOUND.cut));
+
+function buildFramed() {
+  framedCells = new Map();
+  const cellAt = (cx, cz) => {
+    const k = `${cx},${cz}`;
+    let c = framedCells.get(k);
+    if (!c) { c = { seats: [] }; framedCells.set(k, c); }
+    return c;
+  };
+  for (const f of FRAMED) {
+    // THE SIZE. Clamped into the band the campaign already ratified off this
+    // same reference (MOUND.reach), and the clamp is not a tidy-up: what was
+    // measured is the width of the piece of the flank the instrument RESOLVED,
+    // which is a floor on the flank and not the flank. Two of these four read
+    // under the smallest mass this world can build, and a mass narrower than
+    // that is a picket rather than an object.
+    const reach = Math.min(MOUND.reach.high, Math.max(MOUND.reach.low, f.width / (2 * CHORD)));
+    // THE BEARING IS ALONG X, and that is a reading and not a default: the
+    // census measures a flank ACROSS the frame and the eye stands due south of
+    // it, so the axis the picture resolves is the one the mass is long on.
+    const across = reach / (1 + MOUND.lean);
+    const along = reach * (1 + MOUND.lean);
+    // The centre, from the foot of the cut: the chord stands `MOUND.cut` of the
+    // way in from the southern extent, so the centre is that much further north.
+    const z = f.zFoot - across * (1 - MOUND.cut);
+    // AND THE CORRIDOR STILL EXCLUDES IT. The paving is laid before the masses
+    // and returns, so a mass that reached it would not be laid over it -- it
+    // would be CUT by it, at whatever height its profile had where the stone
+    // began, which is the half metre of cliff U-FOND-4 measured on one mound at
+    // the west verge. The reference puts this mass beside the corridor and the
+    // corridor is where our own fit put it, so the seat is moved OFF the paving
+    // by exactly the overlap rather than dropped: the picture's composition is
+    // kept and the corridor's one invariant with it.
+    const centre = pathCentreX(z);
+    const clear = pathHalfWidth(z) + PATH.wander + along;
+    let x = f.x;
+    if (pathRun(z) > 0 && Math.abs(x - centre) < clear) {
+      x = centre + Math.sign(x - centre || 1) * clear;
+      framedTally.pushed++;
+    }
+    // AND NOTHING GROWS ON THE WAY IN OR THROUGH THE MASONRY. The way in is the
+    // committente's own reading named twice -- the seven steps are all in view
+    // in the reference and none in ours -- and a mound rising through a block is
+    // a mound inside a wall. A seat this table puts in either is refused here,
+    // counted, and never half drawn.
+    const buried = CLEAR.some((box) => toBlock(box, x, z) < reach * (1 + MOUND.lean))
+      || GRASS_BLOCKS.some((b) => toBlock(b, x, z) < b.band + reach * (1 + MOUND.lean) * 0.4);
+    if (buried) { framedTally.dropped++; continue; }
+    // AND THE BOULDERS DO NOT REFUSE IT, WHICH IS THE ONE CLEARANCE A FRAMED
+    // SEAT DOES NOT KEEP -- AND THE REASON IS A MEASUREMENT. The lattice keeps
+    // its masses a stone's band away from every stone, boulders included,
+    // because a mass that reached a bank would ADD to it. There is no bank:
+    // MOUND.bank stands at nought on the reference's own evidence
+    // (E-FOND-PIANO2.1), so round a boulder that clearance protects nothing.
+    // And the boulders' places were themselves traced back off this same
+    // picture's pixels, so a rock inside one of these seats is a rock the
+    // reference draws STANDING ON the mass. Refusing the mass would be reading
+    // one half of a picture against the other half.
+    const seat = {
+      x,
+      z,
+      c: 1,
+      s: 0,
+      reach,
+      rise: f.rise,
+      // ONE HEIGHT TO A MASS, AND NEVER TALLER THAN THE MASS. The reference
+      // reads the cut at two or three voxels in one go (A 1.2), and this table
+      // carries how tall the whole mass stands, so the bank is the taller of
+      // the two the dial admits, capped by the mass itself.
+      scarp: Math.min(f.rise, MOUND.scarp.high),
+      zHalf: across,
+      // The clearances above were answered once, here, where the reading is.
+      framed: true,
+    };
+    framedTally.laid++;
+    // Every cell the footprint touches carries the seat; every cell out to the
+    // largest mass the lattice can draw is closed to the lattice, which is how
+    // "mai due attaccati" survives a seat the lattice did not choose.
+    const pad = MOUND.reach.high * (1 + MOUND.lean) + MOUND.halo;
+    const grid = (v) => Math.floor(v / MOUND.cell);
+    for (let cz = grid(z - across - pad); cz <= grid(z + across + pad); cz++) {
+      for (let cx = grid(x - along - pad); cx <= grid(x + along + pad); cx++) {
+        const c = cellAt(cx, cz);
+        if (cx >= grid(x - along) && cx <= grid(x + along)
+          && cz >= grid(z - across) && cz <= grid(z + across)) c.seats.push(seat);
+      }
+    }
+  }
+  for (const c of framedCells.values()) {
+    if (c.seats.length) framedTally.cells++; else framedTally.refused++;
+  }
+}
+
+/** Whether a point is inside a seat's own ellipse, grown by `pad` metres. */
+function insideSeat(seat, x, z, pad) {
+  const dx = x - seat.x;
+  const dz = z - seat.z;
+  const u = (dx * seat.c + dz * seat.s) / (1 + MOUND.lean);
+  const w = (-dx * seat.s + dz * seat.c) * (1 + MOUND.lean);
+  const r = seat.reach + pad;
+  return u * u + w * w < r * r;
+}
+
+/**
+ * The seat a point belongs to: the reference's where the reference has one, the
+ * lattice's everywhere else.
+ *
+ * THE ONE DOOR, so that the mass, its hem and the guard all ask the same
+ * question. Where the reference has spoken the lattice is silent -- a cell this
+ * table touches answers null rather than rolling its own hash -- which is what
+ * keeps a mound of the law from growing into a mound of the picture.
+ *
+ * @param {number} pad  metres of hem to grow a framed seat by, so that the
+ *                      grain's own question and the mass's ask the same one
+ */
+function seatAt(x, z, pad = 0) {
+  if (!framedCells) buildFramed();
+  const cell = framedCells.get(`${Math.floor(x / MOUND.cell)},${Math.floor(z / MOUND.cell)}`);
+  if (cell) {
+    for (const seat of cell.seats) if (insideSeat(seat, x, z, 0)) return seat;
+    if (pad) for (const seat of cell.seats) if (insideSeat(seat, x, z, pad)) return seat;
+    return null;
+  }
+  return moundSeat(Math.floor(x / MOUND.cell), Math.floor(z / MOUND.cell));
 }
 
 // Where the block of the demo stands, so the meadow does not grow inside the
