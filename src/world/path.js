@@ -1,7 +1,5 @@
-import { groundHeightAt, groundHoleAt, groundLightAt } from './contracts.js';
 import {
-  GRID, clamp01, gridToOffset, heightAt, offsetToGrid, pathCentreX, pathCoord,
-  pathEdge, pathHalfWidth, pathRun, smoothstep,
+  pathCentreX, pathCoord, pathEdge, pathHalfWidth, pathRun, smoothstep,
 } from './terrain-field.js';
 
 // THE CORRIDOR, AND IT IS A SURFACE OF ITS OWN FROM HERE ON.
@@ -841,6 +839,19 @@ export const PEB_LEVEL = [0.98, 0.40];
 // middle.
 export const GRAIN_GAIN = 0.62;
 
+// Where the joints stop being drawn, in metres from the eye.
+//
+// MOVED HERE FROM THE LAYER THAT USED TO HANG THE CORRIDOR'S OWN SURFACE, with
+// its reason unchanged: past about twenty metres a joint of three centimetres is
+// under a pixel, so the tail buys no definition and costs fill. A ramp of six
+// metres and not a step, because a step is a ring on the ground standing at a
+// fixed distance from the eye, which is the family of defect
+// guard-sentiero-bande refuses.
+export const JOINT_FADE = [19, 26];
+// And where the tile of grain and small stones stops. Nearer, because what it
+// carries is a centimetre band: it is gone from the picture by ten metres.
+export const GRAIN_FADE = [12, 18];
+
 /**
  * THE PIGMENT OF THE PAVING, AND IT IS ONE SEAT.
  *
@@ -891,312 +902,40 @@ export function pathPigment({
   return out;
 }
 
-// ---------------------------------------------------------------- the surface
+// ---------------------------------------------------------- WHAT DIED HERE
 //
-// WHERE THE CORRIDOR OWNS THE COLUMN, which is the footprint V1's disc has to
-// stop laying ground under.
+// THE SURFACE. Everything from this line to the end of the file was the corridor
+// as a MESH, and it is gone because the corridor is columns of the meadow's own
+// store (PATH in src/world/voxel/worldgen.js, and the family that draws them in
+// src/world/voxel/material.js). It was, with the state it stood at before this:
 //
-// It is published HERE rather than written into the contract, because
-// src/world/contracts.js is the foundation's file and this session owns none of
-// it. What a session may do is say, in its own seat, exactly where its surface
-// is, so that the one line which turns groundHoleAt() on has something true to
-// read. The contract is asked below and its answer reported rather than assumed:
-// today it is false everywhere, which is the truth while the ground under the
-// corridor is still the painted meadow, and the corridor is opaque over every
-// metre of that meadow the old paving ever reached.
-export const FOOT = {
-  // Where the surface is opaque whatever the paving does, as a fraction of the
-  // path's own half width. Everything the ground atlas ever painted as stone is
-  // inside 1.05, so at 1.10 the corridor covers the old paving completely and
-  // nothing of it can show at the seam.
-  solid: 1.10,
-  // Where it stops entirely, and it is CAPPED BY THE STRIP and not chosen.
-  //
-  // The mesh is laid across the strip, so the surface can never reach further
-  // than the strip's own half. pathEdge() tops out at 0.9657 m, so a footprint
-  // stated at 1.42 half-widths would want 1.37 m of ground at the wide end
-  // against a strip that offers 1.25 -- and what that produces is not a missing
-  // sliver, it is a HARD ALPHA EDGE at a fixed fraction of the width, running
-  // the length of the paving, which is exactly the line guard-sentiero-bande
-  // --along exists to catch. At 1.28 the widest the surface ever reaches is
-  // 1.236 m and the strip's border is still in meadow.
-  edge: 1.28,
-  // How far the surface stands above the ground it is laid on, in metres.
-  //
-  // FOUR MILLIMETRES, AND THE SMALLNESS OF IT IS THE POINT. What a lift has to
-  // clear is not the ground but the DISAGREEMENT about where the ground is, and
-  // that disagreement is answered below rather than paid for here: laid on the
-  // higher of the two answers, all a lift is still for is keeping two surfaces
-  // out of one plane so they cannot fight over the depth buffer.
-  //
-  // A LIFT ALONE COULD NOT HAVE DONE IT, and the number says so. Measured over
-  // this footprint, the meadow's triangles stand up to 25.1 mm above the height
-  // the walker's own contract gives -- so a corridor laid on the contract needs
-  // an inch of lift not to be pierced, and an inch of stone standing proud of
-  // the grass is a kerb, where the reference has slabs bedded a finger BELOW the
-  // turf.
-  lift: 0.004,
-  // Where the lift starts letting go, as a fraction of the half width. It is the
-  // solid edge and not a number of its own: wherever the surface is opaque the
-  // lift is whole, and it lets go only across the band where the surface is
-  // already fading, so the taper can never show as a step.
-  taper: 1.10,
-};
-
-/**
- * The height of the ground AS IT IS DRAWN, at a point.
- *
- * THE SECOND ANSWER, AND IT IS NOT THE SAME AS THE FIRST. groundHeightAt() is
- * the walker's floor: a grid of the field sampled every 0.28 m and read back
- * bilinearly. The meadow is drawn from a DIFFERENT sampling of the same field --
- * a grid bent to crowd its vertices near the eye -- and what the frame puts on
- * the screen is the flat triangle between three of those samples. Two samplings
- * of one field are two surfaces, and over this corridor's own footprint they
- * stand up to 25.1 mm apart (v3-sentiero/dev1/eccesso.mjs; the worst of it is at
- * z = 1, where the meadow's rows are 13 cm and the contract's grid is 28 -- so
- * it is not the meadow being coarse, it is the two being coarse in different
- * places).
- *
- * That gap is a fact about the ground and not about the corridor, and it belongs
- * to whoever owns the two samplings -- but the corridor has to be laid on ONE of
- * them and the choice is not free. Laid on the contract it is pierced by the
- * meadow, 23.6 mm at the worst, and the meadow is then drawn THROUGH the stone
- * in a ragged line that moves with the walker. Laid on the HIGHER of the two it
- * is pierced nowhere and stands up to 32.8 mm above the grass beside it, which
- * is a kerb where the reference has slabs bedded a finger BELOW the turf. Laid
- * on the DRAWN ground it is neither: it sits exactly where the meadow it touches
- * sits, four millimetres up, and the only thing left disagreeing is the walker's
- * own floor -- which already disagreed with the meadow by those same three
- * centimetres before this corridor existed, and does so under every square metre
- * of the world and not only here. That is where it is laid, and the gap is
- * reported rather than absorbed: guard-sentiero-cucitura prints it every run.
- *
- * It reads the FIELD's own grid and not src/world/terrain.js, which is the
- * ground session's file; the triangulation is the one that file lays. If the
- * ground is ever re-tessellated this stops being the drawn surface -- and it
- * stops MATTERING at the same moment, because the day V1's disc arrives
- * groundHoleAt() turns on over this footprint and there is no meadow drawn under
- * the corridor to be pierced by.
- */
-export function drawnGroundAt(x, z) {
-  const n = GRID.samples;
-  const u = (offsetToGrid(x - GRID.centreX) + 1) / 2;
-  const v = (offsetToGrid(z - GRID.centreZ) + 1) / 2;
-  const fi = Math.min(n - 2, Math.max(0, Math.floor(u * (n - 1))));
-  const fj = Math.min(n - 2, Math.max(0, Math.floor(v * (n - 1))));
-  const seat = (i, j) => {
-    const gx = GRID.centreX + gridToOffset((i / (n - 1)) * 2 - 1);
-    const gz = GRID.centreZ + gridToOffset((j / (n - 1)) * 2 - 1);
-    return { gx, gz, y: heightAt(gx, gz) };
-  };
-  const a = seat(fi, fj);
-  const b = seat(fi + 1, fj);
-  const c = seat(fi, fj + 1);
-  const d = seat(fi + 1, fj + 1);
-  const s = (x - a.gx) / (b.gx - a.gx);
-  const t = (z - a.gz) / (c.gz - a.gz);
-  // The diagonal of the quad runs from a to d, so which side of it the point
-  // falls on decides which of the two triangles carries it.
-  return s <= t
-    ? a.y + (d.y - c.y) * s + (c.y - a.y) * t
-    : a.y + (b.y - a.y) * s + (d.y - b.y) * t;
-}
-
-/**
- * Whether the corridor owns the ground at a point.
- *
- * WHAT V3 HANDS groundHoleAt(). It is the footprint of the surface and nothing
- * else: inside it the corridor is the floor, so a disc that laid a column there
- * would put two opinions about one floor under the walker.
- */
-export function pathHoleAt(x, z) {
-  return pathRun(z) > 0.001 && Math.abs(pathCoord(x, z)) < FOOT.edge;
-}
-
-/**
- * How much of the corridor there is at a point, nought to one.
- *
- * One inside the solid footprint, letting go over the last quarter of a metre,
- * and nought where the stone has died. It is a fraction of a SURFACE and not of
- * a material: what is drawn on the surface out past the verge is decided in the
- * frame, off the paving's own tone, so a slab standing in the grass is opaque
- * where the earth around it is not.
- */
-export function pathCoverAt(d, z) {
-  return pathRun(z) * (1 - smoothstep(FOOT.solid, FOOT.edge, d));
-}
-
-/**
- * The corridor's own height at a point, in metres.
- *
- * IT READS THE CONTRACT AND NOT THE FIELD. groundHeightAt() is the one answer
- * the walker's feet, the meadow's triangles and this surface all come off, and a
- * corridor built on terrain-field.js directly would be a second reader of the
- * ground that stops following V1 the day V1 rewrites it.
- */
-export function pathHeightAt(x, z, d = Math.abs(pathCoord(x, z))) {
-  return drawnGroundAt(x, z) + FOOT.lift * (1 - smoothstep(FOOT.taper, FOOT.edge, d));
-}
-
-/**
- * How far the walker's own floor stands from the ground as it is drawn, at a
- * point. Positive where the walker is above the picture.
- *
- * PUBLISHED BECAUSE IT IS NOT NOUGHT AND IT IS NOT THIS SESSION'S. It is the
- * same number under the meadow as under the corridor; what makes it visible here
- * is only that a second surface had to choose which of the two to sit on.
- */
-export function floorGapAt(x, z) {
-  return groundHeightAt(x, z) - drawnGroundAt(x, z);
-}
-
-// How far apart the two samples of the height are when the normal is taken, in
-// metres. A tenth of a metre: shorter and it reads the bilinear cells of the
-// height grid, longer and it stops being the tilt of the ground under the foot
-// and becomes the roll of the meadow.
-const NORMAL_STEP = 0.10;
-
-/** The corridor's own normal at a point, as three numbers. */
-export function pathNormalAt(x, z) {
-  const e = NORMAL_STEP;
-  const dx = (groundHeightAt(x + e, z) - groundHeightAt(x - e, z)) / (2 * e);
-  const dz = (groundHeightAt(x, z + e) - groundHeightAt(x, z - e)) / (2 * e);
-  const len = Math.hypot(dx, 1, dz);
-  return [-dx / len, 1 / len, -dz / len];
-}
-
-// The corridor's mesh, and what it costs.
+//   FOOT                path.js:920   where the surface was opaque, and the four
+//                                     millimetres it was lifted by
+//   drawnGroundAt       path.js:994   the ground as the bent grid DREW it, which
+//                                     the surface had to be laid on rather than
+//                                     on the field the grid sampled
+//   pathHoleAt          path.js:1025  the footprint V1's disc laid no column under
+//   pathCoverAt         path.js:1038  how much of the surface was standing
+//   pathHeightAt        path.js:1050  where the surface stood, lift and all
+//   floorGapAt          path.js:1062  how far the walker's floor was from it
+//   pathNormalAt        path.js:1073  the tilt of it, solved on the CPU
+//   MESH {18, 108}      path.js:1091  and pathMesh at :1100 -- 3 638 triangles
+//   holeReport          path.js:1170  what the contract said about the footprint
+//   pathLightAt         path.js:1198  the pair the surface lit itself with
+//   PATH_BUDGET         path.js:1210  1 draw, 3 638 triangles of a budget of 4 000
 //
-// The budget of a layer is four thousand triangles, and this spends 3 638 of
-// them on 18 columns and 108 rows: 14.7 cm across the strip and 40 cm along it.
-// BOTH NUMBERS ARE ARGUED. Across, the lip of the path is spread over 0.47 to
-// 0.78 m of ground, which is four to five columns, and the chord error of the
-// lip's own sine at this spacing is 3 mm. Along, the finest thing in the height
-// under the paving is an octave of 6 cm at a wavelength of 3.2 m -- the turf's
-// hummocks are nought over the path by construction -- whose chord error at
-// 40 cm is 4.6 mm. The lift above is three times the larger of them.
-export const MESH = { across: 18, along: 108 };
-
-/**
- * The corridor, as buffers.
- *
- * No three and no material: this is arithmetic, and the file that hangs it on a
- * scene is the layer's. The same shape src/world/stairs.js hands back, for the
- * same reason.
- */
-export function pathMesh({ across = MESH.across, along = MESH.along } = {}) {
-  const nx = across;
-  const nz = along;
-  const positions = new Float32Array(nx * nz * 3);
-  const normals = new Float32Array(nx * nz * 3);
-  const skin = new Float32Array(nx * nz * 2);
-  const ground = new Float32Array(nx * nz * 2);
-  // How far across the paving this vertex stands, one at the verge, and how much
-  // surface there is here. Both are carried rather than solved in the shader:
-  // pathCoord() is the one seat for the shape of the path and it has a noise in
-  // it, so a copy of it in GLSL would be a second opinion about where the stone
-  // stops.
-  const verge = new Float32Array(nx * nz * 2);
-
-  for (let j = 0; j < nz; j++) {
-    const z = PATH_SKIN.z0 + (j / (nz - 1)) * (PATH_SKIN.z1 - PATH_SKIN.z0);
-    const centre = pathCentreX(z);
-    for (let i = 0; i < nx; i++) {
-      const u = i / (nx - 1);
-      // The columns are laid across the STRIP and not across the paving, so the
-      // mesh's own edge is the strip's edge and the paving's ragged one lives
-      // inside it. A mesh cut to the paving would put a silhouette on a noise.
-      const x = centre + (u - 0.5) * 2 * PATH_SKIN.half;
-      const d = Math.abs(pathCoord(x, z));
-      const o = (j * nx + i) * 3;
-      positions[o] = x;
-      positions[o + 1] = pathHeightAt(x, z, d);
-      positions[o + 2] = z;
-      const n = pathNormalAt(x, z);
-      normals[o] = n[0];
-      normals[o + 1] = n[1];
-      normals[o + 2] = n[2];
-      const t = (j * nx + i) * 2;
-      skin[t] = u;
-      skin[t + 1] = (z - PATH_SKIN.z0) / (PATH_SKIN.z1 - PATH_SKIN.z0);
-      ground[t] = x;
-      ground[t + 1] = z;
-      verge[t] = d;
-      verge[t + 1] = pathCoverAt(d, z);
-    }
-  }
-
-  const quads = (nx - 1) * (nz - 1);
-  const indices = quads * 6 > 65535 ? new Uint32Array(quads * 6) : new Uint16Array(quads * 6);
-  let k = 0;
-  for (let j = 0; j < nz - 1; j++) {
-    for (let i = 0; i < nx - 1; i++) {
-      const a = j * nx + i;
-      indices[k++] = a; indices[k++] = a + nx; indices[k++] = a + nx + 1;
-      indices[k++] = a; indices[k++] = a + nx + 1; indices[k++] = a + 1;
-    }
-  }
-
-  return {
-    positions, normals, skin, ground, verge, indices, triangles: quads * 2,
-  };
-}
-
-/**
- * What the ground contract says about the corridor's own footprint, asked rather
- * than assumed.
- *
- * groundHoleAt() is the seat where a session declares that something else owns a
- * column, and it answers false everywhere today -- which is the truth and not a
- * placeholder: the ground under the corridor is still the painted meadow, and
- * the corridor is opaque over every metre of it the old paving ever reached. The
- * day the disc arrives, one line in the contract turns this on and nothing in
- * this file changes. It is reported instead of being quietly ignored so that the
- * gap between what V3 draws and what V1 is told is a number somebody has seen.
- */
-export function holeReport() {
-  let disagree = 0;
-  let sampled = 0;
-  for (let z = PATH_SKIN.z0; z <= PATH_SKIN.z1; z += 0.5) {
-    for (let d = -1.3; d <= 1.3; d += 0.1) {
-      const x = pathCentreX(z) + d * pathEdge(z, d);
-      sampled++;
-      if (pathHoleAt(x, z) !== Boolean(groundHoleAt(x, z))) disagree++;
-    }
-  }
-  return { sampled, disagree, contractAnswers: Boolean(groundHoleAt(0, 0)) };
-}
-
-/**
- * The two terms of the ground's own light under the corridor, or the analytic
- * pair where nobody can yet say.
- *
- * WHAT THIS IS FOR. groundLightAt() is the contract a card of grass reads so
- * that a blade standing on the paving is lit by the paving and not by a second
- * opinion about the hour. It answers null today, and null is honest: there is no
- * CPU-side copy of anything, because there is no bake left to copy. What the
- * corridor hands back instead is the pair it draws ITSELF with -- the cosine the
- * face turns to the beam and the share of the hemisphere it can see -- which is
- * not an approximation of the light on this surface, it IS the light on this
- * surface, computed by the same arithmetic the fragment computes it by.
- *
- * @param {number[]} sun  the sun's direction, from the one seat that holds it
- */
-export function pathLightAt(x, z, sun = null) {
-  const said = groundLightAt(x, z);
-  if (said) return said;
-  const n = pathNormalAt(x, z);
-  return {
-    sun: sun ? Math.max(0, n[0] * sun[0] + n[1] * sun[1] + n[2] * sun[2]) : null,
-    sky: 0.5 + 0.5 * n[1],
-    normal: n,
-  };
-}
-
-/** What one corridor costs, for the development panel and for the budget. */
-export const PATH_BUDGET = {
-  triangles: (MESH.across - 1) * (MESH.along - 1) * 2,
-  draws: 1,
-};
+// AND EVERY ONE OF THEM WAS THE PRICE OF THE HOLE. A surface laid over a hole in
+// another surface has to know where the other one is DRAWN and not merely where
+// it is; it has to be lifted off it, and the lift is a step, so the step has to
+// be tapered to nothing at an edge, and the taper needs a cover, and the cover
+// needs a fade, and the walker needs a contract branch saying which of the two
+// he is standing on. There is one surface now and the whole of that machinery
+// has nothing left to be the price of.
+//
+// WHAT SURVIVES IS THE PAVING ITSELF -- the lattice, the two tunings, the joints,
+// the shoulder, the small stones, the grain, the pigment, every constant above
+// this line -- because it was never a fact about a mesh. It is what the painter
+// in tools/path/ bakes the three maps from and what the fragment reads them
+// with, and neither of those two ever asked where the triangles were.
 
 export { pathHalfWidth, pathRun };

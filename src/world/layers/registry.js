@@ -1,6 +1,5 @@
 import v1 from './v1-suolo.js';
 import v2 from './v2-pietra.js';
-import v3 from './v3-sentiero.js';
 import v4 from './v4-verde.js';
 import v5 from './v5-cornice.js';
 import v6 from './v6-cielo-nuvole.js';
@@ -42,7 +41,17 @@ import v8 from './v8-avatar.js';
 // there is, the drift the weather hands to everything that reflects the sky, is
 // a uniform read at draw time and not during the update. So this order can be
 // the order a reader expects rather than an order the frame requires.
-export const LAYERS = [v1, v2, v3, v4, v5, v6, v7, v8];
+// V3 IS NOT A LAYER ANY MORE, AND IT IS NOT A SESSION THAT WENT AWAY.
+//
+// It hung one thing: a surface of its own for the corridor, laid over a hole cut
+// in the meadow. The corridor is COLUMNS of V1's disc now -- the same store, the
+// same pass, MATERIAL.PATH on the tops -- so there is no second mesh to hang and
+// no layer to hang it from. Everything V3 measured is where it always was:
+// src/world/path.js holds the paving's law and the painter in tools/path/ bakes
+// the three maps from it; what changed is that the fragment reading them is
+// V1's, in src/world/voxel/material.js, and the three assets are needed by the
+// layer that eats them.
+export const LAYERS = [v1, v2, v4, v5, v6, v7, v8];
 
 const BY_ID = new Map(LAYERS.map((layer) => [layer.id, layer]));
 
