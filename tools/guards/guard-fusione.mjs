@@ -66,7 +66,7 @@ const ALLOCATION = 60000;
 // disc that doubles from forty to eighty thousand in one commit until the day
 // it lands over the line; a declared figure beside it says so the same
 // afternoon. It is printed, with the distance, and it never gates.
-const AT_TODAY = 39758;
+const AT_TODAY = 40038;
 
 const OWNER = 'V1';
 
