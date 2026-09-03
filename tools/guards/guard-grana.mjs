@@ -78,7 +78,11 @@ const AT_APPROVED = { on: 1.5362, off: 0.1903, carpet: 1.3459 };
 // E-V1k: the literal is PROPOSED by the unit and committed by the coordinator),
 // so the row stands where it stood and the run says out loud how far the world
 // has moved from it. The proposal is in the verbale of U-FOND-2.
-const AT_TODAY = { on: 0.3826, off: 0.0215, carpet: 0.3610 };
+// U-FOND-2 (E-FOND-PIANO4): the grain replaced the tuft, the bank against the
+// stone went to nought (the masses stand on the bare plane, so `off` rose) and
+// bare earth entered the count: 0.3505 grained, 0.0478 bare, 0.3027 for the
+// grain alone. Against the approved price (1.3459) the carpet is 1.0432 lower.
+const AT_TODAY = { on: 0.3505, off: 0.0478, carpet: 0.3027 };
 
 /** Whether a constant is still the frozen one. Bit for bit: these are dials. */
 export const frozen = (actual, expected) => actual === expected;
@@ -87,7 +91,7 @@ if (process.argv.includes('--self')) {
   const on = meshDisc(null, true, SHIPPED_RADIUS);
   const off = meshDisc(null, false, SHIPPED_RADIUS);
   const carpet = on.quadsPerColumn - off.quadsPerColumn;
-  selfTest('guard-ciuffo', [
+  selfTest('guard-grana', [
     { what: 'a lattice cell moved to 0.42 m is caught', caught: !frozen(0.42, FROZEN.cell) },
     { what: 'a lattice cell nudged to 0.6000001 is caught', caught: !frozen(0.6000001, FROZEN.cell) },
     { what: 'a density moved from 0.78 to 0.62 is caught', caught: !frozen(0.62, FROZEN.density) },
@@ -100,7 +104,9 @@ if (process.argv.includes('--self')) {
       // the number of the day: a yardstick that has been left behind HAS to
       // make the run say so, whichever of the two moved.
       what: 'a yardstick left behind by a world that moved is reported',
-      caught: Math.abs(carpet - AT_TODAY.carpet) >= 5e-4 && drifted(carpet) !== null,
+      // Tested by INJECTION, not on the number of the day: the day the
+      // yardstick agrees with the world (as it should) this case must still hold.
+      caught: drifted(AT_TODAY.carpet + 0.01) !== null && drifted(AT_TODAY.carpet - 0.01) !== null,
     },
     {
       what: 'a yardstick that agrees with the world is not reported',
@@ -123,7 +129,7 @@ export function drifted(carpet) {
   return Math.abs(gap) >= 5e-4 ? gap : null;
 }
 
-const report = reporter('guard-ciuffo -- the two dials of the grain, and what it costs today');
+const report = reporter('guard-grana -- the two dials of the grain, and what it costs today');
 
 report.check(frozen(SOD.cell, FROZEN.cell),
   'SOD.cell is the value the sweep was run at',
