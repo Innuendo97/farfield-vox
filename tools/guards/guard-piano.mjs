@@ -2,10 +2,11 @@ import { createHash } from 'node:crypto';
 import {
   BASE_STEP, CENTRE, CHUNK, MATERIAL, MOUND, NO_COLUMN, SOD, VOXEL, cellMaterialAt,
   chunkColumns, clearColumn, columnCount, columnSpec, columnTop, createColumns, depthAt,
-  matAt, meadowMoundAt, moundAt, onPaving, paintTop, PATH, raise, setTop, storeBytes,
-  topAt, underAt,
+  matAt, meadowMoundAt, moundAt, moundCutAt, onPaving, paintTop, PATH, raise, setTop,
+  storeBytes, topAt, underAt,
 } from '../../src/world/voxel/pure.js';
 import { TIERS } from '../../src/core/quality.js';
+import { TUNING } from '../../src/core/presence.js';
 import { reporter, selfTest } from './lib.mjs';
 
 // The largest disc any tier lays -- for the reason written in guard-fusione.
@@ -58,6 +59,28 @@ const AT_TODAY = { p50: 5, p90: 12 };
 
 /** The tallest step the open meadow is allowed, in voxels. A mass is not the meadow. */
 const OPEN_STEP = 1;
+
+// WHERE A STEP TALLER THAN ONE IS ALLOWED TO COME FROM, and it is one place.
+// The reference's meadow steps by one voxel and its masses drop two or three in
+// a single riser (A §1.2); nothing else in this world may. So the guard asks
+// two things of every pair that steps by more than one: that both ends are on a
+// mass, and that the step is no taller than the tallest bank a mass may cut.
+// Between them they say «the masses wrote this, and they wrote it to size».
+//
+// AND THE SIZE IS THE REFERENCE'S AND NOT THE DIAL'S. Reading MOUND.scarp here
+// would make this leg agree with whatever the dial was set to, which is not an
+// assertion about anything. Three is what A §1.2 reads -- «un gradino di 2-3
+// voxel in una volta» -- and it is also exactly TUNING.ground.maxM at this
+// voxel size, so the picture and the body ask for the same ceiling.
+const MASS_STEP = 3;
+
+// THE REFERENCE'S OWN READING OF THE MASSES, in the units it was read in.
+// A §1.2 and E-V1h: two to four voxels tall, one and a half to three and a half
+// metres across, three to six metres apart, never two touching. The spacing is
+// read as a TYPICAL distance -- «mai due attaccati» is a property this
+// generator holds by construction, and the tails belong to the hub's own
+// furniture rather than to the lattice.
+const MASS = { tall: { low: 2, high: 4 }, wide: { low: 1.5, high: 3.5 }, gap: { low: 3.0, high: 6.0 } };
 
 const NO = -1e7;
 
@@ -118,6 +141,9 @@ export function survey(radius) {
   const runs = [];
   let pairs = 0;
   let openOver = 0;
+  let worstStep = 0;
+  let overMass = 0;
+  let worstAt = null;
   const risers = new Map();
   const sweep = (alongX) => {
     const a0 = alongX ? j0 : i0;
@@ -152,6 +178,8 @@ export function survey(radius) {
           // The open meadow is both ends of the pair off any mass: a bank is
           // allowed its riser, and the column beside a bank is on the mass too.
           if (step > OPEN_STEP && !onMass(x, z) && !onMass(prevAt.x, prevAt.z)) openOver++;
+          if (step > worstStep) { worstStep = step; worstAt = { x, z }; }
+          if (step > MASS_STEP) overMass++;
         }
         prev = h; prevAt = { x, z };
       }
@@ -167,6 +195,9 @@ export function survey(radius) {
     flat,
     pairs,
     openOver,
+    worstStep,
+    worstAt,
+    overMass,
     runs: runs.length,
     p10: at(0.10),
     p50: at(0.50),
@@ -179,6 +210,92 @@ export function survey(radius) {
       three: (risers.get(3) || 0) / nRisers,
       share: nRisers / pairs,
     },
+  };
+}
+
+/**
+ * The masses of the meadow, gathered from the law as OBJECTS.
+ *
+ * A mass is a connected piece of columns the mound term raises. The four things
+ * asked of it are the four the reference is read for: how tall, how wide, how
+ * far from its nearest neighbour, and whether the earth it shows is its own
+ * bank's height. Nothing here is a picture and nothing is a share of columns.
+ */
+export function massCensus(radius) {
+  const i0 = Math.round((CENTRE.x - radius) / VOXEL);
+  const i1 = Math.round((CENTRE.x + radius) / VOXEL);
+  const j0 = Math.round((CENTRE.z - radius) / VOXEL);
+  const j1 = Math.round((CENTRE.z + radius) / VOXEL);
+  const on = new Map();
+  let meadow = 0;
+  let cutOverScarp = 0;
+  for (let j = j0; j <= j1; j++) {
+    for (let i = i0; i <= i1; i++) {
+      const h = columnTop(i, j, true, radius);
+      if (h < NO) continue;
+      const x = (i + 0.5) * VOXEL;
+      const z = (j + 0.5) * VOXEL;
+      if (onPaving(x, z)) continue;
+      meadow++;
+      const m = meadowMoundAt(x, z);
+      if (!m) continue;
+      // A MASS THE PIECE CUTS IN HALF IS NOT A MASS, and it is dropped rather
+      // than measured -- the same rule the run estimator keeps for a run that
+      // touches an edge. At the rim of the disc, and where the corridor or a
+      // stone's band runs through, a mass shows only the part of itself that
+      // survived, and a census that kept those would report masses one voxel
+      // tall and eighty centimetres wide that nobody ever built.
+      const edge = columnTop(i + 1, j, true, radius) < NO || columnTop(i - 1, j, true, radius) < NO
+        || columnTop(i, j + 1, true, radius) < NO || columnTop(i, j - 1, true, radius) < NO
+        || onPaving((i + 1.5) * VOXEL, z) || onPaving((i - 0.5) * VOXEL, z)
+        || onPaving(x, (j + 1.5) * VOXEL) || onPaving(x, (j - 0.5) * VOXEL);
+      on.set(`${i},${j}`, { i, j, x, z, m, edge });
+      if (moundCutAt(x, z) > MOUND.scarp.high) cutOverScarp++;
+    }
+  }
+  const seenCell = new Set();
+  const masses = [];
+  let pieces = 0;
+  for (const [k0, c0] of on) {
+    if (seenCell.has(k0)) continue;
+    const stack = [c0];
+    seenCell.add(k0);
+    const part = [];
+    while (stack.length) {
+      const p = stack.pop();
+      part.push(p);
+      for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const k = `${p.i + di},${p.j + dj}`;
+        const q = on.get(k);
+        if (!q || seenCell.has(k)) continue;
+        seenCell.add(k);
+        stack.push(q);
+      }
+    }
+    pieces++;
+    if (part.some((p) => p.edge)) continue;
+    const xs = part.map((p) => p.x);
+    const zs = part.map((p) => p.z);
+    masses.push({
+      x: (Math.min(...xs) + Math.max(...xs)) / 2,
+      z: (Math.min(...zs) + Math.max(...zs)) / 2,
+      w: Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs)) + VOXEL,
+      h: Math.max(...part.map((p) => p.m)),
+    });
+  }
+  const gaps = masses.map((m) => Math.min(...masses.filter((o) => o !== m)
+    .map((o) => Math.hypot(m.x - o.x, m.z - o.z)))).filter(Number.isFinite).sort((a, b) => a - b);
+  const ws = masses.map((m) => m.w).sort((a, b) => a - b);
+  const q = (list, t) => (list.length ? list[Math.min(list.length - 1, Math.floor(t * list.length))] : 0);
+  return {
+    n: masses.length,
+    pieces,
+    perM2: meadow * VOXEL * VOXEL / (pieces || 1),
+    tallLow: Math.min(...masses.map((m) => m.h)),
+    tallHigh: Math.max(...masses.map((m) => m.h)),
+    w10: q(ws, 0.1), w50: q(ws, 0.5), w90: q(ws, 0.9),
+    g10: q(gaps, 0.1), g50: q(gaps, 0.5), g90: q(gaps, 0.9),
+    cutOverScarp,
   };
 }
 
@@ -361,8 +478,51 @@ report.line('');
 report.check(seen.openOver === 0,
   `no pair of columns on the open meadow steps by more than ${OPEN_STEP} voxel`,
   `${seen.openOver} pairs do, off any mass`);
-report.line(`  the masses keep their own bank: MOUND.scarp ${MOUND.scarp} voxels, `
-  + `and the bank against the stone stands at ${MOUND.bank.high}`);
+report.check(seen.overMass === 0,
+  `and no pair anywhere steps by more than the ${MASS_STEP} voxels a mass may cut`,
+  `${seen.overMass} pairs do`);
+report.check(seen.worstStep * VOXEL <= TUNING.ground.maxM + 1e-9,
+  `the worst step column against column is ${(seen.worstStep * VOXEL).toFixed(2)} m, `
+  + `inside the ${TUNING.ground.maxM.toFixed(2)} m the body damps`,
+  `${(seen.worstStep * VOXEL).toFixed(2)} m at (${seen.worstAt ? seen.worstAt.x.toFixed(1) : '-'}, `
+  + `${seen.worstAt ? seen.worstAt.z.toFixed(1) : '-'})`);
+report.check(MOUND.scarp.high <= MASS_STEP && MOUND.scarp.low >= 2,
+  `and the dial itself is inside the ${2}-${MASS_STEP} voxels the reference reads`,
+  `MOUND.scarp is ${MOUND.scarp.low}-${MOUND.scarp.high}`);
+report.line(`  the masses keep their own bank: MOUND.scarp ${MOUND.scarp.low}-${MOUND.scarp.high} `
+  + `voxels, one height to a mass, and the bank against the stone stands at ${MOUND.bank.high}`);
+
+// ------------------------------------------------------------------- 3b
+//
+// AND THE MASSES ARE COUNTED AS OBJECTS, because that is what the committente's
+// own words call them (E-DECISIONI4: «composizioni, cumuli ben orchestrati»)
+// and a share of columns cannot tell a meadow of masses from a meadow of noise.
+// They are gathered from the law over the whole shipped disc and measured in
+// the units the reference was read in.
+const census = massCensus(SHIPPED_RADIUS);
+report.line('');
+report.line(`  ${census.pieces} masses on the disc, one to every ${census.perM2.toFixed(0)} m2 of `
+  + `meadow; ${census.n} of them stand whole inside it and are the ones measured below`);
+report.check(census.tallLow >= MASS.tall.low && census.tallHigh <= MASS.tall.high,
+  `every whole mass stands ${MASS.tall.low} to ${MASS.tall.high} voxels tall, as the reference reads`,
+  `they run ${census.tallLow} to ${census.tallHigh}`);
+// THE TYPICAL IS WHAT IS GATED AND THE TAILS ARE PRINTED, and that is not a
+// softening. «Taglia 1,5-3,5 m, spaziatura 3-6 m» is a reading of what a meadow
+// of these masses TYPICALLY looks like; the disc also carries a corridor, a
+// stair, a platform and two stone bands, and a mass that happens to sit beside
+// one of those has a neighbour further away than any lattice can help. Gating a
+// tail here would gate the layout of the hub through the back door.
+report.check(census.w50 >= MASS.wide.low && census.w50 <= MASS.wide.high,
+  `and the typical one is ${MASS.wide.low} to ${MASS.wide.high} m across   `
+  + `(p10 ${census.w10.toFixed(2)}  p50 ${census.w50.toFixed(2)}  p90 ${census.w90.toFixed(2)})`,
+  `p50 ${census.w50.toFixed(2)} against ${MASS.wide.low}-${MASS.wide.high} m`);
+report.check(census.g50 >= MASS.gap.low && census.g50 <= MASS.gap.high,
+  `and stands ${MASS.gap.low} to ${MASS.gap.high} m from its nearest neighbour   `
+  + `(p10 ${census.g10.toFixed(2)}  p50 ${census.g50.toFixed(2)}  p90 ${census.g90.toFixed(2)})`,
+  `p50 ${census.g50.toFixed(2)} m against ${MASS.gap.low}-${MASS.gap.high}`);
+report.check(census.cutOverScarp === 0,
+  'and every cut bank is the riser its own mass carries and no other',
+  `${census.cutOverScarp} columns are cut deeper than their mass is banked`);
 
 // ------------------------------------------------------------------- 4
 const agree = lawAgreesWithStore(0, 0, true, SHIPPED_RADIUS);
