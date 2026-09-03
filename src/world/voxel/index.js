@@ -5,7 +5,7 @@
 // piece of this world that ALL EIGHT sessions build on, so it is the one piece
 // where a change nobody agreed to reaches everybody at once.
 //
-//   meshChunk(cx, cz, tuft)      the field and the greedy mesher over it, as
+//   meshChunk(cx, cz, grain)     the block store and the greedy mesher over it,
 //                                pure arithmetic -- no three.js, no DOM, so the
 //                                same file runs in a worker, on the page and
 //                                under plain node, and the fusion number can be

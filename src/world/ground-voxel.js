@@ -416,7 +416,7 @@ export function createGroundVoxel({
   function start() {
     if (worker || build.startedAt) return;
     build.startedAt = performance.now();
-    // The tuft is asked for by name rather than left to the default: it is the
+    // The grain is asked for by name rather than left to the default: it is the
     // condition every fusion number of this campaign was measured under, and a
     // measurement whose conditions are a default somewhere else is a measurement
     // that changes when somebody edits that default. The radius is named for
@@ -426,7 +426,7 @@ export function createGroundVoxel({
     // corridor rides along for the same reason and with the same force: the
     // thread that cuts the disc is the one that has to know where the ground is
     // not its own, and it cannot ask.
-    worker = runInWorker({ tuft: true, radius, hole }, receive);
+    worker = runInWorker({ grain: true, radius, hole }, receive);
   }
 
   return {

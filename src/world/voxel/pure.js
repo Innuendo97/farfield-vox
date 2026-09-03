@@ -17,19 +17,21 @@
 
 export {
   VOXEL,
-  TUFT_CORRELATION,
-  TUFT_GATE,
-  TUFT_PATCH,
+  BASE_STEP,
   MOUND,
   EARTH,
+  SOD,
+  MATERIAL,
   CHUNK,
   DISC_RADIUS,
   CENTRE,
   FACE,
   NO_COLUMN,
   bareRaisedAt,
+  chunkColumns,
   chunkList,
   columnCentre,
+  columnSpec,
   columnTop,
   earthFacing,
   meadowMoundAt,
@@ -39,9 +41,30 @@ export {
   moundAt,
   onPaving,
   setGroundHole,
-  tuftAt,
-  tuftPatchAt,
+  sodAt,
 } from './mesher.js';
+
+// AND THE STORE ITSELF, because a guard that asserts the world is a plane has
+// to be able to READ the world rather than a mesh of it. The engine's door is
+// the mesher; the store is the thing behind it the mesher is a function of, and
+// leaving it unreachable offline would put the one assertion the rebuilding
+// rests on -- that the block store reproduces the plane -- behind a screenshot.
+export {
+  cellMaterialAt,
+  clearColumn,
+  columnCount,
+  columnIndex,
+  createColumns,
+  depthAt,
+  matAt,
+  paintTop,
+  raise,
+  setFlank,
+  setTop,
+  storeBytes,
+  topAt,
+  underAt,
+} from './columns.js';
 
 export {
   COURSE,

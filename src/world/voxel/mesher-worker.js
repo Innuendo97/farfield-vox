@@ -55,7 +55,7 @@ import { MONOLITHS } from '../layout.js';
 self.onmessage = (event) => {
   const woke = performance.now();
   const {
-    tuft = true, tile = 512, block = '05', radius = DISC_RADIUS, hole = null,
+    grain = true, tile = 512, block = '05', radius = DISC_RADIUS, hole = null,
   } = event.data || {};
   if (hole) setGroundHole(hole);
 
@@ -98,7 +98,7 @@ self.onmessage = (event) => {
   let columns = 0;
   let rim = 0;
   for (const { cx, cz } of list) {
-    const chunk = meshChunk(cx, cz, tuft, radius);
+    const chunk = meshChunk(cx, cz, grain, radius);
     if (chunk.quads === 0) continue;
     quads += chunk.quads;
     columns += chunk.columns;

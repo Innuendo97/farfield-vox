@@ -192,7 +192,7 @@ function addChunk(chunk) {
 
 // The engine's own arithmetic, off the thread the walker is on, through the
 // one seat that knows where the worker file is.
-runInWorker({ tuft: query.get('ciuffo') !== '0', radius: RADIUS }, (message) => {
+runInWorker({ grain: query.get('grana') !== '0', radius: RADIUS }, (message) => {
   // Timed from the first statement, because this handler IS the main thread's
   // share of the work and the gate is about how long it holds the frame.
   const started = performance.now();
