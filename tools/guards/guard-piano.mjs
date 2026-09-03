@@ -2,17 +2,16 @@ import { createHash } from 'node:crypto';
 import {
   BASE_STEP, CENTRE, CHUNK, MATERIAL, MOUND, NO_COLUMN, SOD, VOXEL, cellMaterialAt,
   chunkColumns, clearColumn, columnCount, columnSpec, columnTop, createColumns, depthAt,
-  matAt, meadowMoundAt, moundAt, paintTop, raise, setGroundHole, setTop, storeBytes,
+  matAt, meadowMoundAt, moundAt, onPaving, paintTop, PATH, raise, setTop, storeBytes,
   topAt, underAt,
 } from '../../src/world/voxel/pure.js';
-import { groundHoleAt } from '../../src/world/contracts.js';
 import { TIERS } from '../../src/core/quality.js';
 import { reporter, selfTest } from './lib.mjs';
 
-// The largest disc any tier lays, and the corridor as the world answers it --
-// for the reasons written in guard-fusione. Both arms below are read with it.
+// The largest disc any tier lays -- for the reason written in guard-fusione.
+// Nothing is injected: the corridor is columns of this disc now, so both arms
+// below read the same world the page draws without being told anything.
 const SHIPPED_RADIUS = Math.max(...TIERS.map((t) => t.voxelDiscRadius));
-setGroundHole(groundHoleAt);
 
 // THE GROUND IS A PLANE WITH THINGS PUT ON IT, AND THIS IS WHAT SAYS SO.
 //
@@ -67,6 +66,15 @@ function onMass(x, z) {
   return meadowMoundAt(x, z) > 0 || moundAt(x, z) > 0;
 }
 
+// AND THE CORRIDOR IS THE THIRD THING ON THE PLANE, admitted here rather than
+// tolerated. It is not a mass -- it does not stand ON the floor, it is cut one
+// voxel INTO it -- and it is not the meadow either: it has no grain, its runs
+// are the length of the corridor and the riser at its edge is the one to two
+// voxels the reference is measured at. Left in the meadow's census it would
+// have moved every number this guard prints without a dial having moved, which
+// is exactly the confusion a guard exists to prevent. So it is a seat of its
+// own with a leg of its own, and the meadow's arms step over it.
+
 /**
  * Walks the disc and gathers everything the four claims are read off.
  *
@@ -79,16 +87,27 @@ export function survey(radius) {
   const j0 = Math.round((CENTRE.z - radius) / VOXEL);
   const j1 = Math.round((CENTRE.z + radius) / VOXEL);
 
-  const flat = { columns: 0, offPlane: 0, offPlaneOffMass: 0, worst: null };
+  const flat = {
+    columns: 0, offPlane: 0, offPlaneOffMass: 0, worst: null,
+    paving: 0, pavingOff: 0, pavingWorst: null,
+  };
   for (let j = j0; j <= j1; j++) {
     for (let i = i0; i <= i1; i++) {
       const h = columnTop(i, j, false, radius);
       if (h < NO) continue;
       flat.columns++;
-      if (h === BASE_STEP) continue;
-      flat.offPlane++;
       const x = (i + 0.5) * VOXEL;
       const z = (j + 0.5) * VOXEL;
+      if (onPaving(x, z)) {
+        flat.paving++;
+        if (h !== BASE_STEP - PATH.drop) {
+          flat.pavingOff++;
+          if (!flat.pavingWorst) flat.pavingWorst = { i, j, h };
+        }
+        continue;
+      }
+      if (h === BASE_STEP) continue;
+      flat.offPlane++;
       if (!onMass(x, z)) {
         flat.offPlaneOffMass++;
         if (!flat.worst) flat.worst = { i, j, h };
@@ -113,13 +132,15 @@ export function survey(radius) {
         const i = alongX ? b : a;
         const j = alongX ? a : b;
         const h = columnTop(i, j, true, radius);
-        if (h < NO) {
+        const x = (i + 0.5) * VOXEL;
+        const z = (j + 0.5) * VOXEL;
+        // A missing column breaks a run, and so does the corridor: this census
+        // is of the MEADOW'S grain, and the paving has none.
+        if (h < NO || onPaving(x, z)) {
           if (run > 0) runs.push(run);
           run = 0; prev = null; prevAt = null;
           continue;
         }
-        const x = (i + 0.5) * VOXEL;
-        const z = (j + 0.5) * VOXEL;
         if (prev === null) { run = 1; prev = h; prevAt = { x, z }; continue; }
         pairs++;
         const step = Math.abs(h - prev);
@@ -298,6 +319,12 @@ report.check(seen.flat.offPlaneOffMass === 0,
     ? `column ${seen.flat.worst.i},${seen.flat.worst.j} stands at ${seen.flat.worst.h}`
     : `${seen.flat.offPlaneOffMass} columns are not`);
 report.line(`  ${seen.flat.offPlane} of them stand over the plane, and all of them are masses`);
+report.check(seen.flat.pavingOff === 0,
+  `and every column of the corridor stands one voxel under it, at ${BASE_STEP - PATH.drop}`,
+  seen.flat.pavingWorst
+    ? `column ${seen.flat.pavingWorst.i},${seen.flat.pavingWorst.j} stands at `
+      + `${seen.flat.pavingWorst.h}`
+    : `${seen.flat.paving} of them, none out`);
 
 // ------------------------------------------------------------------- 2
 report.line('');

@@ -1,5 +1,4 @@
-import { meshDisc, setGroundHole } from '../../src/world/voxel/pure.js';
-import { groundHoleAt } from '../../src/world/contracts.js';
+import { meshDisc } from '../../src/world/voxel/pure.js';
 import { TIERS } from '../../src/core/quality.js';
 import { reporter, selfTest } from './lib.mjs';
 
@@ -15,12 +14,11 @@ const SHIPPED_RADIUS = Math.max(...TIERS.map((t) => t.voxelDiscRadius));
 // without re-deriving it.
 const ALLOCATION_RADIUS = 35;
 
-// AND THE CORRIDOR IS TOLD TO THE ENGINE, FOR THE SAME REASON AND IN THE SAME
-// SENTENCE. The engine's own answer to "where is the ground not mine" is a
-// straight passage it can work out without being told; the page injects the
-// world's own -- groundHoleAt -- and the disc that ships is smaller for it. A
-// guard left on the engine's default would weigh a disc nobody draws.
-setGroundHole(groundHoleAt);
+// AND NOTHING IS TOLD TO THE ENGINE ANY MORE. The disc used to be smaller than
+// it looked, because the corridor was a hole in it and where that hole ran had
+// to be injected; a guard left on the engine's own straight passage weighed a
+// disc nobody drew. The corridor is COLUMNS of this disc now -- it is weighed
+// here, with its own family counted -- so there is one disc and it is this one.
 
 
 // WHAT THE DISC COSTS, IN THE UNIT THE BUDGET IS WRITTEN IN.
@@ -47,10 +45,18 @@ setGroundHole(groundHoleAt);
 // -- a fixed margin over whatever shipped, moved four times -- and a wall that
 // moves with the world cannot catch a world that grows. This one does not move.
 //
-// AND BOTH FAMILIES ARE IN THE COUNT NOW. The disc hands the card two meshes,
-// the meadow and its bare earth, and the retired figure counted only the first;
-// E-V1k declared the gap and left it, 0.5334 against 0.5409 with both. A gate
-// on what the card draws has to count what the card draws.
+// AND ALL THREE FAMILIES ARE IN THE COUNT NOW. The disc hands the card three
+// meshes -- the meadow, its bare earth and the PAVING -- and the retired figure
+// counted only the first; E-V1k declared the gap and left it, 0.5334 against
+// 0.5409 with both. A gate on what the card draws has to count what the card
+// draws.
+//
+// AND THE CORRIDOR HAS NO ALLOCATION OF ITS OWN ANY MORE. §2.9 gave it a row --
+// «sentiero V3 <= 0,4 ms, <= 4.000 tri, <= 2 draw», against which it shipped
+// 3 638 triangles and 1 draw (E-V3g) -- because it was a surface somebody else
+// hung. It is columns of this disc now: its triangles are in the number gated
+// below and its draw is one of the disc's. The row that says otherwise is the
+// coordinator's to strike, and this guard names it rather than assuming it.
 
 /** §2.9's allocation for the voxel disc, in triangles. The coordinator's. */
 const ALLOCATION = 60000;
@@ -60,7 +66,7 @@ const ALLOCATION = 60000;
 // disc that doubles from forty to eighty thousand in one commit until the day
 // it lands over the line; a declared figure beside it says so the same
 // afternoon. It is printed, with the distance, and it never gates.
-const AT_TODAY = 40038;
+const AT_TODAY = 39758;
 
 const OWNER = 'V1';
 
@@ -104,7 +110,8 @@ const seen = verdict(disc.triangles);
 report.line(`  ${disc.chunks.length} chunks, ${disc.columns} columns, `
   + `at the ${SHIPPED_RADIUS} m the tiers lay`);
 report.line(`  triangles               ${disc.triangles}`
-  + `   (${disc.quads} quads, of which ${disc.earthQuads} are the bare earth)`);
+  + `   (${disc.quads} quads, of which ${disc.earthQuads} are the bare earth`
+  + ` and ${disc.pavingQuads} the paving)`);
 report.line(`  quads per column        ${disc.quadsPerColumn.toFixed(4)}`
   + '   (printed and not gated: E-V1b retired it as a threshold)');
 report.line(`  with the rim taken out  ${disc.insidePerColumn.toFixed(4)}`

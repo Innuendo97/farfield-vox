@@ -30,7 +30,15 @@ import { lineOf, read, reporter, selfTest } from './lib.mjs';
 //     function of the hour, and it reaches the one pair of numbers every other
 //     guard in this world is weighed on.
 
-const FILES = ['src/world/path.js', 'src/world/layers/v3-sentiero.js'];
+// The two files the paving is made of, and the second one MOVED. The fragment
+// used to live in the layer that hung the corridor's own surface; the corridor
+// is columns of V1's disc now and the fragment that paints their tops is in the
+// voxel families' own material file. The question this guard asks did not move
+// with it: a fragment that reaches for a baked atlas is the same defect
+// wherever it is written, and it is a defect this world can only find by
+// looking.
+const FILES = ['src/world/path.js', 'src/world/voxel/material.js'];
+const LAYER = 'src/world/layers/v1-suolo.js';
 
 // The atlases of the old world, by the name the runtime knows them under, and by
 // the name a shader would sample them under. `tLight` and `bakedTerms` are the
@@ -164,18 +172,25 @@ report.check(joint.length === 0,
 // browser allows and a Node script does not -- so a guard that imported it would
 // be a guard that cannot run. It also asks a better question this way: what the
 // FILE says, which is what a reviewer reads and what a merge carries.
-const needs = [...code(read(FILES[1])).matchAll(/needs:\s*\[([^\]]*)\]/g)]
+// AND THE LAYER IT READS IS V1'S NOW, because the corridor is one of the three
+// families V1's disc draws and an asset is declared where it is eaten. That
+// layer asks for the ground's four AS WELL as the paving's three, so the check
+// is on the three and the print names them: what would be a finding is an
+// atlas arriving through the door that hands the PAVING its maps.
+const PAVING_MAPS = ['path-joint', 'path-tone', 'path-grain'];
+const needs = [...code(read(LAYER)).matchAll(/needs:\s*\[([^\]]*)\]/g)]
   .flatMap((m) => [...m[1].matchAll(/'([^']+)'/g)].map((q) => q[1]));
-const asked = needs.filter((id) => ATLASES.includes(id));
-report.check(asked.length === 0,
-  'the layer asks for no atlas of the old world',
-  `it asks for ${needs.join(', ') || 'nothing'}`);
+const carried = needs.filter((id) => PAVING_MAPS.includes(id));
+const asked = carried.filter((id) => ATLASES.includes(id));
+report.check(asked.length === 0 && carried.length === PAVING_MAPS.length,
+  'the paving is handed three maps through the layer, and no atlas of the old world',
+  `it is handed ${carried.join(', ') || 'nothing'}`);
 
 // The two maps the corridor DOES carry are the paving's own, and neither is a
 // bake: one is a ruler and the other a field of stones. Named here so that the
 // coordinator can read this guard as the evidence for the half-waiver rather
 // than having to take the absence of a word for it.
 report.line('  what it does carry: '
-  + `${needs.join(', ')} -- a ruler and a tile, neither of them a bake`);
+  + `${carried.join(', ')} -- two rulers and a tile, none of them a bake`);
 
 report.end();

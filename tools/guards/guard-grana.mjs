@@ -1,15 +1,13 @@
-import { SOD, meshDisc, setGroundHole } from '../../src/world/voxel/pure.js';
-import { groundHoleAt } from '../../src/world/contracts.js';
+import { SOD, meshDisc } from '../../src/world/voxel/pure.js';
 import { TIERS } from '../../src/core/quality.js';
 import { reporter, selfTest } from './lib.mjs';
 
 // The largest disc any tier lays, for the reason written in guard-fusione.
 const SHIPPED_RADIUS = Math.max(...TIERS.map((t) => t.voxelDiscRadius));
 
-// AND THE CORRIDOR IS TOLD TO THE ENGINE. BOTH ARMS BELOW ARE MESHED WITH IT,
-// which is what keeps the difference between them a fact about the GRAIN: the
-// bare ground lost the same columns the grained one did.
-setGroundHole(groundHoleAt);
+// AND THE CORRIDOR NEEDS NO TELLING: it is columns of this disc, written by the
+// pipeline, and both arms below lay it identically. The difference between them
+// stays a fact about the GRAIN, which is what this guard is for.
 
 
 // THE TWO DIALS THAT MOVE THE GEOMETRY OF THE WORLD WHILE LOOKING LIKE TASTE.
