@@ -83,7 +83,8 @@ setGroundHole(groundHoleAt);
 //   grana 0.53 on top of it         ships 1.5261   wall 1.59
 //   the corridor's own hole         ships 1.5270   wall 1.59
 //   a floor with placed mounds      ships 0.6323   wall 0.66   (E-V1i)
-//   one bank per mound, verge       ships 0.5334   wall 0.56   <- now (E-V1k)
+//   one bank per mound, verge       ships 0.5334   wall 0.56   (E-V1k)
+//   the field is a plane            ships 0.3826   wall 0.40   <- now (E-FOND-PIANO2)
 //
 // THE LAST ROW MOVED THE SHIP AND DID NOT MOVE THE WALL, and that is worth
 // saying rather than leaving to be noticed. The disc stopped laying 923 columns
@@ -125,8 +126,8 @@ setGroundHole(groundHoleAt);
 // ------------------------------------------------------------------------
 
 /** D1's wall, at the same margin over what ships. Provisional: see above.
- * Moved with U-V1-F2 (E-V1k): the disc ships at 0.5334 q/col, 4.15% over is 0.56. */
-const DISQUALIFY = 0.56;
+ * Moved with U-FOND-1 (E-FOND-PIANO2): the plane ships at 0.3826 q/col, 4.15% over is 0.40. */
+const DISQUALIFY = 0.40;
 // D1's target. E-V1b retired it as an imposed number -- the absolute floor
 // under any partition of this field is 0.5035, so 0.45 is unreachable in any
 // world and the target's own meadow reads 1.54 -- but it is left printing,
@@ -155,18 +156,17 @@ if (process.argv.includes('--self')) {
       caught: Math.abs(DISQUALIFY
         - Number((meshDisc(null, true, SHIPPED_RADIUS).quadsPerColumn * 1.0415).toFixed(2))) < 5e-3,
     },
+    // No case 'passes but short of the target' any more: the wall (0.40) now
+    // stands UNDER the target (0.45), so a disc that passes has nothing to
+    // declare. The case returns the day the wall rises above the target again.
     {
-      what: 'a disc at 0.50 q/col passes but is declared short of the target',
-      caught: !verdict(0.50).disqualified && verdict(0.50).missed,
-    },
-    {
-      what: 'a disc at 0.44 q/col passes with nothing to declare',
-      caught: !verdict(0.44).disqualified && !verdict(0.44).missed,
+      what: 'a disc at 0.38 q/col passes with nothing to declare',
+      caught: !verdict(0.38).disqualified && !verdict(0.38).missed,
     },
     {
       what: 'the measurement itself still lands where the shape and grain put it',
       caught: Math.abs(meshDisc(null, true, SHIPPED_RADIUS).quadsPerColumn
-        - 0.5334103601001348) < 1e-12,
+        - 0.3826) < 5e-4,
     },
   ]);
 }

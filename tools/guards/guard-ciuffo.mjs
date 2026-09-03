@@ -112,7 +112,9 @@ const AT_APPROVED = { on: 1.5362, off: 0.1903, carpet: 1.3459 };
 // U-V1-F2 (E-V1k): one earth bank per mound, the floor's grain kept off its
 // back, and the corridor's verge turned to ground: 0.5334 with the carpet,
 // 0.1900 bare, 0.3434 for the carpet alone.
-const AT_TODAY = { on: 0.5334, off: 0.1900, carpet: 0.3434 };
+// U-FOND-1 (E-FOND-PIANO2): the field is a plane at BASE_LEVEL and the disc
+// fuses at 0.3826 with the carpet, 0.0215 bare, 0.3610 for the carpet alone.
+const AT_TODAY = { on: 0.3826, off: 0.0215, carpet: 0.3610 };
 
 /** Whether a constant is still the frozen one. Bit for bit: these are dials. */
 export const frozen = (actual, expected) => actual === expected;
