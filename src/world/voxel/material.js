@@ -682,8 +682,41 @@ export function pavingSettings() {
     // and buying a hue by darkening a level that was solved would be answering
     // one measurement in another measurement's currency.
     //
-    // WHERE IT LANDS: R/B 0.95 x 1.1444 / 0.6288 = 1.729, against the 1.73 the
-    // reference is read at.
+    // AND IT IS SOLVED THROUGH THIS FRAME'S OWN CHAIN, which is the whole
+    // difference between a number that is right and a number that is right on
+    // paper. The ratio above moves the ALBEDO by 1.82; put through the light,
+    // the exposure, the tone curve and the grade it reaches the PIXEL as 1.17,
+    // because AgX's crosstalk spends most of it. That is the same frontier the
+    // meadow's own saturation hit two chapters ago and it was met the same way
+    // there: solve against the target THROUGH the chain, and let the difference
+    // rather than the value be what enters.
+    //
+    // So the direction is the measurement and the amount is fitted on the live
+    // frame: the ratio raised to 2.9 and re-normalised by its own luminance
+    // again. Swept at the judging pose and read the way C 1.5 reads it, over the
+    // corridor at the two distances it names (fondazione/lav/tinta.py):
+    //
+    //                       mid run          near
+    //     albedo x1         R/B 1.171        1.088   <- the reading on paper
+    //     albedo x2         R/B 1.442          --
+    //     albedo x2.9       R/B 1.719        1.912   <- what ships
+    //     the target        R/B 1.730        1.863
+    //
+    // Fitted on the mid run alone -- the window the whole frame is judged at --
+    // and the NEAR window, which nothing was fitted to, lands within 2.6% of its
+    // own target. Two readings from one number is what says the direction was
+    // the right one.
+    //
+    // AND THE INSTRUMENT IS VALIDATED BEFORE IT IS BELIEVED: read on the frame
+    // this world shipped before the fit, the same bench answers R/B 0.921 where
+    // C 1.5 measured 0.95, which is three per cent.
+    //
+    // THE LEVEL IS A WALL AND IT IS NOT REACHED. The target's paving is brighter
+    // as well as warmer -- 137/125/79 against the 119/107/69 this lands -- and
+    // that difference is NOT taken, because the level of this stone was fitted
+    // against the meadow beside it and both readings E-V3g is gated on are
+    // ratios between the two. Buying a level here would move a gate without
+    // moving anything anybody asked for.
     //
     // WHAT IT IS NOT. It is not the texture, and the texture is the other half
     // of the same finding: the reference carries 3.20% of grain inside a face
@@ -691,7 +724,7 @@ export function pavingSettings() {
     // size of a slab and of the pitch of three maps. That half is phase C's and
     // it is NOT attempted here -- what is here is the one part of the reading
     // that is a pigment.
-    warmth: new Vector3(1.1444, 0.9946, 0.6288),
+    warmth: new Vector3(1.4256, 0.9491, 0.2511),
   };
 }
 
