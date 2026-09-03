@@ -1,7 +1,6 @@
 import {
-  AREA_CENTER, MONOLITHS, PLATFORM, SPAWN, STAIRS,
+  AREA_CENTER, PLATFORM, STAIRS,
 } from './layout.js';
-import { turfRise } from './turf.js';
 
 // The shape of the ground, as arithmetic.
 //
@@ -11,10 +10,29 @@ import { turfRise } from './turf.js';
 // sampled from it. Nothing else is allowed to have an opinion about the height
 // of a point, or the walker and the picture stop agreeing.
 //
-// The ground cannot be flat, and the reason is visible in the reference: the
-// feet of the monoliths are swallowed by grass, the path runs in a shallow
-// trench between two raised lips, and the meadow rolls enough to catch light on
-// one flank and lose it on the other. A plane cannot do any of that.
+// THE GROUND IS A PLANE, AND IT IS THE REFERENCE THAT SAYS SO.
+//
+// What stood here said the opposite -- that the feet of the monoliths are
+// swallowed by ground, that the path runs in a shallow trench between two
+// raised lips, and that the meadow has to roll to catch light on one flank and
+// lose it on the other. All three were read off the picture without a ruler,
+// and all three fail when one is held up: the feet are swallowed by tall GRASS
+// and stand on ground at nought; the corridor's own relief is half a voxel, so
+// what put it in a hollow was the meadow around it and never the corridor; and
+// the light on a cube comes from the bearing of its face, which a plane gives
+// exactly as well as a hill.
+//
+// THE MEASUREMENT is in per-il-committente/ricerca/A-STRUTTURA-DEL-MONDO.md
+// §1.1. Projected through the fitted camera, the reference's ground meets a two
+// metre grid at y = 0 across the whole frame; over the eleven seats it shows
+// without occlusion -- four block feet, the foot of the stair, three stretches
+// of meadow and three of corridor -- its excursion is WITHIN ONE VOXEL. The
+// field that stood here made NINE over the same eleven, and sixteen over the
+// disc in frame.
+//
+// So the height of the walkable ground is a LITERAL. What stands above it --
+// the masses of the meadow and the banks against the stone -- is placed on it
+// in src/world/voxel/mesher.js, and is not a shape of this field.
 
 // Value noise. Hashed rather than tabulated so the field is defined everywhere
 // and identical wherever it is evaluated; the operations are the ones that
@@ -93,28 +111,22 @@ export function pathCentreX(z) {
   return PATH_STAIR_X + (PATH_NEAR_X - PATH_STAIR_X) * t;
 }
 
-// Relief of the path, in metres. Everything here is centimetres on purpose:
-// these five numbers are the whole difference between stone bedded in a meadow
-// and a gully with the stone at the bottom of it.
+// THE CORRIDOR HAS NO RELIEF OF ITS OWN, and the four centimetre-sized numbers
+// that gave it one are gone rather than tuned to nought.
 //
-// PATH_LIP_FROM/TO are in units of the half width, so the swell is always
-// proportional to the strip — and the strip has just been divided by 1.613 to
-// land on the width the targets measure, which means the swell came with it.
-// AND THAT IS A REAL CONSEQUENCE, NOT A ROUNDING. Over the live run the lip is
-// now spread over 0.47 to 0.78 m of ground where it used to have 0.75 to 1.25,
-// so the steepest part of the side of the path — the pan coming back up and the
-// lip going over, crossed at right angles — went from about 40% to about 64% at
-// the middle of the run (v0-fondazione/campo/camminata.mjs, measured on the
-// path's own relief with the turf's hummocks held out of it). Eleven
-// centimetres of sink and swell over a fifth of a metre is a kerb rather than a
-// bank, and it is only ever crossed sideways: nothing along the run moved, and
-// the walk down the centreline is the same walk to the millimetre. It is
-// written down here rather than tuned away because PATH_SINK and PATH_LIP are
-// measured centimetres and this unit was given the width, not the relief.
-const PATH_SINK = 0.05;
-const PATH_LIP = 0.06;
-const PATH_LIP_FROM = 0.95;
-const PATH_LIP_TO = 2.05;
+// They were a pan of 0.05 m and a swell of 0.06 m over the width of the strip:
+// half a voxel and six tenths of one, which after quantising to the ten
+// centimetre step barely exist. Marched against the reference (A §2.2), of the
+// 0.914 m between the corridor under the walker's feet and the foot of the
+// nearest block, this relief could move AT MOST 0.05 m -- five per cent. The
+// other ninety five was the meadow. The corridor never was a trench, and the
+// numbers that pretended it was could not have made one.
+//
+// What the reference does show is the stone level with the ground and the grass
+// standing one to two voxels proud of it (A §1.3), and that is now a
+// consequence of the plane rather than a term: the corridor's surface is laid
+// on this field, the meadow's cubes stand one step above it, and neither of
+// them is tilted by anything.
 
 // The axis the turf's long blades are measured from: the path's centreline,
 // shifted a third of a metre.
@@ -208,141 +220,64 @@ export function pathRun(z) {
     * (1 - smoothstep(23, 30, z));
 }
 
-// --------------------------------------------------------------- the meadow
+// ------------------------------------------------------------- the meadow
 
-function mound(x, z, cx, cz, radius, height) {
-  const d = Math.hypot(x - cx, z - cz) / radius;
-  if (d >= 1) return 0;
-  const t = 1 - d * d;
-  return height * t * t;
-}
+/**
+ * The one height of the walkable ground, in metres.
+ *
+ * WHY IT IS BELOW NOUGHT AND NOT AT IT, which is the whole of the derivation.
+ * The reference puts the surface of the meadow at y = 0: the line falls on a
+ * nosing at the foot of the stair to within 0.07 m, and the grass at the four
+ * block feet stands on it with its blades one or two voxels over (A §1.1). What
+ * the eye is given is not this field, though: columnTop in
+ * src/world/voxel/mesher.js rounds it to a step and draws the TOP FACE of that
+ * step, at (step + 1) * VOXEL. A field at nought would therefore hand the eye a
+ * meadow a voxel high, standing over the feet of blocks that are pinned to
+ * nought in layout.js and over the bottom riser of the stair.
+ *
+ * One voxel below nought is the value whose drawn face lands exactly on y = 0,
+ * so the built stone meets the grass instead of wading in it.
+ *
+ * AND IT BUYS THE SECOND MEASUREMENT AT NO COST. The corridor's surface is laid
+ * on this field and the meadow's cubes stand on the face above it, so the grass
+ * beside the stone stands one voxel proud of it -- which is what the reference
+ * measures along the whole run (A §1.3), and which used to be asked of two
+ * centimetre-sized terms that could not deliver it.
+ */
+export const BASE_LEVEL = -0.10;
 
-// Ridges that swallow the feet of the monoliths.
-//
-// The reference shows grass cutting across every base, and that is the whole
-// reason this terrain exists. It is done by raising the ground a couple of
-// metres in front of each block rather than by sinking the block: the fitted
-// silhouettes in layout.js are pinned to the reference framing, and moving one
-// of them down would move its top edge with it.
-const EYE = { x: SPAWN.x, z: SPAWN.z };
-
-// The central block is left out: it stands on a platform at the head of the
-// stairs, not in the grass, and burying its foot would bury the platform with
-// it.
-const GRASS_STANDING = MONOLITHS.filter((m) => m.baseY === 0);
-
-const BASE_RIDGES = GRASS_STANDING.map((m) => {
-  const dx = EYE.x - m.position.x;
-  const dz = EYE.z - m.position.z;
-  const length = Math.hypot(dx, dz) || 1;
-  const depth = Math.max(m.size[0], m.size[2]) / 2;
-  return {
-    // Just in front of the block, on the side the walker sees.
-    x: m.position.x + dx / length * (depth + 1.5),
-    z: m.position.z + dz / length * (depth + 1.5),
-    // Under the block itself, so it stands on a swell rather than on a table.
-    seatX: m.position.x,
-    seatZ: m.position.z,
-    radius: depth + 3.4,
-  };
-});
-
-// A block must meet the grass, never hover over it. The meadow dips below zero
-// in places and the blocks are pinned to it by the reference fit, so the ground
-// under each one is lifted to meet its foot rather than the other way round.
-const SEATS = GRASS_STANDING.map((m) => ({
-  x: m.position.x,
-  z: m.position.z,
-  radius: Math.max(m.size[0], m.size[2]) / 2 + 3.0,
-  floor: 0.06,
-}));
-
-// The stairs and the platform are the one built thing on this ground, and all
-// six steps have to stay legible. The meadow is levelled under them.
+// The stairs and the platform are the one built thing on this ground, and the
+// meadow has to keep clear of them. It no longer takes levelling to do that --
+// the ground under them is the plane, as it is everywhere -- but WHERE the
+// built run stands is still a fact the turf rule reads off this file, so the
+// extent stays and only the levelling has gone.
 export const APPROACH = {
   x: STAIRS.x,
   // Between the bottom step and the back of the platform, so the whole built
-  // run sits on level ground while the meadow closes in again well before it
-  // reaches the blocks either side.
+  // run is covered and the meadow closes in again well before it reaches the
+  // blocks either side.
   z: (PLATFORM.z + STAIRS.z) / 2 - 0.1,
   inner: 4.2,
   outer: 9.0,
-  floor: 0.02,
 };
 
-export function heightAt(x, z) {
-  // Rolling meadow: three octaves, the longest carrying almost all of it. The
-  // reference ground is barely modelled at all, it only has to stop reading as
-  // a plane.
-  let h = 0.42 * snoise(x * 0.055 + 17.3, z * 0.055 + 5.1);
-  h += 0.17 * snoise(x * 0.13 + 11.3, z * 0.13 + 4.7);
-  h += 0.06 * snoise(x * 0.31 + 3.1, z * 0.31 + 9.2);
-
-  // Grassy swells on the east flank, where the reference puts them in front of
-  // the rocks that arrive with the vegetation.
-  h += mound(x, z, 11.0, 2.0, 5.2, 0.95);
-  h += mound(x, z, 8.6, 7.6, 3.8, 0.52);
-  h += mound(x, z, 14.2, -3.0, 5.6, 0.72);
-  h += mound(x, z, -12.4, 3.6, 5.0, 0.44);
-
-  for (const ridge of BASE_RIDGES) {
-    h += mound(x, z, ridge.x, ridge.z, ridge.radius, 0.46);
-    h += mound(x, z, ridge.seatX, ridge.seatZ, ridge.radius * 0.8, 0.22);
-  }
-
-  // The path: laid on the meadow, not cut into it.
-  //
-  // The reference shows stone almost level with the grass either side of it —
-  // slabs bedded into the field, with the turf standing a finger's width proud
-  // of them and nothing more. So the relief here is centimetres, not the
-  // quarter metre a walkable trench would want: the pan drops by PATH_SINK, the
-  // turf rises by PATH_LIP, and the lip is spread over more than half a metre
-  // of ground so that it reads as a swell rather than as a bank.
-  //
-  // It exists only between the stairs and the south rim: north of the bottom
-  // step the ground is meadow, and cutting the path through there would run it
-  // straight under the central platform.
-  const run = pathRun(z);
-  if (run > 0) {
-    const s = x - pathCentreX(z);
-    const edge = pathEdge(z, s);
-    const d = Math.abs(s) / edge;
-    h -= run * PATH_SINK * (1 - smoothstep(0.70, 1.02, d));
-    if (d > PATH_LIP_FROM && d < PATH_LIP_TO) {
-      const t = (d - PATH_LIP_FROM) / (PATH_LIP_TO - PATH_LIP_FROM);
-      h += run * PATH_LIP * Math.sin(Math.PI * t);
-    }
-  }
-
-  // Beyond the walkable area the detail fades out and the ground settles, so
-  // the transition ring welds onto the far plane without a seam. The rise is
-  // deliberately slight: the reference shows flat meadow all the way to the
-  // water, and anything more would lift the horizon.
-  const radius = Math.hypot(x - AREA_CENTER.x, z - AREA_CENTER.z);
-  h *= 1 - smoothstep(24, 34, radius);
-  h += 0.25 * smoothstep(20, 32, radius);
-
-  // Everything that stands on this ground has to keep meeting it. These two
-  // passes come last, so nothing added above can sink a block or drown a step.
-  for (const seat of SEATS) {
-    const w = 1 - smoothstep(seat.radius * 0.45, seat.radius, Math.hypot(x - seat.x, z - seat.z));
-    if (w > 0) h += w * Math.max(0, seat.floor - h);
-  }
-
-  const approach = 1 - smoothstep(APPROACH.inner, APPROACH.outer,
-    Math.hypot(x - APPROACH.x, z - APPROACH.z));
-  h += approach * (APPROACH.floor - h);
-
-  // And the hummocks, last of all.
-  //
-  // Last because the field already holds its own gates: it is nought over the
-  // path, nought against anything built, and faded out under the stair's apron,
-  // so nothing here can be undone by it. Added rather than blended because a
-  // hummock IS ground: the walker climbs it, the mesh carries it, and Cycles
-  // casts the corner shadow the committente named off the same triangles. One
-  // sheet, one height, three consumers — see src/world/turf.js.
-  h += turfRise(x, z);
-  return h;
+/**
+ * Height of the ground at a point, in metres.
+ *
+ * A CONSTANT, AND THE SIGNATURE IS KEPT ON PURPOSE. Fifteen files in src and
+ * tools ask this question, and they are moved to the block store one at a time
+ * rather than all at once; a function that still answers for a point is what
+ * lets them be moved without any of them changing today.
+ *
+ * WHAT USED TO BE HERE, so that nobody looks for it: three octaves of value
+ * noise summed to +/-0.65 m, four mounds of 0.44 to 0.95 m, a ridge and a seat
+ * at each of the four blocks standing in grass, a 0.25 m rise around the rim of
+ * the disc, the pan and the swell of the corridor, two passes that lifted the
+ * ground to meet a block and levelled it under the stair, and the turf's own
+ * hummocks. Every one of them was relief the reference does not have.
+ */
+export function heightAt() {
+  return BASE_LEVEL;
 }
 
 // ------------------------------------------------------------------- the grid
