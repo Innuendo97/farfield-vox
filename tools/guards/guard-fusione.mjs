@@ -4,193 +4,137 @@ import { TIERS } from '../../src/core/quality.js';
 import { reporter, selfTest } from './lib.mjs';
 
 // The largest disc any tier lays. The reach is governed by
-// quality.voxelDiscRadius now (E-V1a, E-V1d), so the disc a guard weighs is the
+// quality.voxelDiscRadius (E-V1a, E-V1d), so the disc a guard weighs is the
 // disc the world puts on a screen -- not the one the engine answers with when
-// nobody asks. It matters to the FIGURE and not only to the run time: q/col
-// FALLS as the radius grows, because a bigger disc is proportionally less rim,
-// so a guard reading the default while the tiers laid something smaller would
-// report a number flattering to a world nobody draws.
+// nobody asks.
 const SHIPPED_RADIUS = Math.max(...TIERS.map((t) => t.voxelDiscRadius));
+
+// The radius the allocation of §2.9 was written at, before the tiers governed
+// the reach. Nothing ships it; it is meshed and PRINTED because an allocation
+// written for a disc nobody lays is a fact somebody should be able to see
+// without re-deriving it.
+const ALLOCATION_RADIUS = 35;
 
 // AND THE CORRIDOR IS TOLD TO THE ENGINE, FOR THE SAME REASON AND IN THE SAME
 // SENTENCE. The engine's own answer to "where is the ground not mine" is a
 // straight passage it can work out without being told; the page injects the
-// world's own -- groundHoleAt -- and the disc that ships is 923 columns smaller
-// for it at this radius (v1-suolo/misure/d4b-buco.json). A guard left on the
-// engine's default would weigh a disc nobody draws, which is the very thing the
-// paragraph above exists to forbid.
+// world's own -- groundHoleAt -- and the disc that ships is smaller for it. A
+// guard left on the engine's default would weigh a disc nobody draws.
 setGroundHole(groundHoleAt);
 
 
-// HOW WELL THE GREEDY MESHER FUSES THE FIELD, MEASURED AND NOT CLAIMED.
+// WHAT THE DISC COSTS, IN THE UNIT THE BUDGET IS WRITTEN IN.
 //
-// Quads over columns is the one number the whole pivot was argued on, and until
-// now it was reported by a running page, in a HUD, at one moment, on one
-// machine. This lays the same disc under plain node, through the same
-// arithmetic the worker and the page run, and gets the same number -- which is
-// what turns a screenshot into a measurement. It is also why
-// src/world/voxel/pure.js must never gain an import a browser is needed for.
+// THIS GUARD CHANGED ITS QUESTION, AND E-V1b IS WHY. What stood here gated
+// QUADS PER COLUMN against a wall, and E-V1b retired that metric with the
+// reason spelled out: it rewards the wrong move. Taking the radius from
+// fourteen metres to thirty five IMPROVES q/col by 19% while multiplying the
+// triangles by more than four, because a bigger disc is proportionally less
+// rim. A figure that gets happier as the bill grows is not a gate.
 //
-// TWO THRESHOLDS, AND THEY MEAN DIFFERENT THINGS.
+// The re-derivation E-V1b asked for is the one below: a hard gate on the
+// TRIANGLES the disc hands the card, against the allocation the campaign wrote
+// for it, and the fusion figure kept as a PRINTED number because it is still
+// the right thing to read when asking WHY the triangles moved.
 //
-//   the WALL   above it the allocation the campaign has agreed is spent by
-//              arithmetic and nothing further needs measuring. It stands just
-//              over what ships, so a disc drifting towards it is caught before
-//              it arrives. It has MOVED -- see the block below.
-//   the TARGET between the two the world still runs and the pivot still stands;
-//              what is true is that a promise has not been kept. So the number
-//              is PRINTED with the owner beside it and the guard exits green.
+// THE ALLOCATION IS §2.9's OWN ROW AND NOT A NUMBER CHOSEN HERE:
 //
-// A single threshold would have had to be one or the other, and both readings
-// are wrong: at the wall the guard says nothing about a disc drifting towards
-// it, and at the target it is red from the day it is written -- which is how a
-// guard stops being read at all.
+//     disco voxel 10 cm    V1    <= 1,5 ms    <= 60.000 tri    <= 22 draw
 //
-// The lever on the remaining gap is named rather than left to be rediscovered:
-// the two-dimensional merge of the flanks, which the mesher deliberately does
-// not do (see src/world/voxel/mesher.js). Its headroom is not quantified, and
-// quantifying it is V1's, not this guard's.
+// It is the coordinator's to amend and nobody else's (§2.9, and rule R4: a
+// layer over its allocation ESCALATES rather than quietly taking another
+// session's margin). The wall that stood here instead FOLLOWED the measurement
+// -- a fixed margin over whatever shipped, moved four times -- and a wall that
+// moves with the world cannot catch a world that grows. This one does not move.
+//
+// AND BOTH FAMILIES ARE IN THE COUNT NOW. The disc hands the card two meshes,
+// the meadow and its bare earth, and the retired figure counted only the first;
+// E-V1k declared the gap and left it, 0.5334 against 0.5409 with both. A gate
+// on what the card draws has to count what the card draws.
 
-// ------------------------------------------------------------------------
-// THE WALL MOVED, AND IT MOVED BECAUSE THE COMMITTENTE MOVED IT.
-//
-// 0.55 WAS NOT A LAW, IT WAS AN ALLOCATION WRITTEN AS A RATIO. Its arithmetic:
-// at the radius the campaign priced, the disc holds 58 046 columns, so 0.55
-// q/col is 31 925 quads and 63 850 triangles -- the 60 000 the disc was
-// allocated, plus the rounding. Nothing about greedy meshing says 0.55; what it
-// said was "this many triangles".
-//
-// THE ALLOCATION IS NOT 60 000 ANY MORE. A1-bis measured that the day target's
-// own meadow puts 14% of its risers at three voxels or more and that no tuft of
-// plus or minus one can make them; D3a re-priced the three answers on the page
-// with the frozen engine reproducing it digit for digit; the question went to
-// the committente as a price, and the committente chose (E-DECISIONI.1, the
-// carpet as the target draws it) at 1.73x of the reallocated budget. Measured
-// here and on the page, that arm is 1.5362 q/col.
-//
-// SO THE WALL IS PUT BACK WHERE IT WAS, RELATIVE TO WHAT SHIPS. E-V1b records
-// the old margin exactly: 0.55 against a shipped 0.5262 is 4.3%. The same
-// margin over the approved 1.5362 is 1.602, and the wall was 1.60 -- 4.15%. It
-// is the same guard doing the same job against a different decision, and it is
-// NOT a wall raised to let a change through: the change was priced, put to the
-// committente in three arms, and chosen before a line of it was written.
-//
-// AND THEN IT MOVED TWICE MORE, BY THE SAME ARITHMETIC, AND THE RULE IS THE
-// ARITHMETIC AND NOT THE DIRECTION. The wall is always the SAME 4.15% over what
-// the disc actually ships, so it follows the ship wherever the ship goes:
-//
-//   clump 0.85 alone (grana 0.45)   ships 1.4442   wall 1.50
-//   grana 0.53 on top of it         ships 1.5261   wall 1.59
-//   the corridor's own hole         ships 1.5270   wall 1.59
-//   a floor with placed mounds      ships 0.6323   wall 0.66   (E-V1i)
-//   one bank per mound, verge       ships 0.5334   wall 0.56   (E-V1k)
-//   the field is a plane            ships 0.3826   wall 0.40   <- now (E-FOND-PIANO2)
-//
-// THE LAST ROW MOVED THE SHIP AND DID NOT MOVE THE WALL, and that is worth
-// saying rather than leaving to be noticed. The disc stopped laying 923 columns
-// that stood under the paving; a column carries roughly its own quads, so the
-// RATIO barely moves -- 1.5261 to 1.5270, nine ten-thousandths -- while the
-// world got 1 356 quads and 2 712 triangles cheaper. 4.15% over the new ship
-// still rounds to 1.59. A fusion figure that rises while the bill falls is the
-// honest reading of a ratio whose denominator lost its cheapest columns, and it
-// is exactly why E-V1b retired this metric: the triangles are in
-// v1-suolo/misure/d4b-buco.json and quota-disegnata.mjs is where they gate.
-//
-// What is forbidden by E-V1b is moving a wall SO THAT A NUMBER CAN PASS. What
-// is done here is holding the margin fixed and letting the wall follow the
-// measurement, in both directions, so that the wall keeps detecting the one
-// thing it exists to detect: a carpet that grows when nobody asked it to. A
-// wall left behind at 1.50 would now fail a world that is working as decided; a
-// wall left behind at 1.60 would not notice a carpet growing a twentieth of
-// itself. Neither is a gate.
-//
-// A NOTE ON WHAT THIS WALL IS NOT. It is not the coordinator's price ceiling.
-// That ceiling is 1.73x of the reallocated triangle budget MEASURED AT A POSE
-// (vox-giorno, 152 240 triangles at the buffer), and it is enforced by the
-// green gate in quota-disegnata.mjs against a chunk list the page hands over.
-// This wall is q/col on the whole disc, and it is about FUSION. The two once
-// happened to reject the same arm -- grana 0.57 -- and that coincidence was
-// briefly written into this file as a test case. It is not written here any
-// more: two gates that agree by accident are one gate with a spare name, and
-// the day they disagree the spare name is the one that lies.
-//
-// AND THE METRIC ITSELF IS ALREADY RETIRED, WHICH IS WHY THIS IS PROVISIONAL.
-// E-V1b: q/col rewards the wrong move -- taking the radius from 14 to 35
-// IMPROVES it by 19% while multiplying the triangles by 4.27 -- so the
-// re-derivation is U-V0-GUARDIA's: a bell on the figure at a declared radius,
-// and a gate on the TRIANGLES AT vox-giorno against the allocation. That is not
-// taken here, because it is not this unit's to take. What is done here is the
-// least that keeps the guard true: the same arithmetic, the same shape of
-// threshold, moved to the number the campaign now decides by. When U-V0-GUARDIA
-// lands, this whole block is replaced rather than adjusted.
-// ------------------------------------------------------------------------
+/** §2.9's allocation for the voxel disc, in triangles. The coordinator's. */
+const ALLOCATION = 60000;
 
-/** D1's wall, at the same margin over what ships. Provisional: see above.
- * Moved with U-FOND-1 (E-FOND-PIANO2): the plane ships at 0.3826 q/col, 4.15% over is 0.40. */
-const DISQUALIFY = 0.40;
-// D1's target. E-V1b retired it as an imposed number -- the absolute floor
-// under any partition of this field is 0.5035, so 0.45 is unreachable in any
-// world and the target's own meadow reads 1.54 -- but it is left printing,
-// because a number that was promised and not kept is worth saying out loud.
-const TARGET = 0.45;
+// What the disc measures today, kept as a tripwire on the MEASUREMENT rather
+// than as a second threshold. A gate at sixty thousand says nothing about a
+// disc that doubles from forty to eighty thousand in one commit until the day
+// it lands over the line; a declared figure beside it says so the same
+// afternoon. It is printed, with the distance, and it never gates.
+const AT_TODAY = 40038;
+
 const OWNER = 'V1';
 
-/** What a fusion figure is worth, as the two thresholds see it. */
-export function verdict(perColumn) {
-  return {
-    disqualified: perColumn > DISQUALIFY,
-    missed: perColumn > TARGET,
-  };
+/** Whether a triangle count is inside the allocation. */
+export function verdict(triangles) {
+  return { over: triangles > ALLOCATION };
 }
 
 if (process.argv.includes('--self')) {
+  const disc = meshDisc(null, true, SHIPPED_RADIUS);
   selfTest('guard-fusione', [
-    { what: 'a disc at 1.70 q/col is disqualified', caught: verdict(1.70).disqualified },
-    { what: 'a disc a hair over the wall is disqualified', caught: verdict(DISQUALIFY + 1e-7).disqualified },
-    { what: 'a disc a hair under the wall is not', caught: !verdict(DISQUALIFY - 1e-7).disqualified },
+    { what: 'a disc at 90 000 triangles is caught', caught: verdict(90000).over },
     {
-      // The margin is the contract, not the number: this is the assertion that
-      // survives the wall moving, and it is the one that would catch a wall
-      // nudged to let a particular measurement through.
-      what: 'the wall stands at the declared 4.15% over what actually ships',
-      caught: Math.abs(DISQUALIFY
-        - Number((meshDisc(null, true, SHIPPED_RADIUS).quadsPerColumn * 1.0415).toFixed(2))) < 5e-3,
+      what: 'a disc one triangle over the allocation is caught',
+      caught: verdict(ALLOCATION + 1).over,
     },
-    // No case 'passes but short of the target' any more: the wall (0.40) now
-    // stands UNDER the target (0.45), so a disc that passes has nothing to
-    // declare. The case returns the day the wall rises above the target again.
+    { what: 'a disc exactly at the allocation is not', caught: !verdict(ALLOCATION).over },
     {
-      what: 'a disc at 0.38 q/col passes with nothing to declare',
-      caught: !verdict(0.38).disqualified && !verdict(0.38).missed,
+      // The allocation is the coordinator's number, and this is the assertion
+      // that would catch it being edited to let a measurement through -- which
+      // is the one thing E-V1b forbids doing to this file.
+      what: 'the allocation is still the 60 000 triangles §2.9 gives the disc',
+      caught: ALLOCATION === 60000,
     },
     {
-      what: 'the measurement itself still lands where the shape and grain put it',
-      caught: Math.abs(meshDisc(null, true, SHIPPED_RADIUS).quadsPerColumn
-        - 0.3826) < 5e-4,
+      what: 'the measurement itself still lands where the shape and the grain put it',
+      caught: Math.abs(disc.triangles - AT_TODAY) <= 200,
+    },
+    {
+      what: 'the count is of both families and not of the meadow alone',
+      caught: disc.earthQuads > 0 && disc.triangles === disc.quads * 2,
     },
   ]);
 }
 
-const report = reporter('guard-fusione -- quads per column on the real field, offline');
+const report = reporter('guard-fusione -- what the voxel disc costs, offline, in triangles');
 
 const disc = meshDisc(null, true, SHIPPED_RADIUS);
-const seen = verdict(disc.quadsPerColumn);
+const seen = verdict(disc.triangles);
 
-report.line(`  ${disc.chunks.length} chunks, ${disc.quads} quads over ${disc.columns} columns, `
+report.line(`  ${disc.chunks.length} chunks, ${disc.columns} columns, `
   + `at the ${SHIPPED_RADIUS} m the tiers lay`);
-report.line(`  quads per column        ${disc.quadsPerColumn.toFixed(4)}`);
+report.line(`  triangles               ${disc.triangles}`
+  + `   (${disc.quads} quads, of which ${disc.earthQuads} are the bare earth)`);
+report.line(`  quads per column        ${disc.quadsPerColumn.toFixed(4)}`
+  + '   (printed and not gated: E-V1b retired it as a threshold)');
 report.line(`  with the rim taken out  ${disc.insidePerColumn.toFixed(4)}`
   + `   (${disc.rim} of the walls exist because something ends there)`);
 
-report.check(!seen.disqualified,
-  `the disc fuses inside the wall of ${DISQUALIFY} q/col`,
-  `${disc.quadsPerColumn.toFixed(4)} against ${DISQUALIFY}`);
+report.check(!seen.over,
+  `the disc stands inside its allocation of ${ALLOCATION} triangles`,
+  `${disc.triangles} against ${ALLOCATION}`);
 
-if (seen.missed && !seen.disqualified) {
-  report.note(`fusione ${disc.quadsPerColumn.toFixed(4)} q/col is over the target `
-    + `${TARGET} by ${(disc.quadsPerColumn - TARGET).toFixed(4)}: target missed, owner ${OWNER}`);
-} else if (!seen.missed) {
-  report.check(true, `and it is inside the target of ${TARGET} q/col`);
+const drift = disc.triangles - AT_TODAY;
+if (Math.abs(drift) > 200) {
+  report.note(`the disc has moved ${drift > 0 ? '+' : ''}${drift} triangles from the `
+    + `${AT_TODAY} this file says ships -- ${drift > 0 ? 'declare it before it is found'
+      : 'a bill that fell, and the yardstick here is behind it'}, owner ${OWNER}`);
+} else {
+  report.line(`  against what this file says ships (${AT_TODAY}): `
+    + `${drift >= 0 ? '+' : ''}${drift} triangles`);
 }
+
+// AND THE ROW THE ALLOCATION WAS WRITTEN FOR, SO THAT NOBODY READS THE GREEN
+// ABOVE AS A STATEMENT ABOUT IT. §2.9 names the disc at r = 35 and the tiers
+// lay twelve to fourteen: the allocation and the world have never been the same
+// disc, and the gap is arithmetic rather than an opinion.
+const wide = meshDisc(null, true, ALLOCATION_RADIUS);
+report.line('');
+report.line(`  the same disc at the ${ALLOCATION_RADIUS} m §2.9's row names: `
+  + `${wide.triangles} triangles over ${wide.columns} columns, `
+  + `${(wide.triangles / ALLOCATION).toFixed(2)}x the allocation`);
+report.note(`the allocation of §2.9 is written at r = ${ALLOCATION_RADIUS} m and no tier `
+  + `lays more than ${SHIPPED_RADIUS} m: the gate above is on the disc that ships, and `
+  + 'the row and the world have never been the same disc. The row is the coordinator\'s');
 
 report.end();
