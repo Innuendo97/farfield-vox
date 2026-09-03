@@ -1,10 +1,9 @@
-import { heightAt, pathCoord, pathRun } from './terrain-field.js';
+import { heightAt } from './terrain-field.js';
 import { stairHeightAt as stairRunHeight } from './stairs.js';
 import { flowerField } from './vegetation.js';
 import { PLATFORM } from './layout.js';
-import { pathHoleAt } from './path.js';
 import {
-  CENTRE, DISC_RADIUS, VOXEL, bareRaisedAt, columnTop,
+  CENTRE, DISC_RADIUS, MATERIAL, VOXEL, columnSpec, columnTop,
 } from './voxel/mesher.js';
 
 // THE CONTRACTS BETWEEN THE SESSIONS, AND THE ONLY DOOR BETWEEN THEM.
@@ -119,9 +118,15 @@ const NO_TOP = -1e8;
  * than by an import -- see the note there.
  */
 export function groundHeightAt(x, z) {
-  // 1. Something else owns this column, and it is laid on the ground rather
-  //    than on the carpet.
-  if (groundHoleAt(x, z)) return heightAt(x, z);
+  // 1. THE BRANCH THAT WAS FIRST IS GONE, AND IT COST NOTHING TO LOSE. It read
+  //    the field exactly wherever the corridor owned the column, because the
+  //    paving was laid on the field and a cube answered there would have put
+  //    the walker on a lip drawn over. The corridor is columns now: the branch
+  //    below answers for it, and it answers the SAME NUMBER -- the paving's top
+  //    is one voxel under the meadow's floor, so its drawn face is at
+  //    (BASE_STEP - 1 + 1) * VOXEL = BASE_LEVEL, which is what the field said.
+  //    The walker's floor over the whole corridor is unmoved to the millimetre
+  //    and one of the three grounds is gone. The 26.4 mm of E-V1g die here.
   // 2. The carpet, from the arithmetic the worker meshes from.
   const top = columnTop(Math.floor(x / VOXEL), Math.floor(z / VOXEL), true, discRadius);
   if (top > NO_TOP) return (top + 1) * VOXEL;
@@ -279,10 +284,25 @@ export function materialAt(x, z) {
   if (Math.abs(dx * PLATFORM_COS - dz * PLATFORM_SIN) <= PLATFORM.width / 2
     && Math.abs(dx * PLATFORM_SIN + dz * PLATFORM_COS) <= PLATFORM.depth / 2) return 'piattaforma';
   if (stairRunHeight(x, z) !== -Infinity) return 'scalinata';
-  if (pathRun(z) > 0.5 && Math.abs(pathCoord(x, z)) <= 1) return 'sentiero';
-  // The steep flank of a mound shows the earth it is made of (E-DECISIONI4):
-  // the same seat the mesher paints from, so the foot and the eye agree.
-  if (bareRaisedAt(x, z)) return 'terra';
+  // AND THE REST OF IT IS THE COLUMN, WHICH IS WHY THE THREE PREDICATES BELOW
+  // THIS LINE ARE GONE.
+  //
+  // It used to ask the corridor's own two functions whether it stood on stone,
+  // and a mound's own function whether it stood on a cut bank -- three
+  // re-derivations of decisions the generator had already made and written
+  // down. The foot and the eye could disagree wherever any of the three was
+  // phrased differently from the pass that draws, and one of them WAS: this
+  // read `pathRun > 0.5 && |pathCoord| <= 1` where the disc cut its hole at
+  // `> 0.5 && < 1`, so a strip either side of the corridor sounded like stone
+  // and drew as grass.
+  //
+  // Now it reads the material of the top of the column, which is the one place
+  // in this world that says what is at a point. It is the LAW and not the store
+  // -- columnSpec, the same door columnTop comes through -- so it stays O(1) and
+  // needs no chunk built to answer for one footfall.
+  const spec = columnSpec(Math.floor(x / VOXEL), Math.floor(z / VOXEL), true, discRadius);
+  if (spec.mat === MATERIAL.PATH) return 'sentiero';
+  if (spec.mat === MATERIAL.EARTH) return 'terra';
   return 'erba';
 }
 
@@ -291,18 +311,27 @@ export function materialAt(x, z) {
 /**
  * Whether the ground is cut away here, because something else owns this column.
  *
- * V3 FILLS THIS, and it is FALSE EVERYWHERE TODAY -- which is the truth and not
- * a placeholder. The path in this world is not separate geometry: it is painted
- * into the ground's albedo and cut into the height field, so there is no hole
- * anywhere and saying otherwise would be a lie the walker could fall through.
+ * IT ANSWERS NO, EVERYWHERE, AND THAT IS THE TRUTH AGAIN RATHER THAN A
+ * PLACEHOLDER -- for the second time in this seat's life and for the opposite
+ * reason.
  *
- * V3 fills this: the corridor is the meadow's one hole, and V1's disc stops
- * laying columns where it answers true. That is the whole of the agreement
- * between those two sessions, and it is one function rather than a
- * conversation. See src/world/path.js.
+ * It answered no while the path was painted into the ground's albedo, because
+ * there was nothing anywhere that was not the ground. Then the corridor became
+ * a surface of its own and this became the one agreement between two sessions:
+ * V3 said where its stone was and V1's disc laid no column under it. The
+ * corridor is COLUMNS now -- the same store, the same pass, PATH and EARTH on
+ * top of them (see PATH in src/world/voxel/worldgen.js) -- so once more there is
+ * nothing in this world that is not the ground.
+ *
+ * AND IT IS KEPT RATHER THAN WITHDRAWN, with its three readers and its
+ * signature, because "is any of this ground somebody else's" is a question the
+ * world will ask again: the day a bridge, a floor or a pool is laid over the
+ * meadow, this is the seat it goes in, and the readers are already wired to it.
+ * What is NOT kept is anything that behaved as though the answer might be yes --
+ * see the branch that used to open groundHeightAt.
  */
-export function groundHoleAt(x, z) {
-  return pathHoleAt(x, z);
+export function groundHoleAt() {
+  return false;
 }
 
 /**
