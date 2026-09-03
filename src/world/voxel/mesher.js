@@ -60,9 +60,9 @@ import {
 
 export { VOXEL, CHUNK, NO_COLUMN, MATERIAL } from './columns.js';
 export {
-  BASE_STEP, CENTRE, DISC_RADIUS, EARTH, MOUND, SOD, bareRaisedAt, chunkColumns, columnCentre,
-  columnSpec, columnTop, earthFacing, meadowMoundAt, moundAt, moundBankAt, onPaving,
-  setGroundHole, sodAt,
+  BASE_STEP, CENTRE, DISC_RADIUS, EARTH, MOUND, PATH, SOD, bareRaisedAt, chunkColumns,
+  columnCentre, columnSpec, columnTop, earthFacing, meadowMoundAt, moundAt, moundBankAt,
+  onPaving, pathVerge, sodAt,
 } from './worldgen.js';
 
 // The six orientations, in the order the material reads them: the top first,
@@ -164,14 +164,27 @@ export function meshChunk(cx, cz, grain = true, radius = DISC_RADIUS) {
   // from the first list all the way down so that neither family can merge into
   // the other, which is the whole of what makes them two families.
   const earth = [];
+  // AND A THIRD, FOR THE PAVING. The corridor is columns of this disc now and
+  // its tops are a material of their own: a stone with a grain finer than the
+  // cell, painted from the three maps V3 measured, where the meadow and the
+  // bare earth are flat pigments with a hash on them. Three families, three
+  // meshes, three draws for the whole disc -- and the corridor gives back the
+  // draw its own surface used to cost.
+  const paving = [];
   // How many of the walls exist only because something ends here -- the rim of
   // the disc, or a verge of the paving -- rather than because the ground
   // stepped. Counted apart because it is the one part of this number that does
   // NOT scale to a world: a disc of fourteen metres is nearly all edge and a
   // world is nearly all middle.
   let rim = 0;
-  const push = (face, ax, ay, az, bx, by, bz, cx2, cy, cz2, dx, dy, dz, bare = false) => {
-    (bare ? earth : quads).push(
+  // Which of the three a rectangle belongs to. A number and not two booleans,
+  // because a face is in exactly one family and a pair of flags can say
+  // otherwise.
+  const MEADOW = 0;
+  const SOIL = 1;
+  const STONE = 2;
+  const push = (face, ax, ay, az, bx, by, bz, cx2, cy, cz2, dx, dy, dz, family = MEADOW) => {
+    (family === SOIL ? earth : family === STONE ? paving : quads).push(
       [face, ax, ay, az, bx, by, bz, cx2, cy, cz2, dx, dy, dz],
     );
   };
@@ -210,7 +223,7 @@ export function meshChunk(cx, cz, grain = true, radius = DISC_RADIUS) {
       // Wound so the face looks up: seen from above the corners run clockwise
       // in x and z, which is counter-clockwise about +Y.
       push(FACE.TOP, x0, y, z0, x0, y, z1, x1, y, z1, x1, y, z0,
-        mat === MATERIAL.EARTH);
+        mat === MATERIAL.EARTH ? SOIL : mat === MATERIAL.PATH ? STONE : MEADOW);
     }
   }
 
@@ -234,16 +247,16 @@ export function meshChunk(cx, cz, grain = true, radius = DISC_RADIUS) {
     // shows what it is cut into. And it has to FACE the eye or the corridor,
     // which is where the reference shows its bare ground and nowhere else.
     const bare = (i, j, h, floor) => {
-      // THE VERGE FIRST, because it is the one bare face whose floor is not
-      // there at all. A wall with nothing beyond it is either the rim of the
-      // disc -- the edge of a piece, and no part of the world -- or the verge
-      // of the corridor, and the STORE says which: the generator marked the
-      // corridor's hole with the corridor's own material at the moment it cut
-      // it, so this asks a byte instead of asking a predicate about the world.
-      if (floor === EMPTY) {
-        if (!EARTH.verge) return false;
-        return matAt(store, ox + i + dix, oz + j + diz) === MATERIAL.PATH;
-      }
+      // THE VERGE RULE IS GONE, AND WHAT REPLACED IT IS THE THING ITSELF. It
+      // used to say: a wall with nothing beyond it whose neighbour is marked as
+      // the corridor's hole is the verge of the paving, so paint it earth. That
+      // was a wall standing at the lip of a hole, painted to stand in for a band
+      // of ground that was not there. The band IS there now -- two to four
+      // columns of MATERIAL.EARTH either side of the stone, written by the
+      // generator (PATH.verge in ./worldgen.js) -- so what is left with nothing
+      // beyond it is only the rim of the disc, which is the edge of a piece and
+      // no part of the world.
+      if (floor === EMPTY) return false;
       if (flank(i, j) !== MATERIAL.EARTH) return false;
       if (h - floor < EARTH.minStep) return false;
       const centre = columnCentre(ox + i, oz + j);
@@ -258,7 +271,12 @@ export function meshChunk(cx, cz, grain = true, radius = DISC_RADIUS) {
         if (h === EMPTY) { b++; continue; }
         const floor = at(i + dix, j + diz);
         if (floor !== EMPTY && h <= floor) { b++; continue; }
-        const soil = bare(i, j, h, floor);
+        // The family of the whole run. A wall raised by a column of paving is
+        // paving -- it happens only at the rim of the disc, where the corridor
+        // runs out of the piece, and a skirt of grass under a stone floor is
+        // the one place that would show.
+        const fam = material(i, j) === MATERIAL.PATH ? STONE
+          : bare(i, j, h, floor) ? SOIL : MEADOW;
         // How far this exact pair of levels carries. A neighbour that is not
         // there ends the run: its floor is not a number this can be compared
         // against and a wall built to it would have no bottom.
@@ -275,7 +293,9 @@ export function meshChunk(cx, cz, grain = true, radius = DISC_RADIUS) {
           // be one rectangle. It is the only thing that can split a merge here
           // which is not a difference of height, and what it costs is measured
           // rather than assumed.
-          if (bare(i2, j2, h2, f2) !== soil) break;
+          const fam2 = material(i2, j2) === MATERIAL.PATH ? STONE
+            : bare(i2, j2, h2, f2) ? SOIL : MEADOW;
+          if (fam2 !== fam) break;
           run++;
         }
         const low = floor === EMPTY ? h - SKIRT : floor;
@@ -289,13 +309,13 @@ export function meshChunk(cx, cz, grain = true, radius = DISC_RADIUS) {
         // The face sits on the boundary the neighbour is across, and the two
         // corners are taken so the winding turns the front of it outwards.
         if (face === FACE.EAST) {
-          push(face, x1, yLow, z0, x1, yTop, z0, x1, yTop, z1, x1, yLow, z1, soil);
+          push(face, x1, yLow, z0, x1, yTop, z0, x1, yTop, z1, x1, yLow, z1, fam);
         } else if (face === FACE.WEST) {
-          push(face, x0, yLow, z1, x0, yTop, z1, x0, yTop, z0, x0, yLow, z0, soil);
+          push(face, x0, yLow, z1, x0, yTop, z1, x0, yTop, z0, x0, yLow, z0, fam);
         } else if (face === FACE.SOUTH) {
-          push(face, x1, yLow, z1, x1, yTop, z1, x0, yTop, z1, x0, yLow, z1, soil);
+          push(face, x1, yLow, z1, x1, yTop, z1, x0, yTop, z1, x0, yLow, z1, fam);
         } else {
-          push(face, x0, yLow, z0, x0, yTop, z0, x1, yTop, z0, x1, yLow, z0, soil);
+          push(face, x0, yLow, z0, x0, yTop, z0, x1, yTop, z0, x1, yLow, z0, fam);
         }
         b += run;
       }
@@ -310,6 +330,7 @@ export function meshChunk(cx, cz, grain = true, radius = DISC_RADIUS) {
 
   const packed = pack(quads, columns, rim, tops, cx, cz);
   packed.earth = packFaces(earth);
+  packed.paving = packFaces(paving);
   return packed;
 }
 
@@ -427,23 +448,30 @@ function pack(quads, columns, rim, tops, cx, cz) {
 /**
  * The whole disc, meshed, and the numbers the budget is read off.
  *
- * BOTH FAMILIES ARE COUNTED NOW, AND THE ONE THAT WAS MISSING WAS DECLARED
- * MISSING. The fusion figure used to leave the second mesh out, which
- * understated the disc by the whole of its bare earth -- E-V1k names the gap,
- * 0.5334 against 0.5409 with both. The earth's rectangles are geometry the card
- * draws, so they are in `quads` here, and `earthQuads` keeps the split readable.
+ * ALL THREE FAMILIES ARE COUNTED, AND THE ONE THAT WAS MISSING WAS DECLARED
+ * MISSING. The fusion figure used to leave the bare earth out, which understated
+ * the disc by the whole of it -- E-V1k names the gap, 0.5334 against 0.5409 with
+ * both. Every rectangle any of the three meshes carries is geometry the card
+ * draws, so all of them are in `quads` here, and `earthQuads` and `pavingQuads`
+ * keep the split readable.
+ *
+ * AND THE PAVING ENTERS THIS NUMBER WHILE IT LEAVES ANOTHER. The corridor cost
+ * 3 638 triangles and one draw in a budget of its own (E-V3g, §2.9); it is part
+ * of the disc now and it is priced with the disc.
  */
 export function meshDisc(onChunk, grain = true, radius = DISC_RADIUS) {
   let quads = 0;
   let earthQuads = 0;
+  let pavingQuads = 0;
   let columns = 0;
   let rim = 0;
   const chunks = [];
   for (const { cx, cz } of chunkList(radius)) {
     const chunk = meshChunk(cx, cz, grain, radius);
-    if (chunk.quads === 0 && chunk.earth.quads === 0) continue;
-    quads += chunk.quads + chunk.earth.quads;
+    if (chunk.quads === 0 && chunk.earth.quads === 0 && chunk.paving.quads === 0) continue;
+    quads += chunk.quads + chunk.earth.quads + chunk.paving.quads;
     earthQuads += chunk.earth.quads;
+    pavingQuads += chunk.paving.quads;
     columns += chunk.columns;
     rim += chunk.rim;
     chunks.push(chunk);
@@ -453,6 +481,7 @@ export function meshDisc(onChunk, grain = true, radius = DISC_RADIUS) {
     chunks,
     quads,
     earthQuads,
+    pavingQuads,
     columns,
     rim,
     triangles: quads * 2,

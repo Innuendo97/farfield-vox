@@ -24,6 +24,7 @@ export {
   MATERIAL,
   CHUNK,
   DISC_RADIUS,
+  PATH,
   CENTRE,
   FACE,
   NO_COLUMN,
@@ -40,7 +41,7 @@ export {
   meshDisc,
   moundAt,
   onPaving,
-  setGroundHole,
+  pathVerge,
   sodAt,
 } from './mesher.js';
 

@@ -1,5 +1,5 @@
 import {
-  DISC_RADIUS, chunkList, meshChunk, setGroundHole,
+  DISC_RADIUS, chunkList, meshChunk,
 } from './mesher.js';
 import { buildMasonry, stoneTileData } from './courses.js';
 import { MONOLITHS } from '../layout.js';
@@ -38,26 +38,18 @@ import { MONOLITHS } from '../layout.js';
 // and moving it onto this one would buy nothing and cost the one thing this
 // thread is for — the disc's own arithmetic arriving as early as it can.
 //
-// AND THE CORRIDOR ARRIVES THE SAME WAY THE RADIUS DOES, WHICH IS THE ONLY WAY
-// IT CAN. Where the ground is cut away is the CONTRACT's answer, and a contract
-// is a function: it cannot be posted across a thread, and importing it here
-// would pull the corridor's whole file into the one module graph in this world
-// that is kept to arithmetic on purpose. So what crosses is the corridor's two
-// numbers, and the engine's own seat rebuilds the predicate out of the field it
-// already reads -- see setGroundHole in ./mesher.js, and the measurement that
-// pins the rebuild to the contract digit for digit. This file learns no import
-// it did not already have: setGroundHole comes from the mesher, and the mesher
-// was always here.
-//
-// A MESSAGE THAT SAYS NOTHING LAYS YESTERDAY'S DISC, deliberately: the engine's
-// bench in src/dev/voxeltest.js draws the engine's own answer with no corridor
-// anywhere near it, and it should keep drawing exactly that.
+// AND THE CORRIDOR NO LONGER HAS TO ARRIVE AT ALL, which is a message field and
+// a seat this thread has stopped needing. It used to be told where the ground
+// was cut away, because the paving was a surface somebody else drew over a hole
+// and the answer lived in a contract -- a function, which cannot be posted
+// across a thread. The corridor is COLUMNS now, written by the same pipeline
+// that writes the meadow out of pathRun and pathCoord, which this thread has
+// always imported. There is nothing left to tell it.
 self.onmessage = (event) => {
   const woke = performance.now();
   const {
-    grain = true, tile = 512, block = '05', radius = DISC_RADIUS, hole = null,
+    grain = true, tile = 512, block = '05', radius = DISC_RADIUS,
   } = event.data || {};
-  if (hole) setGroundHole(hole);
 
   const tileStarted = performance.now();
   const data = stoneTileData(tile);
@@ -103,14 +95,17 @@ self.onmessage = (event) => {
     quads += chunk.quads;
     columns += chunk.columns;
     rim += chunk.rim;
-    // The bare earth's three buffers travel with the chunk's own and are
+    // The other two families' three buffers travel with the chunk's own and are
     // handed over the same way: they are the same three things -- corners, an
-    // orientation, an index -- for the faces of the second family.
+    // orientation, an index -- for the faces of the bare earth and of the
+    // paving.
     self.postMessage({ kind: 'chunk', chunk }, [
       chunk.positions.buffer, chunk.normals.buffer, chunk.faces.buffer,
       chunk.indices.buffer, chunk.tops.buffer,
       chunk.earth.positions.buffer, chunk.earth.normals.buffer,
       chunk.earth.indices.buffer,
+      chunk.paving.positions.buffer, chunk.paving.normals.buffer,
+      chunk.paving.indices.buffer,
     ]);
   }
   self.postMessage({
