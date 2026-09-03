@@ -2,7 +2,7 @@ import {
   CHUNK, MATERIAL, NO_COLUMN, VOXEL, matAt, topAt, underAt,
 } from './columns.js';
 import {
-  DISC_RADIUS, EARTH, EMPTY, FACING, chunkColumns, chunkList as genChunkList,
+  BASE_STEP, DISC_RADIUS, EARTH, EMPTY, FACING, chunkColumns, chunkList as genChunkList,
   columnCentre, earthFacing,
 } from './worldgen.js';
 
@@ -298,7 +298,15 @@ export function meshChunk(cx, cz, grain = true, radius = DISC_RADIUS) {
           if (fam2 !== fam) break;
           run++;
         }
-        const low = floor === EMPTY ? h - SKIRT : floor;
+        // AND A SKIRT IS MEASURED FROM THE PLANE AND NOT FROM THE COLUMN.
+        // Taken from the column, a rim wall standing on a four voxel mass ends
+        // two voxels ABOVE the floor the sheet is drawn at, and what is between
+        // them is daylight under the edge of the piece: measured over the rim
+        // that ships, 82 walls of 1260 ended over the plane, the worst by 0.20 m
+        // -- ten of 1260 by 0.10 m before the masses grew their own bank. Taken
+        // from the plane it cannot happen whatever stands on the column, and it
+        // costs not one quad: a wall is a rectangle whatever its height.
+        const low = floor === EMPTY ? Math.min(h - SKIRT, BASE_STEP - SKIRT) : floor;
         if (floor === EMPTY) rim++;
         const yTop = (h + 1) * VOXEL;
         const yLow = (low + 1) * VOXEL;
