@@ -1,8 +1,21 @@
-import { ShaderMaterial, Vector2, Vector3 } from 'three';
+import {
+  ClampToEdgeWrapping, RepeatWrapping, ShaderMaterial, Vector2, Vector3, Vector4,
+} from 'three';
 import { SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS } from '../../core/sky.js';
 import { FACE_LIGHT_GLSL, faceLightUniforms } from '../face-light.js';
 import { FOG_GLSL, GROUND_EXPOSURE, fogUniforms } from '../air.js';
 import TERRAIN from '../../../assets-src/terrain/terrain.json' with { type: 'json' };
+import { PATH_LINE } from '../terrain-field.js';
+// THE PAVING'S LAW, READ AND NOT COPIED. src/world/path.js is where the corridor
+// IS -- the lattice, the joints, the pigment, the small stones -- and it holds
+// none of three, the sky or the air on purpose, so the painter that bakes the
+// three maps and the frame that reads them can never disagree about a number.
+// What this file adds is the seat those numbers are painted from.
+import {
+  APRON, GRAIN, GRAIN_GAIN, GRAIN_FADE, JOINT_DARK, JOINT_FADE, JOINT_LIP,
+  JOINT_SOFT, PATH_SKIN, PEB_EDGE, PEB_LEVEL, PEB_MIX, SKIN_REACH, TUNING,
+  EARTH as PATH_EARTH, STONE as PATH_STONE, STONE_PALE as PATH_STONE_PALE,
+} from '../path.js';
 
 // The material of a cube, and the five things the reference was measured to be
 // made of. None of them is a texture and none of them is a byte on the wire.
@@ -588,6 +601,302 @@ export function voxelMaterial(voxel, settings) {
     u.uArrisPixels.value = settings.arrisPixels;
     u.uArrisLean.value = settings.arrisLean;
     u.uLift.value.set(settings.sunLift, settings.skyLift);
+  };
+
+  return material;
+}
+
+// ======================================================================
+// THE PAVING: THE MATERIAL OF A CORRIDOR THAT IS COLUMNS.
+//
+// WHAT MOVED, AND WHAT DID NOT. V3 measured a paving and built it: a lattice of
+// slabs with two tunings down the run, a joint of 3.5 cm, a shoulder, fourteen
+// small stones to the square metre, a grain inside each piece that carries more
+// variation than the difference between one piece and the next, and three maps
+// baked from that law by the painter in tools/path/. Every one of those numbers
+// SURVIVES, character for character, in src/world/path.js and in the three
+// delivered assets. What changed is the surface they are painted ON: a mesh of
+// its own laid over a hole in the meadow, and now the top faces of the columns
+// the meadow itself lays.
+//
+// SO THIS FRAGMENT IS V3'S, MOVED. It is the same arithmetic in the same order,
+// with three differences and no fourth:
+//
+//   * the two strip coordinates are SOLVED from the world position instead of
+//     arriving as attributes -- the corner of a greedy rectangle is not a vertex
+//     of the corridor and has nowhere to carry them, and the centreline is
+//     smooth arithmetic with no noise in it, which is what makes the solve exact
+//     rather than interpolated;
+//   * there is no alpha and no verge fade. The old surface had to let go at its
+//     own edge because the meadow was drawn under it; this IS the ground, and
+//     what is beside it is a column of grass standing one voxel higher;
+//   * and the family carries the WARMTH the reference was measured to have,
+//     which is the one number this file adds.
+//
+// THREE TEXTURE READS A FRAGMENT, AND THEY ARE THE THREE V3 ALREADY PAID. The
+// ruler and the level cannot be one texture -- measured with the delivery's own
+// encoder, interleaved they cost 1 407 kB against 731 apart -- and the field of
+// small stones is over the WORLD rather than along the run, so it could not have
+// shared a coordinate with either at any price. What changed is how many
+// fragments pay them: the corridor was 3 638 triangles of a surface of its own
+// and it is fifty two rectangles of the disc.
+
+/** The paving's tunables, live, so a sweep costs a redraw and not a rebuild. */
+export function pavingSettings() {
+  return {
+    earth: new Vector3(...PATH_EARTH),
+    stone: new Vector3(...PATH_STONE),
+    stonePale: new Vector3(...PATH_STONE_PALE),
+    jointDark: new Vector2(...JOINT_DARK),
+    jointLip: new Vector2(...JOINT_LIP),
+    jointSoft: JOINT_SOFT,
+    skinReach: SKIN_REACH,
+    apronWarm: TUNING.apron.warm,
+    apron: new Vector2(...APRON),
+    jointFade: new Vector2(...JOINT_FADE),
+    grainFade: new Vector2(...GRAIN_FADE),
+    grainGain: GRAIN_GAIN,
+    pebEdge: new Vector2(...PEB_EDGE),
+    pebLevel: new Vector2(...PEB_LEVEL),
+    pebMix: PEB_MIX,
+    // THE BROWN, AND IT IS A MEASUREMENT AND NOT A TASTE.
+    //
+    // Read on the reference and on this render at the same two distances, over
+    // the corridor in both (C 1.5):
+    //
+    //     mid run (~10 m)   target 137/125/79   R/B 1.73
+    //                       render 101/106/106  R/B 0.95
+    //     near    (~6 m)    target  95/ 80/51   R/B 1.86
+    //                       render  97/ 98/94   R/B 1.03
+    //
+    // The reference's paving is a warm khaki and ours is a neutral grey. Both
+    // readings say the same thing with the same sign, and the mid-run pair is
+    // the one the whole frame is judged at, so it is the one that enters.
+    //
+    // AND IT IS A CHROMATICITY WITH THE LEVEL HELD, exactly as the apron's own
+    // warm term is. The two triples are normalised by their own means and
+    // divided -- (1.245, 1.082, 0.684) -- and that ratio is divided again by its
+    // OWN luminance, so what is left moves the colour and cannot move how bright
+    // the stone is. The level was fitted against the meadow beside it (both
+    // readings E-V3g is gated on are RATIOS between this surface and that one),
+    // and buying a hue by darkening a level that was solved would be answering
+    // one measurement in another measurement's currency.
+    //
+    // WHERE IT LANDS: R/B 0.95 x 1.1444 / 0.6288 = 1.729, against the 1.73 the
+    // reference is read at.
+    //
+    // WHAT IT IS NOT. It is not the texture, and the texture is the other half
+    // of the same finding: the reference carries 3.20% of grain inside a face
+    // where this render carries 1.18%, which is a question of contrast, of the
+    // size of a slab and of the pitch of three maps. That half is phase C's and
+    // it is NOT attempted here -- what is here is the one part of the reading
+    // that is a pigment.
+    warmth: new Vector3(1.1444, 0.9946, 0.6288),
+  };
+}
+
+const PAVING_FRAGMENT = /* glsl */`
+  precision highp float;
+
+  varying vec3 vLocal;
+  varying vec3 vWorld;
+  varying vec3 vNormal;
+  varying float vDistance;
+  varying vec2 vChunk;
+
+  uniform sampler2D tJoint;
+  uniform sampler2D tTone;
+  uniform sampler2D tGrain;
+  uniform vec3 uEarth;
+  uniform vec3 uStone;
+  uniform vec3 uStonePale;
+  uniform vec3 uWarmth;
+  uniform vec2 uJointDark;
+  uniform vec2 uJointLip;
+  uniform float uJointSoft;
+  uniform float uSkinReach;
+  uniform float uApronWarm;
+  uniform vec2 uApron;
+  uniform vec2 uJointFade;
+  uniform vec2 uGrainFade;
+  uniform float uGrainGain;
+  uniform vec2 uPebEdge;
+  uniform vec2 uPebLevel;
+  uniform float uPebMix;
+  uniform vec4 uLine;
+  uniform vec2 uSkinZ;
+  uniform float uSkinHalf;
+
+  ${SCENE_LIGHT_GLSL}
+  ${FACE_LIGHT_GLSL}
+  ${FOG_GLSL}
+
+  void main() {
+    // WHERE THIS POINT FALLS ON THE STRIP, solved and not carried. It is
+    // pathCentreX out of src/world/terrain-field.js and pathSkinUv out of
+    // src/world/path.js, mirrored: a smoothstep between two northings for the
+    // line, then the offset from it over the strip's own width. Built on the
+    // CENTRELINE and on nothing else, which is the seed's own rule and the
+    // reason it holds -- pathCoord divides by an edge with a noise in it, and a
+    // frame that used it would breathe with the wobble and swim the paving
+    // along the run.
+    float t = clamp((vWorld.z - uLine.x) / (uLine.y - uLine.x), 0.0, 1.0);
+    float centre = uLine.z + (uLine.w - uLine.z) * (t * t * (3.0 - 2.0 * t));
+    vec2 skin = vec2((vWorld.x - centre) / (2.0 * uSkinHalf) + 0.5,
+      (vWorld.z - uSkinZ.x) / (uSkinZ.y - uSkinZ.x));
+
+    // TWO FETCHES OFF ONE COORDINATE, and they are two textures because they
+    // want two pitches. The first is how deep inside the nearest slot this point
+    // stands: a RULER and not a picture, because eight bits of distance
+    // interpolate to a POSITION, so the edge of the joint lands where the
+    // interpolation puts it and not where a texel does. The second is the level
+    // of the piece under the point, piecewise constant on pieces a hand across,
+    // which needs a quarter of the pitch to say so.
+    float depth = texture2D(tJoint, skin).r * uSkinReach;
+    float tone = texture2D(tTone, skin).r;
+
+    float apron = smoothstep(uApron.x, uApron.y, vWorld.z);
+
+    // THE PIGMENT. One ramp, earth to pale stone, walked by the piece's tone.
+    // Below the knee it is the soil between and over the pieces and above it the
+    // slab, and the crossing is the eroded lip where the two meet.
+    vec3 albedo = tone < 0.5
+      ? mix(uEarth, uStone, tone * 2.0)
+      : mix(uStone, uStonePale, (tone - 0.5) * 2.0);
+
+    // The warm of the apron: a chromaticity and not a level, +0.135 of
+    // (r-b)/(r+b) measured inside one band of the frame, where the picture's own
+    // corner shading divides out.
+    float warm = uApronWarm * apron;
+    albedo *= vec3(1.0 + warm, 1.0, 1.0 - warm);
+    // And the family's own, which is the reference's brown. See pavingSettings.
+    albedo *= uWarmth;
+
+    // The small stones and the grain, from a tile repeated over the WORLD and
+    // turned, because 2.8 cm written into a strip 8 mm a texel comes back a
+    // stroke down the run. The turn is what costs the repeat its period along
+    // the walk.
+    vec2 turned = vec2(
+      vWorld.x * ${Math.cos(GRAIN.turn * Math.PI / 180).toFixed(6)}
+    + vWorld.z * ${Math.sin(GRAIN.turn * Math.PI / 180).toFixed(6)},
+      vWorld.z * ${Math.cos(GRAIN.turn * Math.PI / 180).toFixed(6)}
+    - vWorld.x * ${Math.sin(GRAIN.turn * Math.PI / 180).toFixed(6)});
+    vec2 grain = texture2D(tGrain,
+      turned * ${(1 / GRAIN.metresPerRepeat).toFixed(6)}).rg;
+    float near = 1.0 - smoothstep(uGrainFade.x, uGrainFade.y, vDistance);
+
+    // The grain of the stone itself, which has mean a half by construction, so
+    // it adds material without moving the level -- and the level is the fitted
+    // pigment. The reference wants more variation inside a piece than between
+    // one piece and the next: the spread between slabs is 0.78 of the spread
+    // within one.
+    albedo *= 1.0 + near * uGrainGain * (grain.g - 0.5);
+
+    // The stone lying on the ground, drawn from its own field so its rim is as
+    // round as the frame likes rather than as round as the tile is.
+    float inStone = smoothstep(uPebEdge.x, uPebEdge.y, grain.r) * near * uPebMix;
+    albedo = mix(albedo, uStonePale * (uPebLevel.x + uPebLevel.y * grain.g), inStone);
+
+    // THE SLOT, ACROSS ITS OWN WIDTH. The depth is nought over all the stone and
+    // grows into the joint, so this needs no width of its own: where the joint
+    // ENDS is where the depth returns to nought, which is the paving's answer
+    // and not the frame's.
+    float far = 1.0 - smoothstep(uJointFade.x, uJointFade.y, vDistance);
+    float inSlot = smoothstep(0.0, uJointSoft, depth) * far;
+    float trough = smoothstep(uJointLip.x, uJointLip.y, depth);
+    albedo *= 1.0 - inSlot * (uJointDark.x + (uJointDark.y - uJointDark.x) * trough);
+
+    // THE LIGHT, AND THERE IS NO ATLAS IN IT. The same two terms of a flat face
+    // the meadow beside it is lit by, from the one producer of them in
+    // src/world/face-light.js, on this face's own normal.
+    vec3 light = faceLight(normalize(vNormal));
+
+    vec3 colour = albedo * light;
+    colour = mix(colour, uFogColour, fogAmount(vDistance, vWorld.y));
+    gl_FragColor = vec4(colour, 1.0);
+  }
+`;
+
+/**
+ * The paving's material, one for the whole corridor.
+ *
+ * @param {number} voxel the step, in metres
+ * @param {object} settings from pavingSettings(), held by reference
+ * @param {object} maps the three the painter baked: joint, tone, grain
+ */
+export function pavingMaterial(voxel, settings, maps) {
+  for (const map of [maps.joint, maps.tone]) {
+    // CLAMPED, and it is not a formality: these do NOT repeat. They are laid
+    // once along the run, so a wrap would fetch the far end of the paving for
+    // ground just off the near end of it.
+    map.wrapS = ClampToEdgeWrapping;
+    map.wrapT = ClampToEdgeWrapping;
+    // FOUR. What anisotropy buys is resolution along the long axis of a
+    // footprint, and these textures' long axis is the run.
+    map.anisotropy = 4;
+    map.needsUpdate = true;
+  }
+  // EIGHT for the tile: where this is alive the paving is seen close to and
+  // steeply foreshortened, so a pixel covers a few millimetres across the frame
+  // and several times that down it.
+  maps.grain.wrapS = RepeatWrapping;
+  maps.grain.wrapT = RepeatWrapping;
+  maps.grain.anisotropy = 8;
+  maps.grain.needsUpdate = true;
+
+  const material = new ShaderMaterial({
+    uniforms: {
+      uVoxel: { value: voxel },
+      tJoint: { value: maps.joint },
+      tTone: { value: maps.tone },
+      tGrain: { value: maps.grain },
+      uEarth: { value: settings.earth },
+      uStone: { value: settings.stone },
+      uStonePale: { value: settings.stonePale },
+      uWarmth: { value: settings.warmth },
+      uJointDark: { value: settings.jointDark },
+      uJointLip: { value: settings.jointLip },
+      uJointSoft: { value: settings.jointSoft },
+      uSkinReach: { value: settings.skinReach },
+      uApronWarm: { value: settings.apronWarm },
+      uApron: { value: settings.apron },
+      uJointFade: { value: settings.jointFade },
+      uGrainFade: { value: settings.grainFade },
+      uGrainGain: { value: settings.grainGain },
+      uPebEdge: { value: settings.pebEdge },
+      uPebLevel: { value: settings.pebLevel },
+      uPebMix: { value: settings.pebMix },
+      // The centreline and the strip's own frame, so the fragment can solve
+      // what the old surface carried in two attributes.
+      uLine: {
+        value: new Vector4(PATH_LINE.stairZ, PATH_LINE.nearZ,
+          PATH_LINE.stairX, PATH_LINE.nearX),
+      },
+      uSkinZ: { value: new Vector2(PATH_SKIN.z0, PATH_SKIN.z1) },
+      uSkinHalf: { value: PATH_SKIN.half },
+      // THE EXPOSURE IS THE GROUND'S, TO THE FACTOR, and it is not a copy of a
+      // taste. The corridor stands in the ground's air and is read against the
+      // grass beside it: the two readings this material is gated on -- stone
+      // against grass, 1.70 near and 3.41 far -- are RATIOS between this surface
+      // and that one, so a second exposure here would move them both without
+      // moving anything anybody can see.
+      ...faceLightUniforms(TERRAIN.lightScale * GROUND_EXPOSURE),
+      ...SCENE_LIGHT_UNIFORMS,
+      ...fogUniforms(),
+    },
+    vertexShader: VERTEX,
+    fragmentShader: PAVING_FRAGMENT,
+    fog: false,
+  });
+
+  material.userData.refresh = () => {
+    const u = material.uniforms;
+    u.uEarth.value.copy(settings.earth);
+    u.uStone.value.copy(settings.stone);
+    u.uStonePale.value.copy(settings.stonePale);
+    u.uWarmth.value.copy(settings.warmth);
+    u.uGrainGain.value = settings.grainGain;
+    u.uApronWarm.value = settings.apronWarm;
   };
 
   return material;
