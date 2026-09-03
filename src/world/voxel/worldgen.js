@@ -1,5 +1,7 @@
 import { AREA_CENTER, MONOLITHS, PLATFORM, STAIRS } from '../layout.js';
-import { BASE_LEVEL, pathCoord, pathRun } from '../terrain-field.js';
+import {
+  BASE_LEVEL, pathCentreX, pathCoord, pathEdge, pathHalfWidth, pathRun,
+} from '../terrain-field.js';
 import {
   MATERIAL, NO_COLUMN, VOXEL, clearColumn, createColumns, setFlank, setTop,
 } from './columns.js';
@@ -584,72 +586,117 @@ export function earthFacing(face, x, z) {
 export const FACING = { NORTH: 1, SOUTH: 2, EAST: 3, WEST: 4 };
 
 // ======================================================================
-// WHERE THE GROUND IS CUT AWAY, AND WHO IS ENTITLED TO SAY SO.
+// THE CORRIDOR, AND IT IS COLUMNS.
 //
-// The corridor is not this engine's. Where it runs, the ground belongs to the
-// session that draws the paving, and this generator lays no column under it --
-// which is a fact it has to KNOW and cannot work out. What it can give without
-// being told is a straight passage: half a metre of run and one half width
-// either side, which is a corridor drawn with a ruler over one that wanders.
+// WHAT WAS HERE. A SEAT that cut the ground away. The paving was a surface of
+// its own laid over a hole in the meadow, so this generator's whole part in it
+// was to lay no column where the other one drew -- and because the disc is cut
+// in a worker, which is a module graph no function can be posted into, that
+// answer had to arrive as data and be rebuilt here out of two numbers. A seat,
+// an injector, two admissible argument shapes and a pinned re-statement, for a
+// hole.
 //
-// MEASURED, THAT APPROXIMATION LEAVES COLUMNS STANDING UNDER FULL STONE. The
-// world's own answer is groundHoleAt in src/world/contracts.js, and between the
-// two predicates the disc lays 923 columns at fourteen metres and 2 091 at
-// thirty five, 277 of them under paving that is fully opaque.
+// WHY IT IS GONE. The reference was read wrong, and the reading was a good one
+// read as the wrong kind of statement (A §1.3). The paving of the target has no
+// vertical face anywhere on it and its pieces are four to ten centimetres, which
+// is under the cell -- so the SURFACE is textured at a scale below the voxel,
+// and the campaign took that for a statement about the GEOMETRY. But the same
+// crops show the corridor's own edge following the grid: cubes of grass bite
+// into it at right angles of ten centimetres, and the side face each of them
+// shows -- visible because the cube stands higher -- rests ON the level of the
+// paving. Both readings are true at once and they say one thing: THE CORRIDOR IS
+// COLUMNS OF VOXEL AT ONE LEVEL, whose top material is a paved stone with a
+// grain finer than the cell.
 //
-// SO WHY IS IT A SEAT AND NOT AN IMPORT. Because the import is a ring: contracts
-// reads the top of a column from this engine to answer for the walker's floor,
-// and the path reads the contract. A generator that imported the contract back
-// would close it, and it would drag the corridor's whole file into the worker --
-// which is the one module graph in this world that is kept to arithmetic on
-// purpose.
+// SO IT IS A PASS OF THIS PIPELINE, laid after the base and before the masses:
+//
+//   the core     `top` at the floor less PATH.drop, `mat` PATH
+//   the verges   the same top, `mat` EARTH, two to four columns a side
+//   the masses   never on it -- a mound cannot grow out of the corridor
+//   the grain    never on it -- the paving is flat, and the meadow beside it is
+//                what stands one to two voxels proud
+//
+// AND WHAT THAT BUYS IS EVERY DEFECT THE HOLE HAD. There is no seam, because
+// there are no longer two surfaces to sew: 923 columns of ten centimetre cube
+// standing under the stone at fourteen metres, a lift tapered to nothing at an
+// edge, a cover ramp, a floor gap, a contract with a branch for "somebody else
+// owns this column" -- all of them were the price of the hole and none of them
+// has anything left to be the price of.
 
 /**
- * The corridor's footprint, as a FORM and not as one pair of numbers.
+ * The corridor, as the four numbers the pass has.
  *
- * Both answers in this world have this shape -- some of the run, some of the
- * half width -- so the shape is written once and the numbers are the argument.
- * `pathRun` and `pathCoord` are the field's own, read and never copied.
+ * THE WIDTH IS NOT HERE, and that is deliberate: it is pathHalfWidth and
+ * pathEdge in src/world/terrain-field.js, where it has always been and where the
+ * reference's taper was re-measured into it. This object holds only what the
+ * corridor is made OF once its footprint is known.
  */
-function corridorHole(run, coord) {
-  return (x, z) => pathRun(z) > run && Math.abs(pathCoord(x, z)) < coord;
+export const PATH = {
+  // How far below the floor of the meadow the paving lies, in voxels.
+  //
+  // ONE, AND IT IS THE MEASUREMENT AND NOT A SETTING. The reference is read
+  // twice on this and the two readings are the same: at the block feet the mat
+  // of grass stands ON the line at y = 0 with its blades one or two voxels over
+  // it (A §1.1), and along the corridor the line falls on the PAVING with the
+  // grass cubes beside it standing between one and two voxels above (A §1.3).
+  // A corridor level with the floor would put the nearest grass at NOUGHT
+  // voxels proud wherever the grain has not lifted it, and the reading never
+  // reads nought. One voxel down, the plain meadow beside the stone stands one
+  // proud and a grained plate stands two -- which is the band, by construction,
+  // with no term written to buy it.
+  drop: 1,
+  // The bare earth either side of the stone, in columns per side.
+  //
+  // TWO TO FOUR, BY POSITION AND NOT ONE NUMBER, which is the committente's own
+  // answer (E-DECISIONI7 A3: «orli come misurati dove sono misurati»). The
+  // reference gives 0.20-0.35 m a side over the stretch it can be read on
+  // (A §1.3) and this unit's own bench reads three columns a side at the near
+  // rows. So it is tied to the width: the narrow middle of the field carries
+  // the narrow verge and the two wide ends carry the wide one, which is what a
+  // band of trodden ground does and what a constant cannot be.
+  verge: { min: 2, max: 4, at: 0.5, per: 0.7 },
+};
+
+/** How many columns of bare earth line each side of the stone at a northing. */
+export function pathVerge(z) {
+  const v = PATH.verge;
+  const n = Math.round(v.min + (v.max - v.min) * (pathHalfWidth(z) - v.at) / v.per);
+  return n < v.min ? v.min : n > v.max ? v.max : n;
 }
 
-// The engine's own answer, and the one that sits in the seat below when nobody
-// has spoken.
-const PAVING = corridorHole(0.5, 1);
+/**
+ * Where a column stands in the corridor: -1 nowhere near it, 0 on the stone,
+ * 1 on a verge.
+ *
+ * THE FOOTPRINT IS pathRun AND pathCoord AND NOTHING ELSE -- the field's own
+ * two, read and never copied -- and the crossing from stone to verge is a whole
+ * number of columns off the edge, because a verge measured in columns is what
+ * the reference shows and a fraction of a normalised coordinate is not.
+ */
+function corridorAt(x, z) {
+  if (pathRun(z) <= 0) return -1;
+  const centre = pathCentreX(z);
+  const left = centre - pathEdge(z, -1);
+  const right = centre + pathEdge(z, 1);
+  if (x < left || x > right) return -1;
+  // AND THE VERGE IS COUNTED IN COLUMNS AND NOT IN METRES, which is the whole
+  // reason this row's two ends are solved rather than a distance being
+  // thresholded. A band `n * VOXEL` metres wide, sampled at the centres of
+  // columns that fall wherever the wobble of the edge puts them, comes out n
+  // plus or minus one -- and a verge of one column where the law says three is
+  // a thin brown line the eye reads as a mistake. Here the first and last
+  // column of the row ARE the row's ends, and the n beyond each of them is the
+  // verge, exactly, at every northing.
+  const i = Math.floor(x / VOXEL);
+  const first = Math.ceil(left / VOXEL - 0.5);
+  const last = Math.floor(right / VOXEL - 0.5);
+  const n = pathVerge(z);
+  return i - first < n || last - i < n ? 1 : 0;
+}
 
-/** Whether a point stands on the paving, which is not voxel and never becomes one. */
+/** Whether a point stands on the corridor at all, stone or verge. */
 export function onPaving(x, z) {
-  return PAVING(x, z);
-}
-
-let groundHole = onPaving;
-
-/**
- * Who says where the ground is cut away, told to the engine that lays no column
- * under it.
- *
- * TWO ADMISSIBLE ARGUMENTS, AND THE SECOND ONE IS A THREAD. A FUNCTION is the
- * honest form and the one every caller that can reach the contract uses. THE
- * TWO NUMBERS exist because the disc is cut in a WORKER, and a worker is a
- * module graph of its own that no function can be posted into: the corridor
- * travels there as data, exactly as the radius does, and is rebuilt here
- * through the same pathRun and pathCoord the contract's own predicate calls.
- * That reconstruction is a RE-STATEMENT and it is pinned rather than trusted:
- * over every column of the disc, at all three radii the world can lay, it
- * answers the contract's own groundHoleAt with ZERO disagreements.
- *
- * @param {Function|{run: number, coord: number}} hole  the predicate, or the
- *        corridor's two numbers for a thread that cannot be handed one
- * @returns {Function} what now sits in the seat
- */
-export function setGroundHole(hole) {
-  if (typeof hole === 'function') groundHole = hole;
-  else if (hole && Number.isFinite(hole.run) && Number.isFinite(hole.coord)) {
-    groundHole = corridorHole(hole.run, hole.coord);
-  } else groundHole = onPaving;
-  return groundHole;
+  return corridorAt(x, z) >= 0;
 }
 
 // Where the block of the demo stands, so the meadow does not grow inside the
@@ -700,17 +747,31 @@ export function columnSpec(ix, iz, grain = true, radius = DISC_RADIUS) {
   // 2. THE SEATS. The rim of the disc first, because it is the cheapest test
   //    and because a column outside it is not this engine's ground at all.
   if (Math.hypot(x - CENTRE.x, z - CENTRE.z) > radius) return gone(MATERIAL.AIR);
-  // THE SEAT AND NOT THE APPROXIMATION, which is the whole of this line's
-  // history: until somebody injects, the two are the same function. The hole is
-  // marked as the CORRIDOR'S rather than as nothing, so the mesher can tell the
-  // bank of the paving from the edge of the piece without asking a predicate.
-  if (groundHole(x, z)) return gone(MATERIAL.PATH);
   if (insideBlock(x, z)) return gone(MATERIAL.STONE);
 
   // 1. THE BASE. One literal, and it is the only place a height is decided.
   let top = BASE_STEP;
   let under = MATERIAL.GRASS;
   let depth = 0;
+
+  // 2. THE CORRIDOR, and it is the second thing that happens rather than a hole
+  //    cut before anything else. It sets its own level and its own two
+  //    materials and it RETURNS: nothing after this line may touch it, which is
+  //    how the paving stays flat and how the meadow beside it keeps the one to
+  //    two voxels the reference measures.
+  const on = corridorAt(x, z);
+  if (on >= 0) {
+    return {
+      top: top - PATH.drop,
+      mat: on === 0 ? MATERIAL.PATH : MATERIAL.EARTH,
+      // What is under the paving is soil, and it is written down rather than
+      // left at the meadow's default: the corridor is the lowest ground in the
+      // world, so the only wall it ever raises is at the rim of the disc, and
+      // a rim of grass under a stone floor would be the one place this shows.
+      under: MATERIAL.EARTH,
+      depth: 1,
+    };
+  }
 
   // 3. THE MASSES. THE TALLEST THING THAT CLAIMS A COLUMN, AND NOT THE SUM OF
   //    THEM: a mound that reached into a bank used to ADD to it, which put a
