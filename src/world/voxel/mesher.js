@@ -58,7 +58,11 @@ import {
 // src/world/face-light.js already owns.
 // ===========================================================================
 
-export { VOXEL, CHUNK, NO_COLUMN, MATERIAL } from './columns.js';
+// AND topAt AND matAt WITH THEM, because src/world/contracts.js reads the STORE
+// now and not the law: the walker's floor and the material under his foot are
+// two questions about the four arrays, and the seat that answers them may not
+// reach past this door to ask.
+export { VOXEL, CHUNK, NO_COLUMN, MATERIAL, matAt, topAt } from './columns.js';
 export {
   BASE_STEP, CENTRE, DISC_RADIUS, EARTH, FRAMED, MOUND, PATH, SOD, bareRaisedAt, chunkColumns,
   columnCentre, columnSpec, columnTop, earthFacing, framedTally, meadowMoundAt, moundAt,
