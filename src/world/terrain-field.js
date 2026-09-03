@@ -87,24 +87,50 @@ const PATH_NEAR_Z = 8.8;
 const PATH_STAIR_X = 0.25;
 const PATH_NEAR_X = -0.74;
 
-// Where the STONE stops, which is not where the stairs are.
+/**
+ * The centreline's four numbers, published.
+ *
+ * THE FRAGMENT THAT PAINTS THE PAVING HAS TO SOLVE THIS LINE, and GLSL cannot
+ * call JavaScript. So the four travel as uniforms and the shader mirrors
+ * pathCentreX below rather than carrying an attribute: the paving is the top of
+ * a column of the meadow's own store now, and a strip coordinate baked into a
+ * vertex would be a second opinion about where the centreline is, on a mesh that
+ * is rebuilt every time the disc is laid.
+ */
+export const PATH_LINE = {
+  stairZ: PATH_STAIR_Z, nearZ: PATH_NEAR_Z, stairX: PATH_STAIR_X, nearX: PATH_NEAR_X,
+};
+
+// Where the STONE stops, and it is now the bottom of the run.
 //
-// These were one number, and they are two facts. The paving was run down to the
-// bottom step because nothing had been measured about where it ends; marched
-// against the night target it ends at z = -9.1, five metres short of the step,
-// and it is the meadow that covers the join. So the northing the centreline's
-// ramp is anchored at — a fact about where the path POINTS — and the northing
-// the stone dies at are stated separately.
+// IT WAS FIVE METRES SHORT OF THE STEP, ON A READING OF THE NIGHT PICTURE. The
+// paving died at z = -9.1 and the meadow covered the join; the northing was
+// marched against the night target, where the last stone reads there. The DAY
+// target says the opposite and says it plainly (A §1.3, crop A-04): the paving
+// arrives at the bottom step. The committente's word on the two readings is
+// E-DECISIONI7 A6 -- the day picture is the one that judges -- so the stone runs
+// to the stair.
 //
-// They have to be, and not only for tidiness: pathCentreX reads PATH_STAIR_Z as
-// one end of its ramp, and the two targets give no base for moving that line —
-// they put the corridor at the same place in the FRAME and a metre apart in the
-// WORLD. Spending PATH_STAIR_Z on where the stone ends would have moved the
-// centreline as a side effect of a measurement that says nothing about it.
-const PATH_STONE_END_Z = -9.1;
-// The length of the fade out, carried over unchanged from when it hung on the
-// stair: what moved is where the stone ends, not how quickly it lets go.
-const PATH_STONE_FADE = 2.8;
+// AND IT IS DERIVED AND NOT TYPED. The bottom riser's south face is where the
+// last tread ends, which is the run's own arithmetic in src/world/stairs.js:
+// STAIRS.z is the north end of the top tread and each of the six is one tread
+// deep. A literal here would be that sum copied, and a copy is what goes stale
+// the day the run is refitted.
+//
+// THE OTHER NORTHING STAYS WHERE IT IS. pathCentreX reads PATH_STAIR_Z as one
+// end of its ramp -- a fact about where the path POINTS -- and the two targets
+// give no base for moving that line. The two were separated for that reason and
+// they stay separated.
+const PATH_STONE_END_Z = STAIRS.z + STAIRS.tread * STAIRS.steps;
+// How quickly the run lets go at the south end, in metres.
+//
+// A FINGER'S WIDTH, AND IT USED TO BE 2.8 m. The fade existed because the stone
+// ended in the middle of a meadow and something had to cover the join; it ends
+// at a riser now, and a corridor that faded out over nearly three metres would
+// take the last three metres of paving off the ground the reference shows paved.
+// It is not nought only because pathRun is a smoothstep and a smoothstep of zero
+// width has no value at its own edge.
+const PATH_STONE_FADE = 0.10;
 
 export function pathCentreX(z) {
   const t = smoothstep(PATH_STAIR_Z, PATH_NEAR_Z, z);
@@ -155,30 +181,63 @@ export function pathCentreX(z) {
 // weight was anchored on — which is the other reason the number is untouched.
 export const VERGE_OFFSET = 0.34;
 
-// EVERY NUMBER BELOW IS THE ONE THAT WAS HERE DIVIDED BY 1.613, AND THAT FACTOR
-// IS A MEASUREMENT AND NOT A TASTE.
+// THE WIDTH OF THE CORRIDOR IS THE REFERENCE'S OWN TAPER, MEASURED, and it is
+// a table of northings rather than a slope with two coefficients.
 //
-// Marched down the run on both targets, the full width of the corridor has a
-// median of 1.14 m (day, 75 valid rows) and 1.10 m (night, 161 rows); over
-// exactly those rows this law's own weighted mean was 1.807 m. The strip was
-// 1.6 times wider than the picture it copies, which is the whole of what the
-// measurement says.
+// WHAT WAS HERE, AND WHY IT COULD NOT STAY. A straight ramp, 0.3844 + 0.013949
+// per metre of northing, clamped at both ends: one width at the stair and a
+// wider one at the near edge of the frame, monotone all the way. Marched across
+// the reference row by row on the plane the fitted camera puts at nought, the
+// corridor does not do that at all. It is TWENTY VOXELS wide under the walker's
+// own feet, closes hard to eight or ten in the middle of the field, and opens
+// again to TWENTY FOUR in an apron in front of the bottom step. A monotone slope
+// can reproduce none of those three, and the one it came closest to was the
+// middle.
 //
-// AND THE SCALE IS ALSO ALL IT SAYS. Over the seven metres of run the targets
-// can be read on, the measured width scatters by a third of a metre from row to
-// row and carries no trend at all — so the SHAPE of this law is neither
-// supported nor refuted there, and moving it would be inventing. The taper it
-// keeps was fitted against the close reference of the paving, which nothing in
-// this measurement touches: at twelve metres out the stone reaches further from
-// the centreline than the near end of the old slope allowed, and that reading
-// still stands, one sixth of a metre narrower.
+// THE READING, in metres of full width -- stone and the bare verges either side
+// of it -- with the voxels it comes to at the ten centimetre step:
 //
-// WHERE IT LANDS, at the two rows the day target reads with every sample valid:
-// half width 0.552 m at z = 0 and 0.566 m at z = 1, which is the 0.55-0.57 the
-// median asks for.
+//     z = +9.3   1.97 m   20      z = +4.2   1.19 m   12
+//     z = +9.1   1.95 m   20      z = +1.5   0.83 m    8
+//     z = +8.1   1.61 m   16-18   z = -1.5   0.98 m   10
+//     z = +7.4   1.66 m   17-19   z = -5.5   2.43 m   24
+//     z = +5.9   0.77 m    8
+//
+// Re-taken here with a bench of this unit's own (fondazione/lav/largh2.py), on
+// the same camera and the same greenness that separates meadow from ground: the
+// near rows come back 1.97 m and 1.97 m -- the same two figures to the
+// centimetre -- and the apron reads wider still. The middle of the field is
+// where a row is hardest to read and where the two benches scatter most, and the
+// reading there is a BAND and not a curve.
+//
+// SO THE LAW CARRIES THE SHAPE AND THE EDGE CARRIES THE SCATTER. Ten voxels
+// through the middle, with pathEdge's own nineteen per cent of wobble either
+// side of it, IS eight to twelve -- the band the reference is read at, arriving
+// as the irregularity it was measured as rather than as a curve fitted through
+// noise. Nothing was added to buy it.
+//
+// AND IT IS HALF WIDTHS IN METRES, so pathCoord and pathEdge below are unchanged
+// in shape and in every reader: what moved is the number they scale.
+const PATH_WIDTH = [
+  [12.0, 1.00],
+  [9.1, 1.00],
+  [8.1, 0.90],
+  [6.0, 0.50],
+  [-3.0, 0.50],
+  [-5.5, 1.20],
+  [PATH_STAIR_Z, 1.20],
+];
+
 export function pathHalfWidth(z) {
-  const w = 0.3844 + 0.013949 * (z + 12);
-  return w < 0.3596 ? 0.3596 : w > 0.7751 ? 0.7751 : w;
+  const t = PATH_WIDTH;
+  if (z >= t[0][0]) return t[0][1];
+  for (let i = 1; i < t.length; i++) {
+    if (z >= t[i][0]) {
+      const f = (z - t[i][0]) / (t[i - 1][0] - t[i][0]);
+      return t[i][1] + (t[i - 1][1] - t[i][1]) * f;
+    }
+  }
+  return t[t.length - 1][1];
 }
 
 /**
@@ -186,16 +245,20 @@ export function pathHalfWidth(z) {
  * The centreline is fitted and stays put; only the edges wander, which is what
  * makes them bite into the grass instead of ruling a line across it.
  *
- * THE SECOND TERM WAS DIVIDED BY THE SAME 1.613 AS THE WIDTH, and it had to be:
- * it is the one part of the edge stated in metres of ground rather than as a
- * fraction of the strip, so leaving it at seven centimetres on a strip a third
- * narrower would have made the ragged edge half again as ragged. Divided, this
- * function is the old one over one factor at every z — the same shape of edge,
- * on a narrower path — and pathCoord, which divides by it, is unchanged.
+ * AND THE WOBBLE IS IN METRES NOW, WHICH IS THE SAME EDGE AND NOT A NEW ONE.
+ * It was nineteen per cent of the half width, fitted when that half width was
+ * 0.552 m and barely moved down the run. The width is the reference's own taper
+ * now and it runs from ten voxels in the middle of the field to twenty four in
+ * the apron: a fraction of it would have made the edge of the apron wander by a
+ * quarter of a metre, which is a ragged edge on the corridor's widest stretch
+ * and not the one that was measured. So the term is stated in the ground's own
+ * units at the value it was fitted at -- 0.19 x 0.552 = 0.105 m -- and through
+ * the middle of the field, where it was fitted, it is the function it was to
+ * within a millimetre.
  */
 export function pathEdge(z, side) {
   const wobble = snoise(z * 0.33 + (side >= 0 ? 51.7 : 7.3), 3.1);
-  return pathHalfWidth(z) * (1 + 0.19 * wobble) + 0.0434 * snoise(z * 0.91 + side * 13.0, 8.4);
+  return pathHalfWidth(z) + 0.105 * wobble + 0.0434 * snoise(z * 0.91 + side * 13.0, 8.4);
 }
 
 /** Signed distance from the path centreline, normalised so 1 is the edge. */
