@@ -37,6 +37,7 @@ export {
   earthFacing,
   meadowMoundAt,
   moundBankAt,
+  moundCutAt,
   meshChunk,
   meshDisc,
   moundAt,

@@ -62,7 +62,7 @@ export { VOXEL, CHUNK, NO_COLUMN, MATERIAL } from './columns.js';
 export {
   BASE_STEP, CENTRE, DISC_RADIUS, EARTH, MOUND, PATH, SOD, bareRaisedAt, chunkColumns,
   columnCentre, columnSpec, columnTop, earthFacing, meadowMoundAt, moundAt, moundBankAt,
-  onPaving, pathVerge, sodAt,
+  moundCutAt, onPaving, pathVerge, sodAt,
 } from './worldgen.js';
 
 // The six orientations, in the order the material reads them: the top first,
