@@ -136,9 +136,28 @@ function buildGround(radius) {
 
   // How far off the middle of the run a quad may stand and still be the
   // corridor. The stone itself is |pathCoord| < 1 and the verge the material
-  // beds it into reaches 1.4; two is that with a margin, because a quad kept
-  // that is not needed is overdraw behind cubes and a quad dropped that IS
-  // needed is a hole in the world.
+  // beds it into reaches 1.4; two is that with a margin.
+  //
+  // AND THE SIGN OF THIS TEST IS THE OPPOSITE OF WHAT IT WAS, which is a defect
+  // this grid could not have had until now. It used to KEEP the corridor's band
+  // out past the rim of the disc, because the paving was a surface of its own
+  // and needed ground drawn under it where the disc had none. That surface is
+  // gone: past the rim the sheet draws the corridor's passage like any other
+  // ground, and inside the rim the corridor is COLUMNS of the disc.
+  //
+  // Which turned this grid into a fight. The paving's top face lands at exactly
+  // BASE_LEVEL -- one voxel under the meadow's floor is what puts the grass one
+  // to two voxels proud of the stone -- and this grid is drawn at heightAt,
+  // which IS BASE_LEVEL since the ground became a plane. Two coplanar surfaces,
+  // and what the frame draws between them is whichever the depth test happens
+  // to pick, in torn patches that move with the eye. It never showed before
+  // because V3's surface stood four millimetres over it, on a lift that existed
+  // to clear the meadow's own triangles; killing the lift is what uncovered it.
+  //
+  // So the band is DROPPED rather than kept. Where the meadow's cubes stand
+  // there is nothing to see under them either way; where the paving stands, the
+  // paving is the ground. The whole of this grid dies at step 7 and this is the
+  // one line of it that could not wait.
   const CORRIDOR = 2.0;
   const quads = (n - 1) * (n - 1);
   const indices = quads * 6 > 65535 ? new Uint32Array(quads * 6) : new Uint16Array(quads * 6);
@@ -152,7 +171,7 @@ function buildGround(radius) {
       const z = GRID.centreZ + gridToOffset(((j + 0.5) / (n - 1)) * 2 - 1);
       const near = Math.hypot(x - AREA_CENTER.x, z - AREA_CENTER.z) <= radius;
       const corridor = pathRun(z) > 0.02 && Math.abs(pathCoord(x, z)) < CORRIDOR;
-      if (!near && !corridor) continue;
+      if (!near || corridor) continue;
       kept++;
       indices[k++] = a; indices[k++] = a + n; indices[k++] = a + n + 1;
       indices[k++] = a; indices[k++] = a + n + 1; indices[k++] = a + 1;
