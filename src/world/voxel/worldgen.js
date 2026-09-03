@@ -120,17 +120,41 @@ function hash2(ix, iz) {
  *   D-F3  how tall they are in the open       `height`, and `bank` at the stone
  */
 export const MOUND = {
-  // The lattice a seat may stand in. Four and a half metres holds one mass to
-  // about forty five square metres at the density below, which is the target's
-  // own spacing: it counts its masses at three to six metres apart and the
-  // fork's eye read one to every thirty to fifty square metres of meadow.
-  cell: 4.5,
+  // THE LATTICE A SEAT MAY STAND IN, AND IT IS SET BY THE SPACING THE REFERENCE
+  // IS READ AT AND NOT BY A COUNT. A 1.2 and E-V1h both read the target's
+  // masses as standing THREE TO SIX METRES apart, never two touching. Measured
+  // over the meadow the fitted camera actually looks at, the nearest neighbour
+  // of every mass in frame:
+  //
+  //   cell 4.5 m   p10 3.76   p50 4.50   p90 7.72   -- p90 1.72 m outside
+  //   cell 4.0 m   p10 1.99   p50 3.80   p90 4.73
+  //   cell 3.8 m   p10 2.47   p50 3.75   p90 5.48
+  //   cell 3.6 m   p10 2.86   p50 3.46   p90 5.36
+  //
+  // AND THE SECOND BAND DECIDES BETWEEN THE LAST THREE. The level runs of the
+  // meadow are read at five to twelve cubes and that band is GATED
+  // (guard-piano); a mass carries a flat crown, so more masses is more long
+  // run, and at 3.6 the ninetieth run leaves the band at thirteen. At 3.8 it
+  // stands at twelve, the nearest neighbour keeps its p90 inside three to six,
+  // and the meadow carries one mass to every thirty one square metres --
+  // E-V1h's own near field reading is seven masses in about two hundred.
+  //
+  // The share of cells that carry a mass at all is a SEPARATE dial and is the
+  // committente's own answer (E-DECISIONI7 A5): it is not touched here.
+  cell: 3.8,
   // How many of those cells carry a mass at all. D-F1, and E-DECISIONI7 A5
   // confirmed the measured value on a plane that is now really a plane.
   density: 0.62,
   // How far one mass reaches, in metres, before the lean below is applied.
-  // 1.7 to 3.8 metres across, against the 1.5 to 3.5 the fork read.
-  reach: { low: 0.80, high: 1.45 },
+  //
+  // THE SMALL END IS THE COMMITTENTE'S OWN WORD AND WAS MISSING. E-DECISIONI4
+  // asks for «piccole e medie alture sparse»; at a low reach of 0.80 the
+  // narrowest mass this lattice can seat is 1.95 m across and there are no
+  // small ones at all -- measured in frame, the sizes ran 2.00 to 2.90 m
+  // against the 1.5 to 3.5 the reference is read at. At 0.60 the band is
+  // 1.46 to 3.54 m, which is that reading, and a small mass fits beside the
+  // corridor where a medium one has to be kept away from it.
+  reach: { low: 0.60, high: 1.45 },
   // HOW FAR FROM ROUND IT IS ALLOWED TO BE, and it is not a decoration: a
   // circle is the one shape a meadow never draws, and a field of circles reads
   // as a field of circles at the first glance from any pose. The mass is
@@ -140,6 +164,24 @@ export const MOUND = {
   // How much of the reach is flat top. The target's masses have a CROWN --
   // «cima piatta o a due terrazze» -- and a cone has none. E-DECISIONI7 A7.
   plateau: 0.40,
+  // HOW DEEP THE STRAIGHT CUT IS TAKEN INTO THE MASS, as a share of its reach,
+  // and it is what makes the cut flank ONE FLANK instead of a picket.
+  //
+  // THE PICKET WAS MEASURED AND IT WAS THE SHAPE'S OWN FAULT. A mesher merges a
+  // wall into one rectangle only where the top, the floor and the family run on
+  // together; round the rim of an elliptical mass the top changes every column
+  // or two, so twenty masses in frame drew 368 separate cuts of a MEDIAN OF ONE
+  // COLUMN -- the «stecche» E-V1j named, back under another cause. The
+  // reference draws the opposite: «un fianco solo che scende in un gradino di
+  // 2-3 voxel in una volta», five to fifteen columns long (A §1.2).
+  //
+  // So the side that faces the eye is not the shape's curve, it is a STRAIGHT
+  // CHORD: the southern cap of the footprint is taken off at a line of constant
+  // z, and along that line the whole flank stands at one height over one floor.
+  // A tenth of the reach puts the chord where the ellipse is 0.9 to 1.6 metres
+  // wide -- nine to sixteen columns -- which is the reference's own reading,
+  // and it costs the mass a twentieth of its area.
+  cut: 0.10,
   // HOW MUCH OF A MASS'S OWN RIM TURNS THE FULL BANK, as a share of its
   // perimeter, and it is the dial that says how much bare earth the meadow
   // shows without saying anything new about its shape.
@@ -154,11 +196,19 @@ export const MOUND = {
   height: { low: 2, high: 4 },
   // HOW TALL THE ONE RISER OF THE STEEP FLANK IS, in whole voxels, and it is
   // the number that makes a mound an OBJECT rather than a patch of the floor's
-  // own noise. Two and not three: measured over the edges of the shipped disc,
-  // a bank of three puts the worst edge in the world at 0.40 m, which is
-  // 0.10 m past TUNING.ground.maxM in src/core/presence.js and a step the body
-  // does not damp; at two it is 0.30 m, which is exactly maxM.
-  scarp: 2,
+  // own noise. TWO OR THREE, ONE OR THE OTHER FOR A WHOLE MASS, which is what
+  // A 1.2 reads: «un fianco solo che scende in un gradino di 2-3 voxel in una
+  // volta». Never a mix inside one mass -- a bank that changed height along
+  // itself would be two banks, and the eye counts objects.
+  //
+  // THREE IS ADMISSIBLE ONLY BECAUSE THE GROUND IS A PLANE NOW. E-V1k measured
+  // a bank of three at 0.40 m of worst edge and settled on two; that reading
+  // was taken on the rolling field, where a mass stood ON relief and the two
+  // added. On the plane a bank of three is 0.30 m of column against column,
+  // which is exactly TUNING.ground.maxM in src/core/presence.js, and the grain
+  // is held off the hem round a mass so nothing can add to it. Re-measured
+  // here: worst step 0.30 m, no edge over it.
+  scarp: { low: 2, high: 3 },
   // HOW THE CROWN IS FINISHED. Nought is a flat top, which is how the target
   // reads under the compass and is the default; one puts a second terrace a
   // voxel below it over the outer half of the crown.
@@ -198,10 +248,19 @@ export const MOUND = {
  */
 export const EARTH = {
   // How tall a flank has to be, in voxels, before it shows what it is cut into.
-  // TWO, AND THE ROUND TRIP IS THE MEASUREMENT AND NOT A PREFERENCE: counted in
-  // quads two looked far too little, counted in PIXELS -- which is what a share
-  // of a picture means -- two draws 9.66% of the ground against the target's
-  // 9.3%, and one draws 37.4%.
+  //
+  // TWO, RE-MEASURED ON THE WORLD THAT SHIPS AND NOT ON THE ONE IT WAS SET ON.
+  // The reading that put it here -- «two draws 9.66% of the ground against the
+  // target's 9.3%, and one draws 37.4%» -- was taken on a rolling field with a
+  // six voxel bank against every block, and neither of those exists any more.
+  // Taken again, on the plane, with the bank at nought and the masses cut at
+  // two or three: the number is no longer a dial at all. A flank shows earth
+  // only where the ground is CUT (bareRaisedAt), and a cut is the outermost
+  // riser of a mass, which is two or three voxels by construction -- so one and
+  // two draw the same picture, measured, and what the literal does today is
+  // state that a step of ONE is never a bank. That is the reading of A 1.2 and
+  // it is why it stays; the share it used to govern is governed by the size and
+  // the spacing of the masses now, and both are measured over MOUND above.
   minStep: 2,
   // Toward the eye, which in this world is south: the reference camera stands
   // at z 14 and looks north, so a face whose outward bearing is +z is a face
@@ -210,10 +269,16 @@ export const EARTH = {
   // sides of the path answer opposite ways and neither is a number typed here.
   toEye: true,
   toPath: true,
-  // THE VERGE OF THE CORRIDOR: the first ring of meadow beside the corridor's
-  // hole raises a wall with nothing beyond it, and the target draws that lembo
-  // as ground and not as a shadow -- stone giving way to brown earth at the
-  // level of the slabs. E-V1j's answer C, built at E-V1k.
+  // THE VERGE OF THE CORRIDOR IS BARE GROUND: stone giving way to brown earth
+  // at the level of the slabs, and not a shadow. E-V1j's answer C.
+  //
+  // ITS READER MOVED WITH THE THING IT DESCRIBES. It used to be the permission
+  // for a rule in the mesher that painted a wall at the lip of the corridor's
+  // hole; the hole died at step 4 and the rule with it, and for one delivery
+  // this was a datum nobody asked. The band it describes is written by the
+  // generator now -- PATH.verge columns of MATERIAL.EARTH either side of the
+  // stone -- so this is read there, and answering it `false` gives the corridor
+  // back its plain stone edge instead of leaving a dial that decides nothing.
   verge: true,
 };
 
@@ -292,6 +357,12 @@ function moundSeat(cx, cz) {
   const rise = MOUND.height.low + Math.min(MOUND.height.high - MOUND.height.low,
     Math.floor(hash2(cx * 3 + 101, cz * 29 + 61)
       * (MOUND.height.high - MOUND.height.low + 1)));
+  // AND ITS OWN BANK, ONE HEIGHT FOR THE WHOLE MASS. The reference reads the
+  // cut flank at two OR three voxels in one go; a mass that changed height
+  // along its own bank would read as two objects. Never taller than the mass.
+  const scarp = Math.min(rise, MOUND.scarp.low + Math.min(MOUND.scarp.high - MOUND.scarp.low,
+    Math.floor(hash2(cx * 11 + 233, cz * 89 + 17)
+      * (MOUND.scarp.high - MOUND.scarp.low + 1))));
 
   const x = (cx + 0.5) * MOUND.cell + (hash2(cx * 17 + 3, cz * 23 + 71) * 2 - 1) * jitter;
   const z = (cz + 0.5) * MOUND.cell + (hash2(cx * 41 + 59, cz * 19 + 13) * 2 - 1) * jitter;
@@ -313,17 +384,39 @@ function moundSeat(cx, cz) {
   // the nominal half width plus the most the edge's two noises can add, so it
   // is one smoothstep and a table lookup: no noise is evaluated to decide it,
   // which is what keeps a mound's seat as cheap as it was.
+  //
+  // AND THE HEM IS NOT PART OF THAT TEST, which it was and should not have
+  // been. `halo` is the width the GRAIN stops in round a mass, so that a plate
+  // of turf cannot saw a clean bank; the corridor is laid before the masses and
+  // returns, so it carries no grain and there is nothing for a hem to hold off.
+  // What it cost is the near field: the meadow the camera sees at six to nine
+  // metres is a narrow wedge with the corridor down the middle of it, and a
+  // quarter of a metre of hem on each side is the difference between a mass
+  // standing beside the paving -- which is what the reference shows, and what
+  // EARTH.toPath exists to paint -- and no mass there at all.
   if (pathRun(z) > 0
     && Math.abs(x - pathCentreX(z))
-      < pathHalfWidth(z) + PATH.wander + reach * (1 + MOUND.lean) + MOUND.halo) return null;
+      < pathHalfWidth(z) + PATH.wander + reach * (1 + MOUND.lean)) return null;
 
+  const c = Math.cos(ang);
+  const sn = Math.sin(ang);
+  // HOW FAR SOUTH THE MASS ACTUALLY REACHES, which is not `reach` and not
+  // `reach * (1 + lean)`: the ellipse is stretched along its OWN bearing, so
+  // its extent along the world's z axis is the support of that ellipse in that
+  // direction. Written here because it is a property of the seat and the chord
+  // above has to be a line the shape really touches -- taken from the wrong
+  // half width, the cut either misses the mass or eats it.
+  const along = reach * (1 + MOUND.lean);
+  const across = reach / (1 + MOUND.lean);
   return {
     x,
     z,
-    c: Math.cos(ang),
-    s: Math.sin(ang),
+    c,
+    s: sn,
     reach,
     rise,
+    scarp,
+    zHalf: Math.hypot(along * sn, across * c),
   };
 }
 
@@ -456,7 +549,7 @@ function toStone(x, z) {
 
 /** One evaluation of a mound at a point: how high it stands, and on what. */
 function moundProfile(x, z) {
-  const none = { height: 0, bank: false, halo: false };
+  const none = { height: 0, bank: false, halo: false, cut: 0 };
   const seat = moundSeat(Math.floor(x / MOUND.cell), Math.floor(z / MOUND.cell));
   if (!seat) return none;
   const dx = x - seat.x;
@@ -467,6 +560,12 @@ function moundProfile(x, z) {
   const w = (-dx * seat.s + dz * seat.c) * (1 + MOUND.lean);
   const d = Math.hypot(u, w);
   if (d >= seat.reach) return none;
+  // THE CUT, AND IT IS A STRAIGHT LINE IN THE GRID THE MESHER MERGES ON. The
+  // reason is over MOUND.cut. South is the eye's own bearing and the one the
+  // reference banks its earth on, so the chord is a line of constant z: every
+  // column along it stands at the same height over the same floor, and the
+  // flank is one rectangle instead of a row of slivers.
+  if (z > seat.z + seat.zHalf * (1 - MOUND.cut)) return none;
   // Nothing grows on the way in, on the stone, or inside a stone's own band --
   // and the test is on the SEAT and not on the point, so a mass is either
   // wholly there or wholly not and never sliced in half.
@@ -478,11 +577,12 @@ function moundProfile(x, z) {
   if (d <= flat) {
     // The crown. Flat by default; the second terrace of answer B takes the
     // outer half of it and never the middle, so a crown is never a point.
-    if (!MOUND.crownStep) return { height: seat.rise, bank: false, halo: true };
+    if (!MOUND.crownStep) return { height: seat.rise, bank: false, halo: true, cut: 0 };
     return {
       height: d <= flat / 2 ? seat.rise : Math.max(1, seat.rise - MOUND.crownStep),
       bank: false,
       halo: true,
+      cut: 0,
     };
   }
   // WHICH WAY THIS POINT LOOKS OUT, as a share: one due south, nought due
@@ -494,12 +594,20 @@ function moundProfile(x, z) {
   // where the mass faces the camera, one voxel where it faces away, and never
   // more than the mass is tall.
   const arc = southness >= 1 - MOUND.bankArc ? 1 : 0;
-  const first = Math.min(seat.rise, Math.max(1, 1 + (MOUND.scarp - 1) * arc));
+  const first = Math.min(seat.rise, Math.max(1, 1 + (seat.scarp - 1) * arc));
   // Everything above that first riser is spent one voxel at a time.
   const bands = 1 + (seat.rise - first);
   const t = (seat.reach - d) / (seat.reach - flat);
   const band = Math.min(bands - 1, Math.floor(t * bands));
-  return { height: Math.min(seat.rise, first + band), bank: band === 0, halo: true };
+  return {
+    height: Math.min(seat.rise, first + band),
+    bank: band === 0,
+    halo: true,
+    // How tall the riser under this point is, which is what the store has to
+    // write down: a flank of earth has to reach as far down as the wall it is
+    // the face of, and the wall is this mass's own bank and not a constant.
+    cut: band === 0 ? first : 0,
+  };
 }
 
 /** Whole voxels of mound standing on the floor at a point. */
@@ -518,6 +626,20 @@ export function meadowMoundAt(x, z) {
  */
 export function moundBankAt(x, z) {
   return moundProfile(x, z).bank;
+}
+
+/**
+ * How tall the cut bank standing at a point is, in whole voxels, and nought
+ * where the ground is not cut.
+ *
+ * IT IS A NUMBER AND NOT A CONSTANT BECAUSE THE BANK IS NOT ONE. Every mass
+ * carries its own riser of two or three voxels (MOUND.scarp), so the depth the
+ * store has to write under a cut top is the mass's and not the dial's: written
+ * short, the earth would run out half way down its own wall and the bottom
+ * voxel of a three-voxel bank would draw meadow.
+ */
+export function moundCutAt(x, z) {
+  return moundProfile(x, z).cut;
 }
 
 /** Whether a point is on a mass, or inside the hem the grain leaves round one. */
@@ -792,7 +914,14 @@ export function columnSpec(ix, iz, grain = true, radius = DISC_RADIUS) {
   if (on >= 0) {
     return {
       top: top - PATH.drop,
-      mat: on === 0 ? MATERIAL.PATH : MATERIAL.EARTH,
+      // THE VERGE IS EARTH BECAUSE EARTH.verge SAYS SO, and it is read here
+      // rather than assumed. The dial is E-V1j's answer C -- the lembo is bare
+      // ground and not a shadow -- and it lost its reader at step 4 when the
+      // rule that used to consult it, a wall painted at the lip of a hole, died
+      // with the hole. The band it described is real now and this is where it
+      // is decided, so the reading is a dial again instead of a datum nobody
+      // asks.
+      mat: on === 0 || !EARTH.verge ? MATERIAL.PATH : MATERIAL.EARTH,
       // What is under the paving is soil, and it is written down rather than
       // left at the meadow's default: the corridor is the lowest ground in the
       // world, so the only wall it ever raises is at the rim of the disc, and
@@ -815,7 +944,9 @@ export function columnSpec(ix, iz, grain = true, radius = DISC_RADIUS) {
     // of; everything else about a mass is meadow and keeps its grass.
     if (bareRaisedAt(x, z)) {
       under = MATERIAL.EARTH;
-      depth = MOUND.scarp;
+      // As deep as the wall this column raises, and no deeper: the mass's own
+      // bank, not the dial's widest reading.
+      depth = Math.max(1, moundCutAt(x, z));
     }
   }
 
