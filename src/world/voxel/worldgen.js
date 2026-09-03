@@ -293,9 +293,33 @@ function moundSeat(cx, cz) {
     Math.floor(hash2(cx * 3 + 101, cz * 29 + 61)
       * (MOUND.height.high - MOUND.height.low + 1)));
 
+  const x = (cx + 0.5) * MOUND.cell + (hash2(cx * 17 + 3, cz * 23 + 71) * 2 - 1) * jitter;
+  const z = (cz + 0.5) * MOUND.cell + (hash2(cx * 41 + 59, cz * 19 + 13) * 2 - 1) * jitter;
+
+  // AND A MASS MAY NOT REACH THE CORRIDOR EITHER, for the same reason it may
+  // not reach another mass, and it is a measurement rather than a tidy-up.
+  //
+  // The corridor is laid BEFORE the masses and it returns, so a mound that
+  // reached it was not laid over it -- it was CUT OFF by it, at whatever height
+  // its profile happened to have where the paving began. Measured on the disc
+  // that ships, one mound standing on the west verge at z = 11 made fourteen
+  // column-to-column steps of three, four and FIVE voxels, where the whole rest
+  // of this world steps by at most two: half a metre of cliff in one object,
+  // out of an arithmetic where every riser is supposed to be the shape's.
+  //
+  // A mound BESIDE the corridor is wanted -- the reference shows the cut banks
+  // facing the eye and the corridor, which is what EARTH.toPath is for -- so
+  // what is kept away is the OVERLAP and not the neighbourhood. The test is on
+  // the nominal half width plus the most the edge's two noises can add, so it
+  // is one smoothstep and a table lookup: no noise is evaluated to decide it,
+  // which is what keeps a mound's seat as cheap as it was.
+  if (pathRun(z) > 0
+    && Math.abs(x - pathCentreX(z))
+      < pathHalfWidth(z) + PATH.wander + reach * (1 + MOUND.lean) + MOUND.halo) return null;
+
   return {
-    x: (cx + 0.5) * MOUND.cell + (hash2(cx * 17 + 3, cz * 23 + 71) * 2 - 1) * jitter,
-    z: (cz + 0.5) * MOUND.cell + (hash2(cx * 41 + 59, cz * 19 + 13) * 2 - 1) * jitter,
+    x,
+    z,
     c: Math.cos(ang),
     s: Math.sin(ang),
     reach,
@@ -655,6 +679,11 @@ export const PATH = {
   // the narrow verge and the two wide ends carry the wide one, which is what a
   // band of trodden ground does and what a constant cannot be.
   verge: { min: 2, max: 4, at: 0.5, per: 0.7 },
+  // The most the two noises in pathEdge can push an edge past the nominal half
+  // width, in metres: 0.105 of wobble and 0.0434 of wander, both at their own
+  // full swing. Published so a reader that has to stay CLEAR of the corridor
+  // can do it without evaluating either of them.
+  wander: 0.105 + 0.0434,
 };
 
 /** How many columns of bare earth line each side of the stone at a northing. */
