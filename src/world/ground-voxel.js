@@ -3,7 +3,8 @@ import {
 } from 'three';
 import {
   CHUNK, DISC_RADIUS, NO_COLUMN, VOXEL,
-  earthSettings, runInWorker, voxelMaterial, voxelSettings,
+  earthSettings, pavingMaterial as makePaving, pavingSettings, runInWorker,
+  voxelMaterial, voxelSettings,
 } from './voxel/index.js';
 
 // THE MEADOW AS CUBES, STANDING IN THE WORLD RATHER THAN ON A BENCH.
@@ -74,21 +75,13 @@ const chunkKey = (cx, cz) => `${cx},${cz}`;
  *                                   which is what it costs to not do this.
  * @param {number}  options.radius   how far the ten centimetre ground reaches,
  *                                   in metres. The tier's, never this file's.
- * @param {object}  options.hole     where the ground is cut away, as the two
- *                                   numbers of the corridor's own footprint.
- *                                   The disc is meshed in a WORKER and a worker
- *                                   cannot be handed a function, so the layer
- *                                   that knows the contract sends this instead
- *                                   and the engine's seat rebuilds it there.
- *                                   Nought says nothing, and the engine answers
- *                                   with its own approximation.
  * @returns {object} the group to hang, the floor the cubes make, and the numbers
  */
 export function createGroundVoxel({
   dispose = true,
   boundingFromWorker = true,
   radius = DISC_RADIUS,
-  hole = null,
+  paving = null,
 } = {}) {
   const group = new Group();
   group.name = 'ground-voxel';
@@ -119,6 +112,16 @@ export function createGroundVoxel({
   // family is 6.5% of the faces).
   const earthTune = earthSettings();
   const earthMaterial = voxelMaterial(VOXEL, earthTune);
+
+  // AND A THIRD FOR THE CORRIDOR, gathered the same way and for the same
+  // reasons. The paving is the one family of this disc whose colour comes off a
+  // map rather than out of a hash, so it is the one that can be absent: without
+  // the three the painter bakes there is nothing to read, and the corridor's
+  // rectangles are simply not hung. That is a picture with no paving in it and
+  // it is the honest failure -- the alternative is grass drawn over the stone,
+  // which is a wrong picture rather than a missing one.
+  const pavingTune = paving ? pavingSettings() : null;
+  const pavingMaterial = paving ? makePaving(VOXEL, pavingTune, paving) : null;
   // The bare faces as they arrive, chunk by chunk, in the chunk's own frame:
   // they are moved into the world's when the last one has landed.
   const soil = [];
@@ -261,38 +264,55 @@ export function createGroundVoxel({
    * the grass meshes land on. The two families therefore draw the SAME hash for
    * the same cube, and the joint between them cannot show a seam.
    */
-  function landEarth() {
+  function landFamily(pieces, key, use, name) {
     let quads = 0;
-    for (const piece of soil) quads += piece.earth.quads;
-    if (!quads) return;
+    for (const piece of pieces) quads += piece[key].quads;
+    if (!quads) return 0;
     const positions = new Float32Array(quads * 12);
     const normals = new Int8Array(quads * 12);
     const indices = quads * 4 > 65535
       ? new Uint32Array(quads * 6) : new Uint16Array(quads * 6);
     let v = 0;
     let q = 0;
-    for (const piece of soil) {
+    for (const piece of pieces) {
       const ox = piece.cx * CHUNK * VOXEL;
       const oz = piece.cz * CHUNK * VOXEL;
-      const { earth } = piece;
-      for (let k = 0; k < earth.quads * 4; k++) {
-        positions[(v + k) * 3] = earth.positions[k * 3] + ox;
-        positions[(v + k) * 3 + 1] = earth.positions[k * 3 + 1];
-        positions[(v + k) * 3 + 2] = earth.positions[k * 3 + 2] + oz;
-        normals[(v + k) * 3] = earth.normals[k * 3];
-        normals[(v + k) * 3 + 1] = earth.normals[k * 3 + 1];
-        normals[(v + k) * 3 + 2] = earth.normals[k * 3 + 2];
+      const family = piece[key];
+      for (let k = 0; k < family.quads * 4; k++) {
+        positions[(v + k) * 3] = family.positions[k * 3] + ox;
+        positions[(v + k) * 3 + 1] = family.positions[k * 3 + 1];
+        positions[(v + k) * 3 + 2] = family.positions[k * 3 + 2] + oz;
+        normals[(v + k) * 3] = family.normals[k * 3];
+        normals[(v + k) * 3 + 1] = family.normals[k * 3 + 1];
+        normals[(v + k) * 3 + 2] = family.normals[k * 3 + 2];
       }
-      for (let k = 0; k < earth.quads * 6; k++) indices[q + k] = earth.indices[k] + v;
-      v += earth.quads * 4;
-      q += earth.quads * 6;
+      for (let k = 0; k < family.quads * 6; k++) indices[q + k] = family.indices[k] + v;
+      v += family.quads * 4;
+      q += family.quads * 6;
     }
     const chunk = {
       cx: 0, cz: 0, positions, normals, indices, sphere: null, tops: null,
     };
-    land(chunk, earthMaterial, 'ground-earth');
-    build.earthQuads = quads;
+    land(chunk, use, name);
     build.bytes += positions.byteLength + normals.byteLength + indices.byteLength;
+    return quads;
+  }
+
+  /**
+   * The two gathered families, hung once the last chunk is in.
+   *
+   * THE PAVING GOES UP THE SAME WAY THE BARE EARTH DOES, and for the same two
+   * reasons: twenty six chunks each hanging a mesh of their own would be twenty
+   * six draws against a budget of twenty two, and the corridor is one long thin
+   * thing whose pieces are never seen apart. What it costs the frame is ONE
+   * draw -- exactly the one the corridor's own surface used to cost -- and what
+   * it saves is the surface.
+   */
+  function landGathered() {
+    build.earthQuads = landFamily(soil, 'earth', earthMaterial, 'ground-earth');
+    if (pavingMaterial) {
+      build.pavingQuads = landFamily(soil, 'paving', pavingMaterial, 'ground-paving');
+    }
     soil.length = 0;
   }
 
@@ -357,10 +377,15 @@ export function createGroundVoxel({
     const started = performance.now();
     if (message.kind === 'chunk') {
       land(message.chunk);
-      // The bare faces are KEPT rather than hung: see landEarth.
-      if (message.chunk.earth && message.chunk.earth.quads) {
+      // The bare faces and the paving are KEPT rather than hung: see
+      // landGathered.
+      if ((message.chunk.earth && message.chunk.earth.quads)
+        || (message.chunk.paving && message.chunk.paving.quads)) {
         soil.push({
-          cx: message.chunk.cx, cz: message.chunk.cz, earth: message.chunk.earth,
+          cx: message.chunk.cx,
+          cz: message.chunk.cz,
+          earth: message.chunk.earth,
+          paving: message.chunk.paving,
         });
       }
     } else if (message.kind === 'plan') {
@@ -372,7 +397,7 @@ export function createGroundVoxel({
       build.startupMs = message.startupMs;
       build.radius = message.radius;
     } else if (message.kind === 'done') {
-      landEarth();
+      landGathered();
       Object.assign(build, {
         quads: message.quads,
         columns: message.columns,
@@ -426,7 +451,7 @@ export function createGroundVoxel({
     // corridor rides along for the same reason and with the same force: the
     // thread that cuts the disc is the one that has to know where the ground is
     // not its own, and it cannot ask.
-    worker = runInWorker({ grain: true, radius, hole }, receive);
+    worker = runInWorker({ grain: true, radius }, receive);
   }
 
   return {
@@ -434,6 +459,8 @@ export function createGroundVoxel({
     settings,
     material,
     earthMaterial,
+    pavingMaterial,
+    pavingTune,
     build,
     longTasks,
 

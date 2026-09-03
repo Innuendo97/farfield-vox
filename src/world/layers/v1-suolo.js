@@ -1,9 +1,8 @@
 import { createTerrain } from '../terrain.js';
 import { createGroundVoxel } from '../ground-voxel.js';
 import { createGroundShell } from '../ground-shell.js';
-import { DISC_RADIUS, setGroundHole } from '../voxel/index.js';
-import { groundHoleAt, setGroundDiscRadius } from '../contracts.js';
-import { FOOT } from '../path.js';
+import { DISC_RADIUS } from '../voxel/index.js';
+import { setGroundDiscRadius } from '../contracts.js';
 
 // THE SOIL. Owned by V1.
 //
@@ -60,25 +59,6 @@ import { FOOT } from '../path.js';
 // they are handed to the ground's material, and a need is stated where it is
 // eaten.
 
-// THE CORRIDOR'S FOOTPRINT, FOR THE THREAD THAT CANNOT BE HANDED A FUNCTION.
-//
-// The disc is cut in a worker. A worker is a module graph of its own -- pure
-// arithmetic, on purpose, and it is not going to learn the corridor's file -- so
-// the answer that reaches it has to be DATA, the way the radius already is. The
-// engine's seat rebuilds the predicate there out of the same pathRun and
-// pathCoord src/world/path.js calls; see setGroundHole in voxel/mesher.js.
-//
-// ONE OF THE TWO IS THE PATH'S OWN NUMBER, READ AND NOT COPIED, and the other is
-// a re-statement this file is naming rather than hiding: `run` is the epsilon in
-// pathHoleAt -- "any paving at all at this northing" -- which src/world/path.js
-// keeps as a literal in its own body and publishes nowhere. It is PINNED and not
-// trusted: over every column of the disc, at all three radii the world can lay,
-// this pair answers the contract's own groundHoleAt with ZERO disagreements
-// (v1-suolo/misure/d4b-buco.json), where 0.0 in its place would miss eleven
-// columns at fourteen metres and thirty at thirty five. The day the path moves
-// it, the engine and the page draw different discs and the green gate in
-// v1-suolo/analisi/quota-disegnata.mjs is what says so.
-const GROUND_HOLE = { run: 0.001, coord: FOOT.edge };
 
 /**
  * What the address asks this layer for.
@@ -120,7 +100,14 @@ const layer = {
   shell: null,
 
   dress: {
-    needs: ['terrain-albedo', 'terrain-light', 'terrain-detail', 'terrain-path'],
+    // AND THE PAVING'S THREE MAPS ARE THIS LAYER'S NEED NOW.
+    //
+    // They were declared by the layer that hung the corridor's own surface, and
+    // that surface is gone: the corridor is columns of THIS disc and its tops
+    // are one of the three families this layer's engine draws. An asset is
+    // needed where it is eaten, so the need moved with the mesh that eats it.
+    needs: ['terrain-albedo', 'terrain-light', 'terrain-detail', 'terrain-path',
+      'path-joint', 'path-tone', 'path-grain'],
 
     /**
      * @param {object} assets  keyed by asset id, plus what the hub knows
@@ -139,29 +126,13 @@ const layer = {
       // two is for the seat that DECIDES the radius to hand it over, rather
       // than for the contract to work it out again from the tier.
       setGroundDiscRadius(radius);
-      // AND THE ENGINE IS TOLD WHERE THE GROUND IS NOT ITS OWN, in the same
-      // breath and for the same reason. The disc used to stop laying columns at
-      // a straight passage of its own -- half the run, one half width -- and the
-      // world answers from groundHoleAt, which wanders with the paving and
-      // reaches 1.28 half widths. Between the two the disc laid 923 columns of
-      // ten centimetre cube UNDER THE STONE at the fourteen metres three tiers
-      // ship, 277 of them under paving that is fully opaque and one of them
-      // 72 cm proud of it (v1-suolo/misure/d4b-buco.json).
-      //
-      // AND IT IS SEEN, WHICH THE MANDATE DID NOT EXPECT AND THE MEASUREMENT
-      // SAYS. The 277 under opaque stone were invisible; the other 646 stood in
-      // the band where the paving is already fading, so what they drew was a
-      // cubic kerb along the two verges. Without them the verge is earth and
-      // fading stone, and the grass stands on it instead of on cube tops: 2.64%
-      // of the frame at vox-giorno against a null control of 0.13%, nothing at
-      // all at picco-85, and every changed pixel on the two verges
-      // (v1-suolo/misure/d4b-visibile.json).
-      //
-      // THE FUNCTION HERE AND THE TWO NUMBERS TO THE WORKER, which is one
-      // decision arriving at the two threads that draw from it. This one fixes
-      // what the walker's own floor reads through columnTop; the disc is cut in
-      // the worker and takes its copy below.
-      setGroundHole(groundHoleAt);
+      // AND NOTHING IS TOLD WHERE THE GROUND IS NOT ITS OWN ANY MORE. The disc
+      // used to be handed the corridor's footprint twice -- a function here for
+      // the walker's floor, two numbers to the worker for the cut -- because the
+      // paving was a surface laid over a hole. The corridor is columns of the
+      // disc now and the engine writes it out of the same field this layer
+      // reads, so there is nothing to inject and no pair of answers that could
+      // drift apart.
 
       layer.built = createTerrain({
         albedo: assets['terrain-albedo'],
@@ -175,7 +146,20 @@ const layer = {
       });
       layer.meshes = layer.built.meshes;
 
-      layer.voxel = createGroundVoxel({ ...wanted, radius, hole: GROUND_HOLE });
+      layer.voxel = createGroundVoxel({
+        ...wanted,
+        radius,
+        // Nought if any of the three is missing, which is what the engine reads
+        // as "hang no paving": three maps are one material and two of them
+        // would be a corridor painted out of a ruler with no level.
+        paving: assets['path-joint'] && assets['path-tone'] && assets['path-grain']
+          ? {
+            joint: assets['path-joint'],
+            tone: assets['path-tone'],
+            grain: assets['path-grain'],
+          }
+          : null,
+      });
       // ONE GROUP AND NOT TWENTY SIX MESHES, because the hub hangs what a
       // layer built at the moment it built it and the chunks are still being
       // cut in a worker at that moment. A group is on the scene from the

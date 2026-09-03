@@ -2,7 +2,7 @@ import { BufferAttribute, BufferGeometry, Mesh } from 'three';
 import { basinProfile } from './contracts.js';
 import { heightAt } from './terrain-field.js';
 import { AREA_CENTER } from './layout.js';
-import { VOXEL, onPaving } from './voxel/index.js';
+import { VOXEL } from './voxel/index.js';
 
 // THE SHELL: THE GROUND FROM THE RIM OF THE DISC OUT TO THE END OF V1'S WORLD.
 //
@@ -126,28 +126,19 @@ function buildShell(radius) {
     : new Uint16Array(RINGS * SPOKES * 6);
   let k = 0;
   let quads = 0;
-  let onPath = 0;
   for (let i = 0; i < RINGS; i++) {
     for (let s = 0; s < SPOKES; s++) {
       const s1 = (s + 1) % SPOKES;
-      // THE PAVING IS NOT THIS SHEET'S, and where it runs out under the rim the
-      // sheet stands aside rather than fighting the ground that draws it.
+      // THE SHEET NO LONGER STANDS ASIDE FOR THE PAVING, and the quads it used
+      // to drop are back.
       //
-      // AND IT IS NO LONGER THE SAME RULE THE DISC LAYS NO COLUMN UNDER, which
-      // is said here because it used to be and the two files were written as if
-      // it always would be. The disc now stands aside on the CORRIDOR's own
-      // answer, injected by the layer (see setGroundHole in voxel/mesher.js);
-      // this sheet keeps the engine's straight passage, DELIBERATELY. The two
-      // surfaces never cover the same ground -- the sheet begins exactly where
-      // the disc ends -- so there is no seam between them to disagree about, and
-      // widening what the sheet drops would open the band between one and 1.28
-      // half widths to the bent grid beneath, out past the rim, where the
-      // corridor's own surface is already fading. That is a change to a picture,
-      // and this unit's change is 923 columns nobody can see.
-      const rMid = (ringRadius(i, inner) + ringRadius(i + 1, inner)) / 2;
-      const aMid = ((s + 0.5) / SPOKES) * Math.PI * 2;
-      if (onPaving(AREA_CENTER.x + Math.cos(aMid) * rMid,
-        AREA_CENTER.z + Math.sin(aMid) * rMid)) { onPath++; continue; }
+      // It dropped them because the corridor was a surface of its own, laid
+      // over a hole and reaching to z = 31 -- well past the rim of the disc --
+      // so out there the sheet and the paving would have covered the same
+      // ground. The corridor is columns now and it ends where the disc's
+      // columns end. A sheet that kept standing aside would be leaving a band
+      // of nothing along the passage from the rim outwards, which is a hole in
+      // the ground and not a saving.
       const a = i * SPOKES + s;
       const b = i * SPOKES + s1;
       const c = (i + 1) * SPOKES + s1;
@@ -165,7 +156,7 @@ function buildShell(radius) {
   geometry.setIndex(new BufferAttribute(indices.subarray(0, k), 1));
   geometry.computeBoundingSphere();
   return {
-    geometry, quads, onPath, vertices, triangles: quads * 2, inner,
+    geometry, quads, vertices, triangles: quads * 2, inner,
   };
 }
 
@@ -200,7 +191,6 @@ export function createGroundShell({ radius, material }) {
       vertices: built.vertices,
       quads: built.quads,
       triangles: built.triangles,
-      droppedOnPaving: built.onPath,
     },
   };
 }
