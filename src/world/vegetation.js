@@ -13,6 +13,7 @@ import {
 import { MONOLITHS, PLATFORM, STAIRS } from './layout.js';
 import { ROCKS } from './rocks.js';
 import { ALBEDO, voxelSettings } from './voxel/index.js';
+import { FAMILY, PIGMENT, pigTint } from './voxel/pigment.js';
 import { columnTop, DISC_RADIUS, EMPTY, mantoAt } from './voxel/worldgen.js';
 import { VOXEL } from './voxel/columns.js';
 import TERRAIN from '../../assets-src/terrain/terrain.json' with { type: 'json' };
@@ -1105,14 +1106,124 @@ const HEAD_SHADE = 0.34;
 // along the top of each. A T on the face that is turned to the walker, from
 // every bearing, with no yaw and no billboard.
 //
-// AND IT IS DRAWN IN THE FRAGMENT OFF A FACE COORDINATE, WHICH IS THE POINT.
-// Cut as geometry it would be sixteen quads a head instead of five, for two
-// pixels of warm. Carried as a coordinate it costs no vertex and it hands the
-// texture session the seat it needs: every side of the head arrives at the
-// fragment with its own [0,1] square, so a 16x16 sheet with alpha drops onto
-// exactly this without one vertex moving.
+// AND IT IS CUT AS GEOMETRY, WHICH IS WHAT THESE TWO NUMBERS NOW DESCRIBE.
+//
+// It used to be drawn in the fragment off a face coordinate, and the note that
+// stood here priced the alternative and declined it: <<cut as geometry it would
+// be sixteen quads a head instead of five, for two pixels of warm>>. The price
+// was right and the judgement has been overturned from the only bench that
+// outranks it. Walking round the meadow the committente read the pistil as
+// PAINT and asked for VOLUME: <<i pistilli non mi piacciono: STRUTTURALI
+// meglio>>. So the T is a solid that crosses the head and stands out of its four
+// faces, and these two constants keep the meaning they were fitted with -- how
+// wide the spine is, and how deep the course under the lid -- while what carries
+// them stops being a colour and starts being a shape.
+//
+// THE TWO NUMBERS DO NOT MOVE, AND THAT IS DELIBERATE. They were fitted against
+// the reference (U-PIG-2 §2.4) and the sheet on disk is rasterised FROM them, so
+// moving either would be refitting a ratified reading in a session that was
+// asked for a shape. What the geometry below does instead is SOLVE its own rib
+// width so that the solid covers exactly the share these two describe -- see
+// PISTIL_HALF, where the relief is paid for out of the rib rather than out of
+// the share. The far family's single quad still paints
+// BAND_SPINE + BAND_TOP * (1 - BAND_SPINE), and it is still right.
 const BAND_SPINE = 0.20;
 const BAND_TOP = 0.18;
+
+/**
+ * HOW FAR THE PISTIL STANDS OUT OF THE HEAD, as a share of the head's width.
+ *
+ * This is the whole of what "structural" costs, and it is a choice rather than a
+ * reading: nothing in the reference resolves the depth of a relief on a head
+ * fourteen pixels across. What decides it is what a relief has to DO -- present
+ * its own cheeks to the light, so the rib is lit differently from the face it
+ * stands on and reads as a solid rather than as a stripe. At a nominal head that
+ * is 3.75 mm, which is four screen pixels at the range a walker inspects a
+ * flower from and about a third of one at the exchange ring; past the ring the
+ * far family paints the head's average and the relief is not in the picture at
+ * all, which is the same trade every other solid in this meadow makes.
+ */
+const PISTIL_PROUD = 0.05;
+
+/**
+ * HALF THE RIB'S WIDTH, SOLVED SO THAT THE SHARE DOES NOT MOVE.
+ *
+ * A rib that stands proud of the head widens the head's own silhouette, and a
+ * rib drawn at BAND_SPINE on top of that would carry MORE yellow than the
+ * reading it was fitted to -- the share climbs to 40.4 per cent at this relief,
+ * outside the corridor C-TEXTURE §1.6 measured on nine heads (22 to 40). So the
+ * relief is paid for out of the rib instead:
+ *
+ *     (rib half-width + relief) / (head half-width + relief) = BAND_SPINE
+ *
+ * which makes the yellow share of a side, seen square on, come to
+ * BAND_TOP + BAND_SPINE * (1 - BAND_TOP) -- the same 0.344 the sheet covers and
+ * the far family paints, at ANY relief. The pistil becomes volume without one
+ * measured number moving, and pistilShare() below computes it from the BOXES
+ * rather than from this sentence, so the two cannot drift.
+ *
+ * The relief has a ceiling and it is this identity's: a rib cannot be narrower
+ * than nothing, so PISTIL_PROUD must stay under BAND_SPINE / (1 - BAND_SPINE) of
+ * the head's half-width, which is 12.5 per cent of the head. It is at 5.
+ */
+const PISTIL_PROUD_M = HEAD_NOMINAL * PISTIL_PROUD;
+const PISTIL_HALF = BAND_SPINE * (HEAD_NOMINAL / 2 + PISTIL_PROUD_M) - PISTIL_PROUD_M;
+
+/**
+ * THE FLOWERS THAT ARE OPEN, AND THE HALF OF E-DECISIONI9.1 THAT WAS OWED.
+ *
+ * <<Il bocciolo e' un cubo che varia di scala (i fiorellini piccoli) ma puo'
+ * variare anche SOLO IN ALTEZZA (non piu' un cubo: i fiori piu' aperti)>>. The
+ * scale half has been built since U-ERBA-1 and is HEAD_MIN to HEAD_MAX drawn per
+ * flower; the height half was carried as a residual, because it needs a SECOND
+ * per-instance attribute and because the census of nineteen heads publishes a
+ * median height and no spread for it (E-ERBA-A §4: width p25/p50/p75 at 7.6, 8.2
+ * and 9.0 cm, height p50 at 6.3 and nothing either side of it).
+ *
+ * THE ATTRIBUTE IS CHEAP AND THE SPREAD IS DECLARED. The attribute is one float
+ * on a record that already carries two, and no draw. The two numbers below are
+ * NOT measured and are not offered as measured: the census cannot resolve them.
+ * What they are is the committente's sentence turned into arithmetic -- the
+ * closed bud is the census median and stays squat, a minority of heads are open,
+ * and an open one is not a cube any more because it is TALLER than it is wide.
+ * One in four, and the tallest of them stands at 1.075 of its own width against
+ * the bud's 0.768.
+ */
+const OPEN_SHARE = 0.25;
+const OPEN_STRETCH = 0.40;
+
+/**
+ * HOW MUCH PALER THE TOP OF A STALK IS THAN ITS FOOT, AND IN HOW MANY STEPS.
+ *
+ * E-DECISIONI10: <<gli steli hanno una gradazione dalla base alla cima>>. In
+ * steps and not as a ramp, because everything else in this world is a lattice
+ * and a stalk that faded smoothly would be the one column in the frame that does
+ * not step. How many: the mat's blade is 5 cm (columns.js BLADE) and a nominal
+ * stalk is 7.5, so a stalk is taller than one blade and takes the two the rule
+ * asks for.
+ *
+ * The DEPTH is a choice and is declared as one: the reference's own stalk is a
+ * hand reading on two exemplars and E-ERBA-A §8.9 says so itself, so there is no
+ * gradient to fit. Eighteen per cent between foot and tip, hung about the
+ * measured pigment so the stalk's MEAN colour is exactly the one U-ERBA-1 fitted
+ * and the gradation costs the family nothing.
+ */
+const STALK_STEPS = 2;
+const STALK_GRADE = 0.18;
+
+/**
+ * AND HOW DARK THE FACE GOES WHERE THE PISTIL STANDS ON IT.
+ *
+ * The sheet of E-TEX1 is still sampled, and this is what it does now. It was the
+ * pistil's own colour; the pistil has a shape of its own, so what is left for a
+ * mask of exactly where the pistil stands is the CONTACT the relief makes with
+ * the face it rises out of. The rib is narrower than the sheet's spine -- the
+ * relief was paid for out of it -- so what the mask darkens is a rim either side
+ * of the rib and a course either side of the brim, which is where a solid
+ * standing on a face puts its own shadow. Declared as a choice: this world has
+ * no ambient occlusion to read one off.
+ */
+const PISTIL_CONTACT = 0.18;
 
 /**
  * That seat, taken: the two widths above, rasterised at sixteen and delivered.
@@ -1220,6 +1331,14 @@ const CYAN_OF_PALE = 2.21 / 3.61;
  */
 const luma = (v) => 0.2126 * v.x + 0.7152 * v.y + 0.0722 * v.z;
 
+/**
+ * THE SETTINGS THE STALK'S OWN ZONE IS SAMPLED WITH, which are the meadow's with
+ * the stalk family's override laid over them -- the same pair src/world/voxel/
+ * pigment.js hands its own fragment. Built here once rather than per flower, and
+ * built from that module's exports rather than from a copy of its numbers.
+ */
+const STALK_FIELD = { ...PIGMENT, ...FAMILY.stalk };
+
 function flowerPigments() {
   const meadow = voxelSettings().albedo;
   if (!meadow || !(meadow instanceof Vector3)) {
@@ -1227,11 +1346,36 @@ function flowerPigments() {
   }
   const level = luma(meadow) * PALE_STEP;
   const pale = PALE_HUE.clone().multiplyScalar(level / luma(PALE_HUE));
+  const cyan = CYAN_HUE.clone().multiplyScalar(luma(pale) * CYAN_OF_PALE / luma(CYAN_HUE));
+  // One producer of a pistil, asked twice: the head it stands in, at the share of
+  // that head's luminance the target's own band is worth. A white flower and a
+  // blue one differ in which head is handed in and in nothing else.
+  const pistilIn = (head) => PISTIL_HUE.clone()
+    .multiplyScalar(luma(head) * PISTIL_OF_PALE / luma(PISTIL_HUE));
   return {
     pale,
-    pistil: PISTIL_HUE.clone()
-      .multiplyScalar(luma(pale) * PISTIL_OF_PALE / luma(PISTIL_HUE)),
-    cyan: CYAN_HUE.clone().multiplyScalar(luma(pale) * CYAN_OF_PALE / luma(CYAN_HUE)),
+    pistil: pistilIn(pale),
+    cyan,
+    // THE BLUE'S OWN PISTIL, AND WHERE ITS COLOUR COMES FROM.
+    //
+    // The reference has none to measure: C-TEXTURE §1.6 cut five cyan heads at
+    // 22x and found ZERO yellow pixels on all five, and E-DECISIONI9 wrote that
+    // down as a law. E-DECISIONI11 overturns it -- <<anche i blu devono avere i
+    // pistilli>> -- so a colour has to come from somewhere the reference DOES
+    // show, and the nearest such thing is the only pistil in the picture, the
+    // white flower's.
+    //
+    // WHAT IS CARRIED OVER IS THE LAW AND NOT THE TRIPLE. Copying the white's
+    // pistil onto a blue head would put a pigment fitted against an L* 84 head
+    // onto an L* 81 one and call the result measured. What is measured is the
+    // RELATION: PISTIL_HUE, which is the hue the target's band has with its level
+    // taken out, at PISTIL_OF_PALE of its own head's luminance. Applied to the
+    // cyan seat instead of the pale one, that puts a blue head's pistil in the
+    // same relation to its head as a white head's is to its. It comes to
+    // (0.582, 0.380, 0.012) -- L* 69.2, croma 67.5, hue 90 degrees against a head
+    // at 80.9 and 241 -- which is a legal pigment in every channel and 151
+    // degrees of hue away from the head it stands in.
+    cyanPistil: pistilIn(cyan),
     // THE STALK IS ITS OWN FAMILY NOW, AND IT IS THE COMMITTENTE'S OWN WORDS.
     //
     // The note that stood here said the stem was at most one pixel wide at the
@@ -1335,6 +1479,17 @@ function flowerAt(gx, gz, k, height) {
   const cyan = r3 < CYAN_IN_LIGHT + (CYAN_IN_SHADE - CYAN_IN_LIGHT) * shadeAt(x, z);
   const size = (HEAD_MIN + (HEAD_MAX - HEAD_MIN) * r4) * (cyan ? CYAN_SCALE : 1);
   const scale = size / HEAD_NOMINAL;
+  // HOW FAR OPEN THIS ONE IS DRAWN, on a hash of its own and not on its size:
+  // E-DECISIONI9.1 puts the two apart -- a head varies in scale AND, separately,
+  // in height alone -- so a small flower is as likely to be open as a large one.
+  // One in OPEN_SHARE of them, and an open one is drawn anywhere up to
+  // OPEN_STRETCH taller than the bud the census measured.
+  const r5 = hash2(gx * 65867 + k * 40503, gz * 17389 + FLOWER_SEED * 23);
+  const open = 1 + (r5 < OPEN_SHARE ? OPEN_STRETCH * (1 - r5 / OPEN_SHARE) : 0);
+  // The stalk's own zone, sampled where the flower stands. The pigment field is
+  // asked on the COLUMN under it, which is the cell the ground beside it reads,
+  // so a stalk and the cube at its foot are never in two different zones.
+  const zone = pigTint(Math.floor(x / VOXEL), Math.floor(z / VOXEL), STALK_FIELD);
   return {
     x,
     // THE HEAD AND NOT THE GROUND UNDER IT, which is what the contract asks for
@@ -1354,13 +1509,29 @@ function flowerAt(gx, gz, k, height) {
     // walker's floor would be wrong on purpose -- groundHeightAt is the PLANE and
     // stays the plane, because the walker goes through the grass
     // (E-DECISIONI9.2) while the flower stands on it.
-    y: height(x, z) + mantoAt(x, z) + STALK_TALL * scale + size / 2,
+    // AND IT IS THE HEAD THIS FLOWER ACTUALLY HAS, WHICH MOVED TWICE HERE.
+    //
+    // What stood was `STALK_TALL * scale + size / 2`, and it read the head as a
+    // CUBE of side `size`. The head has been squat by HEAD_SQUAT since U-ERBA-1
+    // -- 6.3 cm tall on 8.2 across, the census of nineteen -- so the centre this
+    // published stood 8.7 mm over the centre the meadow draws, on every flower
+    // in the disc. That is the first move and it is a defect being paid off.
+    //
+    // The second is the open flowers: a head drawn OPEN_STRETCH taller has its
+    // centre higher by half of what it grew, up to 11 mm more. Both are one line
+    // because both are the same sentence -- half of the head that is there --
+    // and V7 hangs its lamp core at this y, so a head that grew and a y that did
+    // not would put the lamp in the bottom of the bud.
+    y: height(x, z) + mantoAt(x, z)
+      + STALK_TALL * scale + size * HEAD_SQUAT * open / 2,
     z,
     size,
     kind: cyan ? 'ciano' : 'bianco',
-    // Only the ring needs these two; they cost nothing and keep the two callers
+    // Only the ring needs these four; they cost nothing and keep the two callers
     // reading one record.
     scale,
+    open,
+    zone,
     tint: FLOWER_TINT.min + (FLOWER_TINT.max - FLOWER_TINT.min) * r1,
   };
 }
@@ -1420,12 +1591,22 @@ export function flowerCensus() {
   const pigments = flowerPigments();
   return {
     pigments,
-    head: { min: HEAD_MIN, max: HEAD_MAX, nominal: HEAD_NOMINAL, cyanScale: CYAN_SCALE },
-    stalk: { wide: STALK_WIDE, tall: STALK_TALL },
+    head: { min: HEAD_MIN, max: HEAD_MAX, nominal: HEAD_NOMINAL, cyanScale: CYAN_SCALE,
+      squat: HEAD_SQUAT, openShare: OPEN_SHARE, openStretch: OPEN_STRETCH },
+    stalk: { wide: STALK_WIDE, tall: STALK_TALL, steps: STALK_STEPS, grade: STALK_GRADE },
     // The pistil's band, and the share of ONE SIDE it covers -- the number the
-    // far family carries, written once here and read there.
-    band: { spine: BAND_SPINE, top: BAND_TOP,
-      share: BAND_SPINE + BAND_TOP * (1 - BAND_SPINE) },
+    // far family carries, written once here and read there. The share used to be
+    // arithmetic on the two constants; it is the BOXES' own now, and the two
+    // agree, which is a leg guard-fiori asks for rather than a coincidence.
+    band: { spine: BAND_SPINE, top: BAND_TOP, share: pistilShare(),
+      sheetShare: BAND_SPINE + BAND_TOP * (1 - BAND_SPINE),
+      proud: PISTIL_PROUD, proudMetres: PISTIL_PROUD_M, ribWide: PISTIL_HALF * 2,
+      contact: PISTIL_CONTACT },
+    // What the buffer actually holds, so a gate can count faces without owning a
+    // second copy of the geometry -- and what the roles in it MEAN, so it does
+    // not have to guess that from an integer either.
+    faces: flowerFaces(),
+    roles: { lid: ROLE_LID, side: ROLE_SIDE, pistil: ROLE_PISTIL, stalk: ROLE_STALK },
     headShade: HEAD_SHADE,
     paleStep: PALE_STEP,
     sowing: { perSquareMetre: FLOWER_PER_M2, cell: FLOWER_CELL,
@@ -1439,73 +1620,221 @@ export function flowerCensus() {
 // orientation ladder it takes. It is a property of the FACE and not of anything
 // per-flower: three values in the whole geometry.
 //
-// The lid and the sides are told apart for the band's sake and for nothing
-// else: the target's horizontal band runs UNDER the top face, and the top face
-// itself is pale.
+// FOUR ROLES NOW, AND THE THIRD IS THE ONE THIS SESSION ADDED. The lid and the
+// sides are told apart because the target's course of yellow runs UNDER the top
+// face and the top face itself is pale, and because the contact mask belongs to
+// the pale SIDES and to nothing else. The pistil is its own role because it is
+// its own solid: it carries the warm pigment and it takes the head's light on
+// its own normals, which is the whole of what makes a relief read as one.
 const ROLE_LID = 0;
 const ROLE_SIDE = 1;
-const ROLE_STALK = 2;
+const ROLE_PISTIL = 2;
+const ROLE_STALK = 3;
+
+// The six outward normals of a box, and the up each face measures its own square
+// against. A side stands its [0,1] square on world +Y so the course under the
+// lid is at the top of it on all four; a lid and a floor have no up of their own
+// and take +Z, which is a choice made once here rather than four times below.
+const BOX_FACES = [
+  { n: [1, 0, 0], v: [0, 1, 0] },
+  { n: [-1, 0, 0], v: [0, 1, 0] },
+  { n: [0, 0, 1], v: [0, 1, 0] },
+  { n: [0, 0, -1], v: [0, 1, 0] },
+  { n: [0, 1, 0], v: [0, 0, 1] },
+  { n: [0, -1, 0], v: [0, 0, 1] },
+];
 
 /**
- * The flower: a cube head on a thin box of a stalk, in metres, at the nominal
- * size. Nine quads, eighteen triangles.
+ * ONE CLOSED BOX, WOUND FROM ITS OWN NORMALS.
  *
- * THE HEAD HAS NO UNDERSIDE, and that is measured rather than assumed: it
- * stands seven centimetres over the ground and the eye stands at 1.58 m, so the
- * face pointing down is behind the head from every place a walker can put their
- * eye. The stalk has no lid and no foot either -- the head covers one and the
- * ground the other.
+ * THIS FUNCTION IS THE FIX, and the defect it retires is worth writing down
+ * because it survived four sessions of measurement without one of them seeing
+ * it. The nine quads of the flower were written out by hand as lists of four
+ * corners, and four of the nine were listed the wrong way round: the two faces
+ * along X of the head and the two along X of the stalk wound CLOCKWISE seen from
+ * outside. A ShaderMaterial culls back faces by default, so those four were
+ * never drawn -- the head showed three of its faces and the stalk two of its
+ * four, and a walker turning round one saw a pale lid floating over a green
+ * lamina with the meadow visible straight through where the east and west sides
+ * of the plant should have been. That is exactly what the committente reported:
+ * <<girandoci attorno MANCANO DELLE FACCE, sia ai fiori che allo stelo>>.
  *
- * WHY THE HEAD IS NOT TURNED. Every cube in this world is on the lattice, and
- * the target's flower heads are too: their faces run parallel to the meadow's.
- * A yaw per flower would be the one population in the frame that is not.
+ * The defect could not be seen from the poses this campaign judges, which look
+ * very nearly along -Z: the two faces that face the walker at those poses are
+ * the two that were wound correctly. Every gate the flower had was arithmetic
+ * over the FIELD -- where heads stand, what they are coloured, how many there
+ * are -- and not one of them read the buffer. Both halves of that are mended
+ * below: the winding cannot be got wrong by hand any more because no hand writes
+ * it, and guard-fiori now counts the faces a bearing can see.
  *
- * AND EVERY QUAD CARRIES ITS OWN SQUARE, which is the whole of what the pistil
- * needed and the whole of what the texture session will need. The four corners
- * of every face are written in ONE order -- bottom-left, bottom-right,
- * top-right, top-left -- so aFace is the same four pairs for all nine of them
- * and a fragment always knows where on its own face it stands. The band above
- * is drawn from it; a 16x16 sheet with alpha would be sampled at it.
+ * HOW IT CANNOT GO WRONG. Every face is built from its outward normal n and an
+ * up v, with the in-plane right worked out as u = v x n. Then u, v, n are a
+ * right-handed triple by construction, the four corners are emitted at
+ * (-u,-v), (+u,-v), (+u,+v), (-u,+v), and the first triangle's own normal is
+ * (2u) x (2u + 2v) = 4 (u x v) = 4n -- outward, always, for any n this table
+ * holds. The corners double as the face's [0,1] square, which is what the
+ * contact mask is sampled at.
+ *
+ * @param {number[]} centre  the box's own centre, in metres
+ * @param {number[]} half  its half-extents along x, y, z
+ * @param {number|Function} role  the role of every face, or one per normal
+ * @param {number[][]} [skip]  normals not to emit, for a face another box covers
+ * @returns {object[]} one entry a face: four corners, the normal, the role
  */
-function flowerGeometry() {
+function boxFaces(centre, half, role, skip = []) {
+  const out = [];
+  const ext = (a) => Math.abs(a[0]) * half[0] + Math.abs(a[1]) * half[1] + Math.abs(a[2]) * half[2];
+  for (const { n, v } of BOX_FACES) {
+    if (skip.some((s) => s[0] === n[0] && s[1] === n[1] && s[2] === n[2])) continue;
+    const u = [v[1] * n[2] - v[2] * n[1], v[2] * n[0] - v[0] * n[2], v[0] * n[1] - v[1] * n[0]];
+    const du = ext(u);
+    const dv = ext(v);
+    const mid = [centre[0] + n[0] * ext(n), centre[1] + n[1] * ext(n), centre[2] + n[2] * ext(n)];
+    const corner = (su, sv) => [
+      mid[0] + u[0] * su * du + v[0] * sv * dv,
+      mid[1] + u[1] * su * du + v[1] * sv * dv,
+      mid[2] + u[2] * su * du + v[2] * sv * dv,
+    ];
+    out.push({
+      corners: [corner(-1, -1), corner(1, -1), corner(1, 1), corner(-1, 1)],
+      normal: n,
+      role: typeof role === 'function' ? role(n) : role,
+    });
+  }
+  return out;
+}
+
+/** Where the foot of a stalk is buried, so a slope never shows daylight under it. */
+const STALK_FOOT = -0.03;
+
+/**
+ * THE FLOWER, AS FOUR CLOSED SOLIDS AND A CLOSED STALK, in metres, at the
+ * nominal size. Twenty-seven quads, fifty-four triangles.
+ *
+ * WHAT STANDS THERE, from the bottom up:
+ *
+ *   THE STALK, a closed box on four sides. Its lid is covered by the head's own
+ *   floor, which is wider than it, and its foot is buried; those two faces are
+ *   the only ones in the whole plant that are not built, and they are not built
+ *   because nothing can ever see them rather than because of a range argument.
+ *   That distinction is the point of this session: the old head skipped its
+ *   underside on a reading of where a walker's eye can be, and a reading is a
+ *   thing that can be wrong.
+ *
+ *   THE BODY, a closed box on four sides and a floor. It has no lid, because the
+ *   collar above is WIDER than it and covers the whole of one -- two coplanar
+ *   faces at the same height would fight for the depth buffer, and the fix for
+ *   that is to build one of them and not to bias either.
+ *
+ *   THE TWO RIBS, one crossing on x and one on z, each standing PISTIL_PROUD out
+ *   of the two faces it pierces. Seen from any bearing, the near face carries a
+ *   yellow rib down its middle and the two faces beside it carry the far ends of
+ *   the other rib at their edges -- which is both readings of the reference at
+ *   once: C-TEXTURE's <<banda verticale sullo spigolo verso l'occhio>> at the
+ *   corners and U-PIG-2's centroid at the middle. They run from below the body's
+ *   floor to under the collar, and they start BELOW the floor rather than at it
+ *   so that no two faces of this plant are ever coplanar.
+ *
+ *   THE COLLAR, a closed box under the lid, standing proud on all four sides:
+ *   the reference's <<banda orizzontale sotto la faccia superiore>> as a brim.
+ *   Its own top face is the head's lid and is PALE, which is what the reference
+ *   shows and what the old ROLE_LID meant.
+ *
+ * THE HEAD IS CLOSED FROM EVERY ANGLE, INCLUDING FROM BELOW. Six faces of the
+ * body-and-collar stack, and the reason the floor is built is not that a walker
+ * is expected to see it -- at 1.58 m of eye and 7.5 cm of stalk, on the flat, he
+ * cannot -- but that this world is not flat and the cost of being wrong about it
+ * a second time is a face missing from a picture the committente is holding. It
+ * is two triangles.
+ *
+ * WHY THE HEAD IS NOT TURNED, unchanged: every cube in this world is on the
+ * lattice and the target's heads are too, so a yaw per flower would be the one
+ * population in the frame that is not.
+ *
+ * AND EVERY QUAD STILL CARRIES ITS OWN SQUARE in aFace, which is where the
+ * contact mask is sampled.
+ */
+function flowerBoxes() {
   const h = HEAD_NOMINAL / 2;
   const y0 = STALK_TALL;
-  const y1 = STALK_TALL + HEAD_NOMINAL * HEAD_SQUAT;
+  const tall = HEAD_NOMINAL * HEAD_SQUAT;
+  const y1 = y0 + tall;
   const s = STALK_WIDE / 2;
-  // Buried a little, so a stalk on a slope never shows daylight under it.
-  const foot = -0.03;
-  const quads = [
-    // the head: top, then the four sides
-    [[-h, y1, -h], [-h, y1, h], [h, y1, h], [h, y1, -h], [0, 1, 0], ROLE_LID],
-    [[h, y0, -h], [h, y0, h], [h, y1, h], [h, y1, -h], [1, 0, 0], ROLE_SIDE],
-    [[-h, y0, h], [-h, y0, -h], [-h, y1, -h], [-h, y1, h], [-1, 0, 0], ROLE_SIDE],
-    [[-h, y0, h], [h, y0, h], [h, y1, h], [-h, y1, h], [0, 0, 1], ROLE_SIDE],
-    [[h, y0, -h], [-h, y0, -h], [-h, y1, -h], [h, y1, -h], [0, 0, -1], ROLE_SIDE],
-    // the stalk: four sides, no lid and no foot
-    [[s, foot, -s], [s, foot, s], [s, y0, s], [s, y0, -s], [1, 0, 0], ROLE_STALK],
-    [[-s, foot, s], [-s, foot, -s], [-s, y0, -s], [-s, y0, s], [-1, 0, 0], ROLE_STALK],
-    [[-s, foot, s], [s, foot, s], [s, y0, s], [-s, y0, s], [0, 0, 1], ROLE_STALK],
-    [[s, foot, -s], [-s, foot, -s], [-s, y0, -s], [s, y0, -s], [0, 0, -1], ROLE_STALK],
+  const r = PISTIL_PROUD_M;
+  const collar = tall * BAND_TOP;
+  // The ribs stop under the collar and start under the floor, by the same relief
+  // they stand out by on the sides: one solid crossing the head, not three.
+  const ribLow = y0 - r;
+  const ribHigh = y1 - collar;
+  const ribMid = (ribLow + ribHigh) / 2;
+  const ribHalf = (ribHigh - ribLow) / 2;
+  return [
+    // THE STALK: FIVE FACES, AND THE FIFTH IS A MEASUREMENT AND NOT A HABIT.
+    //
+    // Its lid is not built because the head's floor is wider than the stalk and
+    // covers the whole of it, at the same height, always -- an occlusion that is
+    // a fact about the two boxes and not about where a walker can stand.
+    //
+    // Its FOOT is built, and it was not going to be. The foot is buried three
+    // centimetres under the blade the plant stands on, so the argument for
+    // leaving it out is the same one that left the head's underside out: nobody
+    // can get an eye down there. The ray bench in guard-fiori was run before the
+    // decision instead of after it, and it found 198 rays entering the stalk's
+    // open bottom from eight degrees BELOW the plant -- which is a walker on the
+    // low side of a step looking at a flower on the high side, and this world has
+    // steps. It is two triangles. The rule this session leaves behind is that a
+    // face comes off only when another face covers it, never when an argument
+    // says nobody will look.
+    ...boxFaces([0, (STALK_FOOT + y0) / 2, 0], [s, (y0 - STALK_FOOT) / 2, s],
+      ROLE_STALK, [[0, 1, 0]]),
+    // the body: four sides and a floor, no lid -- the collar is it
+    ...boxFaces([0, (y0 + ribHigh) / 2, 0], [h, (ribHigh - y0) / 2, h],
+      ROLE_SIDE, [[0, 1, 0]]),
+    // the two ribs, closed, each proud of the two faces it pierces
+    ...boxFaces([0, ribMid, 0], [h + r, ribHalf, PISTIL_HALF], ROLE_PISTIL),
+    ...boxFaces([0, ribMid, 0], [PISTIL_HALF, ribHalf, h + r], ROLE_PISTIL),
+    // and the collar, whose lid is the head's and is pale
+    ...boxFaces([0, y1 - collar / 2, 0], [h + r, collar / 2, h + r],
+      (n) => (n[1] > 0 ? ROLE_LID : ROLE_PISTIL)),
   ];
+}
+
+/**
+ * THE FACES THE BUFFER HOLDS, published so a gate can count them.
+ *
+ * The census carries this because of what went wrong: the flower's gates were
+ * arithmetic over the FIELD and none of them ever read a triangle, so four quads
+ * wound the wrong way lived through every one of them. A gate that wants to ask
+ * "can a walker standing there see a hole" needs the faces, and it must not hold
+ * a second copy of them -- a second copy is the next thing to drift out of step
+ * with the first. So it gets these, off the same call the mesh is built from.
+ *
+ * @returns {{normal: number[], role: number, corners: number[][]}[]}
+ */
+function flowerFaces() {
+  return flowerBoxes();
+}
+
+function flowerGeometry() {
+  const faces = flowerBoxes();
   const CORNERS = [[0, 0], [1, 0], [1, 1], [0, 1]];
-  const positions = new Float32Array(quads.length * 4 * 3);
-  const normals = new Float32Array(quads.length * 4 * 3);
-  const roles = new Float32Array(quads.length * 4);
-  const faces = new Float32Array(quads.length * 4 * 2);
-  const indices = new Uint16Array(quads.length * 6);
-  quads.forEach((quad, q) => {
-    const normal = quad[4];
+  const positions = new Float32Array(faces.length * 4 * 3);
+  const normals = new Float32Array(faces.length * 4 * 3);
+  const roles = new Float32Array(faces.length * 4);
+  const square = new Float32Array(faces.length * 4 * 2);
+  const indices = new Uint16Array(faces.length * 6);
+  faces.forEach((face, q) => {
     for (let c = 0; c < 4; c++) {
       const o = (q * 4 + c) * 3;
-      positions[o] = quad[c][0];
-      positions[o + 1] = quad[c][1];
-      positions[o + 2] = quad[c][2];
-      normals[o] = normal[0];
-      normals[o + 1] = normal[1];
-      normals[o + 2] = normal[2];
-      roles[q * 4 + c] = quad[5];
-      faces[(q * 4 + c) * 2] = CORNERS[c][0];
-      faces[(q * 4 + c) * 2 + 1] = CORNERS[c][1];
+      positions[o] = face.corners[c][0];
+      positions[o + 1] = face.corners[c][1];
+      positions[o + 2] = face.corners[c][2];
+      normals[o] = face.normal[0];
+      normals[o + 1] = face.normal[1];
+      normals[o + 2] = face.normal[2];
+      roles[q * 4 + c] = face.role;
+      square[(q * 4 + c) * 2] = CORNERS[c][0];
+      square[(q * 4 + c) * 2 + 1] = CORNERS[c][1];
     }
     const b = q * 4;
     const i = q * 6;
@@ -1516,9 +1845,31 @@ function flowerGeometry() {
   geometry.setAttribute('position', new BufferAttribute(positions, 3));
   geometry.setAttribute('normal', new BufferAttribute(normals, 3));
   geometry.setAttribute('aRole', new BufferAttribute(roles, 1));
-  geometry.setAttribute('aFace', new BufferAttribute(faces, 2));
+  geometry.setAttribute('aFace', new BufferAttribute(square, 2));
   geometry.setIndex(new BufferAttribute(indices, 1));
   return geometry;
+}
+
+/**
+ * WHAT SHARE OF ONE SIDE OF A HEAD IS YELLOW, COMPUTED OFF THE BOXES.
+ *
+ * Seen square on, the head's silhouette is as wide as the collar and the ribs
+ * make it, and three things in it are yellow: the collar's own course across the
+ * whole of that width, the near rib's end cap down the middle, and the two ends
+ * of the crossing rib at the two edges. This returns their sum over the whole,
+ * and it is the ONE producer of that number -- the census publishes it, the far
+ * family's quad paints it, and guard-fiori checks it lands where the reference
+ * put it. Written as arithmetic over the same constants the boxes are built
+ * from, so a rib that changed width without this changing with it is not a thing
+ * that can happen.
+ *
+ * @returns {number} the share, between nought and one
+ */
+function pistilShare() {
+  const h = HEAD_NOMINAL / 2;
+  const r = PISTIL_PROUD_M;
+  const wide = h + r;
+  return BAND_TOP + (PISTIL_HALF + r) / wide * (1 - BAND_TOP);
 }
 
 // THE HEAD'S OWN LIGHT, AND THERE IS ONE PRODUCER OF IT FOR BOTH FAMILIES.
@@ -1538,16 +1889,21 @@ const FLOWER_VERTEX = /* glsl */`
   attribute float aRole;    // which pigment this face carries, and how it is lit
   attribute vec2 aFace;     // where on its own face this vertex stands, [0,1]^2
   attribute vec4 aFlower;   // world x, the foot of the stalk, z, and the scale
-  attribute vec2 aLook;     // nought for white and one for cyan, and the tint
+  // FOUR NOW, AND THE TWO THAT WERE ADDED ARE E-DECISIONI9.1 AND 10. Nought for
+  // white and one for cyan; the tint; how far the head is drawn open, which is
+  // the second per-instance number the squat wanted; and the pigment field under
+  // this flower's own column, which is how a stalk carries the meadow's zones
+  // without its fragment having a cell to rebuild them from.
+  attribute vec4 aLook;
 
-  varying vec3 vPale;
-  varying vec3 vWarm;
-  varying vec3 vFace;       // the face coordinate, and one on the head's sides
+  varying vec3 vTint;
+  varying vec3 vFace;       // the face coordinate, and one on the head's pale sides
   varying float vFog;
 
   uniform vec3 uPale;
   uniform vec3 uPistil;
   uniform vec3 uCyan;
+  uniform vec3 uCyanPistil;
   uniform vec3 uStalk;
   uniform vec2 uCentre;
   uniform float uRadius;
@@ -1573,7 +1929,25 @@ const FLOWER_VERTEX = /* glsl */`
     // to be checked for.
     float reach = length(aFlower.xz - uCentre);
     float trim = 1.0 - step(uRadius, reach);
-    vec3 world = aFlower.xyz + position * (aFlower.w * trim);
+
+    // WHICH OF THE FOUR SOLIDS THIS VERTEX BELONGS TO. The lid, the sides and
+    // the pistil are the head; the stalk is not, and it is the only one of the
+    // four that is not stretched, not lit by the head's own pair and not painted
+    // out of the two flower pigments.
+    float head = step(aRole, 2.5);
+    float pistil = step(1.5, aRole) * step(aRole, 2.5);
+
+    // AND THE HEAD OPENS BY GROWING UPWARD OFF ITS OWN FLOOR. One multiply on
+    // one axis, pivoted where the stalk hands over, so an open head is taller
+    // and stands in exactly the same place as the bud it would otherwise be --
+    // E-DECISIONI9.1's <<puo' variare anche SOLO IN ALTEZZA>>, and the reason the
+    // pivot is the floor and not the centre is that the contract publishes the
+    // head's own y and a head that grew both ways would move it.
+    vec3 local = position;
+    local.y = mix(local.y,
+      ${STALK_TALL.toFixed(6)} + (local.y - ${STALK_TALL.toFixed(6)}) * aLook.z, head);
+
+    vec3 world = aFlower.xyz + local * (aFlower.w * trim);
 
     // THE LIGHT IS THE SEAT'S, PER FACE, AND THE HEAD TAKES A SHARE OF THE
     // LADDER RATHER THAN THE WHOLE OF IT. A card taps the ground's own pair
@@ -1585,18 +1959,48 @@ const FLOWER_VERTEX = /* glsl */`
     // between them, and HEAD_SHADE is that reading: the head's own pair, bent
     // towards the pair its top face makes. The producer is untouched and so is
     // the stalk, which is a stalk and stands like one.
-    float head = step(aRole, 1.5);
     vec3 light = mix(faceLight(normal), headLight(normal), head);
 
-    vec3 pale = mix(uStalk, mix(uPale, uCyan, aLook.x), head);
-    // A cyan head's warm pigment is its own pale: the band below then mixes
-    // between two equal colours and disappears, which is the target's law
-    // (C-TEXTURE §1.3: zero yellow pixels on five cyan heads) written as
-    // arithmetic instead of as a branch nobody can see the other side of.
-    vec3 warm = mix(uStalk, mix(uPistil, uCyan, aLook.x), head);
-    vPale = pale * light * aLook.y;
-    vWarm = warm * light * aLook.y;
-    vFace = vec3(aFace, head * step(0.5, aRole));
+    // THE STALK'S OWN GRADATION, IN STEPS, AND ITS ZONE.
+    //
+    // E-DECISIONI10 asks for a gradation from foot to crown and E-DECISIONI9.1
+    // for a green that <<varia un poco di gradazione per zona>>. Both arrive
+    // here and neither costs a vertex: the steps come off the quad's own square,
+    // which already runs nought at the foot to one at the top on all four sides,
+    // and the zone comes off the instance, sampled from the pigment field at
+    // fill time on the column this flower stands on. The note in
+    // voxel/pigment.js that said a flower's fragment has no cell to rebuild the
+    // field from is answered rather than argued with: it does not need one, it
+    // needs the answer, and the answer is one float.
+    float rung = min(floor(aFace.y * ${STALK_STEPS}.0), ${STALK_STEPS}.0 - 1.0)
+      / (${STALK_STEPS}.0 - 1.0);
+    float grade = 1.0 + ${STALK_GRADE.toFixed(3)} * (rung - 0.5);
+    vec3 stalk = uStalk * aLook.w * grade;
+
+    // AND THE BLUES CARRY A PISTIL TOO, WHICH IS THE COMMITTENTE OVERRULING THE
+    // TARGET AND IS MARKED AS THAT.
+    //
+    // What stood here was the reference's own law written as arithmetic: a cyan
+    // head's warm pigment was its own pale, so the band mixed between two equal
+    // colours and vanished (C-TEXTURE §1.6, zero yellow pixels on five cyan
+    // heads). The committente has since walked the meadow and said <<anche i blu
+    // devono avere i pistilli>>, which corrects E-DECISIONI9, and a reading of
+    // the picture does not outrank the man the picture is for.
+    //
+    // SO THE COLOUR IS TAKEN FROM THE NEAREST THING THE TARGET DOES SHOW, and
+    // that is the white flower's own pistil -- the only pistil in the reference.
+    // It is not copied across: what is carried over is the LAW that produced it,
+    // PISTIL_HUE at PISTIL_OF_PALE of its own head's luminance, applied to the
+    // cyan seat instead of the pale one. So a blue head's pistil stands in the
+    // same relation to its head as a white head's does to its, and the number
+    // that relation is worth is measured and not invented.
+    vec3 pale = mix(stalk, mix(uPale, uCyan, aLook.x), head);
+    vec3 warm = mix(stalk, mix(uPistil, uCyanPistil, aLook.x), head);
+    vTint = mix(pale, warm, pistil) * light * aLook.y;
+    // The contact mask belongs to the pale SIDES and to nothing else: not to the
+    // lid, which the reference draws pale and flat, and not to the pistil, which
+    // is the thing casting it.
+    vFace = vec3(aFace, step(0.5, aRole) * step(aRole, 1.5));
     vFog = fogAmount(length(cameraPosition - world), world.y);
 
     gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
@@ -1606,39 +2010,41 @@ const FLOWER_VERTEX = /* glsl */`
 const FLOWER_FRAGMENT = /* glsl */`
   precision highp float;
 
-  varying vec3 vPale;
-  varying vec3 vWarm;
+  varying vec3 vTint;
   varying vec3 vFace;
   varying float vFog;
 
   uniform vec3 uFogColour;
-  uniform sampler2D tBand;   // the pistil, as a sixteen texel sheet with a mask
+  uniform float uContact;
+  uniform sampler2D tBand;   // where the pistil stands, as a sixteen texel mask
 
   void main() {
-    // THE PISTIL, AND IT IS A SHEET NOW RATHER THAN TWO SMOOTHSTEPS.
+    // THE SHEET IS STILL SAMPLED AND IT IS NO LONGER THE PISTIL.
     //
-    // What it draws is the same shape and the same share: the spine down the
-    // middle of the face and the lid under the top of it, at the two widths
-    // U-PIG-2 fitted, rasterised at sixteen by tools/materia/foglio.mjs into
-    // assets-src/materia/flower-band.png. The seat was already here -- every
-    // side of the head arrives with its own [0,1] square in vFace.xy -- and it
-    // was left ready for exactly this, with no vertex to move.
+    // It used to BE the pistil: the spine down the middle of a face and the
+    // course under the lid, at the two widths U-PIG-2 fitted, rasterised at
+    // sixteen by tools/materia/foglio.mjs into assets-src/materia/flower-band.png
+    // and mixed between two pigments here. The pistil is a solid now, so what is
+    // left for a mask of exactly where the pistil stands is the CONTACT it makes
+    // with the face it rises out of -- the darkening a rib puts on the panel it
+    // is standing on. Nothing about the sheet on disk changes, and neither do
+    // the two constants it is cut from; what changes is that the shape now
+    // agrees with a shape the geometry also has, instead of standing in for one.
     //
-    // WHAT THE SHEET BUYS, since the still is the same still. The shape becomes
-    // DATA: the next reading of the reference's pistil enters as a rectangle in
-    // fogli.json and not as an edit to a shader. And the softening at range
-    // becomes the mip chain's instead of a fwidth's -- the fwidth softened over
-    // one pixel at every distance, which is right at one distance; a mip level
-    // softens over the footprint, and as a head shrinks towards the exchange
-    // ring the last level it reaches is the sheet's own mean, which is the
-    // share the far family paints its quad with. The two halves of the meadow
-    // meet at the same colour by construction rather than by a number written
-    // twice.
-    float band = texture2D(tBand, vFace.xy).r * vFace.z;
+    // AND THE RIM IS THE POINT. The rib is NARROWER than the sheet's spine,
+    // because PISTIL_HALF pays for the relief out of the rib's own width, so
+    // what shows either side of the rib is a strip of darkened white -- and the
+    // same either side of the brim. That is where a solid standing on a face
+    // puts its shadow, and it is what keeps the relief from reading as a decal.
+    //
+    // What the sheet still buys is what it bought before: the shape is DATA and
+    // the softening at range is the mip chain's, so a head receding towards the
+    // exchange ring loses this the way it loses everything else.
+    float contact = 1.0 - uContact * texture2D(tBand, vFace.xy).r * vFace.z;
 
-    // No sheet, no cut-out and no alpha: a flower is a solid, so the one thing
-    // it needs of the air is what is in front of it.
-    gl_FragColor = vec4(mix(mix(vPale, vWarm, band), uFogColour, vFog), 1.0);
+    // No cut-out and no alpha: a flower is a solid, so the one thing it needs of
+    // the air is what is in front of it.
+    gl_FragColor = vec4(mix(vTint * contact, uFogColour, vFog), 1.0);
   }
 `;
 
@@ -1730,6 +2136,7 @@ const FAR_VERTEX = /* glsl */`
 
   uniform vec3 uPale;
   uniform vec3 uPistil;
+  uniform vec3 uCyanPistil;
   uniform vec3 uCyan;
   uniform float uBandShare;  // how much of a SIDE the pistil's band covers
   uniform vec2 uCentre;
@@ -1798,8 +2205,13 @@ const FAR_VERTEX = /* glsl */`
     // CUBE'S own average and not a second recipe for the same flower -- and its
     // band disappears here for the same reason it disappears there, because the
     // two colours it mixes between are equal.
+    // AND THE BLUE'S PISTIL IS IN THE FAR AVERAGE TOO, which is not a tidy-up:
+    // the seam at the exchange is the one number this family was ratified on, and
+    // a cyan head that carried a pistil as a solid and lost it crossing the ring
+    // would be a step in colour on exactly the object the ring was measured with.
+    // One line, the same line the solids read, with the same two pigments.
     vec3 pale = mix(uPale, uCyan, aLook.x);
-    vec3 warm = mix(uPistil, uCyan, aLook.x);
+    vec3 warm = mix(uPistil, uCyanPistil, aLook.x);
     vec3 side = mix(pale, warm, uBandShare);
     vec3 head = (side * headLight(alongX) * share.x
       + pale * headLight(vec3(0.0, 1.0, 0.0)) * share.y
@@ -1876,12 +2288,15 @@ function createFarFlowers({ height, lightScale, pigments, ring }) {
       uPale: { value: pigments.pale },
       uPistil: { value: pigments.pistil },
       uCyan: { value: pigments.cyan },
+      uCyanPistil: { value: pigments.cyanPistil },
       uHeadShade: { value: HEAD_SHADE },
-      // The share of ONE SIDE the band covers, worked out from the two numbers
-      // the solid's fragment draws it with rather than measured a second time:
-      // the spine down the middle, and the lid's band over what is left of the
-      // face on either side of it.
-      uBandShare: { value: BAND_SPINE + BAND_TOP * (1 - BAND_SPINE) },
+      // The share of ONE SIDE the pistil covers, and it is the SOLID'S OWN now.
+      // It used to be arithmetic on the two constants the fragment painted the
+      // band with; the pistil is a shape, so the share is computed off the boxes
+      // -- and the whole point of PISTIL_HALF is that the two answers are the
+      // same number, so this family paints exactly what the family on the other
+      // side of the ring builds, at any relief.
+      uBandShare: { value: pistilShare() },
       ...faceLightUniforms(lightScale * GROUND_EXPOSURE),
       ...SCENE_LIGHT_UNIFORMS,
       uCentre: { value: new Vector2() },
@@ -2077,14 +2492,22 @@ function createFlowers({ height, lightScale, pigments, band }) {
   const offsets = ringOffsets(FLOWER_RADIUS_MAX, FLOWER_CELL);
   const capacity = Math.ceil(offsets.length * FLOWER_PER_CELL * FLOWER_SHARE * 1.6) + 64;
   const flowerData = new Float32Array(capacity * 4);
-  const lookData = new Float32Array(capacity * 2);
+  // FOUR WIDE NOW: which flower, its tint, how far open its head is drawn, and
+  // the pigment field under its own column. The last two are the two halves of
+  // E-DECISIONI9.1 the file was carrying as residuals, and both are answered the
+  // same way -- as a number worked out where the flower is decided and handed to
+  // the shader, rather than as arithmetic the shader has no cell to run.
+  const lookData = new Float32Array(capacity * 4);
   const flowerAttribute = new InstancedBufferAttribute(flowerData, 4);
-  const lookAttribute = new InstancedBufferAttribute(lookData, 2);
+  const lookAttribute = new InstancedBufferAttribute(lookData, 4);
   flowerAttribute.setUsage(DynamicDrawUsage);
   lookAttribute.setUsage(DynamicDrawUsage);
   geometry.setAttribute('aFlower', flowerAttribute);
   geometry.setAttribute('aLook', lookAttribute);
   geometry.instanceCount = 0;
+  // The tallest thing a flower can be, which is an OPEN head on the biggest
+  // draw: the bound has to hold the stretch or a frustum test will cull a plant
+  // that is still on the screen.
   geometry.boundingSphere = new Sphere(new Vector3(), FLOWER_RADIUS_MAX + 1);
 
   // The exchange ring, and it is declared HERE because it is the solids' own
@@ -2096,11 +2519,14 @@ function createFlowers({ height, lightScale, pigments, band }) {
       uPale: { value: pigments.pale },
       uPistil: { value: pigments.pistil },
       uCyan: { value: pigments.cyan },
+      uCyanPistil: { value: pigments.cyanPistil },
       uStalk: { value: pigments.stalk },
       uHeadShade: { value: HEAD_SHADE },
-      // The sheet, or nothing: a head with no sheet is a head with no pistil,
-      // which is the flower that shipped before this one and not a black one.
+      // The sheet, or nothing: a head with no sheet is a head whose pistil casts
+      // no contact on the face it stands on, which is a flatter flower and not a
+      // broken one -- the pistil itself is geometry and is there either way.
       tBand: { value: band },
+      uContact: { value: PISTIL_CONTACT },
       // At the GROUND's exposure, because what a flower is lit by is the meadow
       // it stands in: the same line src/world/voxel/material.js asks for, so a
       // cube and the flower at its foot cannot disagree about the hour.
@@ -2140,12 +2566,18 @@ function createFlowers({ height, lightScale, pigments, band }) {
         if (!flower) continue;
         const o = n * 4;
         flowerData[o] = flower.x;
-        // The FOOT of the stalk and not the head: the geometry stands on it.
-        flowerData[o + 1] = flower.y - STALK_TALL * flower.scale - flower.size / 2;
+        // The FOOT of the stalk and not the head: the geometry stands on it, so
+        // this undoes exactly what flowerAt() put on top of the ground -- the
+        // stalk, and half of the head the flower actually has, open or not.
+        flowerData[o + 1] = flower.y - STALK_TALL * flower.scale
+          - flower.size * HEAD_SQUAT * flower.open / 2;
         flowerData[o + 2] = flower.z;
         flowerData[o + 3] = flower.scale;
-        lookData[n * 2] = flower.kind === 'ciano' ? 1 : 0;
-        lookData[n * 2 + 1] = flower.tint;
+        const l = n * 4;
+        lookData[l] = flower.kind === 'ciano' ? 1 : 0;
+        lookData[l + 1] = flower.tint;
+        lookData[l + 2] = flower.open;
+        lookData[l + 3] = flower.zone;
         if (flower.kind === 'ciano') blue++;
         n++;
         if (n >= capacity) break;
