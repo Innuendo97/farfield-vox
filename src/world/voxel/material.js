@@ -25,7 +25,7 @@ import {
 // What this file adds is the seat those numbers are painted from.
 import {
   APRON, GRAIN, GRAIN_GAIN, GRAIN_FADE, JOINT_DARK, JOINT_FADE, JOINT_LIP,
-  JOINT_SOFT, PATH_SKIN, PEB_EDGE, PEB_LEVEL, PEB_MIX, SKIN_REACH, TUNING,
+  JOINT_SOFT, PATH_SKIN, PEB_EDGE, PEB_LEVEL, PEB_MIX, RELIEF, SKIN_REACH, TUNING,
   EARTH as PATH_EARTH, STONE as PATH_STONE, STONE_PALE as PATH_STONE_PALE,
 } from '../path.js';
 // THE GRAIN INSIDE A FACE, AND ITS SEAT IS A FILE OF ITS OWN because three
@@ -866,6 +866,12 @@ export function pavingSettings() {
     apronWarm: TUNING.apron.warm,
     apron: new Vector2(...APRON),
     jointFade: new Vector2(...JOINT_FADE),
+    // THE RELIEF OF THE TASSELLI, live like everything else in this record, so a
+    // sweep on the shadow costs a redraw and not a rebuild.
+    reliefHigh: RELIEF.high,
+    reliefShade: RELIEF.shade,
+    reliefWall: RELIEF.wall,
+    reliefMean: RELIEF.mean,
     grainFade: new Vector2(...GRAIN_FADE),
     grainGain: GRAIN_GAIN,
     pebEdge: new Vector2(...PEB_EDGE),
@@ -936,7 +942,24 @@ export function pavingSettings() {
     // size of a slab and of the pitch of three maps. That half is phase C's and
     // it is NOT attempted here -- what is here is the one part of the reading
     // that is a pigment.
-    warmth: new Vector3(1.4256, 0.9491, 0.2511),
+    // AND THE AMOUNT IS RE-SOLVED WHERE THE COMPOSITION MOVED IT, on the same
+    // instrument, at the same window, against the same number.
+    //
+    // The exponent above was 2.9 and the paving it was fitted on was nearly all
+    // stone. U-SENT-2 thinned the stone into earth across the corridor
+    // (E-DECISIONI10 S3, SPREAD in ../path.js), and earth is the WARM end of the
+    // very ramp this rotation acts on -- so the same rotation on a browner
+    // paving arrives warmer. Read on V3's own bench at V3's own window
+    // (fondazione/lav/tinta.py, the mid run C 1.5 names) the corridor came back
+    // at R/B 1.913 where the reference reads 1.730 and where the fit had landed
+    // 1.719. Swept live at the judging pose, the exponent that puts it back is
+    // 2.4: 1.529 / 1.629 / 1.733 / 1.913 at 1.8 / 2.1 / 2.4 / 2.9.
+    //
+    // THE DIRECTION IS UNTOUCHED, which is the whole reason the fit was written
+    // as an exponent on a measured ratio rather than as three numbers: what
+    // moved is how much of a measurement the chain lets through when the surface
+    // under it changed, and that is the thing the method above says is fitted.
+    warmth: new Vector3(1.3506, 0.9643, 0.3207),
     // ------------------------------------------------------------------------
     // AND HERE IS THAT OTHER HALF, WITH WHAT IT COULD AND COULD NOT TAKE.
     //
@@ -1019,6 +1042,10 @@ const PAVING_FRAGMENT = /* glsl */`
   uniform vec4 uLine;
   uniform vec2 uSkinZ;
   uniform float uSkinHalf;
+  uniform float uReliefHigh;
+  uniform float uReliefShade;
+  uniform float uReliefWall;
+  uniform float uReliefMean;
 
   ${SCENE_LIGHT_GLSL}
   ${FACE_LIGHT_GLSL}
@@ -1047,7 +1074,13 @@ const PAVING_FRAGMENT = /* glsl */`
     // of the piece under the point, piecewise constant on pieces a hand across,
     // which needs a quarter of the pitch to say so.
     float depth = texture2D(tJoint, skin).r * uSkinReach;
-    float tone = texture2D(tTone, skin).r;
+    // TWO FIELDS OUT OF THE SECOND FETCH AND NOT TWO FETCHES. Red is the level
+    // of the piece, green is HOW FAR IT STANDS PROUD -- nought at the corridor's
+    // floor and one at uReliefHigh. See RELIEF in ../path.js: a centimetre is a
+    // tenth of this world's cell, so the relief is drawn and never built.
+    vec2 piece = texture2D(tTone, skin).rg;
+    float tone = piece.x;
+    float lift = piece.y;
 
     float apron = smoothstep(uApron.x, uApron.y, vWorld.z);
 
@@ -1131,10 +1164,46 @@ const PAVING_FRAGMENT = /* glsl */`
     float trough = smoothstep(uJointLip.x, uJointLip.y, depth);
     albedo *= 1.0 - inSlot * (uJointDark.x + (uJointDark.y - uJointDark.x) * trough);
 
-    // THE LIGHT, AND THERE IS NO ATLAS IN IT. The same two terms of a flat face
-    // the meadow beside it is lit by, from the one producer of them in
-    // src/world/face-light.js, on this face's own normal.
-    vec3 light = faceLight(normalize(vNormal));
+    // THE RELIEF OF THE TASSELLI, AND IT IS THE LIGHT AND NOT THE PIGMENT.
+    //
+    // E-DECISIONI10 S1: «ogni tassello e' giustificato, ha la sua parte scura
+    // dovuta all'ombreggiatura della sporgenza». A shadow is not a colour, and a
+    // shadow written into the albedo would be a stone that is dark at midnight
+    // as well as at noon. src/world/face-light.js exists in the shape it does
+    // for exactly this -- «a material may bend the sun term between the two, the
+    // masonry does, for its own relief» -- so the pair is asked for once and
+    // bent, and where the sun is stays the one producer's business.
+    //
+    // ONE FETCH, AND IT IS THE PIECE ONE SHADOW-LENGTH TOWARD THE SUN. A piece
+    // standing h proud lays h * cot(elevation) of shadow on the ground away from
+    // the beam; so the question "am I in a neighbour's shadow" is "does the
+    // piece one shadow-length sunward stand higher than mine", and it is asked
+    // of the LIVE sun rather than of a baked bearing. The offset is in strip
+    // coordinates because the strip is the only place the answer is written.
+    vec2 sunFlat = uSunDir.xz;
+    float sunRun = max(length(sunFlat), 1e-4);
+    float castLen = uReliefHigh * sunRun / max(uSunDir.y, 1e-3);
+    vec2 castUv = (sunFlat / sunRun) * castLen
+      * vec2(1.0 / (2.0 * uSkinHalf), 1.0 / (uSkinZ.y - uSkinZ.x));
+    float sunward = texture2D(tTone, skin + castUv).y;
+
+    vec2 terms = faceTerms(normalize(vNormal));
+    // The cast shadow keeps the sky and loses the beam, which is what a shadow
+    // IS. Deeper by the step the two pieces stand apart, and nought where the
+    // neighbour is no higher.
+    terms.x *= 1.0 - uReliefShade * max(0.0, sunward - lift);
+    // AND THE WALL OF THE SLOT, WHICH IS THE HALF THE CAST SHADOW CANNOT DRAW. A
+    // slot between two pieces that stand a centimetre proud is a groove, and a
+    // groove sees less of the SKY as well as less of the sun -- which is why
+    // this one multiplies the pair. It is what the reference's own tessellation
+    // reads as at the pose the campaign judges on: a dark ring round every
+    // piece, of which only a fifth is directional (verbale U-SENT-2 §2.3).
+    // ABOUT ITS OWN MEAN, so the term is contrast and not a dimmer: see
+    // RELIEF.mean in ../path.js. The mean fades with the slot itself, or the
+    // far corridor would come back BRIGHTER than the near one where the joints
+    // have stopped being drawn.
+    terms *= 1.0 - uReliefWall * (inSlot * lift - uReliefMean * far);
+    vec3 light = faceLightOf(terms);
 
     vec3 colour = albedo * light;
     colour = mix(colour, uFogColour, fogAmount(vDistance, vWorld.y));
@@ -1203,6 +1272,13 @@ export function pavingMaterial(voxel, settings, maps) {
       },
       uSkinZ: { value: new Vector2(PATH_SKIN.z0, PATH_SKIN.z1) },
       uSkinHalf: { value: PATH_SKIN.half },
+      // The relief of the pieces: how tall the tallest stands, and what its
+      // shadow and the wall of its slot take off the light. See RELIEF in
+      // ../path.js -- these three are read from there and never restated.
+      uReliefHigh: { value: settings.reliefHigh },
+      uReliefShade: { value: settings.reliefShade },
+      uReliefWall: { value: settings.reliefWall },
+      uReliefMean: { value: settings.reliefMean },
       // THE EXPOSURE IS THE GROUND'S, TO THE FACTOR, and it is not a copy of a
       // taste. The corridor stands in the ground's air and is read against the
       // grass beside it: the two readings this material is gated on -- stone
@@ -1229,6 +1305,10 @@ export function pavingMaterial(voxel, settings, maps) {
     u.uSheetLayer.value.copy(settings.sheetLayers);
     u.uSheetGain.value.copy(settings.sheetGain);
     u.uSheetPerMetre.value = 1 / settings.sheetMetres;
+    u.uReliefHigh.value = settings.reliefHigh;
+    u.uReliefShade.value = settings.reliefShade;
+    u.uReliefWall.value = settings.reliefWall;
+    u.uReliefMean.value = settings.reliefMean;
   };
 
   return material;
