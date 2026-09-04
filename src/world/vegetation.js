@@ -12,6 +12,8 @@ import {
 import { MONOLITHS, PLATFORM, STAIRS } from './layout.js';
 import { ROCKS } from './rocks.js';
 import { voxelSettings } from './voxel/index.js';
+import { columnTop, DISC_RADIUS, EMPTY } from './voxel/worldgen.js';
+import { VOXEL } from './voxel/columns.js';
 import TERRAIN from '../../assets-src/terrain/terrain.json' with { type: 'json' };
 import GRASS from '../../assets-src/vegetation/grass.json' with { type: 'json' };
 
@@ -172,9 +174,23 @@ const ALPHA_CUTOFF = 0.34;
 // the old census called 0.13 to 0.15. A lamp cannot be smaller than the flower
 // it is hung in. At 0.082 the two measurements are the same object again.
 
+// AND THE HEAD CAME DOWN AGAIN, BY A TENTH, ON A THIRD READING. The census above
+// re-derived 8.2 cm from the pixels the old finder called heads. Read this
+// session through the SAME fitted camera, on the twenty-five heads the
+// research's own detector marks in its own window and with the voxel measured
+// where each head stands, the target's median comes to 7.0 cm; hand-read on the
+// two best-resolved heads of that window -- the ones where three faces can be
+// told apart -- it comes to 8.5. The pair of them brackets 7.5, and the
+// committente's B3 asks for the smaller of two readings that agree this closely.
+//
+// IT WIDENS THE GAP WITH V7 AND THAT IS SAID HERE. E-V7e measured the night
+// lamp's core at 0.103 m; at 8.2 the two were the same object, at 7.5 the lamp
+// is a third bigger than the flower it hangs in. That is the night's number and
+// this is the day's reading of the day target, so the reading stands and the
+// gap goes to the coordinator.
 /** The head, in metres. Drawn per flower between the two, uniformly. */
-const HEAD_MIN = 0.065;
-const HEAD_MAX = 0.100;
+const HEAD_MIN = 0.060;
+const HEAD_MAX = 0.090;
 /** The size everything below is authored at; a flower scales from it. */
 const HEAD_NOMINAL = (HEAD_MIN + HEAD_MAX) / 2;
 /** And the cyan head is a tenth smaller: 7.3 cm measured against 8.2. */
@@ -244,6 +260,7 @@ const FLOWER_CELL = 0.55;
 const FLOWER_PER_CELL = 2;
 const FLOWER_SHARE = (FLOWER_PER_M2 * FLOWER_CELL * FLOWER_CELL) / FLOWER_PER_CELL;
 const FLOWER_SEED = 1049;
+
 
 // HOW FAR THE SECOND FAMILY CARRIES THE MEADOW, AND WHERE IT STOPS.
 //
@@ -927,8 +944,13 @@ function createRing({
  * between things standing in the SAME picture under the SAME light at levels
  * near enough that the tone curve is locally a straight line.
  *
- *   - the CREAM face against the pale one, INSIDE one head: 0.747, 0.686, 0.355
- *     (n = 7 heads). Same material, same light, a few levels apart.
+ *   - the WARM face against the pale one, INSIDE one head: 0.747, 0.686, 0.355
+ *     (n = 7 heads). Same material, same light, a few levels apart. That ratio
+ *     is kept as a reading and is no longer used as a pigment: it carries the
+ *     hue of the target's band AND three quarters of a stop of its own shading,
+ *     and the shading was already the light's to do -- counted twice, the band
+ *     came out a dark olive where the target draws a pistil. What is authored
+ *     from it is PISTIL_HUE, which is its direction with the level taken out.
  *   - the LUMINANCE STEP from a head to the meadow immediately around it, which
  *     has the light in it twice and therefore not at all: white 3.61x (n = 23),
  *     cyan 2.21x (n = 7).
@@ -964,26 +986,119 @@ function createRing({
 // the same code reads off the target: at 1.75x the pigment would be 1.57, and
 // even there it is short by nearly half.
 //
-// SO THE GAP IS NOT THE FLOWER'S, AND IT IS MEASURED WHERE IT IS. Inside ONE
+// SO THE GAP IS NOT THE PIGMENT'S, AND IT IS MEASURED WHERE IT IS. Inside ONE
 // head -- same geometry, same pigment, two faces -- the brightest fifth over the
 // darkest reads 3.73x in the target and 8.51x here: OUR ORIENTATION LADDER IS
 // 2.3 TIMES STEEPER. With the side faces that far down, the head's average
 // cannot climb where the target's does however high the pigment is raised, and
-// that is exactly why the sweep saturates. src/world/face-light.js says the same
-// thing in its own words and calls it what it is -- "the reference's own shading
-// implies a sun higher and weaker than the one this world is sealed to, so the
-// orientation ladder cannot land while the light stays where it is" -- and moving
-// it is a refit of scene-light.json, which moves the paving and the stone with
-// it and belongs to the coordinator. Never a per-material fudge in a delivery,
-// and a flower painted brighter than an albedo to chase it would be one.
+// that is exactly why the sweep saturates.
+//
+// AND THAT IS THE HALF OF IT THIS SEAT CAN ANSWER, WHICH IS WHY HEAD_SHADE IS
+// BELOW. src/world/face-light.js is not touched and uLift stays at one: the
+// world's ladder is the coordinator's and a delivery never fudges it. What is
+// answered here is narrower and it is a statement about the OBJECT rather than
+// about the light -- how much of that ladder a head of petals takes at all.
 const PALE_STEP = 2.5;
+
+// HOW MUCH OF THIS WORLD'S ORIENTATION LADDER A FLOWER HEAD TAKES.
+//
+// Every flat face here is lit by the one producer in src/world/face-light.js: a
+// sun term that is the cosine the face turns to the beam, and a sky term that
+// is the share of the hemisphere the face can see. For a CUBE OF GROUND that is
+// right and it is frozen. For eight centimetres of petal standing in the open
+// it is too steep in both terms at once -- the side turned from the sun takes
+// NO sun and half the sky, so it lands three quarters below the top of its own
+// head, and at fourteen pixels the two average to the grey blob this campaign
+// has been calling a floating cube.
+//
+// MEASURED, INSIDE ONE HEAD, WITH ONE INSTRUMENT ON BOTH PICTURES: the
+// brightest fifth of a head's own box over the darkest fifth reads 1.68 in the
+// target (n = 25, p25 1.48, p75 1.88). This is the seat that number is answered
+// in, and answering it HERE is what the light's own seat provides for:
+// faceLightOf() takes the PAIR precisely so that a material may bend what it
+// was given -- the masonry already does it for its relief -- while faceTerms()
+// stays the only producer of one.
+//
+// The bend is a mix towards the pair of the head's OWN TOP FACE, which is the
+// one direction that cannot invent light: a petal that catches the open sky is
+// the brightest a petal is at this hour, and no face of the head is taken past
+// it. At nought the head is uniform -- which is what a voxel game does with a
+// flower, and it is a real option that C-TEXTURE §3.6 found in the vanilla
+// flower's own geometry ("shade": false) -- and at one it is a block of stone
+// again.
+const HEAD_SHADE = 0.34;
+
+// WHERE THE PISTIL IS, AND IT IS A BAND AND NOT A FACE.
+//
+// C-TEXTURE §1.3 measured it on nine heads: the yellow is a VERTICAL BAND ON
+// THE EDGE TURNED TO THE EYE plus a HORIZONTAL BAND UNDER THE TOP FACE -- an L
+// or a T -- worth a fifth to two fifths of the head, and the cyan ones have
+// none of it at all. What stood here was the whole of the two faces along z,
+// with the approximation written down beside it: both target poses look along
+// that axis, so a head presented its warm face to the camera and a walker who
+// turned round saw a different flower.
+//
+// THIS IS THE SAME READING ON ALL FOUR SIDES INSTEAD OF TWO, and WHERE on a
+// side it goes was settled between the two readings the dossiers hold, with the
+// numbers of one of them. C-TEXTURE calls it the edge turned to the eye; the
+// twenty-look reading this file already carried calls it "a WARM BAND down the
+// middle of the face turned to the eye -- about a fifth of its width". The
+// POSITIONS C published decide it: the yellow's centroid lands at 29, 34, 34,
+// 49 and 60 per cent of the head's width on its five sunlit samples -- the
+// MIDDLE of the silhouette, not its rim. Both readings agree there when a head
+// is seen corner-on, because then the near edge IS the middle; they part when
+// it is seen face-on, and at the poses this campaign judges, with a yaw of 1.8
+// degrees off the lattice, every head in the frame is seen face-on. So: down
+// the middle of each of the four sides, a fifth of the width, plus the band
+// along the top of each. A T on the face that is turned to the walker, from
+// every bearing, with no yaw and no billboard.
+//
+// AND IT IS DRAWN IN THE FRAGMENT OFF A FACE COORDINATE, WHICH IS THE POINT.
+// Cut as geometry it would be sixteen quads a head instead of five, for two
+// pixels of warm. Carried as a coordinate it costs no vertex and it hands the
+// texture session the seat it needs: every side of the head arrives at the
+// fragment with its own [0,1] square, so a 16x16 sheet with alpha drops onto
+// exactly this without one vertex moving.
+const BAND_SPINE = 0.20;
+const BAND_TOP = 0.18;
+
 /**
- * The pale's own hue, at unit luminance, from the target's heads. Nearly
- * neutral with a little warmth in it, which is what a white reads as under this
- * sun.
+ * The pale's own hue, at unit luminance, from the target's heads.
+ *
+ * FITTED IN THE FRAME AND NOT SAMPLED OFF THE PICTURE, for the reason the whole
+ * note above gives: what a pixel of a head reads is the pigment through the
+ * light and through the tone curve, and the curve takes most of a pigment's
+ * chroma out at this level. Six hues were swept with the two families' uniforms
+ * driven from outside the page and read back with the code that reads the
+ * target: the head's mask goes from croma 6.8 at the hue that stood here to
+ * 18.3, and this one lands it at 13.9 against the target's 13.8.
+ *
+ * ITS TINT IS FOUR DEGREES OFF AND THE FOUR DEGREES DO NOT CLOSE. The target's
+ * mask reads 119; every hue in the sweep that reaches croma 13 reads 115 to 110,
+ * and the ones that read 119 are three points of croma short. The pair the
+ * campaign is judged on is the croma, so the croma is the one that is landed.
  */
-const PALE_HUE = new Vector3(1.058, 1.004, 0.785);
-const CREAM_OF_PALE = new Vector3(0.747, 0.686, 0.355);
+const PALE_HUE = new Vector3(1.000, 1.090, 0.500);
+/**
+ * The pistil's own hue, at the same unit luminance, and its level as a share of
+ * the pale's.
+ *
+ * IT IS A HUE AND NOT A DARKENING, which is the correction. What stood here was
+ * a RATIO to the pale of 0.747 / 0.686 / 0.355, read inside one head between
+ * two faces -- and that ratio carries the warmth of the target's band AND three
+ * quarters of a stop of its own shading, because the two faces it was read
+ * between were lit differently. The shading is already the light's job here, so
+ * it was being done twice, and the band came out a dark olive where the target
+ * draws a pistil.
+ *
+ * WHAT IT IS INSTEAD WAS SWEPT IN THE FRAME, eight albedos from (1.00, 0.85,
+ * 0.35) to (1.20, 0.80, 0.10), each read back with the same code that reads the
+ * target's band. This is the most saturated yellow that is still a PIGMENT --
+ * nothing over one in any channel -- and past it the sweep's own reading of R
+ * minus B stops climbing.
+ */
+const PISTIL_HUE = new Vector3(1.472, 0.961, 0.031);
+const PISTIL_OF_PALE = 0.679;
 /**
  * The cyan's own hue, from its own pixels, at the level its luminance step asks
  * for. It is not a ratio to the meadow for the reason above -- and it cannot be
@@ -1019,8 +1134,8 @@ function flowerPigments() {
   const pale = PALE_HUE.clone().multiplyScalar(level / luma(PALE_HUE));
   return {
     pale,
-    cream: new Vector3(pale.x * CREAM_OF_PALE.x, pale.y * CREAM_OF_PALE.y,
-      pale.z * CREAM_OF_PALE.z),
+    pistil: PISTIL_HUE.clone()
+      .multiplyScalar(luma(pale) * PISTIL_OF_PALE / luma(PISTIL_HUE)),
     cyan: CYAN_HUE.clone().multiplyScalar(luma(pale) * CYAN_OF_PALE / luma(CYAN_HUE)),
     // The stalk is the meadow's own pigment, unchanged. Not a shortcut: at a
     // centimetre and a half it is at most one pixel wide in the target at the
@@ -1069,8 +1184,38 @@ function flowerAt(gx, gz, k, height) {
   const x = (gx + r1) * FLOWER_CELL;
   const z = (gz + r2) * FLOWER_CELL;
 
+  // AND NOT PAST THE MEADOW, WHICH IS THE ONE THING THIS TEST DID NOT DO.
+  // E-V1l reported heads standing over the water outside the disc and left it as
+  // a note. It is this line: the two callers clipped separately -- flowerField
+  // took a radius and the ring took none -- so a walker at the rim carried the
+  // far family twenty metres out over ground that is not meadow but the shell on
+  // its way down to the lake. Asked HERE, where a flower is decided, both halves
+  // stop at the same edge and neither of them can be given a different one.
+  const dist2 = x * x + z * z;
+  if (dist2 > DISC_RADIUS * DISC_RADIUS) return null;
+
   const limit = densityAt(x, z) * FLOWER_SHARE;
   if (limit <= 0 || roll > limit) return null;
+
+  // AND ON A CUBE, WHICH IS ASKED OF THE STORE AND NOT OF A RADIUS. There are
+  // two places inside the disc where groundHeightAt answers with a height that
+  // has no cube under it, and both of them had heads on them: the RAGGED RIM,
+  // where the disc's own columns run out anywhere between 33.5 and 36 m because
+  // the world does not end in a circle, and the FOOTPRINT OF THE BUILT STONE,
+  // where the columns are cut away over a slightly wider figure than the one
+  // densityAt clears the sowing over -- two heads, at (7.80, -2.77) and (7.91,
+  // -2.69), against the flank of block 05. Both were standing on the plane the
+  // masonry stands on rather than on the meadow. Asked of the column, neither
+  // stands at all.
+  //
+  // IT IS ASKED LAST, AND THAT IS WHAT MAKES IT AFFORDABLE. A column costs 1.2
+  // microseconds to work out and the ring asks about every candidate of its
+  // lattice several times a second; asked first it would be most of a
+  // millisecond a refill. Asked after the sowing and the density, it is asked
+  // only of the candidates that were going to stand: 375 in a near refill and
+  // 2,584 in a whole far sweep, which is 0.5 ms and 3.2 ms of the 38.8 and 211
+  // those two already measure.
+  if (columnTop(Math.floor(x / VOXEL), Math.floor(z / VOXEL)) === EMPTY) return null;
 
   const r3 = hash2(gx * 40503 + k * 65867, gz * 92083 + FLOWER_SEED * 17);
   const r4 = hash2(gx * 92083 + FLOWER_SEED * 13, gz * 40503 + k * 65867);
@@ -1127,10 +1272,50 @@ export function flowerField(height, radius = 35) {
   return out;
 }
 
-// The vertex's own role, which picks its pigment. It is a property of the FACE
-// and not of anything per-flower: five values in the whole geometry.
-const ROLE_PALE = 0;
-const ROLE_CREAM = 1;
+/**
+ * EVERYTHING A GATE HAS TO KNOW ABOUT A FLOWER, FROM THE ONE PLACE THAT DECIDES
+ * IT, and it exists so that no gate ever holds a second copy of these numbers.
+ *
+ * The lesson is DEV1's, taken one step further. That build tool read the
+ * meadow's albedo out of a material file as TEXT, with an expression that threw
+ * if the line was not exactly one -- which worked until the albedo stopped being
+ * a line. A guard that read this file the same way would be a guard that stops
+ * seeing the flower the day the flower gets a texture. So the flower publishes
+ * itself, and what the guard checks is the published thing and not a regex over
+ * a source it has to guess at.
+ *
+ * The pigments come from the SEAT, so this throws exactly where the drawing
+ * would: a census that quietly fell back to a default would let a gate pass on
+ * a meadow the world no longer paints.
+ */
+export function flowerCensus() {
+  const pigments = flowerPigments();
+  return {
+    pigments,
+    head: { min: HEAD_MIN, max: HEAD_MAX, nominal: HEAD_NOMINAL, cyanScale: CYAN_SCALE },
+    stalk: { wide: STALK_WIDE, tall: STALK_TALL },
+    // The pistil's band, and the share of ONE SIDE it covers -- the number the
+    // far family carries, written once here and read there.
+    band: { spine: BAND_SPINE, top: BAND_TOP,
+      share: BAND_SPINE + BAND_TOP * (1 - BAND_SPINE) },
+    headShade: HEAD_SHADE,
+    paleStep: PALE_STEP,
+    sowing: { perSquareMetre: FLOWER_PER_M2, cell: FLOWER_CELL,
+      perCell: FLOWER_PER_CELL, share: FLOWER_SHARE, seed: FLOWER_SEED },
+    cyan: { inLight: CYAN_IN_LIGHT, inShade: CYAN_IN_SHADE, reach: CYAN_REACH },
+    reach: { ring: FLOWER_RADIUS, far: FAR_REACH, disc: DISC_RADIUS },
+  };
+}
+
+// The vertex's own role, which picks its pigment AND how much of the world's
+// orientation ladder it takes. It is a property of the FACE and not of anything
+// per-flower: three values in the whole geometry.
+//
+// The lid and the sides are told apart for the band's sake and for nothing
+// else: the target's horizontal band runs UNDER the top face, and the top face
+// itself is pale.
+const ROLE_LID = 0;
+const ROLE_SIDE = 1;
 const ROLE_STALK = 2;
 
 /**
@@ -1147,17 +1332,12 @@ const ROLE_STALK = 2;
  * the target's flower heads are too: their faces run parallel to the meadow's.
  * A yaw per flower would be the one population in the frame that is not.
  *
- * AND WHY THE CREAM IS TWO FACES AND NOT ONE. Looked at twenty times, the
- * target's head is a pale cube with a WARM BAND down the middle of the face
- * turned to the eye -- about a fifth of its width -- and a lit side to one
- * side of it and a shaded side to the other. The pale and the shaded are ONE
- * pigment under two lights, which this world's face-light reproduces for free;
- * the warm band is a second pigment, and at eight centimetres it is sub-voxel
- * structure this campaign does not spend geometry on. So it becomes a FACE, and
- * it becomes the two faces along z: both target poses look along that axis, so
- * every head presents its warm face exactly as both pictures show, and a walker
- * who turns round sees the same flower rather than a different one. It is an
- * approximation and it is written down as one.
+ * AND EVERY QUAD CARRIES ITS OWN SQUARE, which is the whole of what the pistil
+ * needed and the whole of what the texture session will need. The four corners
+ * of every face are written in ONE order -- bottom-left, bottom-right,
+ * top-right, top-left -- so aFace is the same four pairs for all nine of them
+ * and a fragment always knows where on its own face it stands. The band above
+ * is drawn from it; a 16x16 sheet with alpha would be sampled at it.
  */
 function flowerGeometry() {
   const h = HEAD_NOMINAL / 2;
@@ -1168,20 +1348,22 @@ function flowerGeometry() {
   const foot = -0.03;
   const quads = [
     // the head: top, then the four sides
-    [[-h, y1, -h], [-h, y1, h], [h, y1, h], [h, y1, -h], [0, 1, 0], ROLE_PALE],
-    [[h, y0, -h], [h, y0, h], [h, y1, h], [h, y1, -h], [1, 0, 0], ROLE_PALE],
-    [[-h, y0, h], [-h, y0, -h], [-h, y1, -h], [-h, y1, h], [-1, 0, 0], ROLE_PALE],
-    [[-h, y0, h], [h, y0, h], [h, y1, h], [-h, y1, h], [0, 0, 1], ROLE_CREAM],
-    [[h, y0, -h], [-h, y0, -h], [-h, y1, -h], [h, y1, -h], [0, 0, -1], ROLE_CREAM],
+    [[-h, y1, -h], [-h, y1, h], [h, y1, h], [h, y1, -h], [0, 1, 0], ROLE_LID],
+    [[h, y0, -h], [h, y0, h], [h, y1, h], [h, y1, -h], [1, 0, 0], ROLE_SIDE],
+    [[-h, y0, h], [-h, y0, -h], [-h, y1, -h], [-h, y1, h], [-1, 0, 0], ROLE_SIDE],
+    [[-h, y0, h], [h, y0, h], [h, y1, h], [-h, y1, h], [0, 0, 1], ROLE_SIDE],
+    [[h, y0, -h], [-h, y0, -h], [-h, y1, -h], [h, y1, -h], [0, 0, -1], ROLE_SIDE],
     // the stalk: four sides, no lid and no foot
     [[s, foot, -s], [s, foot, s], [s, y0, s], [s, y0, -s], [1, 0, 0], ROLE_STALK],
     [[-s, foot, s], [-s, foot, -s], [-s, y0, -s], [-s, y0, s], [-1, 0, 0], ROLE_STALK],
     [[-s, foot, s], [s, foot, s], [s, y0, s], [-s, y0, s], [0, 0, 1], ROLE_STALK],
     [[s, foot, -s], [-s, foot, -s], [-s, y0, -s], [s, y0, -s], [0, 0, -1], ROLE_STALK],
   ];
+  const CORNERS = [[0, 0], [1, 0], [1, 1], [0, 1]];
   const positions = new Float32Array(quads.length * 4 * 3);
   const normals = new Float32Array(quads.length * 4 * 3);
   const roles = new Float32Array(quads.length * 4);
+  const faces = new Float32Array(quads.length * 4 * 2);
   const indices = new Uint16Array(quads.length * 6);
   quads.forEach((quad, q) => {
     const normal = quad[4];
@@ -1194,6 +1376,8 @@ function flowerGeometry() {
       normals[o + 1] = normal[1];
       normals[o + 2] = normal[2];
       roles[q * 4 + c] = quad[5];
+      faces[(q * 4 + c) * 2] = CORNERS[c][0];
+      faces[(q * 4 + c) * 2 + 1] = CORNERS[c][1];
     }
     const b = q * 4;
     const i = q * 6;
@@ -1204,20 +1388,37 @@ function flowerGeometry() {
   geometry.setAttribute('position', new BufferAttribute(positions, 3));
   geometry.setAttribute('normal', new BufferAttribute(normals, 3));
   geometry.setAttribute('aRole', new BufferAttribute(roles, 1));
+  geometry.setAttribute('aFace', new BufferAttribute(faces, 2));
   geometry.setIndex(new BufferAttribute(indices, 1));
   return geometry;
 }
 
+// THE HEAD'S OWN LIGHT, AND THERE IS ONE PRODUCER OF IT FOR BOTH FAMILIES.
+// The seat's pair for this face, bent towards the pair of the head's top face
+// by HEAD_SHADE. Written once and included twice, because a solid and the quad
+// that replaces it at the exchange have to be the same flower: two copies of
+// four lines is how a ring develops a seam that no gate reads a shader to find.
+const HEAD_LIGHT_GLSL = /* glsl */`
+  uniform float uHeadShade;
+
+  vec3 headLight(vec3 n) {
+    return faceLightOf(mix(faceTerms(vec3(0.0, 1.0, 0.0)), faceTerms(n), uHeadShade));
+  }
+`;
+
 const FLOWER_VERTEX = /* glsl */`
-  attribute float aRole;    // which pigment this face carries
+  attribute float aRole;    // which pigment this face carries, and how it is lit
+  attribute vec2 aFace;     // where on its own face this vertex stands, [0,1]^2
   attribute vec4 aFlower;   // world x, the foot of the stalk, z, and the scale
   attribute vec2 aLook;     // nought for white and one for cyan, and the tint
 
-  varying vec3 vTint;
+  varying vec3 vPale;
+  varying vec3 vWarm;
+  varying vec3 vFace;       // the face coordinate, and one on the head's sides
   varying float vFog;
 
   uniform vec3 uPale;
-  uniform vec3 uCream;
+  uniform vec3 uPistil;
   uniform vec3 uCyan;
   uniform vec3 uStalk;
   uniform vec2 uCentre;
@@ -1225,6 +1426,7 @@ const FLOWER_VERTEX = /* glsl */`
 
   ${SCENE_LIGHT_GLSL}
   ${faceLightGlsl()}
+  ${HEAD_LIGHT_GLSL}
   ${FOG_GLSL}
 
   void main() {
@@ -1245,17 +1447,28 @@ const FLOWER_VERTEX = /* glsl */`
     float trim = 1.0 - step(uRadius, reach);
     vec3 world = aFlower.xyz + position * (aFlower.w * trim);
 
-    // THE LIGHT IS THE SEAT'S, PER FACE. A card taps the ground's own pair
+    // THE LIGHT IS THE SEAT'S, PER FACE, AND THE HEAD TAKES A SHARE OF THE
+    // LADDER RATHER THAN THE WHOLE OF IT. A card taps the ground's own pair
     // because a card stands on the ground and has no normal worth reading; a
     // flower is a solid with six of them, and the pale side and the shaded side
     // of one head are the SAME pigment under two of these -- which is exactly
     // what the target shows and what this file would otherwise have had to
-    // paint by hand.
-    vec3 light = faceLight(normal);
+    // paint by hand. What the target does NOT show is the depth of the step
+    // between them, and HEAD_SHADE is that reading: the head's own pair, bent
+    // towards the pair its top face makes. The producer is untouched and so is
+    // the stalk, which is a stalk and stands like one.
+    float head = step(aRole, 1.5);
+    vec3 light = mix(faceLight(normal), headLight(normal), head);
 
-    vec3 pigment = uStalk;
-    if (aRole < 1.5) pigment = mix(aRole < 0.5 ? uPale : uCream, uCyan, aLook.x);
-    vTint = pigment * light * aLook.y;
+    vec3 pale = mix(uStalk, mix(uPale, uCyan, aLook.x), head);
+    // A cyan head's warm pigment is its own pale: the band below then mixes
+    // between two equal colours and disappears, which is the target's law
+    // (C-TEXTURE §1.3: zero yellow pixels on five cyan heads) written as
+    // arithmetic instead of as a branch nobody can see the other side of.
+    vec3 warm = mix(uStalk, mix(uPistil, uCyan, aLook.x), head);
+    vPale = pale * light * aLook.y;
+    vWarm = warm * light * aLook.y;
+    vFace = vec3(aFace, head * step(0.5, aRole));
     vFog = fogAmount(length(cameraPosition - world), world.y);
 
     gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
@@ -1265,15 +1478,30 @@ const FLOWER_VERTEX = /* glsl */`
 const FLOWER_FRAGMENT = /* glsl */`
   precision highp float;
 
-  varying vec3 vTint;
+  varying vec3 vPale;
+  varying vec3 vWarm;
+  varying vec3 vFace;
   varying float vFog;
 
   uniform vec3 uFogColour;
+  uniform vec2 uPistilBand;  // the spine down the face, and the band under the lid
 
   void main() {
+    // THE PISTIL: the spine down the middle of the face and the band under the
+    // top of it, both in the face's own coordinate, both softened by exactly
+    // one pixel of screen space. A hard step at a head fourteen pixels wide is
+    // a band that crawls as the walker moves -- the same lesson the blades'
+    // cut-out learned, and the same cure, on the same instruction.
+    vec2 grain = fwidth(vFace.xy) + 1e-4;
+    float reach = uPistilBand.x * 0.5;
+    float spine = 1.0 - smoothstep(reach - grain.x, reach + grain.x, abs(vFace.x - 0.5));
+    float lid = smoothstep(1.0 - uPistilBand.y - grain.y,
+      1.0 - uPistilBand.y + grain.y, vFace.y);
+    float band = max(spine, lid) * vFace.z;
+
     // No sheet, no cut-out and no alpha: a flower is a solid, so the one thing
-    // it needs of a fragment is the air in front of it.
-    gl_FragColor = vec4(mix(vTint, uFogColour, vFog), 1.0);
+    // it needs of the air is what is in front of it.
+    gl_FragColor = vec4(mix(mix(vPale, vWarm, band), uFogColour, vFog), 1.0);
   }
 `;
 
@@ -1364,8 +1592,9 @@ const FAR_VERTEX = /* glsl */`
   varying float vFog;
 
   uniform vec3 uPale;
-  uniform vec3 uCream;
+  uniform vec3 uPistil;
   uniform vec3 uCyan;
+  uniform float uBandShare;  // how much of a SIDE the pistil's band covers
   uniform vec2 uCentre;
   uniform float uRing;      // the exchange ring: the solids' own radius
   uniform float uReach;
@@ -1373,6 +1602,7 @@ const FAR_VERTEX = /* glsl */`
 
   ${SCENE_LIGHT_GLSL}
   ${faceLightGlsl()}
+  ${HEAD_LIGHT_GLSL}
   ${FOG_GLSL}
 
   void main() {
@@ -1406,12 +1636,14 @@ const FAR_VERTEX = /* glsl */`
     //   arithmetic instead of by fitting.
     //
     //   COLOUR. Each of those three terms is one face of the head, and this
-    //   world's faces are not interchangeable: the two along z carry the warm
-    //   band's pigment, the others the pale one, and each is lit by the pair
-    //   src/world/face-light.js makes for ITS OWN normal. So the quad carries
-    //   their average weighted by exactly the areas above -- the head's own
+    //   world's faces are not interchangeable: a SIDE carries the pistil's band
+    //   over the share of itself the band covers and the pale over the rest,
+    //   the lid carries the pale whole, and each is lit by headLight() for ITS
+    //   OWN normal -- the same four lines the solid uses. So the quad carries
+    //   their average weighted by exactly the areas above: the head's own
     //   colour at this distance, from the one producer, with nothing added and
-    //   no constant of its own.
+    //   no constant of its own. The band's share is arithmetic off BAND_SPINE
+    //   and BAND_TOP and is not a second reading of the target.
     //
     // The head's underside is not in the sum and does not need to be: it is not
     // built (a head stands 7 cm up and the eye 1.58 m, so it is behind the head
@@ -1423,15 +1655,18 @@ const FAR_VERTEX = /* glsl */`
     vec3 alongX = vec3(toEye.x >= 0.0 ? 1.0 : -1.0, 0.0, 0.0);
     vec3 alongZ = vec3(0.0, 0.0, toEye.z >= 0.0 ? 1.0 : -1.0);
     // AND A CYAN HEAD IS THE SAME HEAD IN ANOTHER PIGMENT, which is exactly how
-    // the solids have it: their one line reads mix(pale-or-cream, cyan, flag),
+    // the solids have it: their one line reads mix(pale-or-pistil, cyan, flag),
     // and this is that line twice, once for each pigment the three faces are
     // drawn from. The weighting above is untouched, so a cyan quad is the cyan
-    // CUBE'S own average and not a second recipe for the same flower.
+    // CUBE'S own average and not a second recipe for the same flower -- and its
+    // band disappears here for the same reason it disappears there, because the
+    // two colours it mixes between are equal.
     vec3 pale = mix(uPale, uCyan, aLook.x);
-    vec3 cream = mix(uCream, uCyan, aLook.x);
-    vec3 head = (pale * faceLight(alongX) * share.x
-      + pale * faceLight(vec3(0.0, 1.0, 0.0)) * share.y
-      + cream * faceLight(alongZ) * share.z) / area;
+    vec3 warm = mix(uPistil, uCyan, aLook.x);
+    vec3 side = mix(pale, warm, uBandShare);
+    vec3 head = (side * headLight(alongX) * share.x
+      + pale * headLight(vec3(0.0, 1.0, 0.0)) * share.y
+      + side * headLight(alongZ) * share.z) / area;
 
     float size = aFlower.w * sqrt(area) * keep * trim;
 
@@ -1502,8 +1737,14 @@ function createFarFlowers({ height, lightScale, pigments, ring }) {
   const material = new ShaderMaterial({
     uniforms: {
       uPale: { value: pigments.pale },
-      uCream: { value: pigments.cream },
+      uPistil: { value: pigments.pistil },
       uCyan: { value: pigments.cyan },
+      uHeadShade: { value: HEAD_SHADE },
+      // The share of ONE SIDE the band covers, worked out from the two numbers
+      // the solid's fragment draws it with rather than measured a second time:
+      // the spine down the middle, and the lid's band over what is left of the
+      // face on either side of it.
+      uBandShare: { value: BAND_SPINE + BAND_TOP * (1 - BAND_SPINE) },
       ...faceLightUniforms(lightScale * GROUND_EXPOSURE),
       ...SCENE_LIGHT_UNIFORMS,
       uCentre: { value: new Vector2() },
@@ -1716,9 +1957,11 @@ function createFlowers({ height, lightScale, pigments }) {
   const material = new ShaderMaterial({
     uniforms: {
       uPale: { value: pigments.pale },
-      uCream: { value: pigments.cream },
+      uPistil: { value: pigments.pistil },
       uCyan: { value: pigments.cyan },
       uStalk: { value: pigments.stalk },
+      uHeadShade: { value: HEAD_SHADE },
+      uPistilBand: { value: new Vector2(BAND_SPINE, BAND_TOP) },
       // At the GROUND's exposure, because what a flower is lit by is the meadow
       // it stands in: the same line src/world/voxel/material.js asks for, so a
       // cube and the flower at its foot cannot disagree about the hour.
