@@ -109,7 +109,9 @@ const RUN_BAND = { low: 5, high: 12 };
 
 // What a level run measures today, printed so a drift is seen the same
 // afternoon rather than on the day it leaves the band.
-const AT_TODAY = { p50: 5, p90: 12 };
+// U-ERBA-1 (E-ERBA1): the terrain is one level, so a run at level is the disc
+// itself; what is printed here is the mat's own rung, not the ground's.
+const AT_TODAY = { p50: 13, p90: 130 };
 
 /** The tallest step the open meadow is allowed, in voxels. A mass is not the meadow. */
 const OPEN_STEP = 1;
