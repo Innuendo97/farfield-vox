@@ -355,17 +355,31 @@ export const MOUND = {
  * says WHERE. Where the colour signal found no bank the gathering's span is all
  * there is, and it is used, clamped.
  */
+// AND NOT ONE OF THESE THREE MOVED WHEN THE CORRIDOR DID. They are positions on
+// the plane y = 0, projected out of the picture through POSE_VOX_DAY, and the
+// corridor is nowhere in that arithmetic: the centreline could be anywhere and
+// these rows would read the same. What DOES follow the corridor is the clause
+// below that pushes a seat off the paving -- and when the centreline moved east
+// by 1.36 m at the near end, the push changed hands. The reading did not.
 export const FRAMED = [
   // The right foreground mass: the one A-10 shows with its brown flank turned
   // to the corridor. Its bank reads 0.92 m of brown; its gathering of risers
   // spans 1.53 m.
+  //
+  // AND IT IS THE ONE THE CLEARANCE NOW HAS TO PUSH, BY 0.48 m, to x 2.62. That
+  // is a bigger correction than the one it replaces and it is reported rather
+  // than absorbed: what it says is that the reference draws this mass closer to
+  // its own corridor than our corridor's nominal width plus this mass's reach
+  // will allow -- 1.52 m of separation measured against 1.81 m demanded. Either
+  // the strip is too wide here (pathHalfWidth reads 0.80 at this northing where
+  // the reference's own verges read 0.69) or the mass's reach is, and both are
+  // fitted numbers of other units. The seat is moved and not dropped for the
+  // reason the clause already gives.
   { x: 2.14, zFoot: 8.19, width: 0.92, rise: 4 },
-  // The left foreground mass, and it stands closest of the four to the
-  // corridor: 0.61 m of clear ground between its centre and the paving's
-  // nominal edge. It is the one seat the rule below has to push, and the push
-  // is 0.18 m -- which lands it at x -2.36, where the same estimator reads it
-  // when its link is loosened to a metre. The correction and the measurement
-  // agree to two centimetres.
+  // The left foreground mass. It used to be the one seat the rule had to push,
+  // by 0.18 m, back when the centreline ran a metre west of where the reference
+  // puts it; with the corridor in register there is 2.80 m between the two and
+  // the seat stands exactly where the picture was read.
   { x: -2.18, zFoot: 7.77, width: 0.21, rise: 3 },
   // The right field, found by its bank rather than by its risers -- the one
   // seat of the three the colour signal contributes on its own, and the one
