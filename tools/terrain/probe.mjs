@@ -1,41 +1,44 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import sharp from 'sharp';
-import { EYE_HEIGHT, SPAWN } from '../../src/world/layout.js';
-import { heightAt, worldToUv } from '../../src/world/terrain-field.js';
 import { agx } from '../grade/lib/agx.mjs';
-import { deltaE76, linearToSrgb, srgbToLab, srgbToLinear } from '../grade/lib/color.mjs';
-import { makeRay, REPO_ROOT } from '../grade/lib/framing.mjs';
+import { linearToSrgb } from '../grade/lib/color.mjs';
+import { REPO_ROOT } from '../grade/lib/framing.mjs';
 import { makeLensShading } from '../grade/lib/shading.mjs';
 import { meanRect, readTarget } from '../grade/lib/target.mjs';
 import { PATCHES } from './sample-target.mjs';
-import SCENE_LIGHT from '../../assets-src/sky/scene-light.json' with { type: 'json' };
 
-// Predicts what the ground will look like, without drawing it.
+// THE COMPOSITE OF THIS FRAME, AND ITS INVERSE.
 //
-// Fitting the meadow through the browser costs a page load, a screenshot and a
-// resize for every attempt, and the attempts run into the dozens: what the
-// albedo and the weather have to be is a numerical question, and the answer is
-// reachable offline. This walks the reference camera into the height field,
-// finds the world position behind every measured pixel, samples the two ground
-// textures there and pushes the result through the same arithmetic the frame
-// uses, as far as the encoded pixel. The remaining difference against the
-// reference is the error the eye will see.
+// What a surface has to CARRY, in radiance, for the frame to land on a colour
+// somebody measured. Grade, corner shading and tone curve are run forwards
+// exactly as src/core/post.js runs them, and then inverted numerically, because
+// none of the three has an inverse in closed form.
 //
-// It is a model of the ground pass and of the composite, not of the renderer:
-// it is checked against a real screenshot each round, and the check is reported
-// so a drift between the two is never silent. Everything the frame does that
-// this does not (bloom below its threshold, the dither, multisampling) moves a
-// mean by well under one unit of error.
+// IT USED TO PREDICT THE GROUND AS WELL, AND THAT HALF IS GONE AT STEP 8. This
+// file walked the reference camera into a height field, found the world point
+// behind every measured pixel, sampled terrain-albedo and terrain-light there
+// and pushed the result through the composite as far as the encoded pixel. Both
+// of the things that made that possible have been retired: the bent grid and its
+// two atlases left the delivery, because nothing in src had asked for one of
+// them since the meadow became cubes, and the height field became a constant
+// when the walker started standing on the block store. The meadow's colour is
+// now arithmetic in a SHADER -- src/world/voxel/material.js -- and nothing in
+// node can sample it, so the prediction is not something to repair here: it is
+// an instrument the light's own step has to build against the new ground.
+//
+// WHAT IS LEFT IS THE HALF THAT WAS NEVER ABOUT THE GROUND. The composite is the
+// frame's, not the meadow's, and its inverse is what every session authors an
+// unlit surface from: tools/monoliths/sample-stone.mjs solves the stone with it,
+// and `--solve` below answers the same question for every measured patch of the
+// reference. A hill carries its colour as a tint and nothing touches it
+// afterwards except this arithmetic, so the tint that reproduces a measured
+// patch is an answer and not a matter of taste.
 
-const DIR = join(REPO_ROOT, 'assets-src', 'terrain');
-const ALBEDO = join(DIR, 'terrain-albedo.png');
-const LIGHT = join(DIR, 'terrain-light.png');
-
-// Mirrors of the runtime constants. They are read from the modules that own
-// them wherever that is possible; this one lives inside shader source, so it is
-// named here and asserted against the bake report below.
+// Exposure of the ground pass. It lives inside shader source, so it is named
+// here rather than imported.
 const EXPOSURE = 1.0;
+
 
 // The corner shading, taken from the module that applies it instead of copied.
 //
@@ -59,108 +62,6 @@ const EXPOSURE = 1.0;
 // pipeline, and it now resamples them under the veil the walker really arrives
 // under rather than under a quarter of it.
 const LENS = makeLensShading();
-
-const EYE = { x: 0, y: EYE_HEIGHT, z: SPAWN.z };
-
-async function readImage(path, { keepAlpha = false } = {}) {
-  const pipeline = sharp(path);
-  const { data, info } = await (keepAlpha ? pipeline : pipeline.removeAlpha()).raw()
-    .toBuffer({ resolveWithObject: true });
-  return { width: info.width, height: info.height, data, channels: info.channels };
-}
-
-/**
- * Bilinear sample of the fourth channel, RAW.
- *
- * Raw and not through the transfer, because alpha carries none: what is stored
- * there is the square root of a linear term, and the caller squares it.
- */
-function sampleAlpha(image, u, v) {
-  const { width, height, data, channels } = image;
-  if (channels < 4) return 0;
-  const x = Math.min(width - 1.001, Math.max(0, u * width - 0.5));
-  const y = Math.min(height - 1.001, Math.max(0, v * height - 0.5));
-  const x0 = Math.floor(x);
-  const y0 = Math.floor(y);
-  const fx = x - x0;
-  const fy = y - y0;
-  const x1 = Math.min(width - 1, x0 + 1);
-  const y1 = Math.min(height - 1, y0 + 1);
-  const at = (a, b) => data[(b * width + a) * channels + 3] / 255;
-  return (at(x0, y0) * (1 - fx) + at(x1, y0) * fx) * (1 - fy)
-    + (at(x0, y1) * (1 - fx) + at(x1, y1) * fx) * fy;
-}
-
-/** Bilinear sample of an 8 bit sRGB map, returned as linear light. */
-function sampleLinear(image, u, v, out) {
-  const { width, height, data } = image;
-  const x = Math.min(width - 1.001, Math.max(0, u * width - 0.5));
-  const y = Math.min(height - 1.001, Math.max(0, v * height - 0.5));
-  const x0 = Math.floor(x);
-  const y0 = Math.floor(y);
-  const fx = x - x0;
-  const fy = y - y0;
-  const x1 = Math.min(width - 1, x0 + 1);
-  const y1 = Math.min(height - 1, y0 + 1);
-  const n = image.channels || 3;
-  for (let c = 0; c < 3; c++) {
-    const a = data[(y0 * width + x0) * n + c];
-    const b = data[(y0 * width + x1) * n + c];
-    const d = data[(y1 * width + x0) * n + c];
-    const e = data[(y1 * width + x1) * n + c];
-    const mix = (a * (1 - fx) + b * fx) * (1 - fy) + (d * (1 - fx) + e * fx) * fy;
-    out[c] = srgbToLinear(mix / 255);
-  }
-  return out;
-}
-
-/**
- * First hit of a ray on the height field.
- *
- * Marched rather than solved: the field is a sum of noise octaves and mounds
- * with no closed form, and the step is kept short near the eye where a metre of
- * ground covers many pixels.
- */
-export function traceGround(direction, { maxDistance = 260 } = {}) {
-  let t = 0.15;
-  let previous = t;
-  let below = false;
-  while (t < maxDistance) {
-    const x = EYE.x + direction[0] * t;
-    const z = EYE.z + direction[2] * t;
-    const y = EYE.y + direction[1] * t;
-    if (y <= heightAt(x, z)) { below = true; break; }
-    previous = t;
-    t += Math.max(0.04, t * 0.025);
-  }
-  if (!below) return null;
-
-  let lo = previous;
-  let hi = t;
-  for (let k = 0; k < 28; k++) {
-    const mid = (lo + hi) / 2;
-    const y = EYE.y + direction[1] * mid;
-    if (y <= heightAt(EYE.x + direction[0] * mid, EYE.z + direction[2] * mid)) hi = mid;
-    else lo = mid;
-  }
-  const distance = (lo + hi) / 2;
-  return {
-    x: EYE.x + direction[0] * distance,
-    z: EYE.z + direction[2] * distance,
-    y: EYE.y + direction[1] * distance,
-    distance,
-  };
-}
-
-/** The height fog of src/world/air.js, evaluated on the CPU. */
-export function fogAmount(distance, fragmentHeight, fog) {
-  const dy = fragmentHeight - EYE.y;
-  const a = Math.exp(-Math.max(EYE.y, 0) / fog.height);
-  const b = Math.exp(-Math.max(fragmentHeight, 0) / fog.height);
-  const mean = Math.abs(dy) < 0.01 ? a : (a - b) * fog.height / dy;
-  const depth = distance * fog.density * mean;
-  return 1 - Math.exp(-depth * depth);
-}
 
 // The fitted grade, sampled exactly as the composite samples it: a cube of side
 // N unrolled into a strip N*N wide, filtered bilinearly inside a slice and
@@ -192,7 +93,7 @@ function tapLut(lut, u, v, out) {
   return out;
 }
 
-export function grade(lut, colour, out = [0, 0, 0]) {
+function grade(lut, colour, out = [0, 0, 0]) {
   const n = lut.size;
   const r = Math.min(1, Math.max(0, colour[0]));
   const g = Math.min(1, Math.max(0, colour[1]));
@@ -209,7 +110,7 @@ export function grade(lut, colour, out = [0, 0, 0]) {
 }
 
 /** Scene light to the encoded pixel: the composite of src/core/post.js. */
-export function composite(colour, px, py, lut, out = [0, 0, 0]) {
+function composite(colour, px, py, lut, out = [0, 0, 0]) {
   agx([colour[0] * EXPOSURE, colour[1] * EXPOSURE, colour[2] * EXPOSURE], 1, out);
   // Same law and same arithmetic as before — linear in the squared screen
   // radius, twice the strength at the corner — with the strength read out of
@@ -219,95 +120,7 @@ export function composite(colour, px, py, lut, out = [0, 0, 0]) {
   return lut ? grade(lut, out, out) : out;
 }
 
-// Read out of the runtime sources rather than imported: both modules pull a
-// JSON asset the bundler resolves and node does not, and duplicating the
-// numbers here would let the model and the frame drift apart in silence.
-function constant(file, pattern, what) {
-  const source = readFileSync(join(REPO_ROOT, file), 'utf8');
-  const found = pattern.exec(source);
-  if (!found) throw new Error(`${what} not found in ${file}`);
-  return found;
-}
 
-export async function loadGround() {
-  for (const path of [ALBEDO, LIGHT]) {
-    if (!existsSync(path)) throw new Error(`missing ${path}: run "npm run terrain" first`);
-  }
-  const terrain = JSON.parse(readFileSync(join(DIR, 'terrain.json'), 'utf8'));
-  const fogColour = constant(
-    'src/world/air.js',
-    /FOG_RADIANCE = \[([-0-9.]+), ?([-0-9.]+), ?([-0-9.]+)\]/, 'FOG_RADIANCE',
-  ).slice(1, 4).map(Number);
-  const exposure = Number(constant(
-    'src/world/air.js', /GROUND_EXPOSURE = ([0-9.]+)/, 'GROUND_EXPOSURE',
-  )[1]);
-  const density = Number(constant(
-    'src/core/sky.js', /FOG_DENSITY = ([0-9.]+)/, 'FOG_DENSITY',
-  )[1]);
-  const scaleHeight = Number(constant(
-    'src/core/sky.js', /scaleHeight: ([0-9.]+)/, 'scaleHeight',
-  )[1]);
-
-  // With --raw the two terms are read straight out of the bake instead of out
-  // of the packed map, so a fit costs no re-encode. There is no weather field
-  // to apply on the way any more: it was retired with
-  // tools/terrain/shade-light.mjs.
-  const raw = process.argv.includes('--raw');
-
-  return {
-    albedo: await readImage(ALBEDO),
-    light: raw
-      ? { sun: await readImage(join(DIR, 'terrain-light-sun-bake.png')),
-        sky: await readImage(join(DIR, 'terrain-light-sky-bake.png')) }
-      : { packed: await readImage(LIGHT, { keepAlpha: true }) },
-    lut: process.argv.includes('--ungraded') ? null : await loadLut(),
-    lightScale: terrain.lightScale * exposure,
-    // The two colours the terms are weighed with, out of the seat the runtime
-    // reads: a derived hue times a fitted magnitude each. Handed in rather than
-    // fixed, because fitting a magnitude means moving one of them and asking
-    // what the ground looks like then.
-    sunLight: SCENE_LIGHT.day.sunBeam.map((v) => v * (SCENE_LIGHT.day.sunStrength ?? 0)),
-    skyLight: SCENE_LIGHT.day.skyBalance.map((v) => v * (SCENE_LIGHT.day.skyStrength ?? 1)),
-    fogColour,
-    fog: { density, height: scaleHeight },
-  };
-}
-
-/** The two terms at a point of the ground, sun first, whichever road they came by. */
-function termsAt(ground, u, v, out) {
-  if (ground.light.packed) {
-    // The packed map is the sun as GREY in rgb and the sky in ALPHA as the
-    // square root of its linear value — see tools/lighting/pack-light.mjs for
-    // the measurement that put it there. So the sky term is read out of the
-    // fourth channel and squared, not out of the green.
-    const packed = sampleLinear(ground.light.packed, u, v, [0, 0, 0]);
-    out[0] = packed[0];
-    out[1] = sampleAlpha(ground.light.packed, u, v) ** 2;
-  } else {
-    out[0] = sampleLinear(ground.light.sun, u, v, [0, 0, 0])[0];
-    out[1] = sampleLinear(ground.light.sky, u, v, [0, 0, 0])[0];
-  }
-  return out;
-}
-
-/** Encoded colour the ground pass will put at one pixel of the framing. */
-export function shadeGround(ground, ray, px, py) {
-  const hit = traceGround(ray(px, py));
-  if (!hit) return null;
-  const { u, v } = worldToUv(hit.x, hit.z);
-  const albedo = sampleLinear(ground.albedo, u, v, [0, 0, 0]);
-  const terms = termsAt(ground, u, v, [0, 0]);
-  const f = fogAmount(hit.distance, hit.y, ground.fog);
-  const colour = [0, 0, 0];
-  for (let c = 0; c < 3; c++) {
-    const light = terms[0] * ground.sunLight[c] + terms[1] * ground.skyLight[c];
-    const lit = albedo[c] * light * ground.lightScale;
-    colour[c] = lit * (1 - f) + ground.fogColour[c] * f;
-  }
-  // The albedo and the fog travel with the answer, so a fit that moves the two
-  // light colours can reuse the ray march instead of paying for it again.
-  return { hit, terms, albedo, fog: f, colour, srgb: composite(colour, px, py, ground.lut) };
-}
 
 /**
  * The radiance a surface has to carry to land on a given colour.
@@ -345,35 +158,6 @@ export function solveRadiance(wanted, px, py, lut, rounds = 5) {
   return { radiance: value.slice(), reached: probe.slice(), error };
 }
 
-const STEP = 4;
-
-/** Mean predicted colour and mean world position over one measured rectangle. */
-export function predictPatch(ground, ray, patch) {
-  let r = 0, g = 0, b = 0, n = 0, sx = 0, sz = 0, sd = 0;
-  const light = [0, 0, 0];
-  const terms = [0, 0];
-  for (let py = patch.y0; py < patch.y1; py += STEP) {
-    for (let px = patch.x0; px < patch.x1; px += STEP) {
-      const shaded = shadeGround(ground, ray, px, py);
-      if (!shaded) continue;
-      r += shaded.srgb[0]; g += shaded.srgb[1]; b += shaded.srgb[2];
-      for (let c = 0; c < 3; c++) light[c] += shaded.colour[c];
-      terms[0] += shaded.terms[0]; terms[1] += shaded.terms[1];
-      sx += shaded.hit.x; sz += shaded.hit.z; sd += shaded.hit.distance;
-      n++;
-    }
-  }
-  if (n === 0) return null;
-  return {
-    srgb: [r / n, g / n, b / n],
-    radiance: light.map((v) => v / n),
-    terms: terms.map((v) => v / n),
-    x: sx / n,
-    z: sz / n,
-    distance: sd / n,
-    coverage: n,
-  };
-}
 
 const hex = (rgb) => `#${rgb.map((v) => Math.round(Math.min(1, Math.max(0, v)) * 255)
   .toString(16).padStart(2, '0')).join('')}`;
@@ -403,56 +187,5 @@ async function solveAll() {
   }
 }
 
-async function main() {
-  const ground = await loadGround();
-  const target = await readTarget();
-  const ray = makeRay();
-  const only = process.argv.find((a) => a.startsWith('--kind='))?.slice(7);
 
-  process.stdout.write(`  ${'patch'.padEnd(20)}${'kind'.padEnd(7)}`
-    + `${'x'.padStart(8)}${'z'.padStart(8)}${'dist'.padStart(7)}  `
-    + `${'predicted'.padEnd(10)}${'target'.padEnd(10)}${'dE76'.padStart(7)}`
-    + `${'gain r'.padStart(8)}${'g'.padStart(7)}${'b'.padStart(7)}\n`);
-
-  const rows = [];
-  for (const patch of PATCHES) {
-    if (only && patch.kind !== only) continue;
-    const predicted = predictPatch(ground, ray, patch);
-    const measured = meanRect(target, patch);
-    if (!predicted) {
-      process.stdout.write(`  ${patch.id.padEnd(20)}${patch.kind.padEnd(7)}`
-        + `${'sky'.padStart(31)}\n`);
-      continue;
-    }
-    const e = deltaE76(srgbToLab(predicted.srgb), srgbToLab(measured));
-    rows.push({ kind: patch.kind, e });
-    // How far the surface is from where it has to be, as a ratio on the light.
-    // A colour difference says the patch is wrong; this says by how much and in
-    // which direction to move the weather or the paint, which is the number a
-    // fitting round is actually steered by.
-    const wanted = solveRadiance(measured, (patch.x0 + patch.x1) / 2,
-      (patch.y0 + patch.y1) / 2, ground.lut);
-    const gain = wanted.radiance.map((v, c) => v / Math.max(1e-6, predicted.radiance[c]));
-    process.stdout.write(`  ${patch.id.padEnd(20)}${patch.kind.padEnd(7)}`
-      + `${predicted.x.toFixed(1).padStart(8)}${predicted.z.toFixed(1).padStart(8)}`
-      + `${predicted.distance.toFixed(1).padStart(7)}  `
-      + `${hex(predicted.srgb).padEnd(10)}${hex(measured).padEnd(10)}${e.toFixed(2).padStart(7)}`
-      + `${gain.map((v) => v.toFixed(2).padStart(7)).join('')}\n`);
-  }
-
-  const byKind = new Map();
-  for (const row of rows) {
-    if (!byKind.has(row.kind)) byKind.set(row.kind, []);
-    byKind.get(row.kind).push(row.e);
-  }
-  process.stdout.write('\n');
-  for (const [kind, values] of byKind) {
-    const mean = values.reduce((t, v) => t + v, 0) / values.length;
-    process.stdout.write(`  mean ${kind.padEnd(12)}${mean.toFixed(2).padStart(7)} dE76\n`);
-  }
-}
-
-if (process.argv[1] && process.argv[1].endsWith('probe.mjs')) {
-  if (process.argv.includes('--solve')) await solveAll();
-  else await main();
-}
+if (process.argv[1] && process.argv[1].endsWith('probe.mjs')) await solveAll();
