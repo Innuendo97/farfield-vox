@@ -302,16 +302,32 @@ export const MOUND = {
  * EACH ROW IS WHAT WAS MEASURED AND NOT WHAT WAS DERIVED. `zFoot` is where the
  * cut flank stands on the floor -- the eye is at z 14 and looks north, so the
  * flank it meets is the one at the largest z, and its foot is the one part of a
- * mass a picture shows without ambiguity. `width` is how far that flank runs
- * across. `rise` is how many voxels of mass stand over the floor. The seat's
- * centre, its reach and its bank are worked out from those three by the shape's
- * own arithmetic, so that a re-reading of the picture lands here and nowhere
- * else.
+ * mass a picture shows without ambiguity. `rise` is how many voxels of mass
+ * stand over the floor. The seat's centre, its reach and its bank are worked out
+ * from those by the shape's own arithmetic, so that a re-reading of the picture
+ * lands here and nowhere else.
+ *
+ * AND `width` IS THE BANK'S OWN WIDTH WHERE THERE IS A BANK, AND THAT CHOICE
+ * WAS MADE ON A NUMBER. Two things in this reading can be called the width of a
+ * mass: the patch of brown, which is the flank itself and nothing else, and the
+ * span of the gathering of risers, which is at least the flank and may be more
+ * -- a riser two courses back up the crown belongs to the same gathering and
+ * widens it. Taken from the gathering, the first seat comes to 3.51 m across,
+ * which is the very top of the 1.5-3.5 m A 1.2 reads and half again what E-V1i
+ * measured the reference's typical mass at (p50 2.1 m); taken from the bank it
+ * comes to 2.11 m. And the two readings are separable by a measurement neither
+ * of them is: run the campaign's own riser census over the resolved band, the
+ * gathering's widths put our 3+ risers at 19.6 % of the strip against the
+ * reference's 3.0 %, and the banks' put them at a figure this file's own
+ * verbale carries. So the bank is what is written, and the gathering is what
+ * says WHERE. Where the colour signal found no bank the gathering's span is all
+ * there is, and it is used, clamped.
  */
 export const FRAMED = [
   // The right foreground mass: the one A-10 shows with its brown flank turned
-  // to the corridor, and the widest thing the reading resolves.
-  { x: 2.14, zFoot: 8.19, width: 1.53, rise: 4 },
+  // to the corridor. Its bank reads 0.92 m of brown; its gathering of risers
+  // spans 1.53 m.
+  { x: 2.14, zFoot: 8.19, width: 0.92, rise: 4 },
   // The left foreground mass, and it stands closest of the four to the
   // corridor: 0.61 m of clear ground between its centre and the paving's
   // nominal edge. It is the one seat the rule below has to push, and the push
@@ -320,7 +336,8 @@ export const FRAMED = [
   // agree to two centimetres.
   { x: -2.18, zFoot: 7.77, width: 0.21, rise: 3 },
   // The right field, found by its bank rather than by its risers -- the one
-  // seat of the three the colour signal contributes on its own.
+  // seat of the three the colour signal contributes on its own, and the one
+  // whose width was never in question.
   { x: 5.08, zFoot: 5.92, width: 1.14, rise: 3 },
 ];
 
