@@ -453,13 +453,46 @@ export const SPREAD = {
   // out on the brown of the verge, which is S4 -- «ai margini del sentiero,
   // sulla terra bruna, ci sono i tasselli di sentiero» -- and it is what stops
   // the crossing being a line.
-  from: 0.30,
-  to: 1.15,
+  //
+  // AND THE CROSSING IS MEASURED IN PIECES AND NOT IN FRACTIONS. What the
+  // committente calls «l'intersezione e' netta: una linea divide la terra bruna
+  // dalla parte chiara» is arithmetic: a share that goes from nought to one over
+  // 0.30 to 1.15 of a half width of 0.50 m crossed 0.42 m of ground, and BLOCK
+  // is 0.40 -- the whole thinning happened across ONE piece, so it could only
+  // ever be drawn as a line. Over the width this unit's own reading of the
+  // reference puts on the corridor (pathHalfWidth in ../terrain-field.js, 0.78
+  // at the middle of the field) the window below crosses 1.05 m, which is two
+  // and a half pieces, and the reference's own curve -- 47.6 / 54.9 / 47.8 /
+  // 42.9 / 40.3 per cent of stone from 0.70 m inside the kerb to the kerb, and
+  // 27.5 outside it (U-SENT-2 2.1) -- is a long shallow fall and not a crossing.
+  //
+  // AND THE TWO ENDS ARE SET SO THE STONE CORE INSIDE THE CORRIDOR IS THE
+  // REFERENCE'S OWN. The corridor is the full 1.6 m the reference reads
+  // (pathHalfWidth in ../terrain-field.js); what its rows were counted at
+  // before -- eight to twelve voxels through the middle of the field -- is the
+  // PALE STONE inside it and not the corridor, and it is the number this window
+  // now carries: the share of stone crosses a half at (from + to)/2 = 0.70 of
+  // the half width, which at z = 4 is 1.14 m of stone core, eleven voxels.
+  from: 0.05,
+  to: 1.35,
   // How much of the thinning survives past the last stone of the run. Nought
   // would leave a ghost of the paving's composition in the ground where the
   // paving has ended; it fades with pathRun for the same reason the mat's own
   // ramp does (MANTO.verge in ../world/voxel/worldgen.js).
   fade: 1.0,
+  // HOW MUCH OF ITS LEVEL THE STONE GIVES UP AT THE KERB. Measured on the day
+  // target at the fitted camera, the pixels that read as stone run 130.0 at
+  // 0.65 m inside the kerb and 112.8 at the kerb -- a fall of 13.2 per cent
+  // (fondazione/lav/u4-terra.py) -- while the earth beside them climbs by 14.
+  // A paving whose stone is as pale at the kerb as in its middle draws a bright
+  // band along its own edge, which is «netti confini» read on the level.
+  //
+  // WRITTEN ON THE TONE AND MEASURED IN THE FRAME. The tone walks a ramp whose
+  // two ends are 0.40 apart in luminance out of 0.43, so a share taken off the
+  // tone arrives in the frame smaller than it left: swept through the chain at
+  // the fitted camera, 0.132 on the tone moved the stone's own level by 3 per
+  // cent of the 13 the reference asks for.
+  dim: 0.42,
 };
 
 // HOW FAR A PIECE STANDS PROUD OF THE CORRIDOR'S FLOOR, in metres.
@@ -501,7 +534,20 @@ export const RELIEF = {
   // pair rather than the beam. Fitted through the chain on a real render at the
   // fitted camera -- see the verbale -- against the reference's own contrast
   // inside the corridor's surface: 19.4% of the local level against our 15.2.
-  wall: 0.80,
+  //
+  // AND IT COMES DOWN, ON A SWEEP THAT SAYS IT NO LONGER CARRIES WHAT IT WAS
+  // FITTED TO CARRY. The 0.80 was solved through the chain when the slot's own
+  // darkening entered over 3.5 mm, so `inSlot` was one over nearly the whole of
+  // a slot; the darkening now eases over the slot's own two centimetres (see
+  // JOINT_LIP), so the term reaches its full value only at the floor of a slot
+  // and its weight at the judged pose has gone with it. Swept at the fitted
+  // camera, 0.80 and 0.60 read sd 21.1 and 21.0 with the dark coda at -36.7 and
+  // -36.6: the difference is under the reading's own noise. What the lower value
+  // buys is the pose the committente walks at, where the term is not averaged
+  // over a pixel and a groove that took four fifths of BOTH terms drew a black
+  // line round every piece. Four tenths of the light at the floor of a slot one
+  // centimetre deep is the ambient a groove that shape actually loses.
+  wall: 0.60,
   // AND THE MEAN THE TERM ABOVE TAKES, SO IT CANNOT MOVE THE LEVEL.
   //
   // This is the grain's own doctrine, and it is not tidiness: the level of this
@@ -513,7 +559,14 @@ export const RELIEF = {
   // the strip that is inside a slot times the height of the piece there -- and
   // the painter prints that mean every run so this literal can be checked
   // against the map it describes.
-  mean: 0.0866,
+  //
+  // RE-TAKEN WITH THE EASING THE FRAGMENT ACTUALLY WRITES. The mean was the mean
+  // of the binary mask, which was near enough to the term while the term entered
+  // over 3.5 mm; the term now eases over the slot's own two centimetres (see
+  // JOINT_LIP), so the mean of it is a third of what a mask reports. The painter
+  // takes it the same way the fragment writes it and refuses the tile if this
+  // literal has drifted from the map it describes.
+  mean: 0.0326,
 };
 
 /**
@@ -539,11 +592,40 @@ function pieceLift(id, bare) {
  * be throwing away the reading that the apron carries more earth than the reach.
  */
 function bareShare(base, x, z) {
-  const half = pathHalfWidth(z);
-  if (!(half > 0)) return base;
-  const q = Math.abs(x - pathCentreX(z)) / half;
+  const q = lateral(x, z);
+  if (q === null) return base;
   const out = smoothstep(SPREAD.from, SPREAD.to, q) * pathRun(z) * SPREAD.fade;
   return base + (1 - base) * out;
+}
+
+/**
+ * How far out across the corridor a point stands, as a fraction of the nominal
+ * half width: nought on the centreline, one at the kerb, more outside it. Null
+ * where there is no corridor.
+ *
+ * ONE SEAT, because three things now read it -- the share of bare pieces, how
+ * dry the earth of a piece is and how pale its stone is -- and three copies of
+ * the same division is how they come to disagree about where the kerb is.
+ */
+function lateral(x, z) {
+  const half = pathHalfWidth(z);
+  if (!(half > 0)) return null;
+  return Math.abs(x - pathCentreX(z)) / half;
+}
+
+/**
+ * How DRY the earth of a piece is: nought for the damp trodden earth of the
+ * middle of the run, one for the dry earth at the kerb, and back toward damp
+ * outside it, where the reference's own earth is in the grass's shade and reads
+ * 17 to 28 against the 60 it reads at the kerb (fondazione/lav/u4-terra.py).
+ *
+ * ASKED AT THE PIECE'S SEAT like everything else about a piece: a dryness that
+ * varied across a slab of earth would be a slab with a gradient painted on it,
+ * and what the reference shows is flat pieces at different levels.
+ */
+function earthDry(q) {
+  if (q === null) return 1;
+  return smoothstep(0.15, 1.0, q) * (1 - smoothstep(1.05, 1.9, q));
 }
 
 /** Nearest site of a jittered lattice, and the joint between the two nearest. */
@@ -741,6 +823,7 @@ export function paveAt(x, z) {
   // different from one another as each is varied inside itself. "Grey, beige and
   // rosy" is not what the material says; one stone at many levels is.
   const level = hash2(Math.round(piece.id * 8191) + 907, 4111);
+  const q = lateral(home.x, home.z);
   return {
     ...piece,
     jm,
@@ -748,10 +831,34 @@ export function paveAt(x, z) {
     inSlot: jm <= gape,
     bare,
     warm: tune.warm,
-    // Nought is earth and one is the palest slab. IDENTITY is the 0.25: the
-    // measured spread of the level between one piece and the next. The tuning's
-    // own level moves the whole ramp without touching that spread.
-    tone: bare ? 0 : clamp01(tune.level * (0.62 + 0.25 * (level - 0.5) * 2.4)),
+    // THE RAMP IS CUT IN TWO AT A HALF AND THE TWO HALVES ARE THE TWO THINGS A
+    // PIECE CAN BE, which is what the generator has always said and what the
+    // pigment did not.
+    //
+    // WHAT WAS WRONG, MEASURED. A stone piece was written at
+    // `level * (0.62 +/- 0.30)`, and with the apron's own level of 0.86 that is
+    // 0.277 to 0.791 spread flat: 43 PER CENT OF THE STONE PIECES CAME OUT
+    // UNDER A HALF and were drawn on the earth's side of the ramp, as a brown
+    // that no stone of this paving is. That is one half of «tasselli strani,
+    // forma che non rispecchia il target» -- pieces of stone painted as pieces
+    // of earth, scattered through the run -- and it is why the corridor's own
+    // stone reads 107 against the reference's 130 (fondazione/lav/u4-terra.py).
+    //
+    // Now the two halves are exclusive. Under a half is EARTH, from damp to
+    // dry; over it is stone, from the worn slab to the palest. IDENTITY is
+    // still the 0.25 the reference measures between one slab and the next, and
+    // the tuning's own level still moves the whole ramp without touching it.
+    //
+    // AND THE STONE GIVES ITS LEVEL UP TOWARD THE KERB, which is the other side
+    // of the same reading: the reference's stone runs 130.0 / 122.5 / 119.8 /
+    // 112.8 from 0.65 m inside the kerb to the kerb, a fall of 13 per cent,
+    // while the earth beside it climbs. The two converge, and that convergence
+    // is the soft crossing the committente is asking for.
+    tone: bare
+      ? 0.5 * clamp01(earthDry(q) + 0.18 * (level - 0.5) * 2)
+      : 0.5 + 0.5 * clamp01(tune.level
+        * (1 - SPREAD.dim * Math.min(1, q === null ? 0 : q))
+        * (0.62 + 0.25 * (level - 0.5) * 2.4)),
     // AND HOW FAR THE PIECE STANDS PROUD, which is the datum U-SENT-2 added and
     // the painter carries in the second channel of the tone strip. See RELIEF.
     lift: pieceLift(piece.id, bare),
@@ -961,7 +1068,60 @@ export function grainUv(x, z) {
 // over unchanged: it is a measurement of the SAME stone off the SAME reference,
 // re-solved twice already, and re-solving it a third time here on a new surface
 // would be inventing a second answer to a settled question.
-export const EARTH = [0.305, 0.272, 0.244];
+// AND IT IS THE SPREAD AND NOT THE MEAN, WHICH IS THE READING THIS UNIT ADDS TO
+// THE RESIDUE U-SENT-2 LEFT.
+//
+// Taken as percentiles of the LEVEL of every pixel of the corridor's own surface
+// that is not grass -- a reading that needs no class and therefore cannot be
+// moved by one (fondazione/lav/u4-terra.py) -- the mid stretch runs:
+//
+//                        p10     p50     p90
+//     TARGET             27.9    89.0   147.5
+//     ours, before       68.3    96.2   116.9
+//
+// The reference's paving spans a hundred and twenty levels and ours fifty five,
+// and the whole of the difference is at the DARK end: its earth and its joints
+// go down to a quarter of its stone and ours to two thirds. E-LUCE7's residue 3
+// and U-SENT-2's residue 1 name the level of the STONE, which is a wall this
+// unit does not own -- the paving is fitted against the meadow beside it and two
+// gates are ratios between them. The EARTH is not that wall: it is the pigment
+// of the soil between the stones, and it was authored a third too bright.
+export const EARTH = [0.1800, 0.1606, 0.1441];
+// AND THE EARTH IS NOT ONE EARTH ACROSS THE CORRIDOR, WHICH IS THE MEASUREMENT
+// THE «STACCO NETTO» IS.
+//
+// Read on the day target at the fitted camera against the corridor's own kerb --
+// the crossing of half a share of green, found on each picture rather than
+// assumed (fondazione/lav/u4-terra.py) -- over the mid stretch, the level and
+// the chromaticity of the pixels that read as EARTH run:
+//
+//     from the kerb   -0.65   -0.37   -0.16   -0.01 m
+//     level             52.6    54.8    58.6    60.1
+//     (r-b)/(r+b)     +0.131  +0.162  +0.280  +0.352
+//
+// and ours, at the same ruler on our own render, read 76.1 / 75.3 / 74.6 / 76.5
+// and +0.339 / +0.338 / +0.352 / +0.353: FLAT IN BOTH. The reference's earth
+// gets brighter and warmer as it comes out from under the stone -- it is damp
+// and trodden in the middle of the run and dry at the verge -- and ours is one
+// brown from the middle to the grass. That is the whole of the «uno stacco
+// netto» on the earth's side, and it is why the crossing reads as a line even
+// where the share of stone is right.
+//
+// WRITTEN AS THE APRON'S WARM IS WRITTEN, and for its reason: a LEVEL and a
+// CHROMATICITY off the one pigment, so the earth stays one material and the
+// reading that fitted it is not re-solved twice. `level` is the damp end over
+// the dry one (52.6 / 60.1) and `cool` is the rotation the frame has to arrive
+// at (0.352 - 0.131), applied so it cannot move the level.
+// AND THE ROTATION IS NOT THE WHOLE 0.221, WHICH IS A READING ABOUT THE READING.
+// A pigment rotated by the full figure comes out with more blue in it than red
+// (EARTH's own (r-b)/(r+b) is 0.111), and damp earth is not blue: what the ruler
+// counts as EARTH half a metre inside the kerb is mostly the SLOT between two
+// pale slabs, and a slot is lit by the sky alone, which under this seal is
+// 0.133 / 0.478 / 1. So most of that 0.221 is the joint's own light and belongs
+// to the light, where this material already puts it (RELIEF.wall). What is
+// carried here is the part a pigment can honestly claim -- a quarter of it --
+// and the rest is named rather than baked into a brown.
+export const EARTH_DAMP = { level: 0.875, cool: 0.055 };
 export const STONE = [0.242, 0.315, 0.313];
 export const STONE_PALE = [0.418, 0.436, 0.428];
 // What a slot takes out of the pigment, at its lip and at its trough.
@@ -977,15 +1137,29 @@ export const STONE_PALE = [0.418, 0.436, 0.428];
 // function of the hour and would reach the one pair of numbers every guard in
 // this world is weighed on.
 export const JOINT_DARK = [0.18, 0.21];
-// Where the lip gives way to the trough, in metres of depth into the slot. The
-// two bands are the reading's own: within a centimetre of stone, and more than
-// two from any.
+// How deep into the slot the darkening is fully in, in metres, and where the lip
+// gives way to the trough on the way. The two bands are the reading's own:
+// within a centimetre of stone, and more than two from any.
+//
+// ONE EASING AND NOT TWO STEPS, AND THAT IS THE «MAPPA TOPOGRAFICA».
+//
+// What was here was a step 3.5 mm wide at the slot's own edge and a SECOND step
+// from one centimetre in to two -- two thresholds on one distance field, so
+// every joint was drawn as two closed outlines nested inside each other, with
+// the relief's own wall term riding on the first of them for a third. Read at
+// walking distance, where a slot 3.5 cm wide covers thirty pixels, that is a
+// contour map: «l'intersezione e' netta», «linee concentriche». And the field
+// the thresholds are read on is stored 7.8 mm to a texel across the run and
+// 8.4 along, so a threshold 3.5 mm wide falls INSIDE one texel and the outline
+// it draws is the bilinear lattice of the map rather than the edge of a stone --
+// which is the staircase on every piece.
+//
+// So the darkening is now ONE monotone easing over the slot's own depth, with
+// no knee and no plateau anywhere in it, and its narrowest feature is 2 cm --
+// two and a half texels of the map that carries it. The two measured levels are
+// still the two ends of it: nought on the stone, JOINT_DARK[0] where the lip
+// gives way, JOINT_DARK[1] at the floor of the slot.
 export const JOINT_LIP = [0.010, 0.020];
-// How quickly the darkening rises from the slot's own edge, in metres. The edge
-// itself is where the stored depth crosses nought, and that crossing is a
-// POSITION and interpolates; this is only how hard the frame is allowed to draw
-// it, and a step with no ramp at all would alias on the near paving.
-export const JOINT_SOFT = 0.0035;
 // Where the rim of a small stone is, in the tile's own coding: the field is a
 // half AT the rim, above it inside the stone and below it out on the ground, so
 // the crossing is a position and the rim is drawn as round as the frame likes
@@ -1046,27 +1220,50 @@ export const GRAIN_FADE = [12, 18];
 export function pathPigment({
   tone, depth, apron = 0, grain = 0.5, stone = 0, near = 1,
 }) {
-  const ramp = tone < 0.5
-    ? EARTH.map((v, i) => v + (STONE[i] - v) * (tone * 2))
-    : STONE.map((v, i) => v + (STONE_PALE[i] - v) * ((tone - 0.5) * 2));
+  // THE RAMP IS CUT IN TWO AT A HALF, AND THE TWO HALVES ARE THE TWO THINGS A
+  // PIECE CAN BE. Under a half it is earth, walked from the damp trodden brown
+  // of the middle of the run to the dry brown of the kerb; over it, stone, from
+  // the worn slab to the palest. See the note on `tone` in paveAt.
+  let ramp;
+  if (tone < 0.5) {
+    const dry = tone * 2;
+    // The damp, and it is a LEVEL and a CHROMATICITY off the one pigment so the
+    // earth stays one material: see EARTH_DAMP.
+    const lvl = EARTH_DAMP.level + (1 - EARTH_DAMP.level) * dry;
+    const cool = EARTH_DAMP.cool * (1 - dry);
+    ramp = [EARTH[0] * lvl * (1 - cool), EARTH[1] * lvl, EARTH[2] * lvl * (1 + cool)];
+  } else {
+    ramp = STONE.map((v, i) => v + (STONE_PALE[i] - v) * ((tone - 0.5) * 2));
+  }
   // The warm of the apron, and it is a CHROMATICITY and not a level: what was
   // measured between the two stretches is +0.135 of (r-b)/(r+b) inside one band
   // of the frame, where the picture's own corner shading divides out. Applied so
   // that it cannot move the level the ratios were read at.
   const warm = TUNING.apron.warm * apron;
-  const out = [ramp[0] * (1 + warm), ramp[1], ramp[2] * (1 - warm)];
+  const tint = [1 + warm, 1, 1 - warm];
+  const out = [ramp[0] * tint[0], ramp[1], ramp[2] * tint[2]];
 
   const bite = 1 + near * GRAIN_GAIN * (grain - 0.5);
   for (let i = 0; i < 3; i++) out[i] *= bite;
 
+  // THE SMALL STONE TAKES THE STRETCH'S OWN WARM, and it did not.
+  //
+  // The pigment laid over the ground here was the bare STONE_PALE, mixed in at
+  // 0.92 over an albedo that had already been through the apron's warm and the
+  // family's brown -- so on the near run, where the warm is fully in, every
+  // small stone was a COLD grey blot on a warm ground. That is the
+  // «macchie grigie» of E-DECISIONI11 in one line: not the stones, their
+  // chromaticity. They are stones of this paving and they wear what the paving
+  // wears.
   const inStone = smoothstep(PEB_EDGE[0], PEB_EDGE[1], stone) * near * PEB_MIX;
   for (let i = 0; i < 3; i++) {
-    out[i] += (STONE_PALE[i] * (PEB_LEVEL[0] + PEB_LEVEL[1] * grain) - out[i]) * inStone;
+    const peb = STONE_PALE[i] * tint[i] * (PEB_LEVEL[0] + PEB_LEVEL[1] * grain);
+    out[i] += (peb - out[i]) * inStone;
   }
 
-  const inSlot = smoothstep(0, JOINT_SOFT, depth);
-  const trough = smoothstep(JOINT_LIP[0], JOINT_LIP[1], depth);
-  const dark = 1 - inSlot * (JOINT_DARK[0] + (JOINT_DARK[1] - JOINT_DARK[0]) * trough);
+  // ONE MONOTONE EASING AND NOT TWO STEPS: see JOINT_LIP.
+  const eased = smoothstep(0, JOINT_LIP[1], depth);
+  const dark = 1 - eased * (JOINT_DARK[0] + (JOINT_DARK[1] - JOINT_DARK[0]) * eased);
   for (let i = 0; i < 3; i++) out[i] *= dark;
   return out;
 }
