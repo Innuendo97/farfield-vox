@@ -120,3 +120,32 @@ export {
   masonryCensus,
   stoneTileData,
 } from './courses.js';
+
+// AND THE FIELD'S OWN TEXEL, for the same reason the store itself is here: the
+// guard that asserts the picture reproduces the block store has to be able to
+// LAY a texel and READ one without opening a browser, and a guard that had to
+// import three.js to ask whether the field agrees with the cubes would stop
+// being able to ask at all. The material that draws it is the page's half of
+// the door (./index.js); this is the arithmetic.
+export {
+  CAMPO,
+  CAMPO_ATLAS,
+  CAMPO_BYTES,
+  CAMPO_MATERIAL,
+  CAMPO_PRESENT,
+  CAMPO_RUNG,
+  CAMPO_TILE,
+  CAMPO_TILE_BYTES,
+  campoColumnOf,
+  campoDecode,
+  campoHeights,
+  campoMaterialCode,
+  campoReduce,
+  campoSlimCode,
+  campoSlimEighths,
+  campoSlot,
+  campoTile,
+  campoTintByte,
+  campoTintOf,
+  campoTopStep,
+} from './campo.js';
