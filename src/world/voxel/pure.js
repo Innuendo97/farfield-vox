@@ -21,7 +21,10 @@ export {
   MOUND,
   EARTH,
   FRAMED,
-  SOD,
+  BLADE,
+  BLADES_PER_VOXEL,
+  SUB,
+  MANTO,
   MATERIAL,
   CHUNK,
   DISC_RADIUS,
@@ -30,6 +33,9 @@ export {
   FACE,
   NO_COLUMN,
   bareRaisedAt,
+  bladeAtColumn,
+  bladeCentre,
+  bladeHeightAt,
   chunkColumns,
   chunkList,
   columnCentre,
@@ -46,7 +52,8 @@ export {
   onPaving,
   pathDrop,
   pathVerge,
-  sodAt,
+  mantoAt,
+  mantoIntensity,
 } from './mesher.js';
 
 // AND THE STORE ITSELF, because a guard that asserts the world is a plane has

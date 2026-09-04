@@ -3,7 +3,8 @@ import {
   BASE_LEVEL, PATH_STONE_END_Z, pathCentreX, pathCoord, pathEdge, pathHalfWidth, pathRun,
 } from '../terrain-field.js';
 import {
-  MATERIAL, NO_COLUMN, VOXEL, clearColumn, createColumns, setFlank, setTop,
+  BLADE, BLADES_PER_VOXEL, MATERIAL, NO_COLUMN, SUB, VOXEL,
+  clearColumn, createColumns, setBlade, setFlank, setTop,
 } from './columns.js';
 // The plan and not the meshes: where the boulders stand is a number in a file,
 // and rocks.js -- which is where they become geometry -- reaches three.js. The
@@ -29,13 +30,20 @@ import ROCK_PLAN from '../../../assets-src/rocks/rocks.json' with { type: 'json'
 //                    into the store: a flat crown of grass and one cut bank of
 //                    bare earth. The same arithmetic that was approved as a
 //                    field, doing the same thing as an edit.
-//   4. THE GRAIN     the sods: plates of five to twelve cubes standing one voxel
-//                    over the floor, on a lattice of their own.
+//   4. THE MAT       the blades of grass, which are NOT the ground: a second
+//                    lattice at half the step, laid on whatever top is meadow,
+//                    read out of the same store and drawn as a family of its
+//                    own. It moves no column and the walker passes through it.
 //
-// AND THE ORDER IS THE MEANING. The grain comes last and stops at the hem of a
-// mass, so a bank stays ONE riser instead of a saw; the seats come before the
-// masses, so a mound cannot grow out of a hole; the base comes first, so there
-// is exactly one place in this world that says how high the ground is.
+// AND THE ORDER IS THE MEANING. The mat comes last and lays itself on the tops
+// the passes before it left, so it never has to know where a mound is; the
+// seats come before the masses, so a mound cannot grow out of a hole; the base
+// comes first, so there is exactly one place in this world that says how high
+// the ground is.
+//
+// THE FOURTH PASS USED TO BE THE GRAIN -- plates of turf standing one voxel over
+// the floor -- and it is gone. E-DECISIONI8: the terrain of the target is ONE
+// LEVEL, and what the plates were fitted to is the mat.
 
 /** Where the disc is centred. */
 export const CENTRE = { x: AREA_CENTER.x, z: AREA_CENTER.z };
@@ -85,6 +93,30 @@ function hash2(ix, iz) {
   h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
   h = (h ^ (h >>> 16)) >>> 0;
   return h / 4294967296;
+}
+
+/**
+ * Value noise on the lattice above, smooth and between nought and one.
+ *
+ * A FIELD AND NOT A SCATTER, and that is the whole of what it is for: the mat's
+ * own law is uncorrelated on purpose (E-ERBA-A 1.4, «il manto cambia quota quasi
+ * a ogni filo»), so a second uncorrelated draw over it would be the same speckle
+ * twice. What the committente asks for -- «ci sono punti a piu' bassa
+ * intensita'» -- is a PLACE, which is a thing with a size, and a size is a
+ * correlation length.
+ */
+function noise2(x, z) {
+  const ix = Math.floor(x);
+  const iz = Math.floor(z);
+  const fx = x - ix;
+  const fz = z - iz;
+  const ux = fx * fx * (3 - 2 * fx);
+  const uz = fz * fz * (3 - 2 * fz);
+  const a = hash2(ix, iz);
+  const b = hash2(ix + 1, iz);
+  const c = hash2(ix, iz + 1);
+  const d = hash2(ix + 1, iz + 1);
+  return (a + (b - a) * ux) + ((c + (d - c) * ux) - (a + (b - a) * ux)) * uz;
 }
 
 // ======================================================================
@@ -386,61 +418,229 @@ export const EARTH = {
 };
 
 /**
- * The grain of the meadow: the sods, and every number they have.
+ * THE MAT OF GRASS, AND THE STEP IT IS MEASURED IN, WHICH IS NOT THE WORLD'S.
  *
- * WHAT THIS REPLACES, AND WHY THE THING IT REPLACES COULD NOT BE MADE TO WORK.
- * The floor used to be grained by a TUFT: a value noise correlated over 0.30 m
- * -- three columns -- thresholded to plus or minus one voxel, evaluated once
- * per column. It put a step every three or four cubes in every direction, which
- * is the committente's own complaint in his own words: «voxel ingiustificati
- * come se ognuno dovesse avere per forza una differenza di altezza con quelli
- * accanto». U-V1-F2 swept it in both directions -- longer correlation, and a
- * second field gating it into patches -- and reported that NEITHER brings the
- * level runs anywhere near the target's. A noise per column cannot: what
- * decides how long a run is, is how far the noise stays on one side of its own
- * threshold, and that is the correlation length again under another name.
+ * WHAT THIS REPLACES. The floor used to be grained twice over: first by a TUFT
+ * (a value noise thresholded to plus or minus a voxel, which put a step every
+ * three or four cubes), then by the SODS -- plates of turf on a lattice, one
+ * voxel proud of the plane, five to twelve columns across. Both were readings
+ * of the same pixels, and both read them as GROUND. E-DECISIONI8 says in the
+ * committente's own words that they are not ground: «nel target l'erba e'
+ * rappresentata da voxel piu' o meno lunghi che proiettano ombre sugli altri
+ * fili ... e' per questo che il terreno era perfettamente pianeggiante:
+ * stavate analizzando i fili d'erba come rilievi».
  *
- * SO THE GRAIN IS A FEATURE AND NOT A NOISE, which is what the structure
- * research recommends and what E-DECISIONI7 A1 = B asks for. A lattice of
- * seats, one to a cell, each carrying a PLATE of five to twelve columns raised
- * by one voxel: an object with a seed and a law, the same shape of arithmetic
- * the mounds already use, three sizes down. A run of level cubes is then as
- * long as a plate or as long as the floor between two of them, and both are
- * set by numbers that say what they mean.
+ * So the terrain goes back to being ONE LEVEL -- the plane, the masses set on
+ * it, the corridor cut into it, and nothing else -- and what stood in the
+ * pixels the sods were fitted to is this: a mat of BLADES standing on top of
+ * it, which is not terrain, is not walkable, and is not measured in the
+ * world's step.
  *
- * AND IT RISES AND NEVER SINKS, WHICH IS A MEASUREMENT AND NOT A SIMPLIFICATION.
- * The tuft was symmetric about nought so it would not move the mean height of a
- * field the walker stood on. The floor is a literal now, and the reference says
- * what the two levels beside the paving are: the corridor's surface lies on the
- * plane and the grass beside it stands ONE TO TWO voxels proud of the stone
- * (A §1.3). One is the bare plane, two is a sod; a sod that sank would draw
- * nought, which the target never shows anywhere along the run.
+ * THE BLADE IS 5 CM AND THE TARGET'S IS 6, AND THE 17% IS DECLARED RATHER THAN
+ * HIDDEN. E-ERBA-A measured the blade at 5.5-6.0 cm -- 0.60 of our cube -- with
+ * a control that reads 1.087 where the truth is 1.000, and three earlier
+ * readings on the ledger say the same number (B 1.2 «10 px against 18»,
+ * E-PIG2 «20 against 12», columns.js:52 «against the target's 12»). Three
+ * answers were on the table and the coordinator took the first (D-E1 = A):
+ *
+ *   A  5 cm, a whole sub-lattice x2 of the store -- 17% short, every seam
+ *      exact, four blades to a column of world. THIS ONE.
+ *   B  6 cm exactly, a lattice of its own -- faithful, and then the two grids
+ *      never line up and every seam (corridor, mound, rim) becomes a case.
+ *   C  10 cm, the blade IS our cube -- 67% over, and the mat would stand
+ *      10-40 cm instead of 6-24.
+ *
+ * AND IT IS NOT THE SECOND STEP columns.js:44-56 REFUSES. That note refuses a
+ * LADDER OF SIZES ANCHORED TO THE WORLD -- a ring measured for the middle of
+ * the hub and wrong under the walker's feet at the rim. This is one step, the
+ * same everywhere, and it is a whole division of the one that already exists:
+ * two blades to a cube on each axis, so a blade boundary is never between two
+ * cube boundaries and no seam has to be invented anywhere.
  */
-export const SOD = {
-  // The lattice a plate may be seated in, in metres. Six columns.
-  cell: 0.60,
-  // How many of those cells carry a plate at all. High, and it is the number
-  // that decides how much of the meadow stands a voxel over the rest: at this
-  // value 53.9% of the columns in frame are on a plate and the other 46.1% are
-  // the plane itself, which is the balance the reference shows beside the
-  // paving -- both of its two levels present in about equal measure.
-  density: 0.78,
-  // How far a plate reaches from its seat, in metres, before the lean below:
-  // four to eight columns across. A PLATE IS SMALLER THAN A RUN, and that is
-  // the mechanism rather than a shortfall -- the jitter is a whole cell wide,
-  // so neighbouring plates at the same level overlap and READ AS ONE, and what
-  // carries a level run past the size of a single plate is that merging.
-  // Measured on the meadow in frame: level runs p10 2, p50 5, p90 12, against
-  // the 5 to 12 the reference is read at (A 1.2, E-V1j).
-  reach: { low: 0.20, high: 0.40 },
-  // HOW FAR FROM ROUND A PLATE IS ALLOWED TO BE. A sod of turf is not a disc,
-  // and a meadow of discs reads as a meadow of discs; stretched along its own
-  // bearing and squeezed across it, the plate keeps its area and loses its
-  // circle.
-  lean: 0.30,
-  // How high a plate stands, in whole voxels.
-  rise: 1,
+export { BLADE, BLADES_PER_VOXEL, SUB } from './columns.js';
+
+/**
+ * The law of the mat: how tall a blade stands, and how often the plane shows.
+ *
+ * THE NUMBERS ARE A FIT AND THE FIT IS WRITTEN DOWN. E-ERBA-A does not measure
+ * the height of a blade directly -- it says so itself (limite 10): what its
+ * validated estimator measures is the RISER between neighbouring blades, over
+ * 2 265 risers in four resolved windows, and it comes to
+ *
+ *     1 blade 52%   2 blades 31%   3 blades 14%   4 or more 3%
+ *
+ * plus one hand reading at the kerb of the corridor, the only true vertical
+ * rule the near field offers: the mat stands 6-24 cm over the plane, median
+ * 12 cm = two blades.
+ *
+ * For a field with no correlation between neighbours -- which is what 1.4
+ * measures, top runs of 0.6-1.0 blades, «il manto cambia quota quasi a ogni
+ * filo» -- those two readings are ONE distribution, and the law below is the
+ * one that reproduces both. Solved on a grid over the five-way laws
+ * (fondazione/lav/er-fit.mjs), it gives back
+ *
+ *     51.9 / 31.0 / 14.1 / 3.0   against the measured 52 / 31 / 14 / 3
+ *
+ * with a median of two blades. The residual is one part in a million and the
+ * fit is not tuned any further, because the measurement it is fitted to has a
+ * band of its own.
+ *
+ * AND THE FIFTH RUNG IS WHAT THE FOURTH BIN COSTS. A mat that stood 1-4 blades
+ * could never draw a riser of four: the tallest riser four levels can make is
+ * three. The measured 3% at «4 or more» ASKS for a fifth rung, and 5% of blades
+ * at five blades is what pays for it -- 30 cm, over the 24 the kerb reading
+ * brackets. It is declared here rather than trimmed, because trimming it would
+ * be trimming the measurement to fit the model.
+ */
+export const MANTO = {
+  // The share of blade columns at each height, from bare plane upward. Index is
+  // the height in blades, so `law[0]` is the plane showing through.
+  //
+  // AND THE PLANE SHOWS AS MUCH AS THE TARGET SHOWS IT AND NOT MORE. E-ERBA-A
+  // 2 counts the brown pixels in the open meadow away from the corridor at
+  // 0.4-0.8%: «il manto e' chiuso: non ci sono buchi nell'erba da cui si veda
+  // il piano». Six thousandths is the middle of that band.
+  law: [0.006, 0.2286, 0.3280, 0.2286, 0.1590, 0.0498],
+  // Where the mat stands, and the one place it does not.
+  //
+  // ON EVERY GRASS TOP, WHICH IS THE COMMITTENTE'S OWN ANSWER (E-DECISIONI9.4,
+  // «un po' d'erba anche sui cumuli») and D-E3. E-ERBA-A 3 measures it on the
+  // target: «sopra il cumulo ci sono i fili ... l'erba continua sopra il prato
+  // del cumulo». So the mat is a term that lays itself on whatever top is
+  // MEADOW, and the corridor's stone and the earth of its verges are exactly
+  // the tops that are not.
+  //
+  // AND THE VERGE IS MEASURED AND NOT ASSUMED. The reading is in the verbale of
+  // this unit: on the target's own verge, in the band the corridor is resolved
+  // in, the brown of the bare earth runs unbroken to the stone. A blade every
+  // few columns there is what the eye reads as a ragged edge, and the target's
+  // is not ragged -- so the verge carries none, and the number that says so is
+  // this one rather than an omission.
+  // ------------------------------------------------- THE FIELD OF INTENSITY
+  //
+  // E-DECISIONI10 G1, his words: «l'erba copre come un MANTO piu' o meno
+  // uniforme quasi tutto il prato; ci sono punti a piu' bassa INTENSITA', con
+  // erba meno fitta e meno alta; il manto e' a piu' alta intensita' vicino alle
+  // creste, alle prominenze e attorno ai monoliti». And G3: «puo' essere molto
+  // bassa (dintorni del sentiero) e infittirsi e alzarsi in maniera GRADUALE e
+  // giustificata».
+  //
+  // SO THERE IS ONE NUMBER AND IT MOVES BOTH, which is not a simplification but
+  // his own sentence: «meno fitta E meno alta». A share of the columns carry no
+  // blade at all, and the ones that do are shorter, and both fall together with
+  // the same field. What it also buys, for nothing, is the SUB-BLADE height of
+  // G3 -- a blade at three quarters of the intensity is three quarters of its
+  // own height, which is not a whole number of blades and does not have to be.
+  //
+  // AND THE RAMP AT THE CORRIDOR IS MEASURED. The committente's own complaint
+  // (E-DECISIONI10, nota) is «da noi ha netti confini verdi ai margini». Read on
+  // the target and on the render that carried this defect, the share of green
+  // pixels against the lateral distance from the edge of the paving, over the
+  // stretch of corridor the pose resolves (fondazione/lav/er-campo.py):
+  //
+  //     from the edge   -0.2   0.0   0.12   0.30   0.55   0.90   1.45   2.4 m
+  //     TARGET          22.1  42.0  50.1   56.5   60.4   63.0   76.2  75.1 %
+  //     before          32.6  56.9  97.9   99.5   98.5   94.6   92.2  90.3 %
+  //
+  // The target climbs over a metre and a half; the meadow that shipped goes from
+  // 57 to 98 per cent in FIFTEEN CENTIMETRES. That step is the «netto confine
+  // verde», and it is a step because the mat used to stand on grass tops and
+  // stop dead at the band of bare earth beside the stone.
+  //
+  // Read against its own plateau the target's ramp is 0.55 at the kerb and 1.00
+  // by 1.2-1.5 m, which is the pair of numbers below.
+  verge: { low: 0.10, reach: 1.80 },
+  // How many of the columns still carry a blade where the intensity is nought,
+  // and how tall it is there as a share of its own draw. Fitted together against
+  // the ramp above, because what the picture shows is the two multiplied.
+  thin: 0.34,
+  short: 0.30,
+  // THE THINNER PLACES OF THE OPEN MEADOW -- «ci sono punti a piu' bassa
+  // intensita'» -- as a slow field over the world rather than a scatter, so what
+  // it draws are PLACES and not speckle. The cell is in metres and the floor is
+  // how far down the field may take the mat where it is thinnest.
+  patch: { cell: 3.4, low: 0.74 },
+  // AND WHERE IT IS THICKEST: «vicino alle creste, alle prominenze e attorno ai
+  // monoliti». A mass and the stone both carry a halo of full intensity, so the
+  // slow field cannot thin the mat out exactly where he asks for it thickest.
+  //
+  // AND THIS ONE IS HIS WORD AND NOT A MEASUREMENT, WHICH IS DECLARED. The same
+  // instrument that measured the corridor's ramp cannot measure this one: in the
+  // rings within a metre and a half of a block's foot the pixels are mostly the
+  // BLOCK -- a dark navy silhouette that is not grass and not ground -- so the
+  // green share there reads 28% and says nothing about the mat. The reading is
+  // reported in the verbale as contaminated rather than quoted as a number.
+  halo: 1.60,
+  // AND THE MAT CROSSES ONTO THE BARE EARTH OF THE VERGE, WHICH IS THE HALF OF
+  // THE ANSWER THE FIELD ABOVE CANNOT GIVE ON ITS OWN.
+  //
+  // A ramp of intensity that stopped at the last grass top would still draw a
+  // hard line, because the line is not the intensity -- it is the EDGE OF THE
+  // MATERIAL: the corridor writes two to four columns of MATERIAL.EARTH either
+  // side of the stone (PATH.verge), and a mat that stood only on grass ended
+  // exactly there, at full height, against brown. So the mat lays on the earth
+  // of the verge too, at whatever intensity the ramp gives it -- which is its
+  // lowest -- and what the eye gets is blades thinning and shortening INTO the
+  // brown instead of a green wall standing on it.
+  //
+  // The stone itself carries none. The target shows a fifth of its kerb pixels
+  // green, so it does carry some; that is the tessellation of E-DECISIONI10 S1
+  // to S3 -- tiles of stone and brown earth thinning into each other with a
+  // relief of a centimetre -- and it is U-SENT-2's, on the corridor's own
+  // sub-lattice. What this unit owes it is a mat that is already fading where
+  // it arrives, and that is what the ramp is.
+  onVerge: true,
+  // HOW MUCH OF THE GROUND BESIDE THE CORRIDOR IS STILL BARE EARTH, as a
+  // multiplier on the intensity: at one, a column is earth exactly as often as
+  // the mat is thin there. Fitted against the ramp of green above -- the sweep
+  // and its table are in the verbale of U-ERBA-1.
+  ground: 0.75,
+  // ------------------------------------------------------- and what it costs
+  //
+  // HOW FAR THE BLADES ARE DRAWN ONE BY ONE, in metres from the walker's own
+  // place. E-ERBA-A 6.3 is the reason there is a number here at all: a field
+  // with no correlation gives the greedy mesher nothing to merge -- 0.66
+  // columns to a quad, measured -- so the mat costs 4.2 triangles a column
+  // against the 0.65 the whole ground costs, and at 5 cm over the disc that
+  // ships that is a million triangles against a ceiling of sixty thousand.
+  //
+  // THE NUMBER IS MEASURED AND NOT CHOSEN. D-E2, the coordinator's answer to
+  // «fin dove arrivano i fili», is «fidelity as far as the frame holds»: the
+  // unit lays the disc at 4, 6 and 8 metres on a loaded machine at the lowest
+  // tier and takes the largest that keeps the frame inside 14.0 ms. The table
+  // is in the verbale of U-ERBA-1 and the number below is its answer.
+  detail: 6,
+  // AND THE BLOCK THE MAT IS SAMPLED IN BEYOND THAT RING, in blades, and it is
+  // the other half of the same measurement rather than a rounding of it.
+  //
+  // The ring decides the near field and the block decides EVERYTHING PAST IT,
+  // which at the pose the campaign judges on is most of the frame: the band
+  // E-ERBA-A reads the mat in -- 7.8 to 9.6 m -- lies outside any ring the frame
+  // can afford. Benched the same way as the ring, three mixed rounds at the
+  // lowest tier with the whole world standing:
+  //
+  //     ring/block   frame tri   gpu p50   gpu p90
+  //       6 / 6       133 310      9.95     12.50
+  //       6 / 4       153 942     10.22     12.28   <- what ships
+  //       4 / 3       155 486     10.49     13.89
+  //       5 / 3       169 074     10.56     13.87
+  //       6 / 3       186 636     11.20     15.75   <- over the gate
+  //
+  // Four blades is 20 cm, and it is the row that buys the most fidelity for
+  // nothing: at the same frame as six blades -- 12.28 against 12.50, which is
+  // inside the noise of this bench -- the far field is sampled half again as
+  // finely. Three blades is finer still and two arms of it hold the gate, but
+  // with 0.13 ms of margin where §2.9 asks for margin, and the third (6/3) fails
+  // it outright.
+  block: 4,
 };
+
+// The law as a ladder, closed once at load rather than summed at every column:
+// a blade column is one hash and one walk of six rungs.
+const MANTO_LADDER = MANTO.law.reduce((acc, p) => {
+  acc.push((acc.length ? acc[acc.length - 1] : 0) + p);
+  return acc;
+}, []);
 
 // ------------------------------------------------------------- the seats
 //
@@ -524,47 +724,142 @@ function moundSeat(cx, cz) {
 }
 
 /**
- * The plate a sod cell carries, or null where it carries none.
+ * How tall the blade standing on one column of the sub-lattice is, in blades.
  *
- * THE JITTER IS NOT BOUNDED HERE AND THAT IS THE DIFFERENCE FROM A MOUND. Two
- * mounds may never touch, because a mound is an object the eye is meant to
- * point at one at a time; two plates of turf at the same level ARE one plate,
- * and letting them meet is how a run gets longer than a single cell of the
- * lattice can make it. So a point is tested against the nine seats round it
- * rather than against one, and the cost of the grain is nine hashes a column
- * instead of three.
+ * ONE HASH AND A WALK OF SIX RUNGS, and it is the whole of the mat's law. There
+ * is no seat, no reach and no lean here, and their absence is the measurement
+ * rather than a saving: E-ERBA-A 1.4 read the top runs of the target's mat at
+ * p50 0.55-0.97 BLADES over four windows from 5 to 15 metres -- «non ci sono
+ * ciuffi, non ci sono file, non ci sono terrazze» -- against the plates of turf
+ * this replaces, which existed precisely to make runs five to twelve columns
+ * long. A field with no correlation draws a run of one 76% of the time, which
+ * is that reading; anything with a seat in it draws longer ones.
+ *
+ * SO THE THING THE SODS WERE BUILT TO DO IS THE THING THE TARGET DOES NOT DO,
+ * and the mechanism goes with the reading. What survives of that work is its
+ * negative: the 5-12 the guard held was the run of a mat that steps every 6 cm
+ * read with the ruler of the TERRAIN, and it is the same measurement in another
+ * unit rather than a wrong one (E-ERBA-A 1.4).
+ *
+ * @param {number} bx  global blade index along x
+ * @param {number} bz  global blade index along z
+ * @returns {number} 0 for the bare plane, 1 to 5 blades otherwise
  */
-function sodSeat(cx, cz) {
-  if (hash2(cx * 29 + 311, cz * 61 + 137) >= SOD.density) return null;
-  const reach = SOD.reach.low
-    + hash2(cx * 83 + 29, cz * 11 + 503) * (SOD.reach.high - SOD.reach.low);
-  const ang = 2 * Math.PI * hash2(cx * 13 + 401, cz * 47 + 67);
-  const jitter = SOD.cell / 2;
-  return {
-    x: (cx + 0.5) * SOD.cell + (hash2(cx * 37 + 7, cz * 5 + 199) * 2 - 1) * jitter,
-    z: (cz + 0.5) * SOD.cell + (hash2(cx * 3 + 89, cz * 73 + 41) * 2 - 1) * jitter,
-    c: Math.cos(ang),
-    s: Math.sin(ang),
-    reach,
-  };
+export function bladeHeightAt(bx, bz) {
+  const r = hash2(bx * 1973 + 7717, bz * 3413 + 15083);
+  for (let h = 0; h < MANTO_LADDER.length - 1; h++) if (r < MANTO_LADDER[h]) return h;
+  return MANTO_LADDER.length - 1;
 }
 
-/** Whether a point stands on a plate of turf. */
-export function sodAt(x, z) {
-  const cx = Math.floor(x / SOD.cell);
-  const cz = Math.floor(z / SOD.cell);
-  for (let dz = -1; dz <= 1; dz++) {
-    for (let dx = -1; dx <= 1; dx++) {
-      const seat = sodSeat(cx + dx, cz + dz);
-      if (!seat) continue;
-      const px = x - seat.x;
-      const pz = z - seat.z;
-      const u = (px * seat.c + pz * seat.s) / (1 + SOD.lean);
-      const w = (-px * seat.s + pz * seat.c) * (1 + SOD.lean);
-      if (u * u + w * w < seat.reach * seat.reach) return true;
-    }
+/** How far a point stands from the edge of the paving, in metres. Negative on it. */
+function pathEdgeGap(x, z) {
+  if (pathRun(z) <= 0) return Infinity;
+  const s = x - pathCentreX(z);
+  return Math.abs(s) - pathEdge(z, s >= 0 ? 1 : -1);
+}
+
+/**
+ * HOW THICK AND HOW TALL THE MAT IS AT A POINT, as one number between nought
+ * and one.
+ *
+ * The committente's own field (E-DECISIONI10 G1 and G3), in three terms and no
+ * fourth. Every one of them is a MULTIPLIER on the same number, so a point that
+ * is both beside the corridor and beside a mass gets the lower of the two
+ * rather than an argument between them.
+ */
+export function mantoIntensity(x, z) {
+  // 1. THE CORRIDOR, and it is the term the committente named the defect of.
+  //    Nought at the edge of the stone, one by `reach` metres out, and smooth
+  //    the whole way: a linear ramp would have a corner at each end and the
+  //    corner is the thing being removed.
+  const gap = pathEdgeGap(x, z);
+  let i = 1;
+  if (gap < MANTO.verge.reach) {
+    const t = Math.min(1, Math.max(0, gap / MANTO.verge.reach));
+    const smooth = t * t * (3 - 2 * t);
+    // FADED WITH THE PAVING ITSELF. Past the last stone there is no corridor to
+    // thin the mat beside, so the ramp goes with it rather than leaving a ghost
+    // of a path in the grass where the path has ended.
+    i = 1 - pathRun(z) * (1 - (MANTO.verge.low + (1 - MANTO.verge.low) * smooth));
   }
-  return false;
+
+  // 2. THE THINNER PLACES OF THE OPEN MEADOW. A slow field, so what it draws is
+  //    a place and not a speckle; the blades' own law is already uncorrelated
+  //    and a second uncorrelated term would only be the same draw twice.
+  const c = 1 / MANTO.patch.cell;
+  let patch = MANTO.patch.low + (1 - MANTO.patch.low) * noise2(x * c + 311.7, z * c + 47.3);
+
+  // 3. AND WHERE IT IS THICKEST. A mass, the hem round one, and the band round
+  //    the stone: «piu' alta intensita' vicino alle creste, alle prominenze e
+  //    attorno ai monoliti».
+  //
+  //    IT LIFTS THE SLOW FIELD AND NOT THE CORRIDOR, AND THE ORDER IS THE
+  //    MEANING. Written as a floor under the whole answer it would put a mat at
+  //    full height against the paving wherever a boulder happened to stand
+  //    within a metre and a half of it -- measured, that is where the grass
+  //    beside the stone stood four voxels proud where the reference reads one to
+  //    two. The two sentences are about two different things: one says where the
+  //    mat is thickest in the OPEN MEADOW, the other says how it crosses into
+  //    the corridor, and the crossing wins because it is the thing the
+  //    committente named the defect of.
+  if (patch < 1 && (underMass(x, z) || toStone(x, z).near <= MANTO.halo)) patch = 1;
+  return Math.min(1, Math.max(0, i * patch));
+}
+
+/**
+ * The mat on one column of the sub-lattice, in SUB-steps of a blade.
+ *
+ * WHY THE UNIT IS A QUARTER OF A BLADE AND NOT A BLADE. E-DECISIONI10 G3 asks
+ * for «erba e steli con altezze diverse dai voxel normali -- voxel PIU' BASSI,
+ * composizioni piu' minuziose dove serve», so that the mat can thin and thicken
+ * «in maniera GRADUALE e giustificata» instead of in steps of a whole blade.
+ * The horizontal step does not move -- a blade is 5 cm wide wherever it stands,
+ * which is the measurement of E-ERBA-A 1.1 -- and what gains a finer unit is the
+ * HEIGHT, which is the axis the gradualness is on.
+ *
+ * AND IT COSTS NOT ONE TRIANGLE. The mesher merges on the LEVEL of a top; a
+ * level counted in quarters of a blade merges exactly as often as one counted
+ * in blades wherever the intensity is one, because a quarter times four is a
+ * blade. Where the intensity is under one the mat is also thinner, so the
+ * columns that would have failed to merge are largely not there at all.
+ *
+ * @returns {number} 0 where no blade stands, else its height in SUB-steps
+ */
+export function bladeAtColumn(bx, bz, intensity) {
+  // WHICH COLUMNS ARE BARE IS ITS OWN DRAW AND NOT THE HEIGHT'S. Thinning a mat
+  // by rounding its shortest blades to nothing would take the SHORT ones away
+  // first and leave the tall ones standing alone, which is a mat of spikes; the
+  // committente asked for «meno fitta e meno alta», which is two things.
+  const cover = MANTO.thin + (1 - MANTO.thin) * intensity;
+  if (hash2(bx * 6151 + 401, bz * 769 + 8887) >= cover) return 0;
+  const h = bladeHeightAt(bx, bz);
+  if (h === 0) return 0;
+  const tall = MANTO.short + (1 - MANTO.short) * intensity;
+  return Math.max(1, Math.round(h * SUB * tall));
+}
+
+/** Where the middle of a blade column stands, in metres. */
+export function bladeCentre(bx, bz) {
+  return { x: (bx + 0.5) * BLADE, z: (bz + 0.5) * BLADE };
+}
+
+/**
+ * How tall the mat is at a point, in METRES, and nought where it does not lay.
+ *
+ * THE DOOR FOR EVERYTHING THAT IS NOT THE MESHER: the flowers have to be set on
+ * the top of the blade under them (E-ERBA-A 4, «i fiori stanno su colonne
+ * d'erba di altezza diversa»), and asking that question of the mesh would be
+ * asking it of a picture. THE WALKER IS NOT ONE OF THESE READERS and must never
+ * become one: groundHeightAt is the plane, by the committente's own word
+ * (E-DECISIONI9.2, «il camminatore attraversa erba e fiori passandoci
+ * attraverso»), and E-ERBA-A 6.7 says why in the body's own numbers -- the mat
+ * puts 1 to 5 blades over EVERY column including the mounds, and a step of
+ * 0.30 m is already exactly the ceiling the body has.
+ */
+export function mantoAt(x, z) {
+  const bx = Math.floor(x / BLADE);
+  const bz = Math.floor(z / BLADE);
+  return bladeAtColumn(bx, bz, mantoIntensity(x, z)) * (BLADE / SUB);
 }
 
 // Where the stone stands, which is the one thing in this world a mound may not
@@ -1247,17 +1542,96 @@ export function columnSpec(ix, iz, grain = true, radius = DISC_RADIUS) {
     // of; everything else about a mass is meadow and keeps its grass.
     if (bareRaisedAt(x, z)) {
       under = MATERIAL.EARTH;
-      // As deep as the wall this column raises, and no deeper: the mass's own
-      // bank, not the dial's widest reading.
-      depth = Math.max(1, moundCutAt(x, z));
+      // AND THE EARTH STOPS ONE VOXEL SHORT OF THE TOP, WHICH IS THE WHOLE OF
+      // WHAT THE COMMITTENTE ASKED FOR ON THE MOUNDS.
+      //
+      // E-DECISIONI8.3, his words: «nel target si vedono circa due voxel di
+      // TERRA + un voxel di PRATO; nel dopo tre voxel terra con la faccia
+      // superiore del terzo verde». E-ERBA-A 3 put a rule on it: 11 +/- 2 cm of
+      // brown under 7 +/- 2 cm of green, in the unit of the BLADE, on a bank
+      // 18 cm tall in all.
+      //
+      // In our step that is one cube of earth under one cube of meadow whose
+      // FOUR SIDES are green, and that is what this line writes: the cut runs
+      // one voxel shallower than the wall it stands in, so the top cube of a
+      // bank keeps the meadow's own flank. The mesher splits the wall at that
+      // boundary (see `cap` in ./mesher.js) -- the store has always been able
+      // to say it, `cellMaterialAt` reads it back today, and what could not say
+      // it was the pass that drew one rectangle for a whole wall.
+      //
+      // THE QUANTISATION IS DECLARED. The target's is 11 cm of earth and 7 of
+      // grass; ours is 10 and 10, because our step is 10 and a bank of two
+      // cubes is the size E-ERBA-A 6.6 reads for it («la taglia c'e' gia'»).
+      // What moves is which material the top cube's sides are cut in, and that
+      // costs no triangle in the store and one in the mesh.
+      depth = Math.max(1, moundCutAt(x, z) - 1);
     }
   }
 
-  // 4. THE GRAIN, last, and never over a mass or the hem round one: the grain
-  //    belongs to the floor, a mass is set on the floor, and letting the one
-  //    run over the other is what turned a bank into a saw and a 0.30 m step
-  //    into a 0.50 m one.
-  if (grain && mass === 0 && !underMass(x, z) && sodAt(x, z)) top += SOD.rise;
+  // 3b. AND THE BROWN OF THE VERGE DOES NOT END AT A COLUMN.
+  //
+  //    THE DEFECT THE COMMITTENTE NAMED, AND WHY THINNING THE MAT ALONE COULD
+  //    NOT CLOSE IT. E-DECISIONI10, nota: «il sentiero sembra piu' largo nel
+  //    target per come si interseca al prato e all'erba: da noi ha netti confini
+  //    verdi ai margini -- il problema e' il diradamento/infittimento graduale».
+  //
+  //    The mat thins beside the corridor now, and MEASURED it changed almost
+  //    nothing: taking blades away over a floor that is MEADOW uncovers green,
+  //    so the share of green pixels at the kerb went 97.9 to 96.7 against the
+  //    target's 50.1. What the target puts between its blades there is BROWN --
+  //    and it puts it a long way out, thinning as it goes:
+  //
+  //        from the edge   0.12   0.30   0.55   0.90   1.45   2.4 m
+  //        TARGET green    50.1   56.5   60.4   63.0   76.2  75.1 %
+  //        before          97.9   99.5   98.5   94.6   92.2  90.3 %
+  //
+  //    So the band of bare earth beside the stone does not END at its last
+  //    column: past it, a share of the columns are still earth, and that share
+  //    falls with the same field the mat's own thickness falls with. One number
+  //    moves the ground and the grass together, which is what «la terra si
+  //    interseca con il prato e l'erba che man mano si infittisce e si alza»
+  //    (E-DECISIONI10 S2) is a description of.
+  //
+  //    AND THE TILES ARE NOT THIS UNIT'S. S1 to S3 ask for the corridor to be
+  //    TESSELLATED -- stone and brown earth in tiles standing up to a centimetre
+  //    proud, each with its own shade and its own colour, the stone thinning
+  //    into the earth instead of stopping. That is U-SENT-2's, on the corridor's
+  //    own sub-lattice, and nothing here anticipates it: what this line does is
+  //    make the MATERIAL of the ground fade where the mat fades, which is the
+  //    half of the crossing the mat cannot do by itself.
+  if (mass === 0 && !underMass(x, z)) {
+    const gap = pathEdgeGap(x, z);
+    if (gap >= 0 && gap < MANTO.verge.reach) {
+      // THE SHARE OF EARTH IS WHAT IS MISSING FROM THE INTENSITY, and it has to
+      // be written that way round: a threshold on the intensity itself leaves
+      // brown standing where the field has already come back to one, which is a
+      // second hard edge a metre further out instead of no hard edge at all.
+      // Measured before the sign was fixed, the share of bare columns ran
+      // 87 / 78 / 56 / 32 per cent over the four bands, where the last one is
+      // open meadow and has to be nought.
+      if (hash2(ix * 3319 + 55, iz * 7717 + 91) < (1 - mantoIntensity(x, z)) * MANTO.ground) {
+        under = MATERIAL.EARTH;
+        depth = 1;
+        return { top, mat: MATERIAL.EARTH, under, depth };
+      }
+    }
+  }
+
+  // 4. AND NOTHING AFTER THE MASSES, WHICH IS THE POINT OF THIS STEP.
+  //
+  //    A fourth pass used to stand here and raise a column by one voxel where a
+  //    plate of turf lay over it. It is gone, and E-DECISIONI8 is why: the
+  //    plates were a reading of the target's BLADES as terrain, and the terrain
+  //    of the target is one level. What the plates were fitted to is the mat,
+  //    which is not a height of this column at all -- it stands ON the column,
+  //    in a step of its own, and ./columns.js keeps it in an array of its own.
+  //
+  //    So `grain` no longer reaches this function's answer, and the argument is
+  //    kept because it has not stopped meaning what it meant: it says whether
+  //    the SECOND LAYER is part of the world, and the layer it switches is the
+  //    mat now. guard-piano's bare arm and guard-grana's off arm both ask for
+  //    exactly what they asked for before -- the plane and the masses set on
+  //    it, with nothing grown over them.
 
   return { top, mat: MATERIAL.GRASS, under, depth };
 }
@@ -1307,7 +1681,7 @@ export const EMPTY = -1e9;
  * @param {boolean} grain
  * @param {number} radius
  */
-export function chunkColumns(cx, cz, n, grain = true, radius = DISC_RADIUS) {
+export function chunkColumns(cx, cz, n, grain = true, radius = DISC_RADIUS, focus = CENTRE) {
   const span = n + 2;
   const store = createColumns(cx * n - 1, cz * n - 1, span, span);
   for (let j = 0; j < span; j++) {
@@ -1325,7 +1699,73 @@ export function chunkColumns(cx, cz, n, grain = true, radius = DISC_RADIUS) {
       }
     }
   }
+  if (grain) layMat(store, focus);
   return store;
+}
+
+/**
+ * The fourth pass: the mat of grass, laid over the tops the three before it left.
+ *
+ * IT ASKS THE STORE AND NOT THE LAW, which is what makes «erba anche sui cumuli»
+ * cost nothing. A blade stands wherever the column under it is MEADOW -- the
+ * plane, the crown of a mound, the flank's own grass cap -- and stands nowhere
+ * the column under it is stone or the bare earth of the corridor's verge. This
+ * pass never asks where a mound is, because the pass that put the mound there
+ * already wrote the answer down.
+ *
+ * AND THE SHAPE HAS A LOD, WHICH IS THE ONE LEVER THIS COSTS ANYTHING ON.
+ * E-ERBA-A 6.3 measured the price: a field with no correlation between its
+ * neighbours gives the greedy mesher NOTHING to merge -- 0.66 columns to a
+ * quad -- so the mat costs 4.2 triangles a column against the 0.65 the whole
+ * ground costs today, and at 5 cm over the disc that ships it is a million
+ * triangles against a ceiling of sixty thousand.
+ *
+ * So the blades are drawn one by one where the eye resolves one -- a blade is
+ * 15 px at 5 m and 5 px at 14 -- and in BLOCKS where it does not: an N by N
+ * patch of the sub-lattice sharing one height, which is one prism to the
+ * mesher instead of N squared. The shape of the mat is the same law either
+ * way; what changes is how finely it is sampled.
+ */
+function layMat(store, focus) {
+  const b = BLADES_PER_VOXEL;
+  const bw = store.w * b;
+  const bd = store.d * b;
+  const bx0 = store.ox * b;
+  const bz0 = store.oz * b;
+  // HOW FAR THE RING REACHES IS THE FOCUS'S AND NOT ONLY THE DIAL'S, and it is
+  // the same shape of handle `radius` already is: a number the page can be
+  // MEASURED at before it is written into a constant. What ships is MANTO's.
+  const reach = focus.detail ?? MANTO.detail;
+  const detail = reach * reach;
+  const block = focus.block ?? MANTO.block;
+  for (let j = 0; j < bd; j++) {
+    for (let i = 0; i < bw; i++) {
+      const bx = bx0 + i;
+      const bz = bz0 + j;
+      // The column under this blade, and the one question asked of it.
+      //
+      // THE MAT LAYS ON MEADOW AND ON THE BARE EARTH OF THE VERGE, AND ON
+      // NOTHING ELSE. Grass is the plane, the crown of a mound and the cap of
+      // its bank; earth is the two to four columns the corridor writes either
+      // side of its stone. Letting it onto the second is what takes the «netto
+      // confine verde» out of the picture -- see MANTO.onVerge -- and the field
+      // of intensity is what makes the crossing gradual rather than a change of
+      // material. The stone carries none: the tiles are U-SENT-2's.
+      const k = ((bz >> 1) - store.oz) * store.w + ((bx >> 1) - store.ox);
+      const on = store.mat[k];
+      if (store.top[k] === NO_COLUMN) continue;
+      if (on !== MATERIAL.GRASS && !(MANTO.onVerge && on === MATERIAL.EARTH)) continue;
+      const x = (bx + 0.5) * BLADE;
+      const z = (bz + 0.5) * BLADE;
+      const near = (x - focus.x) * (x - focus.x) + (z - focus.z) * (z - focus.z) <= detail;
+      // Beyond the ring the whole block answers with its own first blade, so a
+      // patch of N by N stands at one height and the mesher merges it.
+      const ax = near ? bx : Math.floor(bx / block) * block;
+      const az = near ? bz : Math.floor(bz / block) * block;
+      const h = bladeAtColumn(ax, az, mantoIntensity(x, z));
+      store.blade[j * bw + i] = h;
+    }
+  }
 }
 
 /** The whole disc, in chunk coordinates: every chunk with a column in it. */
