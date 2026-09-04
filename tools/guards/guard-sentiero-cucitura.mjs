@@ -4,8 +4,8 @@ import {
 } from '../../src/world/terrain-field.js';
 import { groundHeightAt, materialAt } from '../../src/world/contracts.js';
 import {
-  BASE_STEP, MANTO, MATERIAL, PATH, VOXEL, columnSpec, mantoAt, meadowMoundAt, moundAt,
-  onPaving, pathDrop, pathVerge,
+  BASE_STEP, CENTRE, DISC_RADIUS, MANTO, MATERIAL, PATH, VOXEL, columnSpec, mantoAt,
+  meadowMoundAt, moundAt, onPaving, pathDrop, pathVerge,
 } from '../../src/world/voxel/pure.js';
 import { reporter, selfTest } from './lib.mjs';
 
@@ -30,18 +30,18 @@ import { reporter, selfTest } from './lib.mjs';
 // this corridor that a defect could take away without anything else in this
 // world going red, and this asks all four:
 //
-//   * THE LEVEL. The paving stands one voxel under the floor of the meadow, so
-//     the grass beside the stone stands ONE TO TWO voxels proud of it -- one
-//     where the meadow is plain, two where a plate of grain has lifted it. That
-//     band is the reading of A 1.3, and it is what an eye actually sees of this
-//     whole rebuild.
-//     AND OVER THE APRON IT GIVES THAT VOXEL BACK, which is the same statement
-//     and not an exception to it: the paving's top face meets what the corridor
-//     arrives at, and over the last tread before the run that is the lowest
-//     riser, which src/world/stairs.js draws down to nought. So the level is
-//     asked against PATH.lift's own law rather than against one number, and the
-//     proud is read in two bands -- one to two along the run, nought to one over
-//     the apron, where the stone has come up to the meadow's own floor.
+//   * THE LEVEL. CHANGED BY U-SENT-2, and the committente's own words are why:
+//     E-DECISIONI10 S1, «e' a piano col selciato, ma ha TASSELLI che sporgono in
+//     maniera diversa -- non voxel completi». The paving stands at the meadow's
+//     OWN floor at every northing, so the corridor raises no wall at its kerb at
+//     all, and the apron's exception -- a northing where the drop changed, to
+//     keep the ground from falling away from the lowest riser -- goes with it.
+//     What stands proud of the stone is the MAT: A 1.3's «l'erba sporge 1-2
+//     voxel sulla pietra» is answered by the blades, and it is answered where
+//     the mat is at full intensity, because beside the stone the mat is at its
+//     THINNEST by law and that ramp is the defect E-DECISIONI10 asked to have.
+//     So the proud is read twice -- at the kerb and past the ramp -- and what is
+//     gated is that it RISES between them.
 //   * THE WIDTH. Twenty voxels under the walker's own feet, eight to twelve
 //     through the middle of the field, twenty four in the apron at the step: the
 //     reference's own taper (A 1.3, E-DECISIONI7 A4), which the straight ramp
@@ -61,9 +61,10 @@ import { reporter, selfTest } from './lib.mjs';
 // missed.
 const RUN = { from: STAIRS.z + STAIRS.tread * STAIRS.steps, to: 12.0 };
 
-// How far the grass beside the stone has to stand proud of it, in voxels.
-// A 1.3, and the committente's word on it is E-DECISIONI7 A2. It is the MAT that
-// answers this now and not the terrain: see the note in survey().
+// How far the grass has to stand proud of the stone, in voxels, PAST THE RAMP --
+// where the mat is at full intensity. A 1.3, and the committente's word on it is
+// E-DECISIONI7 A2. It is the MAT that answers this and not the terrain: see the
+// note in survey().
 const PROUD = { low: 1, high: 2 };
 
 // WHERE THE BROWN IS COUNTED, in metres out from the edge of the paving, and it
@@ -80,9 +81,15 @@ const BANDS = [
   { mid: 2.20, what: 'past the ramp' },
 ];
 
-// And over the apron, where the paving has come up to the meadow's own floor:
-// nought where the meadow is plain, one where a plate of grain has lifted it.
-const APRON_PROUD = { low: 0, high: 1 };
+// And AT THE KERB, one column past the verge, where the mat is at its thinnest
+// because the corridor's own ramp put it there (MANTO.verge in
+// ../../src/world/voxel/worldgen.js). Nought is allowed here and nowhere else:
+// what this band exists to refuse is a mat that arrives at the stone at full
+// height, which is «il netto confine verde» in one number.
+const KERB_PROUD = { low: 0, high: 1 };
+// Where the mat is read at full intensity, in metres out from the kerb. Past
+// MANTO.verge.reach, so the corridor's own ramp has finished.
+const PLATEAU = 2.20;
 
 // The reference's taper, in voxels of FULL width -- stone and both verges -- at
 // the three northings it is read at, with the tolerance each reading carries. A
@@ -112,11 +119,8 @@ const cell = (v) => Math.floor(v / VOXEL);
 export function survey() {
   const seen = {
     rows: 0,
-    proudLow: 99,
-    proudHigh: -99,
-    apronRows: 0,
-    apronProudLow: 99,
-    apronProudHigh: -99,
+    kerbProud: [],
+    plateauProud: [],
     vergeLow: 99,
     vergeHigh: -99,
     bands: BANDS.map(() => ({ earth: 0, all: 0 })),
@@ -195,28 +199,33 @@ export function survey() {
       // reading and E-ERBA-A 1.2 named the identity in as many words: «che e',
       // nella vecchia unita', l'erba sporge 1-2 voxel sulla pietra -- la lettura
       // di A 1.3 ... le due letture non erano in disaccordo: erano la stessa
-      // misura in due unita'». The terrain beside the stone is the PLANE now,
-      // exactly one voxel over the paving and never two; what stands one to two
-      // voxels proud is the mat of blades standing on it, and mantoAt is the
-      // law's own word for how tall it is.
+      // misura in due unita'». The terrain beside the stone is the PLANE, and
+      // since U-SENT-2 the paving is at that same plane, so the ground raises
+      // nothing at all at the kerb; the whole of what stands proud is the mat of
+      // blades standing on it, and mantoAt is the law's own word for how tall it
+      // is.
       // AND IT IS MEASURED FROM THE PAVING'S OWN LEVEL and not from whatever the
       // column before it turned out to be: with the brown thinning, the column
       // before the kerb is earth at the MEADOW's level as often as it is verge
       // at the stone's, and a difference taken against it would read nought.
+      // TWICE, AND THE TWO READINGS ARE THE RAMP. At the kerb the mat is at its
+      // thinnest by law, so the band there admits nought; past the ramp it is at
+      // full intensity, and that is where A 1.3's one to two has to land.
       const proud = columnSpec(i, j, true).top - (BASE_STEP - pathDrop(z))
         + Math.round(mantoAt(gx, z) / VOXEL);
-      if (pathDrop(z) === 0) {
-        if (proud < seen.apronProudLow) seen.apronProudLow = proud;
-        if (proud > seen.apronProudHigh) seen.apronProudHigh = proud;
-      } else {
-        if (proud < seen.proudLow) seen.proudLow = proud;
-        if (proud > seen.proudHigh) seen.proudHigh = proud;
+      seen.kerbProud.push(proud);
+      const px = gx + dir * PLATEAU;
+      if (meadowMoundAt(px, z) === 0 && moundAt(px, z) === 0
+        && !onPaving(px, z) && Math.hypot(px - CENTRE.x, z - CENTRE.z) < DISC_RADIUS - 1) {
+        const pi = cell(px);
+        const far = columnSpec(pi, j, true).top - (BASE_STEP - pathDrop(z))
+          + Math.round(mantoAt((pi + 0.5) * VOXEL, z) / VOXEL);
+        seen.plateauProud.push(far);
       }
     }
 
     // The level of the paving itself, and the walker's floor over it.
     const top = columnSpec(i0, j, true).top;
-    if (pathDrop(z) === 0) seen.apronRows++;
     const off = Math.abs(top - (BASE_STEP - pathDrop(z)));
     if (off > seen.level) { seen.level = off; seen.levelAt = [i0, j]; }
     const walked = groundHeightAt((i0 + 0.5) * VOXEL, z);
@@ -236,6 +245,15 @@ export function survey() {
       if (!seen.strayAt) seen.strayAt = [(i + 0.5) * VOXEL, z];
     }
   }
+  // AND THE PROUD IS A MEDIAN AND NOT AN EXTREMUM, which is what A 1.3 is: «l'erba
+  // sporge 1-2 voxel sulla pietra» is a typical blade and not a promise about
+  // every column. The mat's own law leaves 0.6% of the plane bare and puts five
+  // blades on one column in twenty (MANTO.law), so a band on the extremes would
+  // be a band on the tails of a distribution nobody measured the tails of.
+  const median = (a) => (a.length
+    ? a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)] : NaN);
+  seen.kerbProudMid = median(seen.kerbProud);
+  seen.proudMid = median(seen.plateauProud);
   return seen;
 }
 
@@ -243,16 +261,16 @@ if (process.argv.includes('--self')) {
   const seen = survey();
   selfTest('guard-sentiero-cucitura', [
     {
-      what: 'a corridor level with the meadow, so the grass stands nowhere proud of it',
-      caught: PROUD.low > 0,
+      what: 'a corridor sunk under the meadow, which is what U-SENT-2 took out',
+      caught: PATH.drop === 0,
     },
     {
-      what: `grass standing ${seen.proudLow} to ${seen.proudHigh} voxels proud`,
-      caught: seen.proudLow >= PROUD.low && seen.proudHigh <= PROUD.high,
+      what: `grass standing ${seen.proudMid} voxels proud past the ramp`,
+      caught: seen.proudMid >= PROUD.low && seen.proudMid <= PROUD.high,
     },
     {
-      what: 'a corridor that keeps its voxel of drop right up to the lowest riser',
-      caught: seen.apronRows > 0,
+      what: 'a mat that arrives at the stone at full height -- the netto confine verde',
+      caught: seen.kerbProudMid < seen.proudMid,
     },
     {
       what: 'a verge of one column a side, or of five',
@@ -290,18 +308,20 @@ report.line(`  ${seen.rows} rows of corridor, from z ${seen.southmost.toFixed(2)
   + `z ${RUN.to.toFixed(2)}, laid as columns of the disc`);
 
 // ------------------------------------------------------------------- 1
-report.check(seen.level === 0,
-  `the paving stands at ${BASE_STEP - PATH.drop} along the run and at ${BASE_STEP} over `
-  + `the ${PATH.lift.toFixed(2)} m of apron, where it meets the lowest riser`,
+report.check(seen.level === 0 && PATH.drop === 0,
+  `the paving stands at ${BASE_STEP}, the meadow's own floor, at every northing`,
   seen.levelAt ? `off by ${seen.level} at column ${seen.levelAt[0]},${seen.levelAt[1]}`
-    : `every row of it, ${seen.apronRows} of them apron`);
-report.check(seen.proudLow >= PROUD.low && seen.proudHigh <= PROUD.high,
-  `and the grass beside it stands ${PROUD.low} to ${PROUD.high} voxels proud, as A 1.3 reads`,
-  `${seen.proudLow} to ${seen.proudHigh} voxels over the run`);
-report.check(seen.apronProudLow >= APRON_PROUD.low && seen.apronProudHigh <= APRON_PROUD.high,
-  `and ${APRON_PROUD.low} to ${APRON_PROUD.high} over the apron, where the stone has come up `
-  + 'to the floor the grass stands on',
-  `${seen.apronProudLow} to ${seen.apronProudHigh} over ${seen.apronRows} rows`);
+    : `every one of ${seen.rows} rows, and PATH.drop is ${PATH.drop}`);
+report.check(seen.proudMid >= PROUD.low && seen.proudMid <= PROUD.high,
+  `and past the ramp the grass stands ${PROUD.low} to ${PROUD.high} voxels proud of it, `
+  + 'as A 1.3 reads',
+  `median ${seen.proudMid} over ${seen.plateauProud.length} readings at ${PLATEAU} m out`);
+report.check(seen.kerbProudMid >= KERB_PROUD.low && seen.kerbProudMid <= KERB_PROUD.high
+  && seen.kerbProudMid < seen.proudMid,
+  `and ${KERB_PROUD.low} to ${KERB_PROUD.high} at the kerb itself, where the corridor's own `
+  + 'ramp has the mat at its thinnest, and it is LOWER there than past the ramp',
+  `median ${seen.kerbProudMid} at the kerb against ${seen.proudMid} past the ramp, `
+  + `over ${seen.kerbProud.length} readings`);
 
 // ------------------------------------------------------------------- 2
 report.line('');

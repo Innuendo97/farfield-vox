@@ -90,7 +90,25 @@ export function writesTerms(source) {
     || /0\.5\s*\+\s*0\.5\s*\*\s*\w+\.y/.test(source);
 }
 
-/** Whether anything in a fragment multiplies the light rather than the pigment. */
+/**
+ * Whether anything in a fragment multiplies the light rather than the pigment.
+ *
+ * CHANGED BY U-SENT-2, and the change is what src/world/face-light.js was
+ * written for. Its own note says it in as many words: «a material may bend the
+ * sun term between the two -- the masonry does, for its own relief -- and that
+ * is why faceLightOf() takes the pair rather than the normal». The corridor's
+ * tiles stand up to a centimetre proud (E-DECISIONI10 S1), and what a piece's
+ * own shadow takes away is the BEAM and not the colour of the stone: a shadow
+ * written into the albedo would be a stone that is dark at midnight as well as
+ * at noon.
+ *
+ * So a write to the pair passes when the line names the producer OR one of the
+ * corridor's declared relief uniforms, and is a second opinion otherwise. What
+ * the rule still refuses is the whole of what it ever protected: a fragment
+ * that decides for itself where the sun is, and the JOINT moved onto the light.
+ */
+const RELIEF = /uRelief[A-Z]/;
+
 export function lightsTheJoint(source) {
   const bad = [];
   // Every assignment whose left hand side is the light or the terms.
@@ -98,9 +116,35 @@ export function lightsTheJoint(source) {
   let hit;
   while ((hit = re.exec(source))) {
     const line = source.slice(hit.index, source.indexOf('\n', hit.index));
-    // The one legitimate write is the light being MADE, once, out of the
-    // producer. Anything that bends it afterwards is a second opinion.
+    // The light being MADE, once, out of the producer.
     if (/faceLight|faceLightOf|faceTerms/.test(line)) continue;
+    // Or the pair being bent by the relief, through a uniform that says so --
+    // and never with the joint riding along on it.
+    if (RELIEF.test(line) && !/uJoint/.test(line)) continue;
+    bad.push({ line, at: lineOf(source, hit.index) });
+  }
+  return bad;
+}
+
+/**
+ * Whether the joint's own darkening is still a pigment.
+ *
+ * This is the half of the old rule that did NOT move. The relief is light and
+ * the soil in a slot is colour, and the two are separated here so neither can
+ * drift into the other while the fragment gets longer: every line that names
+ * uJointDark has to be assigning the albedo or declaring the uniform.
+ */
+export function jointIsPigment(source) {
+  const bad = [];
+  const re = /uJointDark/g;
+  let hit;
+  while ((hit = re.exec(source))) {
+    const from = source.lastIndexOf('\n', hit.index) + 1;
+    const line = source.slice(from, source.indexOf('\n', hit.index));
+    // The albedo being darkened, the uniform being declared in the GLSL, and
+    // the same uniform being bound in the JS beside it: those three, and the
+    // reason the third is here is that this reads a FILE and not a shader.
+    if (/^\s*(albedo\s*\*?=|uniform\s|float\s+\w+\s*=|uJointDark:|u\.uJointDark)/.test(line)) continue;
     bad.push({ line, at: lineOf(source, hit.index) });
   }
   return bad;
@@ -126,6 +170,26 @@ if (process.argv.includes('--self')) {
       caught: lightsTheJoint('  light *= 1.0 - inSlot * uJointDark.x;').length > 0,
     },
     {
+      what: 'a relief bending the pair through its own uniform is let through',
+      caught: lightsTheJoint('  terms.x *= 1.0 - uReliefShade * step;').length === 0,
+    },
+    {
+      what: 'a fragment deciding for itself where the sun is, is caught',
+      caught: lightsTheJoint('  sun = max(dot(n, vec3(0.0, 1.0, 0.0)), 0.0);').length > 0,
+    },
+    {
+      what: 'the joint riding onto the light behind a relief uniform is caught',
+      caught: lightsTheJoint('  terms *= 1.0 - uJointDark.x * uReliefWall;').length > 0,
+    },
+    {
+      what: 'a joint darkening left on the albedo is not',
+      caught: jointIsPigment('  albedo *= 1.0 - inSlot * uJointDark.x;').length === 0,
+    },
+    {
+      what: 'and the same darkening moved onto the light is',
+      caught: jointIsPigment('  terms *= 1.0 - inSlot * uJointDark.x;').length > 0,
+    },
+    {
       what: 'a fetch hidden in a comment is still not a fetch',
       caught: names(code('// the old terrain-light is gone\nvec3 c = albedo;'),
         ATLASES).length === 0,
@@ -133,6 +197,7 @@ if (process.argv.includes('--self')) {
     {
       what: 'the delivered fragment is none of those',
       caught: !writesTerms(clean) && lightsTheJoint(clean).length === 0
+        && jointIsPigment(clean).length === 0
         && names(clean, [...ATLASES, ...FETCHES]).length === 0,
     },
   ]);
@@ -155,12 +220,19 @@ for (const file of FILES) {
 const fragment = code(read(FILES[1]));
 report.check(!writesTerms(fragment),
   'the fragment does not write a second copy of the two terms');
-report.check(/faceLight\s*\(/.test(fragment) && /FACE_LIGHT_GLSL/.test(fragment),
-  'it asks src/world/face-light.js for them instead');
+report.check((/faceLight\s*\(/.test(fragment)
+    || (/faceTerms\s*\(/.test(fragment) && /faceLightOf\s*\(/.test(fragment)))
+  && /FACE_LIGHT_GLSL/.test(fragment),
+  'it asks src/world/face-light.js for them instead, whole or as a pair it bends');
+
+const pigment = jointIsPigment(fragment);
+report.check(pigment.length === 0,
+  'a joint is a pigment: every line that darkens it multiplies the albedo',
+  pigment.map((h) => `line ${h.at}`).join(' | '));
 
 const joint = lightsTheJoint(fragment);
 report.check(joint.length === 0,
-  'nothing in the paving multiplies the light -- a joint is a pigment',
+  'and the only thing that bends the light is the relief, through its own uniforms',
   joint.map((h) => `line ${h.at}`).join(' | '));
 
 // AND THE DOOR THE SHADER CANNOT SEE. A layer asks for its assets by id, and an
