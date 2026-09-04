@@ -116,7 +116,7 @@ const AT_APPROVED = { on: 1.5362, off: 0.1903, carpet: 1.3459 };
 // nothing left to merge anyway. A blade narrower than its own cell is a box: it
 // leaves the merge, and 1 543 of them over the disc are what this figure carries.
 // The row is PROPOSED here and writing it is the coordinator's (E-V1j, E-V1k).
-const AT_TODAY = { on: 1.5529, off: 0.0996, carpet: 1.4533 };
+const AT_TODAY = { on: 1.5413, off: 0.0988, carpet: 1.4425 };
 
 /** Whether a constant is still the frozen one. Bit for bit: these are dials. */
 export const frozen = (actual, expected) => actual === expected;
