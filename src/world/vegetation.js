@@ -12,8 +12,8 @@ import {
 } from './terrain-field.js';
 import { MONOLITHS, PLATFORM, STAIRS } from './layout.js';
 import { ROCKS } from './rocks.js';
-import { voxelSettings } from './voxel/index.js';
-import { columnTop, DISC_RADIUS, EMPTY } from './voxel/worldgen.js';
+import { ALBEDO, voxelSettings } from './voxel/index.js';
+import { columnTop, DISC_RADIUS, EMPTY, mantoAt } from './voxel/worldgen.js';
 import { VOXEL } from './voxel/columns.js';
 import TERRAIN from '../../assets-src/terrain/terrain.json' with { type: 'json' };
 import GRASS from '../../assets-src/vegetation/grass.json' with { type: 'json' };
@@ -197,13 +197,64 @@ const HEAD_NOMINAL = (HEAD_MIN + HEAD_MAX) / 2;
 /** And the cyan head is a tenth smaller: 7.3 cm measured against 8.2. */
 const CYAN_SCALE = 0.90;
 
-// The stalk. It is the one thing in this meadow a cube face cannot draw -- two
-// centimetres against a lattice of ten -- and it is declared as what it is: a
-// thin box, not a card and not a voxel. Its width is at the floor of what the
-// target can resolve (one pixel where a 10 cm face reads sixteen), so the number
-// is an upper bound and is written as one.
-const STALK_WIDE = 0.015;
-const STALK_TALL = 0.070;
+// THE STALK, AND THE NOTE THAT USED TO STAND HERE CLOSED ITSELF.
+//
+// It said: <<it is the one thing in this meadow a cube face cannot draw -- two
+// centimetres against a lattice of ten>>, and it was right about the lattice it
+// had. The mat of grass is a lattice of FIVE now, and E-ERBA-A 6.6 saw the
+// consequence before the mat existed: <<con un reticolo da 6 cm lo stelo E' un
+// voxel, e la nota si chiude da se'>>.
+//
+// THE TWO NUMBERS ARE MEASURED. E-ERBA-A 4, on the ritaglio at 16x: the stalk is
+// <<una colonna verde piu' stretta della testa -- circa META' della sua
+// larghezza, cioe' 4-5 cm -- alta 1-2 fili (6-12 cm)>>. Half of the nominal head
+// is 3.75 cm and one and a half blades is 7.5 cm, which is what these two say.
+//
+// AND THE CORRELATION THE COMMITTENTE ASKED FOR IS ALREADY IN THE FILE, which is
+// the whole reason this is two literals and not a law. E-DECISIONI9.1:
+// <<DIMENSIONE DELLO STELO E DEL FIORE SONO CORRELATE: la larghezza dello stelo
+// varia fra UN QUARTO e MEZZO cubo secondo la dimensione del fiore -- piu'
+// grande il bocciolo, piu' spesso lo stelo; anche l'altezza del fiore cambia: un
+// fiore piu' basso ha il bocciolo piu' piccolo e lo stelo piu' stretto>>. A
+// flower is ONE geometry authored at the nominal head and scaled uniformly per
+// instance by size / HEAD_NOMINAL, so the stalk's width and its height already
+// follow the head's own draw, exactly and for nothing:
+//
+//     head 6.0 cm (scale 0.80)   stalk 3.0 cm wide, 6.0 cm tall   1.2 blades
+//     head 7.5 cm (scale 1.00)   stalk 3.8 cm wide, 7.5 cm tall   1.5 blades
+//     head 9.0 cm (scale 1.20)   stalk 4.5 cm wide, 9.0 cm tall   1.8 blades
+//
+// which is his <<un quarto a mezzo cubo>> (2.5 to 5 cm) and E-ERBA-A's <<1-2
+// fili>>, both, out of one draw.
+const STALK_WIDE = HEAD_NOMINAL / 2;
+const STALK_TALL = 0.075;
+
+// HOW MUCH LOWER THE HEAD IS THAN IT IS WIDE, from the census of nineteen heads.
+//
+// E-ERBA-A 4 measured the head at 8.2 cm across and 6.3 cm tall: p50 to p50, the
+// bud of the target is NOT a cube, it is squat by a quarter. The committente read
+// the same thing from the other side (E-DECISIONI9.1): <<il bocciolo e' un cubo
+// che varia di scala (i fiorellini piccoli) ma puo' variare anche SOLO IN ALTEZZA
+// (non piu' un cubo: i fiori piu' aperti)>>.
+//
+// WHAT IS BUILT IS THE CENSUS AND WHAT IS NOT IS DECLARED. 6.3 over 8.2 is the
+// number below and it is a constant of the geometry, so it costs nothing: the
+// head that ships is the median head of the target. Making the squat vary from
+// flower to flower is a SECOND per-instance attribute -- the scale is the one
+// there is -- and the census of nineteen heads does not resolve its spread, so
+// the number given to it would be invented. It is carried to the coordinator as
+// a proposal in the verbale rather than taken here.
+const HEAD_SQUAT = 6.3 / 8.2;
+
+// AND THE SMALL ONES STAND ROUND THE BIG ONES. E-DECISIONI9.1: <<spesso i fiori
+// grandi sono circondati da qualche fiorellino piu' piccolo>>.
+//
+// A cell of the sowing holds up to FLOWER_PER_CELL candidates. The first of them
+// draws its size freely; the others are pulled DOWN by however big the first one
+// came out, so a cell that seated a large head seats small companions and a cell
+// that seated a small one is unchanged. It is one hash -- the first candidate's
+// own draw, recomputed, which is deterministic -- and no state.
+const COMPANION = 0.55;
 
 // HOW MANY HEADS STAND ON A SQUARE METRE. Two measurements that agree:
 //   - counted by eye, head by head, on a window of open meadow blown up five
@@ -1181,12 +1232,28 @@ function flowerPigments() {
     pistil: PISTIL_HUE.clone()
       .multiplyScalar(luma(pale) * PISTIL_OF_PALE / luma(PISTIL_HUE)),
     cyan: CYAN_HUE.clone().multiplyScalar(luma(pale) * CYAN_OF_PALE / luma(CYAN_HUE)),
-    // The stalk is the meadow's own pigment, unchanged. Not a shortcut: at a
-    // centimetre and a half it is at most one pixel wide in the target at the
-    // range the campaign judges, so a colour measured on it would be a reading
-    // about resampling and not about a stem. The honest pigment for a stem is
-    // the plant's, and the seat publishes it.
-    stalk: meadow.clone(),
+    // THE STALK IS ITS OWN FAMILY NOW, AND IT IS THE COMMITTENTE'S OWN WORDS.
+    //
+    // The note that stood here said the stem was at most one pixel wide at the
+    // judging range, so a colour measured on it would be a reading about
+    // resampling and not about a stem. That was true at 1.5 cm; the stalk is 3 to
+    // 4.5 cm now -- half its own head, E-ERBA-A 4 -- which is four to six pixels
+    // in the near field, and that is a thing that can carry a colour.
+    //
+    // E-DECISIONI9.1: <<il colore degli STELI e' un verde piu' intenso,
+    // leggermente piu' scuro, MAI MARRONE, che varia un poco di gradazione per
+    // zona>>. The first three are the triple src/world/voxel/pigment.js publishes
+    // as ALBEDO.stalk, derived from the meadow's own and standing beside it, so
+    // the two can never part company.
+    //
+    // AND THE FOURTH IS NOT BUILT AND IS DECLARED. <<Varia un poco di gradazione
+    // per zona>> is the pigment FIELD -- two octaves over the world's XZ, which
+    // the ground's fragment rebuilds from a cube's own cell. A flower is an
+    // INSTANCE and its fragment has no cell: giving it the field means either an
+    // attribute per instance or the field's arithmetic compiled into a second
+    // shader. It is a step, it is priced in the verbale of U-ERBA-1, and it is
+    // not taken here.
+    stalk: new Vector3(...ALBEDO.stalk),
   };
 }
 
@@ -1262,15 +1329,32 @@ function flowerAt(gx, gz, k, height) {
   if (columnTop(Math.floor(x / VOXEL), Math.floor(z / VOXEL)) === EMPTY) return null;
 
   const r3 = hash2(gx * 40503 + k * 65867, gz * 92083 + FLOWER_SEED * 17);
-  const r4 = hash2(gx * 92083 + FLOWER_SEED * 13, gz * 40503 + k * 65867);
+  let r4 = hash2(gx * 92083 + FLOWER_SEED * 13, gz * 40503 + k * 65867);
+  // The companions of a big head, and see COMPANION for why it is this hash.
+  if (k > 0) r4 *= 1 - COMPANION * hash2(gx * 92083 + FLOWER_SEED * 13, gz * 40503);
   const cyan = r3 < CYAN_IN_LIGHT + (CYAN_IN_SHADE - CYAN_IN_LIGHT) * shadeAt(x, z);
   const size = (HEAD_MIN + (HEAD_MAX - HEAD_MIN) * r4) * (cyan ? CYAN_SCALE : 1);
   const scale = size / HEAD_NOMINAL;
   return {
     x,
     // THE HEAD AND NOT THE GROUND UNDER IT, which is what the contract asks for
-    // and what a lamp is hung at: the floor, the stalk, and half a head.
-    y: height(x, z) + STALK_TALL * scale + size / 2,
+    // and what a lamp is hung at: the floor, the MAT, the stalk, and half a head.
+    //
+    // AND THE MAT IS UNDER IT NOW, WHICH IS THE READING OF THE TARGET. E-ERBA-A 4
+    // measured two heads at 30 cm and at 15 cm above the plane and concluded <<i
+    // fiori stanno su colonne d'erba di altezza diversa>>, which is
+    // E-DECISIONI8.4's <<i fiori sono voxel d'erba + voxel bocciolo col
+    // pistillo>> in centimetres. So a flower is seated on the top of the blade
+    // beneath it and its stalk starts there; standing it on the terrain put a
+    // head half buried in the grass, which is what the render before this showed.
+    //
+    // IT IS ASKED OF THE LAW AND NOT OF THE MESH. mantoAt is worldgen's own
+    // statement of how tall the mat is at a point, the same one the store is
+    // written from; asking the picture would be a second opinion, and asking the
+    // walker's floor would be wrong on purpose -- groundHeightAt is the PLANE and
+    // stays the plane, because the walker goes through the grass
+    // (E-DECISIONI9.2) while the flower stands on it.
+    y: height(x, z) + mantoAt(x, z) + STALK_TALL * scale + size / 2,
     z,
     size,
     kind: cyan ? 'ciano' : 'bianco',
@@ -1386,7 +1470,7 @@ const ROLE_STALK = 2;
 function flowerGeometry() {
   const h = HEAD_NOMINAL / 2;
   const y0 = STALK_TALL;
-  const y1 = STALK_TALL + HEAD_NOMINAL;
+  const y1 = STALK_TALL + HEAD_NOMINAL * HEAD_SQUAT;
   const s = STALK_WIDE / 2;
   // Buried a little, so a stalk on a slope never shows daylight under it.
   const foot = -0.03;
