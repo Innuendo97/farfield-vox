@@ -92,60 +92,179 @@
   "entries": [
     {
       "id": "orientation-ladder",
-      "what": "luminance of a face by its orientation, over the brightest family",
+      "what": "luminance of a face by its orientation, in one material under one light",
       "specification": "1.00 / 0.63 / 0.34",
       "measured": {
+        "rocce-est": "1.00 / 0.91 / 0.327 -- THE READING THAT WINS: the only window of either target where the three faces of one material are identified by GEOMETRY, from the fitted camera, with no clustering in the answer",
         "finestra-demo": "1.000 / 0.653 / 0.362",
         "prato-est": "1.000 / 0.590 / 0.360",
-        "prato-ovest": "1.000 / 0.700 / 0.339",
-        "rocce-est": "1.000 / 0.91 / 0.327, and here the three ARE top / west facing / south facing"
+        "prato-ovest": "1.000 / 0.700 / 0.339"
       },
-      "wins": "target",
+      "wins": "target, at rocce-est: 1.00 / 0.91 / 0.327",
       "note": [
-        "The three rungs of a grass window are three CLUSTERS and not three",
-        "orientations: a meadow shows tops, two flanks and a scatter of white flowers,",
-        "and a k-means with three centres has to put four populations somewhere. That",
-        "is why the middle rung moves by 0.11 between two windows of the same meadow",
-        "while the third moves by 0.02. On the rocks, where the orientation of every",
-        "face is known from the camera, the middle rung is 0.91 -- a lit vertical face",
-        "stands within a tenth of a top face in this picture, which no reading of the",
-        "grass windows shows.",
-        "The third rung is the one the light was refitted against, because it is the",
-        "one a sun cannot reach: half the sky and nothing else."
+        "THE THREE GRASS READINGS ARE AN ARTEFACT AND ARE KEPT AS ONE. The three",
+        "rungs of a grass window are three CLUSTERS and not three orientations: a",
+        "meadow shows tops, two flanks and a scatter of white flowers, and a k-means",
+        "with three centres has to put four populations somewhere. That is why the",
+        "middle rung moves by 0.11 between two windows of the same meadow while the",
+        "third moves by 0.02. On the rocks, where the orientation of every face is",
+        "known from the camera, the middle rung is 0.91 -- a lit vertical face stands",
+        "within a tenth of a top face in this picture, which no reading of the grass",
+        "windows shows.",
+        "",
+        "AND THE RENDER READS THE SAME LADDER WITH ITS PIGMENT SWITCHED OFF: 1.000 /",
+        "0.915 / 0.330 against 1.00 / 0.91 / 0.327. The light of this world is the",
+        "light of the target and src/world/face-light.js does not change. What the",
+        "pigment does to this reading is a separate finding and it is below.",
+        "",
+        "THE RUNG IS NOT INVARIANT TO THE PIGMENT, and that is why the ladder is now",
+        "quoted with the column it was read at. Carried through the frame's own chain",
+        "at the two ends of the pigment field, the bottom rung reads 0.2997 at the",
+        "darkest twentieth of columns and 0.4125 at the palest -- a spread of 0.113",
+        "against an estimator null of 0.019. tools/guards/guard-scala.mjs reads it at",
+        "the field's median and prints the two ends every run."
       ],
       "renderNow": {
-        "prato-est": "1.000 / 0.738 / 0.322",
-        "prato-ovest": "1.000 / 0.667 / 0.373",
-        "before the refit": "1.000 / 0.734 / 0.269 and 1.000 / 0.676 / 0.353",
-        "method": "src/dev/voxeltest.html at the fitted camera, cards off, tier basso"
+        "offline, at the field's median column": "1.0000 / 0.9108 / 0.3436",
+        "offline, at the field's darkest twentieth": "bottom rung 0.2997",
+        "offline, at the field's palest twentieth": "bottom rung 0.4125",
+        "method": "tools/lighting/render-chain.mjs: the light seat, the pigment read from src/world/voxel/pigment.js, the two face terms, the ground bounce, AgX and the delivered grade cube. No browser: every rung IS a normal",
+        "on the page, pigment flat": "1.000 / 0.915 / 0.330 (U-RICERCA-B, bench of arms)"
       }
     },
     {
-      "id": "per-voxel-tint",
-      "what": "sd of the region means INSIDE the brightest family, over its own mean",
-      "specification": "at least 20% (24.2% claimed)",
+      "id": "slow-field-share",
+      "what": "the share of a meadow window's luminance variance that survives a blur at three cubes -- how much of the light and dark is organised ABOVE the single cube",
+      "window": "940, 700, 400x230 on both pictures; Gaussian sigma 12 px on the target and 22 px here, the ratio of the two cube steps read with one estimator on both",
       "measured": {
-        "finestra-demo": "18.7%",
-        "prato-est": "15.7%",
-        "prato-ovest": "15.3%",
-        "the two halves of prato-est": "8.7% and 13.6%"
+        "the day target": "0.516",
+        "the day target with its own cubes shuffled": "0.066 -- the injection, and the absolute floor of no organisation at all",
+        "the target, second reading of the same crop": "0.516 -- the null"
       },
-      "wins": "target, 18.7% on the window the campaign fixed",
+      "wins": "target, 0.516",
       "note": [
-        "The spread is the most window-sensitive number in this file: halving the",
-        "window takes it from 15.7% to 8.7%, because a smaller crop holds fewer faces",
-        "and the k-means splits them differently. Quote it with its window or not at",
-        "all."
+        "THIS IS THE ENTRY per-voxel-tint SHOULD ALWAYS HAVE BEEN. It is measured per",
+        "PIXEL and not per plaque, so it does not go through a k-means, and it carries",
+        "both directions: a null that repeats to three decimals on two readings of one",
+        "state, and an injection -- the target cut into one-cube tiles and shuffled --",
+        "that leaves the total spread identical at 37.78 and collapses the share from",
+        "0.516 to 0.066. The instrument finds exactly the defect it accuses.",
+        "",
+        "WHAT THE RENDER READ BEFORE THE PIGMENT WAS REBUILT: 0.151. Nearer the",
+        "shuffle than the picture."
       ],
+      "renderNow": {
+        "before U-PIG-1": "0.151 at the judged pose, 0.156 over the wide ground band",
+        "after": "0.291 at the judged pose, 0.247 over the wide ground band",
+        "with the pigment switched off entirely": "0.259 -- so the pigment's own contribution is 0.03 and the rest of the gap is the frame's denominator: the relief, and how much flank the eye sees",
+        "the pigment field's OWN share, offline": "0.540, gated by tools/guards/guard-campo-lento.mjs"
+      },
       "ceiling": {
-        "value": "9.2%",
-        "measuredAt": "ricerca-demo/corse/taratura.json, the sweep of tint: 0.84 -> 6.3%, 1.30 -> 7.8%, 1.80 -> 9.2%, and then it stops",
-        "renderNow": "6.8% at prato-est, 9.8% at prato-ovest, tint 1.30",
-        "causes": [
-          "the multiplier on the albedo reaches through nought at one end",
-          "the tone curve flattens the other"
-        ],
-        "owner": "V1: the gap between 9.2% and 18.7% is the analysis phase of the ground, half of it the tone curve. If it is structural it goes to the committente as an A/B."
+        "value": "0.291",
+        "owner": "the relief, and it is not the pigment's. With the pigment switched off the same window reads 0.259 and with it 0.291; reaching 0.40 asks for 0.11 more from a denominator this file does not own. Unit A, and B named it as risk 6 before the pass began."
+      }
+    },
+{
+      "id": "neighbour-top-ratio",
+      "what": "the ratio between two cube tops one cube apart, at the same screen height -- how much a cube differs from the cube beside it",
+      "window": "finestra-demo 940, 720, 340x190; a cube is 10 px on the target and 18 here, measured",
+      "measured": {
+        "the day target": "p50 1.19, p90 1.92, p99 2.92"
+      },
+      "wins": "target",
+      "note": [
+        "THE TARGET VARIES BETWEEN NEIGHBOURING CUBES MORE THAN THIS RENDER DOES, NOT",
+        "LESS, and the entry is written down because it reverses the intuition the",
+        "chequerboard produces. The prescription from the block-world literature --",
+        "keep the variation inside a material under the smallest orientation step --",
+        "is calibrated on a ladder covering 1.67x. This world and the target cover",
+        "3.06x. The target's variation sits at 63% of its own orientation step and",
+        "this render's at 45%: we were already UNDER it. What was missing was never",
+        "the amount, it was the low frequency.",
+        "",
+        "AND THIS IS THE ENTRY WITH THE WORST REPEATABILITY IN THE FILE. Measured",
+        "twice on ONE state from two launches of the same build, it read 1.285 and",
+        "2.827. E-V5j's rule applies with a number: this statistic's launch-to-launch",
+        "floor is of the order of the whole gap it is being asked about, so it is a",
+        "witness and not a gate. slow-field-share above repeats to three decimals on",
+        "the same pair and is the one that carries the judgement."
+      ],
+      "renderNow": {
+        "before U-PIG-1": "p50 1.12, p90 1.40, p99 2.19",
+        "after": "p50 1.12, p90 1.18 to 2.83 depending on the launch",
+        "with the pigment switched off": "p90 2.41"
+      }
+    },
+{
+      "id": "dark-floor",
+      "what": "the deepest rung a cube shows: the darkest pixel under a top face over that top face, fifth percentile",
+      "window": "finestra-demo 940, 720, 340x190, read down each column of pixels from a local maximum",
+      "measured": {
+        "the day target": "0.365 -- and 0.535 at the twenty fifth percentile",
+        "the day target, share of pixels under 0.35 of its own p90": "15.1%"
+      },
+      "wins": "target, 0.365",
+      "note": [
+        "A FLOOR AND NOT A TARGET: the target never lets a face fall below this, so",
+        "the entry is a thing not to go under rather than a number to reach.",
+        "",
+        "THE PIGMENT WAS SINKING IT AND IS NOT ANY MORE. The multiplier that shipped",
+        "covered 0.10 to 6.18 -- sixty two to one between the palest and the darkest",
+        "cube of ONE material under ONE light -- drawn independently for every cube,",
+        "so a top face and the flank under it were two independent draws and their",
+        "ratio could reach far past the light's own. The field that replaces it is a",
+        "function of the COLUMN, so that pair now shares one tint exactly and the rung",
+        "is the orientation ladder alone; and the band it may take is 0.72 to 1.72,",
+        "2.39 to one, gated in tools/guards/guard-campo-lento.mjs.",
+        "",
+        "WHAT IS LEFT IS NOT THE PIGMENT'S. With the pigment switched off entirely the",
+        "same window reads 0.274 -- already under the target's 0.365 -- so the",
+        "remaining gap is the ladder and the relief, and no setting in",
+        "src/world/voxel/pigment.js reaches it."
+      ],
+      "renderNow": {
+        "before U-PIG-1": "0.291, share under 0.35 of p90 13.4%",
+        "after": "0.249, share under 0.35 of p90 24.7%",
+        "with the pigment switched off": "0.274, share 22.9%"
+      },
+      "ceiling": {
+        "value": "0.274",
+        "owner": "unit A. It is what this frame reads with no pigment at all."
+      }
+    },
+{
+      "id": "bright-family-share-and-cohesion",
+      "what": "how much of a meadow window the brightest family covers, and how much of its own boundary touches its own kind against a shuffle null",
+      "window": "finestra-demo 940, 720, 340x190; plaques segmented by gradient, three families by area-weighted k-means, null over 120 shuffles of the family labels between plaques",
+      "measured": {
+        "the day target": "8.9% of the area, cohesion 66% against a null of 10 -- an excess of +56 points",
+        "prato-ovest": "cohesion excess +57",
+        "prato-est": "cohesion excess +92",
+        "the target's spread inside that family": "18.7%"
+      },
+      "wins": "target",
+      "note": [
+        "COHESION IS THE ENTRY THAT SAYS ZONES AND SHARE IS THE ONE THAT SAYS RELIEF,",
+        "and the pass separated them by measurement. The bright family went from an",
+        "excess of +29 points over the shuffle to +55, against the target's +56: the",
+        "pale of this meadow is now a few compact patches instead of many scattered",
+        "cubes, which is what the slow field was built to do and what the pale",
+        "minority drawn per column could not.",
+        "",
+        "The SHARE is a different animal. With the pigment switched off entirely the",
+        "brightest family still covers 35.3% of the window, because the share is the",
+        "ratio of top area to flank area that the eye is shown -- geometry, not",
+        "pigment. The field brings it to 21%, and the rest of the distance to the",
+        "target's 8.9% is the relief.",
+        "",
+        "AND THE SPREAD INSIDE THE FAMILY REACTS BACKWARDS, which is why it is a note",
+        "and not a gate: switching OFF a source of variation used to make it rise. It",
+        "is an artefact of where the k-means cuts, not a property of the meadow."
+      ],
+      "renderNow": {
+        "before U-PIG-1": "18.9% of the area, cohesion excess +29, spread inside 9.6%",
+        "after": "19.8%, cohesion excess +55, spread inside 8.8%",
+        "with the pigment switched off": "35.3%, cohesion excess +20, spread inside 3.3%"
       }
     },
     {
@@ -276,6 +395,50 @@
       "id": "depth-of-field",
       "verdict": "absent",
       "evidence": "the 10-90 rise is 1 px (p90 4) in the day target and 2 px (p90 4) in the night, at every window"
+    },
+    {
+      "id": "cast-shadow",
+      "verdict": "absent, measured",
+      "evidence": [
+        "The sun of the day target stands at 47 degrees of elevation: a figure 1.8 m",
+        "tall standing on the paving must lay 1.7 m of shadow towards east-south-east.",
+        "There is none. Under the avatar's boots at the foot of the stair there is a",
+        "two pixel contact darkening and nothing else; there is none under a block of",
+        "stone on the meadow either, nor under the monoliths. The sun's bearing was",
+        "read off the LIT FACES precisely because there was no shadow to read it from.",
+        "",
+        "This render has none by protocol: src/core/renderer.js sets shadowMap.enabled",
+        "to false, the one line at run time in the whole repository. The seven",
+        "occurrences of castShadowTest are an OFFLINE fitting instrument and not a",
+        "shadow map.",
+        "",
+        "The entry is written because the two pictures agree and the absence is worth",
+        "three to four depth-only passes a frame. It is the dearest thing this world",
+        "can go on NOT buying, and without a line here somebody eventually builds it."
+      ]
+    },
+    {
+      "id": "vertex-ambient-occlusion",
+      "verdict": "absent, and forbidden BY MEASUREMENT before it is forbidden by cost",
+      "evidence": [
+        "The border profile -- luminance against distance from a face's own edge, on",
+        "its own inside -- is flat to within 1.2% out to 6 px in both pictures: the",
+        "day target reads 0.988 / 0.995 / 0.998 / 1.003 / 0.999 / 0.991 / 0.995 and",
+        "this render 1.001 / 1.001 / 1.001 / 1.000 / 1.000 / 1.000 / 1.000.",
+        "",
+        "Vertex ambient occlusion in the canonical form -- Lysenko, 0 FPS, 2013, four",
+        "discrete levels interpolated across the quad -- maps an occluded vertex onto",
+        "a ramp of about 28% over 6 px on a 16 px face. The target is roughly TWENTY",
+        "EIGHT TIMES flatter than that technique permits. It is not an opinion about",
+        "the cost: it is the measurement saying the technique is not in the picture.",
+        "",
+        "The cost is the second reason and it is large: vertex AO can only be merged",
+        "where the four corners agree, and greedy meshing is worth 2.3x to 3.3x on the",
+        "geometry of a world like this one.",
+        "",
+        "The only edge darkening either picture has is the JOINT, and it has its own",
+        "entry: 6% over one or two pixels. A line, not a well."
+      ]
     },
     {
       "id": "broad-ambient-occlusion",
