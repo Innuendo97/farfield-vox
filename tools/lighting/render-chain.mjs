@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import { agx } from '../grade/lib/agx.mjs';
+import { pigmentCensus } from '../../src/world/voxel/pure.js';
 import { REPO_ROOT, sunVector } from './sun.mjs';
 
 // THE FRAME'S OWN LIGHT, OFFLINE: scene light -> the pixel a face comes out as.
@@ -37,9 +38,32 @@ export const GROUND_EXPOSURE = Number(
   /GROUND_EXPOSURE = ([0-9.]+)/.exec(source('src/world/air.js'))[1],
 );
 
-/** src/world/voxel/material.js voxelSettings().albedo, read rather than restated. */
-export const MEADOW_ALBEDO = /albedo: new Vector3\(([0-9.]+), ([0-9.]+), ([0-9.]+)\)/
-  .exec(source('src/world/voxel/material.js')).slice(1, 4).map(Number);
+// THE MEADOW'S PIGMENT, IMPORTED AND NOT SCRAPED, and the change is not a
+// tidying: it is the only way this chain still works.
+//
+// This file used to lift the meadow's albedo out of material.js as TEXT, with a
+// regular expression, for the reason stated above -- the modules that hold it
+// reach three.js. That was possible while the pigment was ONE TRIPLE. It is a
+// FIELD now, two octaves of value noise in the world's own XZ with a band closed
+// on it, and there is no regular expression for a field: a chain that went on
+// quoting the base triple would be modelling a meadow this render no longer
+// draws.
+//
+// So the pigment was made a PURE FUNCTION in src/world/voxel/pigment.js, beside
+// the shader that reproduces it, and it comes through src/world/voxel/pure.js --
+// the half of the engine's door that a browser is not required for. This chain
+// imports the arithmetic the page draws with. That is residuo 1 of
+// E-FOND-PIANO11, and it is why the offline reading of the meadow exists again.
+//
+// WHICH COLUMN OF A FIELD THE LADDER IS READ AT is a question a single albedo
+// never had to answer, and it is answered by measuring rather than by choosing:
+// the census below walks 65 536 columns of the field and hands back its own
+// median. The two ends come back with it, because the tone curve is not a
+// straight line and the gate should show the band it is quoting the middle of.
+export const MEADOW_FIELD = pigmentCensus('meadow');
+export const EARTH_FIELD = pigmentCensus('earth');
+export const MEADOW_ALBEDO = MEADOW_FIELD.albedo.p50;
+export const EARTH_ALBEDO = EARTH_FIELD.albedo.p50;
 
 /** What the meadow's material hands faceLightUniforms as its own exposure. */
 export const LIGHT_SCALE = json('assets-src/terrain/terrain.json').lightScale * GROUND_EXPOSURE;
