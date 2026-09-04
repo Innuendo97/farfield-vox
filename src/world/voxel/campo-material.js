@@ -354,7 +354,20 @@ const FRAGMENT = /* glsl */`
     // on it at exactly the right height and stands aside, so the family that
     // owns it draws it and nothing is painted over it.
     if (family == 2) discard;
-    bool earth = family == 1;
+    // AND A BLADE IS THE MAT'S FAMILY WHATEVER IT STANDS ON, which is the one
+    // thing the material of a column does NOT decide.
+    //
+    // The mat lays on grass AND on the bare earth of a verge (MANTO.onVerge:
+    // «blades thinning and shortening INTO the corridor» is what takes the netto
+    // confine verde out of the picture), and the greedy draws every one of them
+    // through ONE material with the meadow's own albedo -- bladeSettings() is
+    // voxelSettings() with three light terms moved and the pigment untouched. A
+    // field that read the family off the column would paint the blades on a
+    // verge, on a mound's bank and in the halo round a boulder with the EARTH's
+    // albedo and the EARTH's sheet: measured on the frame, a whole meadow of
+    // tan tops and grey-blue flanks where the cubes draw grass. So the family is
+    // the GROUND's question, and a blade never asks it.
+    bool earth = !blade && family == 1;
 
     // ---------------------------------------------- how big a pixel is here
     // AN ANALYTIC FOOTPRINT AND NOT AN fwidth, AND THE REASON IS THE
