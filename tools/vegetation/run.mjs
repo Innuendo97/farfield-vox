@@ -1,9 +1,18 @@
 import { join } from 'node:path';
 import { run, TOOLS_DIR } from '../toolchain.mjs';
 
-// Entry point of the green chain: reads the colours off the reference, paints
-// the grass sheet, then works out where the rocks stand. In that order, because
-// each step reads what the one before wrote.
+// Entry point of the green chain: paints the grass sheet, then works out where
+// the rocks stand.
+//
+// IT USED TO READ THE COLOURS OFF THE REFERENCE FIRST, and that step is gone at
+// step 8. sample-plants.mjs solved a pigment by dividing the reference's own
+// radiance by the light a Cycles bake of the ground put under those pixels; the
+// bake and the two atlases that carried it have left the delivery, so there is
+// no divisor and no tool. What it wrote, assets-src/vegetation/palette.json, is
+// in the repository as a delivered file that src/world/rocks.js reads -- the
+// same standing the rock mesh and its light map already have -- and the patches
+// it measured are in tools/vegetation/compare.mjs, which is what still reads
+// them.
 //
 // It used to end by sculpting and lighting those rocks in Blender, and that
 // half is gone with the rest of the offline chain, packing pass included. The
@@ -24,6 +33,5 @@ import { run, TOOLS_DIR } from '../toolchain.mjs';
 // under it. See tools/lighting/check-suns.mjs.
 run(process.execPath, [join(TOOLS_DIR, 'lighting', 'check-suns.mjs'), '--sources']);
 
-run(process.execPath, [join(TOOLS_DIR, 'vegetation', 'sample-plants.mjs')]);
 run(process.execPath, [join(TOOLS_DIR, 'vegetation', 'paint-grass.mjs')]);
 run(process.execPath, [join(TOOLS_DIR, 'vegetation', 'plan-rocks.mjs')]);

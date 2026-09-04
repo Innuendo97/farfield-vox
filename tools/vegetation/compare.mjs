@@ -4,7 +4,6 @@ import sharp from 'sharp';
 import { FRAME, REPO_ROOT } from '../grade/lib/framing.mjs';
 import { deltaE76, srgbToLab } from '../grade/lib/color.mjs';
 import { meanRect, readTarget } from '../grade/lib/target.mjs';
-import { PATCHES } from './sample-plants.mjs';
 
 // The side by side material the vegetation is judged on.
 //
@@ -15,6 +14,58 @@ import { PATCHES } from './sample-plants.mjs';
 // at the same crop, one above the other, at twice size — the only way to answer
 // whether the near ground reads as matter with a texture in it or as a set of
 // cards somebody can count.
+
+// THE PATCHES OF THE REFERENCE, WHICH LIVE HERE NOW.
+//
+// They were the table of tools/vegetation/sample-plants.mjs, which solved a
+// pigment out of each of them by dividing the reference's radiance by the light
+// a Cycles bake of the ground put under it. That bake and the two atlases that
+// carried it left the delivery at step 8, so the division has no divisor and the
+// tool went with it; E-V4f.3 had already recorded that the reading itself was
+// wrong -- sampled off a photorealistic reference through the light of a bake,
+// with its blue 3.7x out. What survives is the MEASUREMENT of where each thing
+// is in the frame, which is a set of rectangles and owes nothing to any bake,
+// and this file is the only thing that still reads it.
+//
+// assets-src/vegetation/palette.json therefore has no seat any more, and it is a
+// DELIVERED file that src/world/rocks.js reads: it stays in the repository as
+// the rock mesh and its light map already do, and the pigment that replaces it
+// is V4's to solve on the meadow the cubes draw.
+//
+// "surface" and "high" are kept as they were written: the first says what the
+// patch stands on, the second takes the brightest tail of a rectangle instead of
+// its mean, which is the only way to measure a flower two pixels across.
+
+const PATCHES = [
+  // The meadow, from the lit band under the blocks down to the shaded
+  // foreground. The tuft has to agree with these four or it will not belong to
+  // the ground it stands on.
+  { id: 'grass-lit-band', kind: 'grass', surface: 'ground', x0: 1180, y0: 690, x1: 1330, y1: 730 },
+  { id: 'grass-lit-near', kind: 'grass', surface: 'ground', x0: 1200, y0: 760, x1: 1340, y1: 800 },
+  { id: 'grass-shade-near', kind: 'grass', surface: 'ground', x0: 300, y0: 800, x1: 460, y1: 870 },
+  { id: 'grass-deep-low', kind: 'grass', surface: 'ground', x0: 1180, y0: 880, x1: 1380, y1: 936 },
+  // The lit crown of a tuft, against the mean of the grass around it. This
+  // ratio is what the blade tips are painted with.
+  { id: 'grass-crown', kind: 'grass', surface: 'ground', high: 0.02, x0: 1150, y0: 700, x1: 1400, y1: 790 },
+  // The white flowers: the brightest half per cent of a patch of meadow that is
+  // full of them, because that is what a flower is in this image.
+  { id: 'flower-white', kind: 'flower', surface: 'ground', high: 0.005, x0: 1180, y0: 700, x1: 1460, y1: 800 },
+  { id: 'flower-shade', kind: 'flower', surface: 'ground', high: 0.01, x0: 260, y0: 760, x1: 520, y1: 860 },
+
+  // The hero rocks in the bottom right corner: the lit crown of the big one is
+  // weathered stone catching the sun, the moss is the olive on its shoulder.
+  { id: 'rock-lit-crown', kind: 'rock', surface: 'rock', x0: 1330, y0: 772, x1: 1420, y1: 806 },
+  { id: 'rock-lit-right', kind: 'rock', surface: 'rock', x0: 1455, y0: 795, x1: 1530, y1: 820 },
+  { id: 'rock-moss-rim', kind: 'moss', surface: 'rock', x0: 1290, y0: 796, x1: 1345, y1: 822 },
+  { id: 'rock-moss-top', kind: 'moss', surface: 'rock', x0: 1436, y0: 800, x1: 1500, y1: 828 },
+  { id: 'rock-shade-face', kind: 'rock', surface: 'rock', x0: 1300, y0: 830, x1: 1400, y1: 870 },
+  // The mass in the bottom left corner, which the reference leaves almost in
+  // silhouette.
+  { id: 'rock-left-dark', kind: 'rock', surface: 'rock', x0: 40, y0: 850, x1: 180, y1: 920 },
+
+  // The low bushes between the blocks: dark, cool, barely broken up.
+  { id: 'bush-behind-01', kind: 'bush', surface: 'ground', x0: 470, y0: 596, x1: 540, y1: 624 },
+];
 
 const OUT = join(REPO_ROOT, 'shots');
 

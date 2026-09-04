@@ -26,9 +26,10 @@ import { dilate, Canvas } from './lib/canvas.mjs';
 // it.
 //
 // WHY THE PIGMENTS ARE NOT MEASURED HERE ANY MORE. They were, and that is the
-// defect. assets-src/vegetation/palette.json is sampled by sample-plants.mjs
+// defect. assets-src/vegetation/palette.json was sampled by sample-plants.mjs
 // off the PHOTOREAL reference and divided by the light a Cycles bake put on the
-// ground -- two things this world no longer has. Read against the voxel target
+// ground -- two things this world no longer has, which is why that tool was
+// retired at step 8 and the file it wrote is left standing as a delivered one. Read against the voxel target
 // its grass runs 2.4 to 1 green over blue where the target's open meadow runs
 // nearly 9 to 1, and a sheet painted from it is grey-green whatever it is
 // multiplied by. The ground of this world states its own reflectance in one
