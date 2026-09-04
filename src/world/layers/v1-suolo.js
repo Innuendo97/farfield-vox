@@ -1,6 +1,6 @@
 import { createGroundVoxel } from '../ground-voxel.js';
 import { createGroundShell } from '../ground-shell.js';
-import { DISC_RADIUS } from '../voxel/index.js';
+import { CENTRE, DISC_RADIUS, createCampo, runInWorker } from '../voxel/index.js';
 import { setGroundDiscRadius } from '../contracts.js';
 import { SPAWN } from '../layout.js';
 
@@ -97,13 +97,59 @@ function asked() {
   // decides everything past it, and the frame is paid for by both.
   const rawBlock = query.get('voxblock');
   const askedBlock = rawBlock === null ? Number.NaN : Number(rawBlock);
+  // ------------------------------------------------------------- THE FIELD
+  // WHAT THE ADDRESS ASKS OF THE RAY-MARCHED GROUND, AND THE DEFAULT IS NOUGHT
+  // ON EVERY ONE OF THEM.
+  //
+  // This is a step of MEASUREMENT and not a delivery. The field was approved as
+  // the definitive technique and the order came with it: the greedy does not
+  // fall until the committente has seen the two of them in one frame. So
+  // without `campo` in the address nothing below is built, nothing is bound,
+  // and no uniform of the cubes' own material is anything but what it shipped.
+  //
+  //   campo=1        build the field and draw it over a SECTOR of the meadow
+  //   camposettore   which sector, as a plane in the world's XZ: `ovest` (the
+  //                  field takes x below the middle of the disc), `est`,
+  //                  `nord`, `sud`, `tutto` (the field takes all the cubes had)
+  //   campopassi=N   the ceiling on the steps of one ray. 64 is the prototype's
+  //   campotop=N     the level of the pyramid the traversal starts at
+  //   campolod=N     metres of five centimetre cells round the walker (D-P3: 8)
+  //   campoombra=0   the sun's own march off, to price it
+  //   campodepth=0   gl_FragDepth off, to price the early test it costs
+  //   campodebug=1   how many steps each ray took, as a grey
+  //   campodebug=2   magenta where a ray ran out without finding anything
   return {
     dispose: query.get('voxdispose') !== '0',
     boundingFromWorker: query.get('voxbound') !== 'walk',
     radius: Number.isFinite(asAsked) && asAsked > 0 ? asAsked : null,
     detail: Number.isFinite(askedDetail) && askedDetail >= 0 ? askedDetail : null,
     block: Number.isFinite(askedBlock) && askedBlock >= 1 ? askedBlock : null,
+    campo: query.get('campo') === '1',
+    campoSector: query.get('camposettore') || 'ovest',
+    campoSteps: Number(query.get('campopassi')) > 0 ? Number(query.get('campopassi')) : null,
+    campoTop: query.get('campotop') === null ? null : Number(query.get('campotop')),
+    campoLod: Number(query.get('campolod')) > 0 ? Number(query.get('campolod')) : null,
+    campoShadow: query.get('campoombra') !== '0',
+    campoDepth: query.get('campodepth') !== '0',
+    campoDebug: Number(query.get('campodebug')) || 0,
   };
+}
+
+/**
+ * The plane that divides the two representations, in the world's own XZ.
+ *
+ * The field owns the half-space where nx*x + nz*z + d is not negative and the
+ * cubes own the other one. The line runs through the middle of the disc, so at
+ * the pose the campaign judges on it falls down the middle of the frame with
+ * the same meadow, the same weather and the same machine on both sides of it --
+ * which is the whole of what a comparison has to have.
+ */
+function sectorPlane(name, centre) {
+  if (name === 'tutto') return [0, 0, 1, 1];
+  if (name === 'est') return [1, 0, -centre.x, 1];
+  if (name === 'nord') return [0, 1, -centre.z, 1];
+  if (name === 'sud') return [0, -1, centre.z, 1];
+  return [-1, 0, centre.x, 1];
 }
 
 const layer = {
@@ -116,6 +162,9 @@ const layer = {
 
   /** The sheet beyond it. */
   shell: null,
+
+  /** The same ground as a ray-marched picture, when the address asks for it. */
+  campo: null,
 
   dress: {
     // AND THE PAVING'S THREE MAPS ARE THIS LAYER'S ONLY NEED NOW.
@@ -226,6 +275,47 @@ const layer = {
       });
       layer.meshes = [...layer.meshes, layer.shell.mesh];
 
+      // ---------------------------------------------------------- THE FIELD
+      // ADDITIVE, AND OFF UNLESS THE ADDRESS ASKS. See asked() above for why:
+      // this step exists to put the two representations in ONE frame for the
+      // committente, and until he has spoken the world that ships is the world
+      // that shipped.
+      if (wanted.campo) {
+        layer.campo = createCampo({
+          radius,
+          // THE CUBES' OWN ARRAY, BY REFERENCE. One cut of the strip, one
+          // upload, one binding, and -- the reason it matters here rather than
+          // in the byte count -- one grain: a field that cut its own copy could
+          // be handed a different strip and nobody would see it.
+          sheets: layer.voxel.settings.sheet,
+          depth: wanted.campoDepth,
+          // The engine's own worker seat, handed in rather than imported, so
+          // that the window holds no opinion about how a thread is started.
+          worker: runInWorker,
+        });
+        const cut = sectorPlane(wanted.campoSector, CENTRE);
+        const line = layer.campo.setCut(cut[0], cut[1], cut[2], cut[3]);
+        // ONE LINE, BOTH PROGRAMS. The cubes read the same plane out of the
+        // same seat, so the pixel the field draws is exactly the pixel they do
+        // not: there is no band both claim and none neither does.
+        for (const family of [
+          layer.voxel.material, layer.voxel.earthMaterial, layer.voxel.bladeMaterial,
+        ]) {
+          if (!family || !family.uniforms.uCut) continue;
+          family.uniforms.uCut.value = line.cut;
+          family.uniforms.uCutDisc.value = line.disc;
+        }
+        const u = layer.campo.material.uniforms;
+        if (wanted.campoSteps) u.uSteps.value = wanted.campoSteps;
+        if (wanted.campoTop !== null) u.uTopLevel.value = wanted.campoTop;
+        if (wanted.campoLod) u.uLod.value.set(wanted.campoLod, wanted.campoLod * 2);
+        u.uHorizon.value = wanted.campoShadow ? 1 : 0;
+        u.uDebug.value = wanted.campoDebug;
+        layer.campo.start(SPAWN.x, SPAWN.z);
+        layer.meshes = [...layer.meshes, layer.campo.group];
+        window.voxcampo = layer.campo;
+      }
+
       // The handle the measurements are taken through, and it carries both
       // grounds: what the disc came to and what the sheet came to.
       window.voxsuolo = layer.voxel;
@@ -246,8 +336,13 @@ const layer = {
     return layer.voxel ? layer.voxel.topAt(x, z) : null;
   },
 
-  update() {
+  update(frame) {
     if (layer.voxel) layer.voxel.update();
+    // AND THE WINDOW FOLLOWS THE EYE, which is the whole of what the committente
+    // asked for when he wrote «i fili restano a un raggio di tot metri dalla
+    // posa iniziale». The hub already hands every layer where the eye is, so
+    // nothing new had to be told to anybody.
+    if (layer.campo) layer.campo.update(frame && frame.eye);
   },
 };
 

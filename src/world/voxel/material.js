@@ -40,6 +40,15 @@ import {
   FAMILY_LAYERS, LAYER, PAVING_SHEET_METRES, SHEEN_GLSL, SHEET_GLSL, STONE_SHINE,
   sheetArray, sheetUniforms,
 } from './sheet.js';
+// AND THE LINE BETWEEN THE TWO REPRESENTATIONS OF THE GROUND, WHICH IS ONE SEAT
+// AND NOT TWO. src/world/voxel/campo.js draws the same meadow as a ray-marched
+// field, and the step that decides whether it replaces these cubes is a frame
+// with BOTH in it -- one pose, one weather, one machine -- so that the
+// committente judges a comparison and not two photographs. A boundary spelled
+// out in two programs is two boundaries the moment one of them is edited, so
+// the plane is compiled from there into here. At uCut.w nought it discards
+// nothing, which is the world that ships.
+import { CAMPO_CUT_GLSL, campoCutUniform } from './campo.js';
 
 // The material of a cube, and the six things the reference was measured to be
 // made of. Five of them are arithmetic and none of those is a byte on the wire;
@@ -687,6 +696,7 @@ const FRAGMENT = /* glsl */`
   // normalisation are in src/world/voxel/sheet.js beside it, with the readings
   // they came from. Exponent ${STONE_SHINE.toFixed(0)}, which is C's own Q2b.
   ${SHEEN_GLSL}
+  ${CAMPO_CUT_GLSL}
   ${FOG_GLSL}
 
   // WHAT A FACE OF THIS FAMILY IS WORTH, AND WHY IT IS A BEND AND NOT A LIFT.
@@ -755,6 +765,11 @@ const FRAGMENT = /* glsl */`
   }
 
   void main() {
+    // WHERE THE FIELD OWNS THE PIXEL, THESE CUBES DO NOT DRAW IT. Nought in a
+    // delivery, so this is one uniform compare on a branch that is never taken
+    // and the frame is the frame that shipped.
+    if (campoOwns(vWorld.xz)) discard;
+
     vec3 n = normalize(vNormal);
 
     // WHICH CUBE THIS IS. Half a step back along the normal, so a face lands
@@ -1037,6 +1052,7 @@ export function voxelMaterial(voxel, settings) {
       uShadeMap: { value: shade.map },
       uShadeSun: { value: settings.shadeSun },
       uCellRatio: { value: voxel / VOXEL },
+      ...campoCutUniform(),
       // The sun, the exposure and the two lifts, from the one seat that
       // produces the pair they act on. Shared by reference with the rest of the
       // world, as are the light colours and the air below: a copy here would be
