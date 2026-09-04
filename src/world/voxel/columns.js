@@ -182,11 +182,72 @@ export function createColumns(ox, oz, w, d) {
     // skirt, and it never leaves the worker: the mat travels as TRIANGLES like
     // everything else.
     //
-    // AND THE SKIRT COMES FOR FREE. The blade rectangle is the column
-    // rectangle doubled, so the one column of skirt the store already carries
-    // is two blades of skirt -- which is one more than the mesher needs to
-    // compare a blade against its neighbour across a chunk's edge.
+    // AND THE SKIRT COMES FOR FREE FOR THE MESHER, AND IS BOUGHT FOR THE SUN.
+    // The blade rectangle is the column rectangle doubled, so ONE column of
+    // skirt is two blades -- one more than the mesher needs to compare a blade
+    // against its neighbour across a chunk's edge. The shadow below needs as
+    // many blades of skirt as the sun's own march is long, and the seat that
+    // widens the rectangle for it is chunkColumns in ./worldgen.js: this file
+    // holds no opinion about how wide a store is, only about what one holds.
     blade: new Uint8Array(w * BLADES_PER_VOXEL * d * BLADES_PER_VOXEL),
+    // AND WHERE THE SUN STOPS REACHING THE MAT, ON THE SAME LATTICE AND IN THE
+    // SAME UNIT, WHICH IS THE ONE THING A BLADE CANNOT WORK OUT ON ITS OWN.
+    //
+    // The height of a blade is a property of its own column: one hash, no
+    // neighbour (bladeHeightAt in ./worldgen.js). The SHADOW on it is the
+    // opposite -- it is what the blades UPWIND of it are, along a bearing the
+    // whole world shares -- so it is baked once, here, where every neighbour is
+    // already in one array, and read back as a number exactly the way the
+    // height is.
+    //
+    // WHAT ONE BYTE HOLDS: the world height of the line between light and
+    // shadow on this blade column, in SUB-steps of a blade above y = 0, which
+    // is the plane's own drawn surface. Nought means the sun reaches all the
+    // way down to the plane. It is the SAME unit the mat's heights are kept in
+    // -- a quarter of a blade, 1.25 cm -- so the line is quantised exactly as
+    // finely as the thing that casts it, and one byte spans 3.19 m where the
+    // tallest thing this lattice carries stands under one.
+    //
+    // WHY A HEIGHT AND NOT A PAIR OF FACTORS. A factor for the top and one for
+    // the flank would be two bytes, and it would answer a question the fragment
+    // can already answer for itself: it knows its own y. One height compared
+    // against that y gives the top, the flank, the part of a flank above the
+    // line and the part below it -- which is the profile E-ERBA-A 1.6 measured
+    // in centimetres from the foot -- out of one read and one subtraction.
+    //
+    // AND IT COSTS FOUR MORE BYTES A COLUMN, so thirteen: the peak is still one
+    // chunk's worth and it still never leaves the worker as an array. What
+    // leaves is the chunk's own square of it, which becomes texels.
+    shade: new Uint8Array(w * BLADES_PER_VOXEL * d * BLADES_PER_VOXEL),
+    // AND HOW HIGH THE MAT ITSELF STANDS THERE, WHICH IS A SECOND LINE AND NOT
+    // A SECOND COPY OF THE FIRST.
+    //
+    // The top of the blade the LAW puts on this column, in the same unit, and it
+    // is not the top of the blade the mesher DRAWS: beyond the detail ring a
+    // block of blades is meshed at one height, because triangles are what the
+    // frame cannot afford. This line is what the mat really is, and the light of
+    // a place is the light of the mat that is really there -- so it carries the
+    // fall E-ERBA-A 1.6 measured inside a face, and it carries the LOD's own
+    // error paid back in light instead of geometry. The bake in ./worldgen.js
+    // states both in as many words.
+    sky: new Uint8Array(w * BLADES_PER_VOXEL * d * BLADES_PER_VOXEL),
+    // AND HOW WIDE THE BLADE IS, IN EIGHTHS OF ITS OWN CELL.
+    //
+    // E-DECISIONI10 G3, the committente's own words: «larghezza da 3/4 a 1 voxel
+    // completo, altezza variabile». Eight is the whole cell and is what the mat
+    // has always been; six and seven are the three quarters and the seven
+    // eighths, and a blade that carries one of them stands APART from its
+    // neighbours -- which is what a blade of grass does, and what lets the eye
+    // see down between them.
+    //
+    // NOUGHT IS "FULL WIDTH" AND IS THE DEFAULT, so an empty store is the mat
+    // that shipped before this array existed. The mesher reads it as the one
+    // thing that takes a blade out of the greedy: a rectangle inset inside its
+    // own cell cannot be merged with the cell beside it, and that is the whole
+    // of what this costs. The seat that decides WHERE it is nought is
+    // MANTO.slim in ./worldgen.js, and it is a threshold on the field of
+    // intensity because that is where the width is free.
+    slim: new Uint8Array(w * BLADES_PER_VOXEL * d * BLADES_PER_VOXEL),
   };
 }
 
@@ -210,6 +271,38 @@ export function setBlade(store, bx, bz, h) {
   const k = bladeIndex(store, bx, bz);
   if (k < 0) return;
   store.blade[k] = h;
+}
+
+/**
+ * Where the sun stops reaching one column of the mat, in SUB-steps above y = 0.
+ *
+ * Nought outside the store, which reads as "lit all the way down" -- the safe
+ * answer for a question asked past the edge of a piece, where there is nothing
+ * to cast anything.
+ */
+export function shadeAt(store, bx, bz) {
+  const k = bladeIndex(store, bx, bz);
+  return k < 0 ? 0 : store.shade[k];
+}
+
+/** How high the mat closes over one column, in the same unit and the same way. */
+export function skyAt(store, bx, bz) {
+  const k = bladeIndex(store, bx, bz);
+  return k < 0 ? 0 : store.sky[k];
+}
+
+/** How wide a blade stands, in eighths of its cell. Nought is the whole cell. */
+export function slimAt(store, bx, bz) {
+  const k = bladeIndex(store, bx, bz);
+  return k < 0 ? 0 : store.slim[k];
+}
+
+/** Writes those lines on one column of the sub-lattice. */
+export function setShade(store, bx, bz, sun, canopy) {
+  const k = bladeIndex(store, bx, bz);
+  if (k < 0) return;
+  store.shade[k] = Math.max(0, Math.min(255, sun));
+  store.sky[k] = Math.max(0, Math.min(255, canopy));
 }
 
 /** Where a global column sits in a store's arrays, or -1 if it is outside it. */
@@ -346,5 +439,6 @@ export function columnCount(store) {
 /** How many bytes a store holds, so the cost of a disc can be added up. */
 export function storeBytes(store) {
   return store.top.byteLength + store.mat.byteLength
-    + store.under.byteLength + store.depth.byteLength + store.blade.byteLength;
+    + store.under.byteLength + store.depth.byteLength + store.blade.byteLength
+    + store.shade.byteLength + store.sky.byteLength + store.slim.byteLength;
 }
