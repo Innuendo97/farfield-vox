@@ -116,7 +116,7 @@ const RUN_BAND = { low: 5, high: 12 };
 // thin (E-DECISIONI10 G3, MANTO.slim), so a run of the MAT ends wherever one of
 // them stands apart. The terrain under it has not moved a voxel -- the leg above
 // still reads one level off a mass -- and the row is PROPOSED here.
-const AT_TODAY = { p50: 11, p90: 129 };
+const AT_TODAY = { p50: 11, p90: 126 };
 
 /** The tallest step the open meadow is allowed, in voxels. A mass is not the meadow. */
 const OPEN_STEP = 1;
