@@ -43,7 +43,8 @@
 export * from './pure.js';
 
 export {
-  earthSettings, pavingMaterial, pavingSettings, voxelMaterial, voxelSettings,
+  BLADE_BOUNCE, bladeSettings, earthSettings,
+  pavingMaterial, pavingSettings, voxelMaterial, voxelSettings,
 } from './material.js';
 export { createMasonry, stoneTile } from './masonry.js';
 

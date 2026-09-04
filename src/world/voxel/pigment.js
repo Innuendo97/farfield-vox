@@ -170,6 +170,37 @@ export const ALBEDO = {
   // measured against is seven and a half levels high, and that is the tone
   // curve's ceiling of E-V1c.2, parked at the light's own window.
   earth: [0.696, 0.423, 0.119],
+  // THE STALK OF A FLOWER, AND IT IS THE MEADOW'S OWN GREEN MOVED BY THE THREE
+  // WORDS THE COMMITTENTE USED AND BY NOTHING ELSE.
+  //
+  // E-DECISIONI9.1: <<il colore degli STELI e' un verde piu' intenso, leggermente
+  // piu' scuro, MAI MARRONE, che varia un poco di gradazione per zona>>.
+  //
+  // It is DERIVED and not quoted, for the same reason the bare earth above is
+  // derived: a triple read off the target's stalk would be quoting the target's
+  // light and the target's grade along with its stem, and E-ERBA-A 9 declares
+  // that its own reading of the stalk is a hand reading on two exemplars rather
+  // than a census -- <<il rilevatore automatico dello stelo non regge, e l'ho
+  // lasciato nel banco rotto e dichiarato invece di pubblicarne i numeri>>. So
+  // what enters is the DIFFERENCE, which is what the committente actually said:
+  //
+  //   piu' intenso        the green is pulled further from the two either side
+  //                       of it: the red comes down by a fifth, and the blue
+  //                       stays where the meadow's is, which is nought.
+  //   leggermente piu'    the whole triple is taken down 12%, which is one step
+  //   scuro               of the ladder and reads as <<leggermente>>.
+  //   MAI MARRONE         the constraint, and it is the one this file can hold
+  //                       by construction rather than by a number: brown is red
+  //                       over green, and this triple's green is 2.0 times its
+  //                       red where the meadow's is 1.66 and the bare earth's is
+  //                       0.61. A stalk drawn from here cannot go brown however
+  //                       the light moves, because there is no red in it to go
+  //                       brown with.
+  //
+  //     meadow   0.272 / 0.452 / 0.000    green over red 1.66
+  //     stalk    0.191 / 0.398 / 0.000    green over red 2.08, level 0.88x
+  //     earth    0.696 / 0.423 / 0.119    green over red 0.61
+  stalk: [0.191, 0.398, 0.0],
 };
 
 /** Per-family overrides. Bare earth does not carry the meadow's hue jitter:
@@ -178,6 +209,21 @@ export const ALBEDO = {
 export const FAMILY = {
   meadow: {},
   earth: { hue: 0.10 },
+  // The mat of grass is the meadow: same albedo, same field, same zones. It is an
+  // entry and not an omission, because a family that is deliberately identical to
+  // another has to say so somewhere -- a mat drawing its own field over the
+  // ground it stands on would put a seam under every blade (see bladeSettings()
+  // in ./material.js for the measurement that says the pigment is not what is
+  // wrong with our grass).
+  blade: {},
+  // AND THE STALK CARRIES NO FIELD AT ALL TODAY, WHICH IS DECLARED HERE BECAUSE
+  // THIS IS WHERE A READER LOOKS FOR IT. <<Varia un poco di gradazione per zona>>
+  // (E-DECISIONI9.1) is the two slow octaves above, rebuilt in a fragment out of
+  // a cube's own cell; a flower is an INSTANCE and its fragment has no cell, so
+  // the field would have to arrive as an attribute per instance or as a second
+  // copy of this arithmetic in the flower's own shader. The colour is here, the
+  // field is a step, and the step is priced in the verbale of U-ERBA-1.
+  stalk: { hue: 0 },
 };
 
 // ------------------------------------------------------------------ the twin

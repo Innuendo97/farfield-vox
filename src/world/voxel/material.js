@@ -6,6 +6,7 @@ import { FACE_LIGHT_GLSL, faceLightUniforms } from '../face-light.js';
 import { FOG_GLSL, GROUND_EXPOSURE, fogUniforms } from '../air.js';
 import TERRAIN from '../../../assets-src/terrain/terrain.json' with { type: 'json' };
 import { PATH_LINE } from '../terrain-field.js';
+import { VOXEL } from './columns.js';
 // THE PIGMENT'S OWN SEAT, AND IT IS A FILE OF ITS OWN FOR ONE REASON: the
 // offline chain has to be able to ask what colour a cube is without a browser.
 // While the pigment was a single albedo, render-chain.mjs lifted the triple out
@@ -60,6 +61,37 @@ import {
 // changes is only who writes the terms, and that is not this file either: the
 // pair comes from src/world/face-light.js, which is the one producer of it in
 // the world.
+
+// HOW MUCH OF ITS OWN HEMISPHERE THE MAT GIVES BACK TO ITS FLANKS, as one
+// literal, so the sweep that fitted it and the guard that holds it read the same
+// character. See bladeSettings() below for what it is and what measured it.
+//
+// SWEPT ON THE LIVE FRAME, IN ONE RUN OF THE BROWSER, with E-ERBA-A 1.5's own
+// instrument -- pairs across the fall that marks a top, two pixels above and
+// three below, so the two samples are on one blade under one air with one
+// pigment. Four windows from 5 to 15 m, the median of the four
+// (fondazione/lav/er-lift.mjs):
+//
+//     bounce      0.00   0.20   0.32   0.44   0.56      the target
+//     flank/top   0.417  0.487  0.523  0.551  0.563     0.617-0.648
+//
+// AND IT SATURATES, WHICH IS THE PHYSICS AND NOT THE SWEEP RUNNING OUT. A flank
+// carries a sky term of exactly a half -- half a hemisphere is what a vertical
+// plane sees -- so a bounce of 0.50 is the point where it sees the WHOLE sky and
+// the term clamps. Past that the curve buys 0.012 for 0.12 of bounce because it
+// is buying nothing: 0.56 would be claiming a vertical face sees more sky than
+// there is. 0.44 leaves the flank at 0.94 of a hemisphere, under that ceiling,
+// and it is the last value on the table that is still a statement about light.
+//
+// WHAT IS LEFT IS NOT THIS TERM'S AND IS DECLARED: 0.551 against 0.62 closes
+// three fifths of the gap, and the rest is the THIRD TERM of the light --
+// E-LUCE1 measured this world's sky weight at 0.259 where the target asks 0.362,
+// E-V4g read the same thing as a ladder 3.73x against our 8.51x, and E-TEX1-bis
+// read it a third time as an ombra 38% too steep. That is fit 2 of the light's
+// own window, it moves the paving and the stone with it, and E-ERBA-A 6.7 puts
+// it at step 7 -- «al passo 9 della luce, non prima». Three readings and this
+// one point at the same seat, and it is the coordinator's.
+export const BLADE_BOUNCE = 0.44;
 
 /** The tunables, live, so a sweep costs a redraw and not a rebuild. */
 export function voxelSettings() {
@@ -245,6 +277,12 @@ export function voxelSettings() {
     // src/world/face-light.js, which is also where they are applied.
     sunLift: 1,
     skyLift: 1,
+    // The two terms the mat of grass is the only family to carry. NOUGHT here,
+    // and the ground and the bare earth draw exactly the picture they drew
+    // before either existed: see matLight() and the foot of the mat in the
+    // fragment for what they are and what measured them.
+    bounce: 0,
+    base: new Vector2(0, 1),
   };
 }
 
@@ -352,6 +390,49 @@ export function earthSettings() {
   };
 }
 
+/**
+ * The mat of grass, which is the same material with three numbers moved.
+ *
+ * THE PIGMENT DOES NOT MOVE, AND THAT IS A MEASUREMENT. E-ERBA-A 5 read the
+ * chroma of both pictures scaled by scaled by L*, and up to L* 40 the two
+ * curves lie on top of each other -- 34.8 against 33.6, 42.2 against 41.3.
+ * «Il nostro slavato non e' saturazione»: the committente's «piu' acceso»
+ * (E-DECISIONI8.2) is LUMINANCE in both directions -- the flank falls too far
+ * and the top never rises -- and the pigment of E-PIG1 is doing its work. So
+ * this family carries the meadow's own albedo, the meadow's own field and the
+ * meadow's own zones, and it must: a mat drawing a second field over the ground
+ * it stands on would put a seam under every blade.
+ *
+ * WHAT MOVES IS THE TWO TERMS OF THE LIGHT E-ERBA-A MEASURED ON GRASS AND ONLY
+ * ON GRASS -- the bounce into the flanks and the shade at the foot -- and both
+ * are written where they were measured, in the fragment above.
+ */
+export function bladeSettings() {
+  return {
+    ...voxelSettings(),
+    // HOW MUCH OF ITS OWN HEMISPHERE THE MAT GIVES BACK TO ITS FLANKS.
+    //
+    // Fitted on the live frame with E-ERBA-A's own instrument -- pairs across
+    // the fall that marks a top, at the pose the campaign judges on -- because
+    // what the reading is of is a PIXEL and the road from a sky term to a pixel
+    // runs through the light, the exposure, the tone curve and the grade, none
+    // of which is linear. The sweep and its table are in the verbale of
+    // U-ERBA-1.
+    bounce: BLADE_BOUNCE,
+    // AND THE SHADE AT THE FOOT: how much the lowest cube of a stack loses, and
+    // how much of that is left one cube higher. Straight off E-ERBA-A 1.6 -- 16%
+    // at nought, home by 7 cm -- and the reason it is these two numbers and not
+    // a fitted curve is that the measurement is these two numbers.
+    base: new Vector2(0.16, 0.62),
+    // AND ITS OWN SLICE OF THE GRAIN, which is the one thing E-TEX1 leaves this
+    // family. The sheet of «grass, top» was cut for the top face of the TERRAIN
+    // and E-DECISIONI8.4 retired that reading; what it is grain FOR is this --
+    // the inside of the face of a blade -- and the seat, the slice and the
+    // guard all survive the move unchanged (E-TEX1's own closing note).
+    sheetLayers: new Vector2(...FAMILY_LAYERS.meadow),
+  };
+}
+
 const VERTEX = /* glsl */`
   varying vec3 vLocal;
   varying vec3 vWorld;
@@ -393,6 +474,9 @@ const FRAGMENT = /* glsl */`
   uniform float uArris;
   uniform float uArrisPixels;
   uniform float uArrisLean;
+  uniform float uBounce;
+  uniform vec2 uBase;
+  uniform float uCellRatio;
 
   ${SCENE_LIGHT_GLSL}
   ${FACE_LIGHT_GLSL}
@@ -420,6 +504,57 @@ const FRAGMENT = /* glsl */`
   ${SHEEN_GLSL}
   ${FOG_GLSL}
 
+  // WHAT A FACE OF THIS FAMILY IS WORTH, AND WHY IT IS A BEND AND NOT A LIFT.
+  //
+  // E-ERBA-A 1.5 measured the orientation ladder on the target's GRASS, in
+  // pairs on the same column of pixels -- two above the fall that marks the top
+  // and three below it, so the two samples are on one blade, under one air,
+  // with one pigment, and everything cancels but the orientation. Five windows
+  // from 5 to 15 metres:
+  //
+  //     target  0.643  0.648  0.634  0.617  0.624   (deviation 0.013)
+  //     ours    0.477  0.397  0.518  0.500  0.505
+  //
+  // The committente's «una tonalita' leggermente piu' scura» is 0.62, and our
+  // flank is a third too dark. src/world/face-light.js carries 1.00 / 0.947 /
+  // 0.336, which B 1.1 verified on the target's STONE and the fit closed; the
+  // grass of the same picture does not use it -- 1.00 / 0.71 / 0.41.
+  //
+  // TWO READINGS FIT AND THE TARGET DOES NOT SEPARATE THEM (E-ERBA-A 6.5): the
+  // mat has a BOUNCE the stone has not -- light entering between the blades and
+  // coming back out of their flanks, which is what a dense mat physically does
+  // -- or the side of a blade is a paler albedo than its top. This is written as
+  // the first, because the first is a thing a mat does and the second is a
+  // number that would have to be invented.
+  //
+  // AND IT IS THE DOOR src/world/face-light.js OPENS, NOT THE ONE guard-lift
+  // SHUTS. The seat's own note says it: «a material may bend the sun term
+  // between the two -- the masonry does, for its own relief -- and that is why
+  // faceLightOf() takes the pair rather than the normal: bending it is a
+  // material's business, producing it is not». So the pair is produced by the
+  // one producer and bent HERE, for one family, in the sky term, which is the
+  // term a bounce moves. uLift is untouched and stays at one everywhere in the
+  // world, because what it exists to stop -- a session quietly giving the world
+  // a second opinion about the HOUR -- is a different thing from a material
+  // saying what its own surface does with the light it gets.
+  //
+  // Nought for the ground and the bare earth, so those two draw exactly the
+  // picture they drew before this term existed.
+  //
+  // AND IT HANDS BACK A PAIR AND NOT A LIGHT, WHICH IS THE RULE AND NOT A STYLE.
+  // guard-sentiero-luce refuses any line in this file that assigns to the light
+  // without naming the producer, and it is right to: the light of this world is
+  // made in ONE place, and a material that computed its own would be the second
+  // opinion about the hour that the campaign spent a session removing. What a
+  // material may do -- what src/world/face-light.js says in as many words -- is
+  // bend the pair it was GIVEN. So this bends a pair, and every line that makes
+  // a light out of one still names faceLightOf.
+  vec2 matTerms(vec3 nn, float shade) {
+    vec2 pair = faceTerms(nn);
+    pair.y = min(1.0, pair.y + uBounce * (1.0 - abs(nn.y)));
+    return pair * shade;
+  }
+
   void main() {
     vec3 n = normalize(vNormal);
 
@@ -429,6 +564,32 @@ const FRAGMENT = /* glsl */`
     // tint of a whole wall would crawl as the eye moved.
     vec3 p = vLocal - n * (uVoxel * 0.5);
     vec3 cell = floor(p / uVoxel) + vec3(vChunk.x, 0.0, vChunk.y);
+
+    // AND WHICH COLUMN OF THE WORLD THAT CUBE STANDS IN, WHICH IS NOT THE SAME
+    // QUESTION ONCE A FAMILY IS DRAWN AT HALF THE STEP.
+    //
+    // Everything this fragment rebuilds out of the cell falls into two kinds,
+    // and the mat of grass is what forced them apart:
+    //
+    //   the CUBE's own -- the joint at its edges, the lightened arris along its
+    //   upper one, which slice of the sheet is laid on it. A blade is a cube of
+    //   five centimetres and those are its edges, so they are drawn on ITS
+    //   lattice, and drawing them on the world's would put a joint straight
+    //   through the middle of every blade and cut its top in two. Measured: the
+    //   estimator of E-ERBA-A 1.1 read our blade at 0.20 of a cube where the
+    //   truth is 0.50, because it was counting those false edges.
+    //
+    //   the COLUMN's -- the pigment, which is a field over the world in zones of
+    //   half a metre and more. A zone of the world is one zone whichever family
+    //   stands in it (the note over the bare earth's own hue says so), and a mat
+    //   that drew the field at twice the frequency would put a change of scale
+    //   between the grass and the ground it stands on.
+    //
+    // So the ratio is what the material is drawn at over the step the world is
+    // kept in: ONE for every family that is a cube of the world, a half for the
+    // mat. At one it is a floor of a whole number and cannot move a pixel of
+    // what shipped.
+    vec2 column = floor(cell.xz * uCellRatio);
 
     // How much ground one pixel covers here. Taken off the smooth position and
     // not off anything wrapped: the derivative of a fract is a cliff at every
@@ -447,7 +608,7 @@ const FRAGMENT = /* glsl */`
     // the deepest rung goes back to being the orientation ladder alone. The
     // arithmetic is src/world/voxel/pigment.js, and the same file's pure twin
     // answers this call under plain node for the offline chain.
-    vec3 albedo = pigmentOf(cell.x, cell.z);
+    vec3 albedo = pigmentOf(column.x, column.y);
 
     // ------------------------------------------------------------ the grain
     // ONE READ, AND IT MULTIPLIES THE PIGMENT RATHER THAN REPLACING IT: the
@@ -489,7 +650,81 @@ const FRAGMENT = /* glsl */`
     albedo *= joint;
 
     // ----------------------------------------------------------- the light
-    vec3 light = faceLight(n);
+
+    // -------------------------------------------------- the foot of the mat
+    // THE ONE TERM E-ERBA-A CALLS THE MOST IMPORTANT THING IN ITS DOSSIER FOR
+    // WHOEVER HAS TO BUILD IT, AND IT COSTS TWO INSTRUCTIONS.
+    //
+    // The committente read it as «i bordi di quella faccia sono piu' scuri»
+    // (E-DECISIONI8.1) and asked which it was, an artefact of the zoom or an
+    // ambient occlusion. It is neither, and the measurement that separates them
+    // is in E-ERBA-A 1.6: the profile inside a face, read in CENTIMETRES FROM
+    // THE GROUND instead of in fractions of the face, splits the two readings
+    // apart. A face more than one blade tall reaches the plane and is 16% dark
+    // there; a face of a single blade, which stands HIGHER in the mat because it
+    // rests on other blades, has no darkening at all. A painted gradient would
+    // scale with its face and the two rows would coincide as fractions; they
+    // coincide in centimetres instead.
+    //
+    //     target, tall faces (>= 11 cm), n 100, by cm from the foot
+    //     0.844  0.833  0.850  0.898  0.904  0.931  0.997  1.015
+    //     target, short faces (4-9 cm),  n 345
+    //     0.951  0.967  0.990  1.000  1.018  1.055  1.114  1.077
+    //     ours, over the whole face
+    //     1.007  1.011  1.002  1.001  1.000  1.000  0.996  1.000
+    //
+    // So it is a function of the HEIGHT ABOVE THE PLANE and of nothing else --
+    // no neighbour, no attribute, no read, no pass -- and the plane of this
+    // world is a plane, which is what makes the two the same quantity.
+    //
+    // AND IT IS A STAIR AND NOT A GRADIENT, WHICH IS THE COMMITTENTE'S OWN WORD
+    // AND ALSO WHAT PAYS FOR THE SHADOWS. E-DECISIONI10 G4: «la base dello stelo
+    // e dell'erba e' leggermente piu' scura della parte finale: non una sfumatura
+    // ma un CAMBIO GRADUALE E GIUSTIFICATO fra i voxel (se piu' d'uno); questa
+    // regola puo' andare bene anche per le PERFORMANCE rispetto alle ombre». So
+    // every cube of a stack of blades carries ONE level, darkest at the foot,
+    // and the levels this geometric fall gives are
+    //
+    //     rung   0      1      2      3      4
+    //     ours   0.840  0.901  0.938  0.962  0.977
+    //     target 0.844   --    1.015   --     --     (it has 0-7 cm of data)
+    //
+    // THE AMOUNT IS THE MEASUREMENT AND THE SPAN IS HIS SENTENCE, and the two
+    // came from two places on purpose. E-ERBA-A 1.6 measures 16% at the foot and
+    // the fall SPENT by 7 cm, and built exactly that way -- 0.840, 0.947, 0.983,
+    // spent by the second cube -- it is invisible in the frame: measured by A/B
+    // in one run of the browser, one uniform apart, it moves the low decile of
+    // the near meadow by 0.2 to 3.0 per cent where the target's own instrument
+    // reads 16 (fondazione/lav/er-base.mjs, er-ab.py; the sky control moves by
+    // 0.0000). The cause is geometry and E-ERBA-A 1.6 named the risk itself: at
+    // a pose a degree above the horizon a closed mat HIDES ITS OWN FEET, so the
+    // cubes the term darkens most are the ones the mat in front covers.
+    //
+    // What the committente asked for is not a fall spent in 7 cm, it is a step
+    // between the voxels: «un CAMBIO GRADUALE E GIUSTIFICATO fra i voxel (se
+    // piu' d'uno)». At 0.62 every pair of cubes up a blade differs -- 6.1, 3.7,
+    // 2.4, 1.5 per cent -- and the A/B reads it: -2.9% in the near field, -6.1%
+    // at eleven metres, the sky still at 0.0000. The deficit at the foot is left
+    // at E-ERBA-A's own 0.16 and NOT raised to make the frame move more: 0.26
+    // was on the same table and it reads 4.7 and 9.5, and it would be answering
+    // a measurement in a currency the measurement does not use.
+    //
+    // AND ON A MOUND IT IS AN APPROXIMATION AND IS DECLARED AS ONE. The foot of
+    // a blade standing on a mound is not at y = 0, so the term counts the rungs
+    // from the plane and leaves the crown of a mass unshaded. The mound is
+    // 0.20 m where the fall is spent in 0.10, so what is lost is a fringe on the
+    // back of a mass; E-ERBA-A 6.4 proposes it in exactly this shape and
+    // E-DECISIONI9.4 -- grass on the mounds too -- is what makes the case exist.
+    //
+    // AND IT IS TAKEN OFF THE PAIR AND NOT OFF THE LIGHT, which is the same
+    // arithmetic in the honest seat: what the foot of a blade has less of is the
+    // SKY IT CAN SEE and the sun that reaches it, and both of those are terms.
+    // Taken off the light afterwards it would be a material bending a light it
+    // did not make; taken here it is a face saying how much of the world it can
+    // see, which is what a pair of terms is.
+    float rung = max(0.0, floor(vWorld.y / uVoxel));
+    float shade = 1.0 - uBase.x * pow(uBase.y, rung);
+    vec3 light = faceLightOf(matTerms(n, shade));
 
     // ------------------------------------------------- the lightened arris
     // The single strongest signal in the reference, and it is done as what it
@@ -505,7 +740,7 @@ const FRAGMENT = /* glsl */`
       * (1.0 - abs(n.y)) * uArris * smoothstep(2.5, 5.0, onScreen);
     if (arris > 0.0) {
       vec3 leaning = normalize(mix(n, normalize(n + vec3(0.0, 1.0, 0.0)), uArrisLean));
-      light = mix(light, faceLight(leaning), arris);
+      light = mix(light, faceLightOf(matTerms(leaning, shade)), arris);
     }
 
     vec3 colour = albedo * light;
@@ -546,6 +781,9 @@ export function voxelMaterial(voxel, settings) {
       uArris: { value: settings.arris },
       uArrisPixels: { value: settings.arrisPixels },
       uArrisLean: { value: settings.arrisLean },
+      uBounce: { value: settings.bounce },
+      uBase: { value: settings.base },
+      uCellRatio: { value: voxel / VOXEL },
       // The sun, the exposure and the two lifts, from the one seat that
       // produces the pair they act on. Shared by reference with the rest of the
       // world, as are the light colours and the air below: a copy here would be
@@ -572,6 +810,8 @@ export function voxelMaterial(voxel, settings) {
     u.uArris.value = settings.arris;
     u.uArrisPixels.value = settings.arrisPixels;
     u.uArrisLean.value = settings.arrisLean;
+    u.uBounce.value = settings.bounce;
+    u.uBase.value.copy(settings.base);
     u.uLift.value.set(settings.sunLift, settings.skyLift);
   };
 
