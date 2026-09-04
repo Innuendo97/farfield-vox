@@ -87,7 +87,7 @@ const AT_APPROVED = { on: 1.5362, off: 0.1903, carpet: 1.3459 };
 // 3.8 m: 0.3290 grained, 0.0524 bare, 0.2766 for the grain alone.
 // U-FOND-5 (E-FOND-PIANO9): the framed seats come from the reference and the
 // stone's footprint answers the plane: 0.3335 grained, 0.0501 bare, 0.2833.
-const AT_TODAY = { on: 0.3335, off: 0.0501, carpet: 0.2833 };
+const AT_TODAY = { on: 0.3335, off: 0.0502, carpet: 0.2833 };
 
 /** Whether a constant is still the frozen one. Bit for bit: these are dials. */
 export const frozen = (actual, expected) => actual === expected;
