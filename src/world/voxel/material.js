@@ -83,14 +83,46 @@ import {
 // there is. 0.44 leaves the flank at 0.94 of a hemisphere, under that ceiling,
 // and it is the last value on the table that is still a statement about light.
 //
-// WHAT IS LEFT IS NOT THIS TERM'S AND IS DECLARED: 0.551 against 0.62 closes
-// three fifths of the gap, and the rest is the THIRD TERM of the light --
-// E-LUCE1 measured this world's sky weight at 0.259 where the target asks 0.362,
-// E-V4g read the same thing as a ladder 3.73x against our 8.51x, and E-TEX1-bis
-// read it a third time as an ombra 38% too steep. That is fit 2 of the light's
-// own window, it moves the paving and the stone with it, and E-ERBA-A 6.7 puts
-// it at step 7 -- «al passo 9 della luce, non prima». Three readings and this
-// one point at the same seat, and it is the coordinator's.
+// THE THIRD TERM CAME, AND THIS WAS RE-DERIVED UNDER IT RATHER THAN LEFT ALONE.
+// The note above used to end by saying the rest of the gap was fit 2 of the
+// light's window, «al passo 9 della luce, non prima». That step has been taken:
+// src/world/face-light.js now carries the ground's own return, and the world
+// this literal was swept in is not the world it lives in. What follows is the
+// SAME sweep, same instrument, same four windows, run again with the third term
+// live and under the seal the world now ships -- and with a null, the first arm
+// sent again at the end, which came back identical on all four windows:
+//
+//     bounce      0.00   0.10   0.20   0.30   0.44      the target
+//     flank/top   0.416  0.430  0.443  0.456  0.473     0.617
+//     sun/shade   5.70x  5.42x  5.16x  4.94x  4.67x     3.68x
+//
+// IT STILL WANTS THE CEILING, AND THE TWO TERMS DO NOT ADD TWICE. The reason is
+// arithmetic and not discipline: the third term is a fraction of ONE MINUS the
+// sky term, and this bounce RAISES the sky term, so whatever share of the lower
+// hemisphere a blade claims as sky is exactly the share the ground's return no
+// longer reaches it through. At 0.44 a flank keeps 0.06 of that share and the
+// third term is worth 0.012 of flank over top to it; on the meadow's own cubes,
+// which bend nothing, the same term is worth 0.104 on the orientation ladder.
+// The two cannot be counted twice and no second rule was needed to stop them.
+//
+// AND 0.44 IS STILL THE LAST HONEST VALUE, NOW FOR A SECOND REASON. The first
+// is the one above: a flank sees half a hemisphere, so 0.50 is the whole sky and
+// past it the sweep is claiming a vertical face sees more sky than there is. The
+// second is new: at 0.50 the ground's return into a blade would be exactly
+// nought, which is this world saying that a blade standing in a meadow sees no
+// meadow -- the one statement the term that just landed was installed to deny.
+//
+// WHAT IS LEFT IS NOT THIS TERM'S AND IS DECLARED, AND IT HAS A DIFFERENT
+// ADDRESS NOW. 0.473 against 0.617 is what the light can buy; the rest is the
+// SHADOW BLADES CAST ON EACH OTHER, and three measurements say so rather than
+// one. Read down a face from top to foot, the target falls 1.12 -> 0.96 across
+// its own height and ours reads 1.000 to three digits at every step (E-ERBA-A
+// 1.6's own instrument, before and after the third term: the term moved the
+// foot by 0.013). Read as families of level in one window of meadow, the target
+// puts 47% of its pixels in a dark family at level 50 and we put 5.7% at level
+// 39: half of the reference's grass IS the shade between its blades, and ours
+// is not there to be lit. That is E-DECISIONI9.3 and E-DECISIONI10 G4, it is
+// geometry, and it is not a knob in this file.
 export const BLADE_BOUNCE = 0.44;
 
 /** The tunables, live, so a sweep costs a redraw and not a rebuild. */
@@ -423,6 +455,18 @@ export function bladeSettings() {
     // how much of that is left one cube higher. Straight off E-ERBA-A 1.6 -- 16%
     // at nought, home by 7 cm -- and the reason it is these two numbers and not
     // a fitted curve is that the measurement is these two numbers.
+    //
+    // AND THE THIRD TERM DOES NOT MOVE IT, WHICH WAS CHECKED RATHER THAN
+    // ASSUMED. This pair scales the whole pair a cube is given, so the ground's
+    // return arrives already shaded and a foot gets less of it in the same
+    // proportion as it gets less of everything else -- there is nothing here to
+    // count twice. Measured on the frame with E-ERBA-A 1.6's own instrument, the
+    // profile down a face reads 1.000 1.000 1.002 1.002 1.000 1.003 0.987 0.977
+    // after the term against 1.000 1.000 1.004 1.003 1.000 1.002 0.985 0.964
+    // before it: thirteen thousandths at the foot, and a target that reads 1.122
+    // at the head and 0.956 at the foot. The two numbers stay because they are a
+    // reading of the target, and what stands between them and the picture is the
+    // blades' own occlusion, not this scale.
     base: new Vector2(0.16, 0.62),
     // AND ITS OWN SLICE OF THE GRAIN, which is the one thing E-TEX1 leaves this
     // family. The sheet of «grass, top» was cut for the top face of the TERRAIN
