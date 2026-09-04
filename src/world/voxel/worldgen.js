@@ -1,6 +1,6 @@
 import { AREA_CENTER, MONOLITHS, PLATFORM, STAIRS } from '../layout.js';
 import {
-  BASE_LEVEL, pathCentreX, pathCoord, pathEdge, pathHalfWidth, pathRun,
+  BASE_LEVEL, PATH_STONE_END_Z, pathCentreX, pathCoord, pathEdge, pathHalfWidth, pathRun,
 } from '../terrain-field.js';
 import {
   MATERIAL, NO_COLUMN, VOXEL, clearColumn, createColumns, setFlank, setTop,
@@ -893,6 +893,29 @@ export const PATH = {
   // proud and a grained plate stands two -- which is the band, by construction,
   // with no term written to buy it.
   drop: 1,
+  // How far back from the foot of the run the paving gives that voxel up
+  // again, in metres.
+  //
+  // THE LAST STRETCH OF THE CORRIDOR STANDS AT THE MEADOW'S OWN FLOOR, BECAUSE
+  // THAT IS WHERE THE STAIR'S STONE ENDS. src/world/stairs.js draws the lowest
+  // riser from its tread down to NOUGHT -- the meadow's drawn floor -- and the
+  // corridor was laid a voxel under that, so the ground fell away from the run
+  // exactly where a foot leaves it: 0.3167 m from the lowest tread down to the
+  // stone, at three seats of the disc, against a body that will not take a step
+  // down of more than 0.30 (src/core/player.js). Level with the floor the drop
+  // is the riser itself, 0.2167 m, which is a step and not a ledge.
+  //
+  // AND IT IS CURED HERE AND NOT IN THE RUN. Moving the lowest tread would be a
+  // change to V2's fitted staircase -- its height is the platform's, measured
+  // off the reference framing -- to fix a foundation that laid its own ground
+  // low. The ground is this file's.
+  //
+  // ONE TREAD, WHICH IS THE RUN'S OWN UNIT. The stretch has to be wide enough
+  // to be a piece of paving rather than a lip, and there is exactly one length
+  // in this corner of the world that was measured: the tread the risers stand
+  // on. It comes to three columns, and what the eye is given is the last course
+  // of the corridor stepping up to meet the stone it arrives at.
+  lift: STAIRS.tread,
   // The bare earth either side of the stone, in columns per side.
   //
   // TWO TO FOUR, BY POSITION AND NOT ONE NUMBER, which is the committente's own
@@ -909,6 +932,15 @@ export const PATH = {
   // can do it without evaluating either of them.
   wander: 0.105 + 0.0434,
 };
+
+/**
+ * How far under the meadow's floor the corridor lies at a northing, in voxels.
+ *
+ * One everywhere, and NOUGHT over the apron where the run begins: see PATH.lift.
+ */
+export function pathDrop(z) {
+  return z <= PATH_STONE_END_Z + PATH.lift ? 0 : PATH.drop;
+}
 
 /** How many columns of bare earth line each side of the stone at a northing. */
 export function pathVerge(z) {
@@ -1183,7 +1215,8 @@ export function columnSpec(ix, iz, grain = true, radius = DISC_RADIUS) {
   const on = corridorAt(x, z);
   if (on >= 0) {
     return {
-      top: top - PATH.drop,
+      // A NORTHING AND NOT A CONSTANT, and only over the apron: see PATH.lift.
+      top: top - pathDrop(z),
       // THE VERGE IS EARTH BECAUSE EARTH.verge SAYS SO, and it is read here
       // rather than assumed. The dial is E-V1j's answer C -- the lembo is bare
       // ground and not a shadow -- and it lost its reader at step 4 when the

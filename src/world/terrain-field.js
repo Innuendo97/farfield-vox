@@ -121,7 +121,13 @@ export const PATH_LINE = {
 // end of its ramp -- a fact about where the path POINTS -- and the two targets
 // give no base for moving that line. The two were separated for that reason and
 // they stay separated.
-const PATH_STONE_END_Z = STAIRS.z + STAIRS.tread * STAIRS.steps;
+//
+// AND IT IS PUBLISHED NOW, because the generator needs this same northing and
+// must not sum it again: the paving stands at the meadow's own floor over the
+// last stretch before this line, so the stone a walker steps off meets the
+// lowest riser instead of a tenth of a metre under it. See PATH.lift in
+// src/world/voxel/worldgen.js.
+export const PATH_STONE_END_Z = STAIRS.z + STAIRS.tread * STAIRS.steps;
 // How quickly the run lets go at the south end, in metres.
 //
 // A FINGER'S WIDTH, AND IT USED TO BE 2.8 m. The fade existed because the stone

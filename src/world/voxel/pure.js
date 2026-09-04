@@ -44,6 +44,7 @@ export {
   meshDisc,
   moundAt,
   onPaving,
+  pathDrop,
   pathVerge,
   sodAt,
 } from './mesher.js';
