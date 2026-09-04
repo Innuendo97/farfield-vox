@@ -1,12 +1,13 @@
 import {
-  ClampToEdgeWrapping, RepeatWrapping, ShaderMaterial, Vector2, Vector3, Vector4,
+  ClampToEdgeWrapping, DataTexture, NearestFilter, RGFormat, RepeatWrapping,
+  ShaderMaterial, UnsignedByteType, Vector2, Vector3, Vector4,
 } from 'three';
 import { SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS } from '../../core/sky.js';
 import { FACE_LIGHT_GLSL, faceLightUniforms } from '../face-light.js';
 import { FOG_GLSL, GROUND_EXPOSURE, fogUniforms } from '../air.js';
 import TERRAIN from '../../../assets-src/terrain/terrain.json' with { type: 'json' };
 import { PATH_LINE } from '../terrain-field.js';
-import { VOXEL } from './columns.js';
+import { BLADE, SUB, VOXEL } from './columns.js';
 // THE PIGMENT'S OWN SEAT, AND IT IS A FILE OF ITS OWN FOR ONE REASON: the
 // offline chain has to be able to ask what colour a cube is without a browser.
 // While the pigment was a single albedo, render-chain.mjs lifted the triple out
@@ -124,6 +125,122 @@ import {
 // is not there to be lit. That is E-DECISIONI9.3 and E-DECISIONI10 G4, it is
 // geometry, and it is not a knob in this file.
 export const BLADE_BOUNCE = 0.44;
+
+// HOW MUCH OF THE SUN A BLADE UNDER THE MAT'S CANOPY STILL GETS, as one literal
+// beside the one above, for the same reason: the sweep that fitted it and the
+// guard that holds it read the same character.
+//
+// IT IS NOT NOUGHT, AND THAT IS A MEASUREMENT AND NOT A KINDNESS. A blade in
+// the shadow of the blade beside it stands one centimetre from a face in full
+// sun, and what it gets back off that face is not in this world's sky term --
+// the sky term is a hemisphere of dome, and this is a wall of lit grass a
+// centimetre away. Fitted on the live frame against the reference's own dark
+// family (its level, not only its share) and its sun-over-shade scale, with
+// famiglie() of the campaign's pg-lib at B's own window; the sweep and its table
+// are in the verbale of U-ERBA-2.
+export const BLADE_SHADE_SUN = 0.16;
+
+/**
+ * The mat's shadow map: one R8 texture over the whole disc, and the four numbers
+ * a fragment needs to read it.
+ *
+ * ONE TEXTURE AND NOT ONE PER CHUNK, which is the difference between a bind and
+ * a material. The mat is already one draw a chunk through ONE material -- that
+ * is what keeps the disc a run of draws through a single program -- and a map
+ * per chunk would be a uniform per chunk, so a material per chunk, so the thing
+ * the head of voxelMaterial() exists to prevent. The chunks write their own
+ * squares into this one as they arrive.
+ *
+ * WHAT IT COSTS, IN THE UNITS THE BUDGET IS KEPT IN. Two bytes a blade column
+ * over the disc: at the radius the low tier lays that is 560 x 560 x 2 =
+ * 627 200 B of VRAM and ONE read a fragment. E-ERBA-A named 313 kB and one read
+ * when it proposed this and U-ERBA-1 declined it at that price; the second byte
+ * is the canopy, it buys the term the first one cannot carry, and it costs VRAM
+ * and not a fetch. The reading that decided it is in the verbale of U-ERBA-2.
+ *
+ * @param {number} centreX  where the disc is centred, in metres
+ * @param {number} centreZ
+ * @param {number} radius   how far it reaches, in metres
+ */
+export function shadeMap(centreX, centreZ, radius) {
+  // The blade columns the disc spans, and the map is exactly them: a texel
+  // outside the disc is a texel of a place where no blade stands.
+  const bx = Math.floor((centreX - radius) / BLADE);
+  const bz = Math.floor((centreZ - radius) / BLADE);
+  const side = Math.ceil((centreX + radius) / BLADE) - bx > Math.ceil((centreZ + radius) / BLADE) - bz
+    ? Math.ceil((centreX + radius) / BLADE) - bx
+    : Math.ceil((centreZ + radius) / BLADE) - bz;
+  // TWO CHANNELS AND ONE READ. R is where the sun stops reaching this column and
+  // G is where the mat closes over it: two heights in the same unit, asked at
+  // the same place at the same moment, so one RG texel is one fetch where two R
+  // textures would be two.
+  const data = new Uint8Array(side * side * 2);
+  const texture = new DataTexture(data, side, side, RGFormat, UnsignedByteType);
+  // NEAREST IN BOTH DIRECTIONS, AND THAT IS THE FAITHFUL ANSWER RATHER THAN THE
+  // CHEAP ONE. The line this map holds is a property of a blade COLUMN: two
+  // neighbouring columns hold two lines and the boundary between them is real,
+  // so filtering across it would draw a shadow that half belongs to a blade the
+  // fragment is not standing on. A face is one texel wide by construction and
+  // the read is addressed by whole numbers, so magnification never happens and
+  // minification is the same point sample the geometry itself is.
+  texture.magFilter = NearestFilter;
+  texture.minFilter = NearestFilter;
+  texture.wrapS = ClampToEdgeWrapping;
+  texture.wrapT = ClampToEdgeWrapping;
+  texture.generateMipmaps = false;
+  texture.needsUpdate = true;
+  return {
+    texture,
+    data,
+    side,
+    bx,
+    bz,
+    // What the fragment is handed: where the first texel stands, one over the
+    // side, and the metres a full byte is worth -- 255 SUB-steps of a blade,
+    // which is the unit ./worldgen.js marches in.
+    map: new Vector4(bx, bz, 1 / side, 255 * BLADE / SUB),
+    /**
+     * Lays one chunk's square of texels into the map.
+     *
+     * Clipped, because a chunk at the rim of the disc reaches past the map and
+     * what it reaches into is a place with no blades in it.
+     */
+    put(tile) {
+      const i0 = tile.bx - bx;
+      const j0 = tile.bz - bz;
+      for (let j = 0; j < tile.side; j++) {
+        const dj = j0 + j;
+        if (dj < 0 || dj >= side) continue;
+        for (let i = 0; i < tile.side; i++) {
+          const di = i0 + i;
+          if (di < 0 || di >= side) continue;
+          data[(dj * side + di) * 2] = tile.data[(j * tile.side + i) * 2];
+          data[(dj * side + di) * 2 + 1] = tile.data[(j * tile.side + i) * 2 + 1];
+        }
+      }
+      texture.needsUpdate = true;
+    },
+  };
+}
+
+/**
+ * The map every family that is NOT the mat is handed, and it is one texel.
+ *
+ * A NEUTRAL TEXTURE AND NOT A NULL SAMPLER, for the reason sheetArray() gives a
+ * few lines up: a null sampler is a different program on some drivers and the
+ * same one on others, and a world that draws differently depending on which is
+ * the defect this campaign spends its guards on. What actually turns the term
+ * off is `shadeSun` at one and `base` at nought, which are the ground's own
+ * settings and make both halves of the arithmetic the identity.
+ */
+export function neutralShade() {
+  const texture = new DataTexture(new Uint8Array(2), 1, 1, RGFormat, UnsignedByteType);
+  texture.magFilter = NearestFilter;
+  texture.minFilter = NearestFilter;
+  texture.generateMipmaps = false;
+  texture.needsUpdate = true;
+  return { texture, map: new Vector4(0, 0, 0, 0) };
+}
 
 /** The tunables, live, so a sweep costs a redraw and not a rebuild. */
 export function voxelSettings() {
@@ -309,12 +426,16 @@ export function voxelSettings() {
     // src/world/face-light.js, which is also where they are applied.
     sunLift: 1,
     skyLift: 1,
-    // The two terms the mat of grass is the only family to carry. NOUGHT here,
-    // and the ground and the bare earth draw exactly the picture they drew
-    // before either existed: see matLight() and the foot of the mat in the
-    // fragment for what they are and what measured them.
+    // The three terms the mat of grass is the only family to carry. NEUTRAL
+    // here -- nought bounce, nought fall, a whole sun under the line -- and the
+    // ground and the bare earth draw exactly the picture they drew before any of
+    // them existed: see matTerms() and the foot of the mat in the fragment for
+    // what they are and what measured them. The third one is ONE and not nought
+    // because it is a survival and not an amount: at one, a face under the line
+    // keeps all of its sun, which is a face that has no line.
     bounce: 0,
     base: new Vector2(0, 1),
+    shadeSun: 1,
   };
 }
 
@@ -456,18 +577,18 @@ export function bladeSettings() {
     // at nought, home by 7 cm -- and the reason it is these two numbers and not
     // a fitted curve is that the measurement is these two numbers.
     //
-    // AND THE THIRD TERM DOES NOT MOVE IT, WHICH WAS CHECKED RATHER THAN
-    // ASSUMED. This pair scales the whole pair a cube is given, so the ground's
-    // return arrives already shaded and a foot gets less of it in the same
-    // proportion as it gets less of everything else -- there is nothing here to
-    // count twice. Measured on the frame with E-ERBA-A 1.6's own instrument, the
-    // profile down a face reads 1.000 1.000 1.002 1.002 1.000 1.003 0.987 0.977
-    // after the term against 1.000 1.000 1.004 1.003 1.000 1.002 0.985 0.964
-    // before it: thirteen thousandths at the foot, and a target that reads 1.122
-    // at the head and 0.956 at the foot. The two numbers stay because they are a
-    // reading of the target, and what stands between them and the picture is the
-    // blades' own occlusion, not this scale.
+    // AND THE TWO NUMBERS DID NOT MOVE WHEN THE SHADOW ARRIVED, WHICH IS THE
+    // POINT: what moved is what they are counted FROM. U-ERBA-1 counted the
+    // rungs upward from the plane and the pair scaled BOTH terms of a cube;
+    // they are counted downward from the canopy the map holds now, and the pair
+    // scales the SKY term only, because the sun's own loss is the map and
+    // charging a face for it twice is the thing the fragment's note refuses.
+    // The amount and the span are still E-ERBA-A 1.6's own reading and not a
+    // fit, which is why nothing about them had to be re-derived.
     base: new Vector2(0.16, 0.62),
+    // AND HOW MUCH OF THE SUN IS LEFT UNDER THAT LINE. The literal, its reason
+    // and the sweep that fitted it are over BLADE_SHADE_SUN at the head.
+    shadeSun: BLADE_SHADE_SUN,
     // AND ITS OWN SLICE OF THE GRAIN, which is the one thing E-TEX1 leaves this
     // family. The sheet of «grass, top» was cut for the top face of the TERRAIN
     // and E-DECISIONI8.4 retired that reading; what it is grain FOR is this --
@@ -521,6 +642,26 @@ const FRAGMENT = /* glsl */`
   uniform float uBounce;
   uniform vec2 uBase;
   uniform float uCellRatio;
+  // WHERE THE SUN STOPS REACHING THE MAT, AS A PICTURE OF THE GROUND IN XZ.
+  //
+  // One byte a blade column, marched at worldgen along the seal's own bearing
+  // (SUN_MARCH in ./worldgen.js), holding the WORLD HEIGHT of the line between
+  // light and shadow on that column. It is one texture over the whole disc and
+  // the read is one, in XZ, off the blade cube this fragment already knows it
+  // stands in -- so nothing per voxel rides on a vertex, which is the rule at
+  // the head of ./mesher.js and the reason this is a texture and not an
+  // attribute.
+  uniform sampler2D tShade;
+  // Where that picture stands and what one byte of it is worth: the blade column
+  // of its first texel, one over its side, and the metres a full byte spans.
+  uniform vec4 uShadeMap;
+  // AND HOW MUCH OF THE SUN A FACE UNDER THAT LINE STILL GETS. Not nought: a
+  // blade in the shade of the blade beside it stands a centimetre from a lit
+  // face and takes some of it back, and the number is fitted on the frame
+  // against the reference's own dark family rather than assumed. ONE for every
+  // family that is not the mat, which is what turns the whole term off for them
+  // without a branch and without a second program.
+  uniform float uShadeSun;
 
   ${SCENE_LIGHT_GLSL}
   ${FACE_LIGHT_GLSL}
@@ -593,10 +734,24 @@ const FRAGMENT = /* glsl */`
   // material may do -- what src/world/face-light.js says in as many words -- is
   // bend the pair it was GIVEN. So this bends a pair, and every line that makes
   // a light out of one still names faceLightOf.
-  vec2 matTerms(vec3 nn, float shade) {
+  // AND THE TWO THINGS THAT ARE TAKEN OFF IT ARE TAKEN OFF DIFFERENT TERMS,
+  // WHICH IS THE WHOLE OF "NOT TWICE".
+  //
+  // A point under the mat's canopy has less of two different things and they are
+  // not the same loss. It has less SUN, because a blade upwind of it is between
+  // it and the beam -- that is the map, and it is all or nothing at a line. And
+  // it has less SKY, because the blades around it close over it -- that is the
+  // fall E-ERBA-A 1.6 measured, 16% by the time the canopy is a blade deep, and
+  // it is gradual.
+  //
+  // U-ERBA-1 scaled the WHOLE pair by the second one and had no first one at
+  // all. Scaling the whole pair by both would charge a shaded face for its lost
+  // sun twice, once in the term it lost and once again in a term it did not, so
+  // each goes on the term it is about.
+  vec2 matTerms(vec3 nn, float sun, float sky) {
     vec2 pair = faceTerms(nn);
     pair.y = min(1.0, pair.y + uBounce * (1.0 - abs(nn.y)));
-    return pair * shade;
+    return vec2(pair.x * sun, pair.y * sky);
   }
 
   void main() {
@@ -717,21 +872,23 @@ const FRAGMENT = /* glsl */`
     //     ours, over the whole face
     //     1.007  1.011  1.002  1.001  1.000  1.000  0.996  1.000
     //
-    // So it is a function of the HEIGHT ABOVE THE PLANE and of nothing else --
-    // no neighbour, no attribute, no read, no pass -- and the plane of this
-    // world is a plane, which is what makes the two the same quantity.
+    // So it is a function of HOW DEEP UNDER THE MAT'S OWN CANOPY a face stands,
+    // and E-ERBA-A read that as a height above the plane because on the target's
+    // plane the two are the same quantity. This unit reads the canopy itself off
+    // the map below, so the term is written against the thing it is about; what
+    // does not move is the amount and the span, which are the measurement.
     //
-    // AND IT IS A STAIR AND NOT A GRADIENT, WHICH IS THE COMMITTENTE'S OWN WORD
-    // AND ALSO WHAT PAYS FOR THE SHADOWS. E-DECISIONI10 G4: «la base dello stelo
+    // AND IT IS A STAIR AND NOT A GRADIENT, WHICH IS THE COMMITTENTE'S OWN WORD.
+    // E-DECISIONI10 G4: «la base dello stelo
     // e dell'erba e' leggermente piu' scura della parte finale: non una sfumatura
     // ma un CAMBIO GRADUALE E GIUSTIFICATO fra i voxel (se piu' d'uno); questa
     // regola puo' andare bene anche per le PERFORMANCE rispetto alle ombre». So
-    // every cube of a stack of blades carries ONE level, darkest at the foot,
+    // every cube under the canopy carries ONE level, darkest deepest under it,
     // and the levels this geometric fall gives are
     //
-    //     rung   0      1      2      3      4
-    //     ours   0.840  0.901  0.938  0.962  0.977
-    //     target 0.844   --    1.015   --     --     (it has 0-7 cm of data)
+    //     rungs under the line   0      1      2      3      4
+    //     ours                 1.000  0.939  0.901  0.877  0.863   -> 0.840
+    //     target                 --   0.844  --     --     --     (0-7 cm of data)
     //
     // THE AMOUNT IS THE MEASUREMENT AND THE SPAN IS HIS SENTENCE, and the two
     // came from two places on purpose. E-ERBA-A 1.6 measures 16% at the foot and
@@ -753,22 +910,67 @@ const FRAGMENT = /* glsl */`
     // was on the same table and it reads 4.7 and 9.5, and it would be answering
     // a measurement in a currency the measurement does not use.
     //
-    // AND ON A MOUND IT IS AN APPROXIMATION AND IS DECLARED AS ONE. The foot of
-    // a blade standing on a mound is not at y = 0, so the term counts the rungs
-    // from the plane and leaves the crown of a mass unshaded. The mound is
-    // 0.20 m where the fall is spent in 0.10, so what is lost is a fringe on the
-    // back of a mass; E-ERBA-A 6.4 proposes it in exactly this shape and
-    // E-DECISIONI9.4 -- grass on the mounds too -- is what makes the case exist.
+    // AND WHAT IT IS COUNTED FROM HAS MOVED, WHICH CLOSED THE ONE THING THIS
+    // TERM WAS DECLARED AS AN APPROXIMATION OF.
+    //
+    // U-ERBA-1 counted the rungs from the PLANE, because the plane is where the
+    // reference's own faces reach and «distance from the foot of a face» and
+    // «height above the plane» were then the same quantity. The price was the
+    // crown of a mound: a blade standing 0.20 m up read as a blade three rungs
+    // high and carried no fall at all, and that was written down as a fringe on
+    // the back of a mass. It is counted from the CANOPY now -- from the line the
+    // map holds -- and the canopy stands wherever the ground under it does, so a
+    // mound's crown gets exactly the fall the plane's does and the approximation
+    // has no case left to be one in.
     //
     // AND IT IS TAKEN OFF THE PAIR AND NOT OFF THE LIGHT, which is the same
-    // arithmetic in the honest seat: what the foot of a blade has less of is the
-    // SKY IT CAN SEE and the sun that reaches it, and both of those are terms.
-    // Taken off the light afterwards it would be a material bending a light it
-    // did not make; taken here it is a face saying how much of the world it can
-    // see, which is what a pair of terms is.
-    float rung = max(0.0, floor(vWorld.y / uVoxel));
-    float shade = 1.0 - uBase.x * pow(uBase.y, rung);
-    vec3 light = faceLightOf(matTerms(n, shade));
+    // arithmetic in the honest seat: what a blade under the canopy has less of
+    // is the SKY IT CAN SEE and the SUN THAT REACHES IT, and both of those are
+    // terms. Taken off the light afterwards it would be a material bending a
+    // light it did not make; taken here it is a face saying how much of the
+    // world it can see, which is what a pair of terms is.
+
+    // ------------------------------------------- and where the sun stops
+    // ONE READ, IN XZ, AND IT CARRIES BOTH LINES.
+    //
+    // The map holds two world heights for this blade column: where the SUN stops
+    // reaching it, and where the blade the LAW puts here ends. Everything a
+    // fragment needs is how far it stands below each -- under the first the beam
+    // does not arrive, under the second the sky is progressively shut out by the
+    // mat's own body -- so the read is one RG fetch and each term is one
+    // subtraction. Neither is a function of y alone any more, which is what lets
+    // a blade on the crown of a mound carry the fall a blade on the plane
+    // carries, and what lets a plateau of the LOD carry the light of the blades
+    // it stands for.
+    //
+    // THE COLUMN IS THE CUBE'S AND NOT THE PIXEL'S, which is what makes the read
+    // exact rather than filtered: cell.xz is already the blade column this
+    // face belongs to, in the map's own units, so the texel is addressed by
+    // whole numbers and a face never straddles two of them.
+    vec2 shadeUv = (cell.xz - uShadeMap.xy + 0.5) * uShadeMap.z;
+    vec2 lines = texture2D(tShade, shadeUv).rg * uShadeMap.w;
+    // THE HEIGHT THE LIGHT IS ASKED AT, WHICH IS NOT ALWAYS THE HEIGHT THE
+    // FRAGMENT STANDS AT. Beyond the detail ring the mesher draws a block of
+    // blades at one level -- the frame cannot afford the steps -- and lines.y is
+    // where the law's own blade ends on THIS column. A fragment above that is
+    // standing on a surface the LOD raised, and the light it takes is the light
+    // of the blade that is really there, not of the level it was lifted to. On
+    // every blade the mesher draws one by one the two are the same number and
+    // this costs nothing.
+    float lightY = min(vWorld.y, lines.y);
+    // THE SUN: gone under the first line, and softened over exactly the quarter
+    // blade the line is quantised in. A hard step on a quantised height crawls
+    // when the eye moves; softened over its own quantum it is the same line
+    // without the crawl, and it is a quarter of a blade rather than a taste.
+    float lit = 1.0 - smoothstep(0.0, uVoxel * 0.25, lines.x - lightY);
+    float sun = uShadeSun + (1.0 - uShadeSun) * lit;
+    // AND THE SKY: the stair of G4, counted downward from the top of that same
+    // blade. Nought rungs under it is the open top of the mat; every rung under
+    // it keeps uBase.y of what is left to lose, and the floor is the 16%
+    // E-ERBA-A 1.6 read at the foot of a face that reaches the plane.
+    float rung = floor(max(0.0, lines.y - vWorld.y) / uVoxel);
+    float shade = 1.0 - uBase.x * (1.0 - pow(uBase.y, rung));
+    vec3 light = faceLightOf(matTerms(n, sun, shade));
 
     // ------------------------------------------------- the lightened arris
     // The single strongest signal in the reference, and it is done as what it
@@ -784,7 +986,7 @@ const FRAGMENT = /* glsl */`
       * (1.0 - abs(n.y)) * uArris * smoothstep(2.5, 5.0, onScreen);
     if (arris > 0.0) {
       vec3 leaning = normalize(mix(n, normalize(n + vec3(0.0, 1.0, 0.0)), uArrisLean));
-      light = mix(light, faceLightOf(matTerms(leaning, shade)), arris);
+      light = mix(light, faceLightOf(matTerms(leaning, sun, shade)), arris);
     }
 
     vec3 colour = albedo * light;
@@ -814,6 +1016,10 @@ export function voxelMaterial(voxel, settings) {
   // world that draws differently depending on which is the defect this campaign
   // spends its guards on.
   const sheet = settings.sheet ?? sheetArray(null);
+  // The same shape of handover as the sheet above: what the caller laid, or a
+  // neutral one so that a family with no shadow map is a family whose shadow
+  // arithmetic is the identity rather than a second program.
+  const shade = settings.shade ?? neutralShade();
   const material = new ShaderMaterial({
     uniforms: {
       uVoxel: { value: voxel },
@@ -827,6 +1033,9 @@ export function voxelMaterial(voxel, settings) {
       uArrisLean: { value: settings.arrisLean },
       uBounce: { value: settings.bounce },
       uBase: { value: settings.base },
+      tShade: { value: shade.texture },
+      uShadeMap: { value: shade.map },
+      uShadeSun: { value: settings.shadeSun },
       uCellRatio: { value: voxel / VOXEL },
       // The sun, the exposure and the two lifts, from the one seat that
       // produces the pair they act on. Shared by reference with the rest of the
@@ -856,6 +1065,7 @@ export function voxelMaterial(voxel, settings) {
     u.uArrisLean.value = settings.arrisLean;
     u.uBounce.value = settings.bounce;
     u.uBase.value.copy(settings.base);
+    u.uShadeSun.value = settings.shadeSun;
     u.uLift.value.set(settings.sunLift, settings.skyLift);
   };
 
