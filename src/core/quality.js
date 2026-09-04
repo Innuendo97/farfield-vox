@@ -81,6 +81,17 @@
 // was — see hub.setVoxelDiscRadius.
 // ------------------------------------------------------------------------
 
+// AND THE PIXEL OF THE SCENE BUFFER IS THE SAME ON EVERY TIER, which is the one
+// lever here that is NOT a tier's to spend. A tier may draw fewer pixels and
+// resolve fewer samples of them; what it may not do is hold a different range of
+// light, because the bloom's threshold, the exposure and both grades are fitted
+// against the numbers in this buffer and a tier that carried a different range
+// would be a second opinion about the hour. Four bytes of packed float carry the
+// same range the half float did -- the sun's disc stands at a hundred in these
+// units -- at half the bandwidth, and the half float is the rung below it for a
+// driver that has no packed float. Measured on the reference machine, tier alto,
+// median of the frame over 336 frames, six poses: 22.4 -> 16.8 ms at pose P and
+// 28.9 -> 24.0 at the worst pose in the world.
 export const TIERS = [
   {
     id: 'oltre',
@@ -91,6 +102,7 @@ export const TIERS = [
     // never a feature the other tiers do not have.
     scale: 1,
     samples: 4,
+    sceneFormat: 'R11F_G11F_B10F',
     bloom: 'half',
     grass: { density: 1.3, radius: 16 },
     // Owners in brackets, so a reader knows whose number this is before
@@ -104,6 +116,7 @@ export const TIERS = [
     label: 'Alta',
     scale: 1,
     samples: 4,
+    sceneFormat: 'R11F_G11F_B10F',
     bloom: 'half',
     grass: { density: 1, radius: 12 },
     // Owners in brackets, so a reader knows whose number this is before
@@ -117,6 +130,7 @@ export const TIERS = [
     label: 'Media',
     scale: 0.85,
     samples: 4,
+    sceneFormat: 'R11F_G11F_B10F',
     bloom: 'quarter',
     grass: { density: 0.7, radius: 12 },
     // Owners in brackets, so a reader knows whose number this is before
@@ -130,6 +144,7 @@ export const TIERS = [
     label: 'Bassa',
     scale: 0.75,
     samples: 2,
+    sceneFormat: 'R11F_G11F_B10F',
     bloom: 'quarter',
     grass: { density: 0.4, radius: 12 },
     // Owners in brackets, so a reader knows whose number this is before
@@ -283,15 +298,21 @@ export function createQuality({ renderer, hub }) {
     renderer.setBloomTier(tier.bloom);
   }
 
-  /** And the two that reallocate the buffers the frame is drawn into. */
+  /** And the three that reallocate the buffers the frame is drawn into. */
   function applyHard(tier) {
+    // Through the same seam the development panel grades through: the pixel of
+    // the scene buffer is a property of the picture, like the bloom's shape,
+    // and not one of the levers every caller of the renderer needs to know
+    // about.
+    renderer.post.setSceneFormat(tier.sceneFormat);
     renderer.setSamples(tier.samples);
     renderer.setRenderScale(tier.scale);
   }
 
   function apply(tier, { immediate = false } = {}) {
     applySoft(tier);
-    const needsHard = !applied || applied.scale !== tier.scale || applied.samples !== tier.samples;
+    const needsHard = !applied || applied.scale !== tier.scale || applied.samples !== tier.samples
+      || applied.sceneFormat !== tier.sceneFormat;
     if (!needsHard) {
       applied = tier;
       return;
