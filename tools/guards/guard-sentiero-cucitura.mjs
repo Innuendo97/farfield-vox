@@ -7,6 +7,7 @@ import {
   BASE_STEP, CENTRE, DISC_RADIUS, MANTO, MATERIAL, PATH, VOXEL, columnSpec, mantoAt,
   meadowMoundAt, moundAt, onPaving, pathDrop, pathVerge,
 } from '../../src/world/voxel/pure.js';
+import { SPREAD } from '../../src/world/path.js';
 import { reporter, selfTest } from './lib.mjs';
 
 // IS THE CORRIDOR THE GROUND, AT THE LEVEL THE REFERENCE MEASURES IT AT?
@@ -120,11 +121,41 @@ const PLATEAU = 2.20;
 // the three northings it is read at, with the tolerance each reading carries. A
 // row of the target is read to about a voxel, and the middle of the field is a
 // BAND rather than a figure.
+//
+// AND THE MIDDLE BAND HAS CHANGED, BECAUSE IT WAS COUNTING THE WRONG THING.
+// «Eight to twelve» came from counting voxels along rows of the reference, and
+// a row of the reference stops at the pale stone: U-SENT-2 measured that the
+// reference's paving is never more than half stone even in its own middle and
+// that its earth runs a metre and a half past the kerb, so a count that stops at
+// the stone stops INSIDE the corridor. Taken instead in metres of world on the
+// plane the fitted camera puts at nought -- the two crossings of half a share of
+// green on each flank, found on the picture being measured
+// (fondazione/lav/u4-largh.py) -- the reference holds 1.19 / 1.22 / 1.46 / 1.57
+// m from z 7.5 to z 1.9 and does not narrow at all. With the two tenths of a
+// metre the mat covers at the kerb that is fifteen to nineteen voxels of laid
+// corridor, and the eight to twelve is now the STONE CORE, gated below.
 const TAPER = [
   { z: 9.2, low: 18, high: 22, what: 'under the walker' },
-  { z: 4.0, low: 8, high: 12, what: 'through the middle of the field' },
+  { z: 4.0, low: 15, high: 19, what: 'through the middle of the field' },
   { z: -7.0, low: 22, high: 26, what: 'in the apron at the step' },
 ];
+
+/**
+ * How wide the PALE STONE inside the corridor is at a northing, in voxels:
+ * twice the distance from the centreline at which the share of stone pieces
+ * crosses a half.
+ *
+ * ASKED OF THE LAW AND NOT OF A PICTURE. SPREAD in ../../src/world/path.js is a
+ * smoothstep between two fractions of the half width, so the crossing is their
+ * middle exactly, and the number below is that middle carried into metres by
+ * the width beside it. It is the reading the middle band above used to carry.
+ */
+export function coreAt(z) {
+  return 2 * ((SPREAD.from + SPREAD.to) / 2) * pathHalfWidth(z) / VOXEL;
+}
+
+/** What the reference's own stone core comes to, in voxels, at the middle. */
+const CORE = { z: 4.0, low: 8, high: 12 };
 
 /** The full width of the corridor at a northing, in voxels. */
 export function widthAt(z) {
@@ -362,6 +393,10 @@ report.check(seen.kerbProudMid >= KERB_PROUD.low && seen.kerbProudMid <= KERB_PR
 
 // ------------------------------------------------------------------- 2
 report.line('');
+report.check(coreAt(CORE.z) >= CORE.low && coreAt(CORE.z) <= CORE.high,
+  `and the PALE STONE inside it is ${CORE.low} to ${CORE.high} voxels through the middle `
+  + 'of the field, which is what the rows of the reference were counted at',
+  `${coreAt(CORE.z).toFixed(1)} at z ${CORE.z}`);
 for (const t of TAPER) {
   const w = widthAt(t.z);
   report.check(w >= t.low && w <= t.high,

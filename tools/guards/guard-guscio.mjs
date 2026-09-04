@@ -144,19 +144,42 @@ for (let s = 0; s < shell.built.spokes; s++) {
   if (y > high) high = y;
 }
 
-// And every vertex against the seat both readers share.
-let apart = 0;
-for (let i = 0; i < position.count; i++) {
-  const r = Math.hypot(position.getX(i), position.getZ(i));
-  const d = Math.abs(position.getY(i) - shellHeightAt(r));
-  if (d > apart) apart = d;
-}
+// AND THE TWO POPULATIONS OF VERTICES, WHICH IS THE LEG THIS GUARD DID NOT HAVE.
+//
+// The sheet runs back UNDER the disc by an overlap, because the rim of the disc
+// is a staircase of ten centimetre steps and a sheet cut to meet it exactly
+// would have to reproduce that staircase. Under the cubes it must stand STRICTLY
+// BELOW the floor they draw -- two coplanar surfaces at one depth is a state
+// neither of them can win, and what it draws is the flicker E-DECISIONI11
+// reports at the rim and at the junction with the path. Outside the cubes it
+// must stand exactly where the contract puts it, to the buffer's own precision:
+// the shape of the ground past the rim is not this file's to move.
+//
 // A vertex is a Float32 and the seat answers in double, so the two agree to the
 // buffer's own precision and not exactly. A tenth of a millimetre is four orders
 // under the voxel and three over the rounding.
 const APART = 1e-4;
-
-const stitch = seam(SHIPPED_RADIUS, high);
+const FLOOR = (BASE_STEP + 1) * VOXEL;
+let apart = 0;
+let under = 0;
+let shallowest = Infinity;
+let overOutside = 0;
+for (let i = 0; i < position.count; i++) {
+  const r = Math.hypot(position.getX(i), position.getZ(i));
+  const y = position.getY(i);
+  if (r < SHIPPED_RADIUS) {
+    under++;
+    const gap = FLOOR - y;
+    if (gap < shallowest) shallowest = gap;
+  } else {
+    const d = Math.abs(y - shellHeightAt(r));
+    if (d > apart) apart = d;
+    if (y > shellHeightAt(r) + APART) overOutside++;
+  }
+}
+// The seam is read against the level the sheet stands at WHERE IT LEAVES THE
+// CUBES, which is the contract's own and not the sunk level of the overlap.
+const stitch = seam(SHIPPED_RADIUS, FLOOR);
 
 if (process.argv.includes('--self')) {
   selfTest('guard-guscio', [
@@ -170,7 +193,15 @@ if (process.argv.includes('--self')) {
     },
     {
       what: 'a sheet laid on the walkable field, a voxel under the cubes it meets',
-      caught: Math.abs(high - (BASE_STEP + 1) * VOXEL) < 1e-9,
+      caught: shallowest > 0 && shallowest < VOXEL / 10,
+    },
+    {
+      what: 'a sheet COPLANAR with the floor the cubes draw, which is the flicker itself',
+      caught: shallowest > 0,
+    },
+    {
+      what: 'a sheet sunk past the rim as well, which would move the ground the contract states',
+      caught: overOutside === 0 && apart <= APART,
     },
     {
       what: 'a step at the rim on the floor of the meadow',
@@ -207,9 +238,13 @@ report.line('');
 report.check(low === high,
   'inside the basin\'s own nought the sheet is one level',
   `${low.toFixed(4)} to ${high.toFixed(4)} m on the first ring`);
-report.check(Math.abs(high - (BASE_STEP + 1) * VOXEL) < 1e-9,
-  `and that level is the floor the disc DRAWS, ${((BASE_STEP + 1) * VOXEL).toFixed(3)} m`,
-  `the sheet stands at ${high.toFixed(3)} m`);
+report.check(shallowest > 0 && shallowest < VOXEL / 10,
+  `and under the cubes it stands BELOW the floor they draw (${FLOOR.toFixed(3)} m) `
+  + 'and by less than a tenth of the step: two surfaces at one depth is the flicker',
+  `${under} vertices under the disc, the shallowest ${(shallowest * 1000).toFixed(1)} mm down`);
+report.check(overOutside === 0 && apart <= APART,
+  'and past the rim it is the contract to the buffer own precision, on every vertex',
+  `${overOutside} over the seat, worst ${apart.toExponential(2)} m`);
 report.check(stitch.floorWorst === 0,
   `so the seam is nought on all ${stitch.floors} bearings of ${stitch.bearings} where the rim `
   + 'column is plain floor',
@@ -235,9 +270,9 @@ report.line(`  and one mesh, one material, one draw: it is two hundred metres ac
 
 // ------------------------------------------------------------------- 5
 report.line('');
-report.check(apart <= APART,
-  'the mesh and the contract answer the same height on every vertex of the sheet',
-  `worst ${apart.toExponential(2)} m over ${position.count} vertices`);
+report.check(apart <= APART && shallowest > 0,
+  'the mesh and the contract answer the same height on every vertex the cubes do not cover',
+  `worst ${apart.toExponential(2)} m over ${position.count - under} of ${position.count} vertices`);
 report.line('  -- one statement, shellHeightAt in src/world/contracts.js, read by the mesh that '
   + 'draws the ground and by the floor a walker stands on out there');
 

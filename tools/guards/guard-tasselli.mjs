@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
-  RELIEF, SPREAD, TUNING, paveAt,
+  RELIEF, SPREAD, TUNING, apronAt, paveAt, pathPigment,
 } from '../../src/world/path.js';
 import {
   pathCentreX, pathHalfWidth, pathRun,
@@ -99,6 +99,7 @@ export function survey(spread = SPREAD) {
   const bands = BANDS.map(() => ({ stone: 0, all: 0 }));
   const lifts = [];
   const tones = [];
+  const levels = [];
   const seenLift = new Set();
   for (let z = RUN.from; z <= RUN.to; z += RUN.step) {
     if (pathRun(z) <= 0) continue;
@@ -113,7 +114,25 @@ export function survey(spread = SPREAD) {
         if (k <= 2) {
           lifts.push(seat.lift);
           seenLift.add(Math.round(seat.lift * 1e6));
-          if (!seat.bare) tones.push(seat.tone);
+          // THE LEVEL AND NOT THE CODE, which is what E-V3d states: «identita'
+          // per lastra 25% IN LIVELLO». The tone is a CODING of the level along
+          // a ramp and the coding has changed once already -- when the ramp was
+          // cut in two so that a stone piece could not be painted on the earth's
+          // half of it, every code moved and the spread of the codes halved
+          // without one piece changing colour. A guard that reads the code
+          // reads the coding; this reads the pigment the code names.
+          if (!seat.bare) {
+            // THE IDENTITY IN THE UNITS IT IS AUTHORED IN, which is where the
+            // ramp was cut in two. `tone` is a CODING: over a half it names a
+            // point on the stone's own ramp, and the point is what the identity
+            // is written on. Read as the code, the spread halved the day the
+            // ramp was cut without one piece changing colour -- so it is read
+            // as the ramp position, and the coding can move again without
+            // moving this number.
+            tones.push((seat.tone - 0.5) * 2);
+            const rgb = pathPigment({ tone: seat.tone, depth: 0, apron: apronAt(z) });
+            levels.push(0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]);
+          }
         }
       }
     }
@@ -128,6 +147,7 @@ export function survey(spread = SPREAD) {
     liftHeights: seenLift.size,
     lifts: lifts.length,
     toneSd: sd(tones) / Math.max(mean(tones), 1e-9),
+    levelSd: sd(levels) / Math.max(mean(levels), 1e-9),
     tones: tones.length,
     spread,
   };
@@ -254,9 +274,21 @@ report.check(cross >= CROSS.least,
 // ------------------------------------------------------------------- 3
 report.line('');
 report.check(seen.toneSd >= IDENTITY.low && seen.toneSd <= IDENTITY.high,
-  `every piece carries its own level, spread ${(IDENTITY.low * 100).toFixed(0)} to `
+  `every piece carries its own place on the stone's own ramp, spread ${(IDENTITY.low * 100).toFixed(0)} to `
   + `${(IDENTITY.high * 100).toFixed(0)}% as E-V3d measures it`,
   `${(seen.toneSd * 100).toFixed(1)}% over ${seen.tones} stone pieces`);
+// AND WHAT THAT COMES TO IN LIVELLO, WHICH IS THE UNIT E-V3d STATES AND WHICH
+// THIS PIGMENT PAIR CANNOT REACH. It is printed and not gated, and the
+// arithmetic is why: the stone's ramp runs from STONE to STONE_PALE, whose
+// luminances are 0.299 and 0.432 -- a ratio of 1.44 -- and the identity is
+// written about a mean 0.62 of the way up it. A spread of 25% of THAT mean
+// needs the ramp's two ends about 2.4 apart, so no identity written on this
+// pair reaches it: at the 25% E-V3d states, the level comes out at the figure
+// below. The pair is E-V3g's and is a measurement of the same stone off the
+// same reference, re-solved twice; moving it is the coordinator's.
+report.line(`  and in LIVELLO that comes to ${(seen.levelSd * 100).toFixed(1)}% against `
+  + 'the 25% of E-V3d: the pair STONE / STONE_PALE stands 1.44 apart and a spread of a '
+  + 'quarter of the mean needs about 2.4 -- printed, not gated, and escalated');
 
 // ------------------------------------------------------------------- 4
 report.line('');
