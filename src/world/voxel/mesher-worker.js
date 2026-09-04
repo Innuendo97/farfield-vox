@@ -3,6 +3,7 @@ import {
 } from './mesher.js';
 import { buildMasonry, stoneTileData } from './courses.js';
 import { MONOLITHS } from '../layout.js';
+import { campoTile } from './campo.js';
 
 // Everything this demo builds by arithmetic, built off the thread the walker is
 // on. Three jobs, in the order the picture wants them.
@@ -45,7 +46,41 @@ import { MONOLITHS } from '../layout.js';
 // across a thread. The corridor is COLUMNS now, written by the same pipeline
 // that writes the meadow out of pathRun and pathCoord, which this thread has
 // always imported. There is nothing left to tell it.
+// AND A FOURTH JOB, WHICH IS THE FIRST ONE THIS THREAD IS ASKED FOR MORE THAN
+// ONCE.
+//
+// The three above are a BOOT: they are asked for together, they are answered
+// once, and the thread is terminated at `done`. The field's window is not a
+// boot -- it follows the walker, so it asks for the chunk that just came into
+// range and then, a few seconds later, for the next one. A thread started per
+// chunk would pay its own module graph every time (measured at 159 to 284 ms
+// for this one), so the message is answered and the thread STAYS.
+//
+// It is a branch at the top and not a second worker file for the reason the
+// door in ./index.js exists at all: the field is built out of the same
+// chunkColumns() and layMat() the greedy mesher is built out of, and two
+// threads that each imported half of that would be two module graphs of the
+// same arithmetic in one page.
 self.onmessage = (event) => {
+  const message = event.data || {};
+  if (message.job === 'campo') {
+    const { chunks = [], radius: reach = DISC_RADIUS } = message;
+    for (const { cx, cz } of chunks) {
+      const built = campoTile(cx, cz, reach);
+      self.postMessage({
+        kind: 'campo',
+        cx,
+        cz,
+        bx: built.bx,
+        bz: built.bz,
+        tallest: built.tallest,
+        ms: built.ms,
+        data: built.data,
+      }, [built.data.buffer]);
+    }
+    return;
+  }
+
   const woke = performance.now();
   const {
     grain = true, tile = 512, block = '05', radius = DISC_RADIUS, focus = null,

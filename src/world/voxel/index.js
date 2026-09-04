@@ -46,6 +46,13 @@ export {
   BLADE_BOUNCE, BLADE_SHADE_SUN, bladeSettings, earthSettings, neutralShade,
   pavingMaterial, pavingSettings, shadeMap, voxelMaterial, voxelSettings,
 } from './material.js';
+// AND THE SAME GROUND AS A PICTURE. src/world/voxel/campo.js is the arithmetic
+// of the texel and lives behind ./pure.js with the rest of it; what comes
+// through THIS half of the door is the live window and the box it is drawn on,
+// because those two build a three.js texture and a three.js material and the
+// pure half may not.
+export { createCampo } from './campo-field.js';
+export { campoBox, campoMaterial } from './campo-material.js';
 export { createMasonry, stoneTile } from './masonry.js';
 
 /**
