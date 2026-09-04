@@ -25,8 +25,8 @@ import {
 // three maps and the frame that reads them can never disagree about a number.
 // What this file adds is the seat those numbers are painted from.
 import {
-  APRON, GRAIN, GRAIN_GAIN, GRAIN_FADE, JOINT_DARK, JOINT_FADE, JOINT_LIP,
-  JOINT_SOFT, PATH_SKIN, PEB_EDGE, PEB_LEVEL, PEB_MIX, RELIEF, SKIN_REACH, TUNING,
+  APRON, EARTH_DAMP, GRAIN, GRAIN_GAIN, GRAIN_FADE, JOINT_DARK, JOINT_FADE,
+  JOINT_LIP, PATH_SKIN, PEB_EDGE, PEB_LEVEL, PEB_MIX, RELIEF, SKIN_REACH, TUNING,
   EARTH as PATH_EARTH, STONE as PATH_STONE, STONE_PALE as PATH_STONE_PALE,
 } from '../path.js';
 // THE GRAIN INSIDE A FACE, AND ITS SEAT IS A FILE OF ITS OWN because three
@@ -1115,7 +1115,9 @@ export function pavingSettings() {
     stonePale: new Vector3(...PATH_STONE_PALE),
     jointDark: new Vector2(...JOINT_DARK),
     jointLip: new Vector2(...JOINT_LIP),
-    jointSoft: JOINT_SOFT,
+    // The damp earth of the middle of the run over the dry earth of the kerb,
+    // and how far the rotation between them goes. See EARTH_DAMP in ../path.js.
+    earthDamp: new Vector2(EARTH_DAMP.level, EARTH_DAMP.cool),
     skinReach: SKIN_REACH,
     apronWarm: TUNING.apron.warm,
     apron: new Vector2(...APRON),
@@ -1261,6 +1263,33 @@ export function pavingSettings() {
     // same way. The paving's own tone map says which piece a fragment is in and
     // is already fetched, so a turn off it costs nothing -- see the fragment.
     sheetGain: new Vector2(2.9, 2.9),
+    // AND A FLOOR UNDER IT, BECAUSE A SLAB IS NEVER A HOLE.
+    //
+    // THE «MACCHIE BLU» OF E-DECISIONI11, FOUND AND NAMED. sheetOver in
+    // ./sheet.js is `max(0.0, 1.0 + gain * (grey - 0.5))`, and at the gain of
+    // 2.9 the sweep above landed on, every texel of the sheet under 0.155 hits
+    // that floor: the multiplier is EXACTLY NOUGHT and the albedo of the paving
+    // with it. The note over sheetGrain already knew half of this -- it says a
+    // multiplier under nought is a negative albedo «and the frame answered with
+    // specks of the air's own blue» -- but clamping at nought only turned the
+    // negative into a zero, and a zero is still not a colour this frame can
+    // draw: measured through the delivered grade, a fragment of exactly (0,0,0)
+    // comes back as sRGB (0, 0, 105), a saturated navy, while (0.001, 0.001,
+    // 0.001) comes back as (6, 6, 24) and reads as the shadow it is
+    // (fondazione/lav/u4-x-cal2.png). So the blue specks the committente sees
+    // are the sheet's own floor, one for one -- flagged in the fragment and
+    // counted, 1 643 pixels of the walking pose, every one of them a texel of
+    // the sheet at the bottom of its own range.
+    //
+    // The floor is therefore a FRACTION and not a zero, AND IT IS THE
+    // REFERENCE'S OWN DARKEST. Inside the corridor's surface the reference's
+    // fifth per cent stands 30 per cent under the local level and its coda goes
+    // no further (U-SENT-2 4.3); a quarter of the pigment is more than twice as
+    // far down as that, so nothing the reference draws is clipped by it. What is
+    // clipped is the family of holes -- 12 569 pixels of the walking pose at a
+    // floor of eight hundredths, black on a brown ground -- which is the other
+    // half of «macchie... che non so cosa siano».
+    sheetFloor: 0.15,
     sheetMetres: PAVING_SHEET_METRES,
   };
 }
@@ -1283,7 +1312,8 @@ const PAVING_FRAGMENT = /* glsl */`
   uniform vec3 uWarmth;
   uniform vec2 uJointDark;
   uniform vec2 uJointLip;
-  uniform float uJointSoft;
+  uniform vec2 uEarthDamp;
+  uniform float uSheetFloor;
   uniform float uSkinReach;
   uniform float uApronWarm;
   uniform vec2 uApron;
@@ -1338,20 +1368,30 @@ const PAVING_FRAGMENT = /* glsl */`
 
     float apron = smoothstep(uApron.x, uApron.y, vWorld.z);
 
-    // THE PIGMENT. One ramp, earth to pale stone, walked by the piece's tone.
-    // Below the knee it is the soil between and over the pieces and above it the
-    // slab, and the crossing is the eroded lip where the two meet.
+    // THE PIGMENT, AND THE RAMP IS CUT IN TWO AT A HALF BECAUSE A PIECE IS TWO
+    // THINGS AND NOT THREE. Under a half it is earth, walked from the damp
+    // trodden brown of the middle of the run to the dry brown of the kerb; over
+    // it, the slab, from the worn stone to the palest. See the note on tone in
+    // paveAt and EARTH_DAMP, both in ../path.js: the earth's own two ends are a
+    // LEVEL and a CHROMATICITY off one pigment, so the earth stays one material.
+    float dry = clamp(tone * 2.0, 0.0, 1.0);
+    float damp = uEarthDamp.x + (1.0 - uEarthDamp.x) * dry;
+    float cool = uEarthDamp.y * (1.0 - dry);
+    vec3 soil = uEarth * damp * vec3(1.0 - cool, 1.0, 1.0 + cool);
     vec3 albedo = tone < 0.5
-      ? mix(uEarth, uStone, tone * 2.0)
+      ? soil
       : mix(uStone, uStonePale, (tone - 0.5) * 2.0);
 
     // The warm of the apron: a chromaticity and not a level, +0.135 of
     // (r-b)/(r+b) measured inside one band of the frame, where the picture's own
     // corner shading divides out.
     float warm = uApronWarm * apron;
-    albedo *= vec3(1.0 + warm, 1.0, 1.0 - warm);
-    // And the family's own, which is the reference's brown. See pavingSettings.
-    albedo *= uWarmth;
+    // HELD, AND NOT ONLY APPLIED. The small stone below is laid OVER this
+    // albedo, so a stone written in the bare pigment is a stone that wears
+    // neither the stretch's warm nor the family's brown -- which is exactly
+    // what it was, and exactly what «macchie grigie» describes.
+    vec3 tint = vec3(1.0 + warm, 1.0, 1.0 - warm) * uWarmth;
+    albedo *= tint;
 
     // The small stones and the grain, from a tile repeated over the WORLD and
     // turned, because 2.8 cm written into a strip 8 mm a texel comes back a
@@ -1400,23 +1440,33 @@ const PAVING_FRAGMENT = /* glsl */`
     // sixteen buckets the draw is constant on a piece, which is what it is for.
     float slab = floor(tone * 16.0);
     float footprint = max(length(fwidth(vWorld.xz)), 1e-6) * uSheetPerMetre;
-    albedo *= sheetOver(sheetLay(turned * uSheetPerMetre,
+    // AND A FLOOR UNDER IT, BECAUSE A SLAB IS NEVER A HOLE: sheetOver clamps its
+    // own multiplier at nought, and a nought here is an albedo of nought, which
+    // this frame's grade draws as the air's own blue. See sheetFloor in
+    // pavingSettings for the measurement.
+    albedo *= max(uSheetFloor, sheetOver(sheetLay(turned * uSheetPerMetre,
       vec2(fract(slab * 0.2135), fract(slab * 0.5077))),
-      uSheetLayer.x, uSheetGain.x, footprint);
+      uSheetLayer.x, uSheetGain.x, footprint));
 
     // The stone lying on the ground, drawn from its own field so its rim is as
     // round as the frame likes rather than as round as the tile is.
     float inStone = smoothstep(uPebEdge.x, uPebEdge.y, grain.r) * near * uPebMix;
-    albedo = mix(albedo, uStonePale * (uPebLevel.x + uPebLevel.y * grain.g), inStone);
+    albedo = mix(albedo,
+      uStonePale * tint * (uPebLevel.x + uPebLevel.y * grain.g), inStone);
 
     // THE SLOT, ACROSS ITS OWN WIDTH. The depth is nought over all the stone and
     // grows into the joint, so this needs no width of its own: where the joint
     // ENDS is where the depth returns to nought, which is the paving's answer
     // and not the frame's.
+    // ONE MONOTONE EASING AND NOT TWO STEPS, WHICH IS THE «MAPPA TOPOGRAFICA».
+    // Two thresholds on one distance field draw two closed outlines nested
+    // inside each other, and the narrower of them was 3.5 mm on a field stored
+    // 7.8 mm to a texel -- an outline that follows the map's own lattice and not
+    // the edge of a stone. See JOINT_LIP in ../path.js.
     float far = 1.0 - smoothstep(uJointFade.x, uJointFade.y, vDistance);
-    float inSlot = smoothstep(0.0, uJointSoft, depth) * far;
-    float trough = smoothstep(uJointLip.x, uJointLip.y, depth);
-    albedo *= 1.0 - inSlot * (uJointDark.x + (uJointDark.y - uJointDark.x) * trough);
+    float inSlot = smoothstep(0.0, uJointLip.y, depth) * far;
+    float jointDark = uJointDark.x + (uJointDark.y - uJointDark.x) * inSlot;
+    albedo *= 1.0 - inSlot * jointDark;
 
     // THE RELIEF OF THE TASSELLI, AND IT IS THE LIGHT AND NOT THE PIGMENT.
     //
@@ -1457,6 +1507,14 @@ const PAVING_FRAGMENT = /* glsl */`
     // far corridor would come back BRIGHTER than the near one where the joints
     // have stopped being drawn.
     terms *= 1.0 - uReliefWall * (inSlot * lift - uReliefMean * far);
+    // AND THE SKY TERM MAY NOT PASS ONE. The mean above is written so the wall
+    // cannot move the level, which means that off a slot the term is multiplied
+    // by 1.069 -- and one minus the sky term is the share of the hemisphere the
+    // ground's own return comes back through (src/world/face-light.js). Past one
+    // that share is NEGATIVE and the frame subtracts warm light from a surface
+    // that is already dark. A solid angle is not a knob: it is clamped where it
+    // is a solid angle, and the sun term keeps the whole of the contrast.
+    terms.y = min(terms.y, 1.0);
     vec3 light = faceLightOf(terms);
 
     vec3 colour = albedo * light;
@@ -1504,7 +1562,8 @@ export function pavingMaterial(voxel, settings, maps) {
       uWarmth: { value: settings.warmth },
       uJointDark: { value: settings.jointDark },
       uJointLip: { value: settings.jointLip },
-      uJointSoft: { value: settings.jointSoft },
+      uEarthDamp: { value: settings.earthDamp },
+      uSheetFloor: { value: settings.sheetFloor },
       uSkinReach: { value: settings.skinReach },
       uApronWarm: { value: settings.apronWarm },
       uApron: { value: settings.apron },
@@ -1563,6 +1622,8 @@ export function pavingMaterial(voxel, settings, maps) {
     u.uReliefShade.value = settings.reliefShade;
     u.uReliefWall.value = settings.reliefWall;
     u.uReliefMean.value = settings.reliefMean;
+    u.uEarthDamp.value.copy(settings.earthDamp);
+    u.uSheetFloor.value = settings.sheetFloor;
   };
 
   return material;
