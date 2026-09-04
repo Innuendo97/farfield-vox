@@ -1,0 +1,129 @@
+{
+ "side": 16,
+ "sd": 0.16,
+ "sheets": [
+  {
+   "id": "grass-top",
+   "cut": [
+    1065,
+    901,
+    1090,
+    906
+   ],
+   "px": [
+    26,
+    6
+   ],
+   "L": 64.74,
+   "deviazioneInterna": 12.36,
+   "escursione": 44.1,
+   "pianoPerPx": [
+    -0.768,
+    3.522
+   ],
+   "quotaDopoIlRicampionamento": 0.816,
+   "quotaLarghaQuantoLaFaccia": 0.083,
+   "mediaByte": 127.5,
+   "mediaVoluta": 127.5,
+   "mip1x1": 128,
+   "mip1x1Frazione": 0.502
+  },
+  {
+   "id": "grass-side",
+   "cut": [
+    1064,
+    908,
+    1079,
+    919
+   ],
+   "px": [
+    16,
+    12
+   ],
+   "L": 54.26,
+   "deviazioneInterna": 14.19,
+   "escursione": 45.3,
+   "pianoPerPx": [
+    0.541,
+    -1.758
+   ],
+   "quotaDopoIlRicampionamento": 0.845,
+   "quotaLarghaQuantoLaFaccia": 0.036,
+   "mediaByte": 127.5,
+   "mediaVoluta": 127.5,
+   "mip1x1": 128,
+   "mip1x1Frazione": 0.502
+  },
+  {
+   "id": "earth",
+   "cut": [
+    1212,
+    724,
+    1222,
+    736
+   ],
+   "px": [
+    11,
+    13
+   ],
+   "L": 90.48,
+   "deviazioneInterna": 10.17,
+   "escursione": 44.3,
+   "pianoPerPx": [
+    -0.497,
+    1.849
+   ],
+   "quotaDopoIlRicampionamento": 0.877,
+   "quotaLarghaQuantoLaFaccia": 0.047,
+   "mediaByte": 127.5,
+   "mediaVoluta": 127.5,
+   "mip1x1": 128,
+   "mip1x1Frazione": 0.502
+  },
+  {
+   "id": "paving",
+   "cut": [
+    717,
+    847,
+    738,
+    857
+   ],
+   "px": [
+    22,
+    11
+   ],
+   "L": 102.73,
+   "deviazioneInterna": 14.85,
+   "escursione": 77.4,
+   "pianoPerPx": [
+    -0.652,
+    1.611
+   ],
+   "quotaDopoIlRicampionamento": 0.817,
+   "quotaLarghaQuantoLaFaccia": 0.115,
+   "mediaByte": 127.5,
+   "mediaVoluta": 127.5,
+   "mip1x1": 128,
+   "mip1x1Frazione": 0.502
+  },
+  {
+   "id": "flower-band",
+   "spine": 0.2,
+   "top": 0.18,
+   "share": 0.3434,
+   "mediaByte": 87.566,
+   "mediaVoluta": 87.566,
+   "mip1x1": 88,
+   "mip1x1Frazione": 0.3451
+  }
+ ],
+ "strip": {
+  "side": 16,
+  "layers": [
+   "grass-top",
+   "grass-side",
+   "earth",
+   "paving"
+  ]
+ }
+}

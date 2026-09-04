@@ -1,0 +1,42 @@
+{
+  "note": "THE SHEETS ARE CUT OUT OF THE REFERENCE AND NOT DRAWN. Every entry below names a rectangle of the day target -- the picture the whole campaign is judged against -- and tools/materia/foglio.mjs turns it into one sixteen by sixteen grey square: luminance, the least squares plane taken out (which is the light across the face, and not the material), resampled by area, and closed on a mean of a half. What survives is the light and dark INSIDE one face of the reference, which is the thing research C measured to be missing from ours by two to five times.",
+  "target": "C:/workspace-project/farfield-vox/farfield-day-voxel-target.png",
+  "side": 16,
+  "sd": 0.16,
+  "sigma": 5.33,
+  "seedNote": "Ogni foglio porta il seme della sua fase, dichiarato qui e non nel codice: la fase e' l'unica cosa del foglio che non viene dal bersaglio, e una cosa che non viene dal bersaglio si scrive dove si vede. Cambiarlo cambia il foglio e non cambia una sola delle sue misure -- ampiezza per frequenza, media, deviazione -- il che e' anche la prova che la fase non porta informazione.",
+  "sigmaNote": "A THIRD OF A FACE, in texels, and the sheet is the cut minus its own blur at that width. What it takes out is the light and dark AT THE SCALE OF A FACE -- a bowl, a streak, a lighter corner -- and it takes it out because on the reference that component is different on every face and here there is one sheet: laid on ten thousand cubes with eight ways to turn it, a face-wide component is a stamp and a meadow of them is wallpaper. Measured on the first sweep: at the gain that lands the reference's own per cent, the frame read as a pattern. And nothing is lost by it, because this world already draws that scale -- it is the pigment field, two octaves of noise over the world's own XZ, a function of the column, varying from cube to cube exactly as the reference's does. Below a third of a face the pigment says nothing at all, and that is precisely the band C measured us to be missing.",
+  "sdNote": "The sheets carry the SHAPE and one number per family carries the AMOUNT. Every sheet is closed on the same deviation, so the gain in the fragment is the only thing that says how much grain a family has and two families can be compared by their gains alone. The gain is then fitted on our own frame, through our own light and our own tone curve, against the figure C measured on the reference: a per cent read off a photograph and a per cent out of a shader are the same number only after the chain, and this campaign has paid for that lesson twice already.",
+  "sheets": [
+    {
+      "id": "grass-top",
+      "seed": 101,
+      "cut": [1065, 901, 1090, 906],
+      "note": "A lit cube top in the near meadow, 5.9 m out. IT IS SIX PIXELS TALL AND THAT IS THE REFERENCE'S DOING and not a hasty crop: at row 903 the eye looks down at 24.5 degrees, so a top face is foreshortened to 0.41 of its width and a 16.5 px voxel shows under seven pixels of top. Resampled to sixteen, its structure across the face is measured and its structure down the face is interpolated above 2.6 texels. That is the honest limit of what a single photograph taken from six metres can say about the top of a ten centimetre cube."
+    },
+    {
+      "id": "grass-side",
+      "seed": 211,
+      "cut": [1064, 908, 1079, 919],
+      "note": "The flank under that same top, sixteen by twelve, inside its own edges. This is the face the reference mostly SHOWS at the pose that judges: with the eye a degree above the horizon the meadow is a wall of flanks and a scattering of top edges, which is also why C 1.1 reads under one texel per face here and 1.6 to 2.4 in the middle distance."
+    },
+    {
+      "id": "earth",
+      "seed": 307,
+      "cut": [1212, 724, 1222, 736],
+      "note": "The lit face of the bare earth under the meadow at ten metres, cut inside its own borders: eleven by thirteen, clear of the grass column at x 1223 and clear of the flower whose head begins at row 737. AND THE RECTANGLE C 1.2 PUBLISHES FOR THIS FACE IS NOT ONE FACE. Its x 1219-1235 by y 726-741 reproduces every figure that section prints -- RGB 96/85/39, L 83.8, a residual of 24.4 levels which is 29.1% -- but looked at twenty times over it crosses a column of GRASS at x 1223-1225 and lands on a SECOND, shadowed earth face beyond it. The 29.1% is therefore the deviation of a pair of faces with a stripe of meadow between them, not of one face; this one face reads 11.2%, and the shadowed one beside it reads 17.5%. The reading that survives unhurt is the one this unit uses everywhere else: the 3x3 low quartile, which by construction only ever looks inside a face, and which gives this window 2.40% against our 0.51%."
+    },
+    {
+      "id": "paving",
+      "seed": 409,
+      "cut": [717, 847, 738, 857],
+      "note": "The inside of one slab of the near paving, twenty two by eleven, clear of the black crack that runs under it at row 858. The reference's slabs are 20 to 40 px across at six metres -- BIGGER THAN A VOXEL -- so what a sheet can carry is the grain inside a slab and not the lattice of slabs. That lattice is src/world/path.js's law, baked into the two maps the corridor already reads, and it stays exactly where it is: this unit does not own that file."
+    },
+    {
+      "id": "flower-band",
+      "kind": "banda",
+      "band": { "spine": 0.20, "top": 0.18 },
+      "note": "NOT A CUT, AND THE REASON IS THAT THERE IS NOTHING TO CUT: a flower head in the reference is 13 to 21 px across, which is one voxel, and the pistil inside it is a band about five pixels wide. Photographed at that size there is no texel structure to lift. So this sheet is the band U-PIG-2 FITTED, rasterised at sixteen: the spine down the middle of each side and the lid under its top, at the two widths that unit settled between the dossier's two readings of where the yellow sits. It carries a MASK and not a grain -- nought is the pale pigment of a petal, one is the pistil -- so its mean is not a half but the share of a side the band covers, and the far family reads exactly that number to paint a head it draws as a single quad. Cutting it as a sheet moves nothing anybody can see and buys two things: the shape becomes data, so the next reading of the reference can enter without a shader edit, and the softening at range becomes the mip chain's instead of a fwidth, which cannot crawl."
+    }
+  ]
+}
