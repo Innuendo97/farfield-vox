@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
-  BASE_STEP, CENTRE, CHUNK, DISC_RADIUS, FRAMED, MATERIAL, MOUND, NO_COLUMN, SOD, VOXEL,
+  BASE_STEP, BLADE, CENTRE, CHUNK, DISC_RADIUS, FRAMED, MANTO, MATERIAL, MOUND, NO_COLUMN, SUB,
+  VOXEL,
   cellMaterialAt,
   chunkColumns, clearColumn, columnCount, columnSpec, columnTop, createColumns, depthAt,
   framedTally, matAt, meadowMoundAt, moundAt, moundCutAt, onPaving, paintTop, PATH, pathDrop,
@@ -80,7 +81,30 @@ const CENSUS_RADIUS = DISC_RADIUS;
 // The comparison is on DATA and never on a picture (E-V5j): the fingerprint
 // below is of the store's own four arrays.
 
-/** The band the reference's level runs are read at: A §1.2, E-V1j, E-DECISIONI7 A1. */
+// WHAT A LEVEL RUN OF THE TERRAIN IS ALLOWED TO BE, AND IT IS NO LONGER A BAND.
+//
+// THE BAND THAT STOOD HERE WAS THE GRASS MEASURED WITH THE TERRAIN'S RULER, and
+// it was retired by the reading it came from. A 1.2 and E-V1j read the target's
+// level runs at FIVE TO TWELVE CUBES and E-DECISIONI7 A1 = B ratified them;
+// U-FOND-2 built the sods to reproduce them. E-ERBA-A 1.4 then measured the same
+// runs in the unit the thing being measured is actually made of -- the BLADE of
+// 6 cm -- and got p50 0.55 to 0.97 BLADES over four windows: «nel target il
+// manto cambia quota quasi a ogni filo. Non ci sono ciuffi, non ci sono file,
+// non ci sono terrazze». And it named the identity: «il numero 5-12 non e'
+// sbagliato: e' la corsa in NOSTRI voxel di un manto che si scalina ogni 6 cm,
+// vista da uno stimatore che aveva il righello del terreno. Va rifatto il
+// bersaglio, non la misura».
+//
+// So the band moved to the thing it was a measurement of. guard-erba gates the
+// mat's own top run, in blades, at p50 <= 1.2; and what is asserted HERE is the
+// stronger claim the rebuilding actually makes, which no band could say: the
+// terrain has no runs to measure at all, because off a mass it is ONE LEVEL --
+// with the mat on as well as off. That is leg 1, and it is now the whole of
+// leg 2 as well.
+//
+// The runs are still COUNTED and printed, because a terrain that grew a step
+// nobody asked for would show up here first and the printed line is where a
+// reader would see it.
 const RUN_BAND = { low: 5, high: 12 };
 
 // What a level run measures today, printed so a drift is seen the same
@@ -619,16 +643,10 @@ if (process.argv.includes('--self')) {
       caught: seen.flat.offPlaneOffMass === 0 && seen.flat.columns > 0,
     },
     {
-      what: 'a run of three cubes -- the grain that shipped before -- is under the band',
-      caught: 3 < RUN_BAND.low,
-    },
-    {
-      what: 'a disc that is one run from rim to rim is over it',
-      caught: 400 > RUN_BAND.high,
-    },
-    {
-      what: 'the grain measured on the real disc lands inside the band',
-      caught: seen.p50 >= RUN_BAND.low && seen.p50 <= RUN_BAND.high,
+      // The claim that replaced the band: it has to be asserted with the mat ON,
+      // because the mat is what used to move these columns.
+      what: 'a terrain that stepped off the plane with the mat on would be caught',
+      caught: seen.flat.offPlaneOffMass === 0 && seen.flat.columns > 0,
     },
     {
       what: 'a step of two voxels on the open meadow would be caught',
@@ -707,12 +725,11 @@ report.line(`  level runs   p10 ${seen.p10}   p50 ${seen.p50}   p90 ${seen.p90} 
   + `max ${seen.max}   (${seen.runs} runs over ${seen.pairs} pairs)`);
 report.line(`  ${(seen.inBand * 100).toFixed(1)}% of them are ${RUN_BAND.low} to `
   + `${RUN_BAND.high} cubes long`);
-report.check(seen.p50 >= RUN_BAND.low && seen.p50 <= RUN_BAND.high,
-  `half the level runs are ${RUN_BAND.low} to ${RUN_BAND.high} cubes, as the reference reads`,
-  `p50 ${seen.p50} against ${RUN_BAND.low}-${RUN_BAND.high}`);
-report.check(seen.p90 >= RUN_BAND.low && seen.p90 <= RUN_BAND.high,
-  'and nine in ten are inside it too',
-  `p90 ${seen.p90} against ${RUN_BAND.low}-${RUN_BAND.high}`);
+report.line(`  (the band ${RUN_BAND.low}-${RUN_BAND.high} that used to be gated here was the `
+  + 'GRASS read with the terrain\'s ruler: E-ERBA-A 1.4, and guard-erba gates it in blades)');
+report.check(seen.flat.offPlaneOffMass === 0,
+  'the terrain has no level run to measure: off a mass it is ONE LEVEL, mat and all',
+  `${seen.flat.columns} columns, ${seen.flat.offPlaneOffMass} of them off the plane`);
 report.line(`  risers: ${(seen.riser.share * 100).toFixed(2)}% of pairs step at all; of those, `
   + `${(seen.riser.one * 100).toFixed(1)}% by one voxel, `
   + `${(seen.riser.two * 100).toFixed(1)}% by two, ${(seen.riser.three * 100).toFixed(1)}% by three or more`);
@@ -863,7 +880,9 @@ report.line(`  a chunk of the store is ${storeBytes(store)} bytes over `
   + `${store.w * store.d} columns (${(storeBytes(store) / (store.w * store.d)).toFixed(1)} a column)`);
 report.line(`  fingerprint of chunk 0,0   grain on ${fingerprint(0, 0, true, SHIPPED_RADIUS)}`
   + `   grain off ${fingerprint(0, 0, false, SHIPPED_RADIUS)}`);
-report.line(`  SOD cell ${SOD.cell} m, density ${SOD.density}, `
-  + `reach ${SOD.reach.low}-${SOD.reach.high} m, rise ${SOD.rise} voxel`);
+report.line(`  the mat: blade ${BLADE * 100} cm on ${SUB} steps of height, law `
+  + `${MANTO.law.map((v) => v.toFixed(3)).join('/')}, ramp at the corridor `
+  + `${MANTO.verge.low} over ${MANTO.verge.reach} m, blades one by one to ${MANTO.detail} m `
+  + `and in blocks of ${MANTO.block} beyond`);
 
 report.end();

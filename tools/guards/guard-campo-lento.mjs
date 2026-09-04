@@ -110,8 +110,27 @@ const fragment = sorgente.slice(sorgente.indexOf('const FRAGMENT ='),
   sorgente.indexOf('// THE PAVING: THE MATERIAL OF A CORRIDOR'));
 
 /** Il pigmento e' una funzione della COLONNA: la chiamata non porta la quota. */
-export const perColonna = (testo) => /pigmentOf\(cell\.x,\s*cell\.z\)/.test(testo)
-  && !/pigmentOf\([^)]*cell\.y/.test(testo);
+// LA DOMANDA NON E' CAMBIATA, LO E' LA FORMA DELLA RISPOSTA. Quel che questa
+// guardia difende e' che il pigmento sia una funzione della COLONNA e mai
+// dell'altezza del cubo: una cima e il fianco sotto di lei portano una tinta
+// sola, che e' quel che rende compatta la famiglia chiara e riporta il gradino
+// piu' basso a essere la sola scala d'orientamento.
+//
+// PERCHE' IL LETTERALE SI E' MOSSO. U-ERBA-1 ha messo nel mondo una quarta
+// famiglia disegnata a META' PASSO -- il manto di fili da 5 cm -- e per lei
+// `cell` non e' piu' la colonna del mondo, e' il cubo da cinque centimetri. Il
+// frammento risolve la colonna a parte (`column`, che e' `cell.xz` per il
+// rapporto fra il passo del materiale e quello del magazzino: uno per il suolo,
+// un mezzo per il manto) e chiede il pigmento a QUELLA. E' la stessa domanda
+// posta bene: al passo del suolo `column` e' `cell.xz` esatta, e il manto
+// disegna il campo del mondo invece di uno suo alla frequenza doppia.
+//
+// Quel che la riga rifiuta e' invariato: l'altezza non entra, in nessuna forma.
+// Il letterale e' PROPOSTO da U-ERBA-1 (verbale, sezione U-ERBA-1).
+export const perColonna = (testo) => /pigmentOf\(column\.x,\s*column\.y\)/.test(testo)
+  && /vec2 column = floor\(cell\.xz \* uCellRatio\)/.test(testo)
+  && !/pigmentOf\([^)]*cell\.y/.test(testo)
+  && !/column\s*[*+]=?\s*cell\.y/.test(testo);
 
 /** I semi stanno in un posto solo: il GLSL li porta dall'oggetto, non a mano. */
 export const semiCondivisi = (glsl, seeds) => Object.values(seeds)
@@ -143,7 +162,8 @@ if (process.argv.includes('--self')) {
     },
     {
       what: 'and one that reaches the height beside the column is caught',
-      caught: !perColonna('vec3 albedo = pigmentOf(cell.x, cell.z) * f(cell.y);\n pigmentOf(cell.x + cell.y, cell.z)'),
+      caught: !perColonna('vec2 column = floor(cell.xz * uCellRatio);\n'
+        + 'vec3 albedo = pigmentOf(column.x, column.y) * f(cell.y);\n pigmentOf(cell.x + cell.y, cell.z)'),
     },
     {
       what: 'a shader carrying its own copy of a seed is caught',

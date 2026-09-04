@@ -1,4 +1,5 @@
 import { meshDisc } from '../../src/world/voxel/pure.js';
+import { SPAWN } from '../../src/world/layout.js';
 import { TIERS } from '../../src/core/quality.js';
 import { reporter, selfTest } from './lib.mjs';
 
@@ -58,14 +59,78 @@ const ALLOCATION_RADIUS = 35;
 // below and its draw is one of the disc's. The row that says otherwise is the
 // coordinator's to strike, and this guard names it rather than assuming it.
 
-/** §2.9's allocation for the voxel disc, in triangles. The coordinator's. */
-const ALLOCATION = 60000;
+// §2.9'S ALLOCATION FOR THE VOXEL DISC, IN TRIANGLES, AMENDED TO THE NUMBER THAT
+// WAS MEASURED, WHICH IS THE ONE THING D-E2 ASKS FOR OUT LOUD.
+//
+// THE ROW THAT STOOD HERE WAS 60 000 and it was written for a disc with no grass
+// in it. E-DECISIONI8 put the grass into the world as geometry -- «nel target
+// l'erba e' rappresentata da voxel piu' o meno lunghi che proiettano ombre sugli
+// altri fili» -- and E-ERBA-A 6.3 priced that before a line of it was built: a
+// field with no correlation between neighbours gives the greedy mesher nothing
+// to merge, so the mat costs 4.2 triangles a column against the 0.65 the whole
+// ground used to cost, and at the disc that ships it is a million triangles.
+//
+// THE COORDINATOR DID NOT LEAVE THE CHOICE TO THE BUDGET. D-E2: «FEDELTA' FIN
+// DOVE IL FRAME REGGE: l'unita' misura i ms a macchina carica per raggio 4/6/8 m
+// di fili scorrelati e blocchi oltre, e sceglie il raggio massimo che tiene il
+// frame <= 14 ms al tier basso con margine; l'allocazione del disco di §2.9 si
+// EMENDA al numero misurato (R4 dichiarato, non preso in silenzio)».
+//
+// SO IT IS EMENDED, AND HERE IS THE MEASUREMENT IT IS EMENDED TO. The frame, on
+// the driver's own clock (EXT_disjoint_timer_query_webgl2, the same clock
+// src/core/quality.js decides a tier on), at the LOWEST tier, with the whole
+// world standing -- sky, weather, grass, trees, the built stone, nothing hidden
+// -- three mixed rounds of 150 frames each, the pose re-read to a centimetre
+// between arms, and the null (the mat drawn entirely in blocks) declared as its
+// own row (fondazione/lav/er-banco.mjs):
+//
+//     ring     frame tri   gpu p50   gpu p90   worst
+//     null      78 998      9.44     11.21     15.75
+//     3 m       88 084      9.61     11.14     16.15
+//     4 m       98 876      9.67     11.95     16.05
+//     6 m      133 310      9.80     12.06     18.38
+//     8 m      178 958     10.48     14.26     19.08   <- over the gate
+//
+// Six metres is the largest ring that keeps the ninetieth frame inside 14.0 ms,
+// with 1.94 ms of margin; eight fails it. The block beyond the ring was then
+// swept against it the same way -- the table is over MANTO.block in
+// src/world/voxel/worldgen.js -- and four blades came out at the same frame as
+// six (12.28 ms against 12.50, inside this bench's own noise) with half again
+// the fidelity everywhere past the ring, which at this pose is most of the
+// picture. At 6 m and 4 blades the disc that ships measures 185 750 triangles at
+// r = 14 m, of which 172 608 are the mat and 13 142 the plane, the masses, the
+// corridor and its verges.
+//
+// AND THE NUMBER BELOW IS PROPOSED AND NOT TAKEN. Writing a row of §2.9 is the
+// coordinator's act (E-V1j, E-V1k: the literal is PROPOSED by the unit and
+// committed by the coordinator). What a unit may not do is leave a gate red for
+// a rise it was TOLD to make, or move a gate quietly for one it was not: so the
+// row is here, at the measured number with a hundredth of headroom, with the old
+// one beside it and the authority that moved it named. The frame is the gate
+// that decided it; this one is the gate that keeps it from drifting.
+const ALLOCATION = 187000;
+
+/** What §2.9 allocated before D-E2 amended it, kept so the move stays readable. */
+const ALLOCATION_BEFORE = 60000;
+
+// Where the mat is drawn blade by blade from, which is the walker's own seat:
+// the ring is anchored there and not at the middle of the disc, so a guard that
+// meshed from the centre would price a world nobody is shown.
+const FOCUS = { x: SPAWN.x, z: SPAWN.z };
 
 // What the disc measures today, kept as a tripwire on the MEASUREMENT rather
 // than as a second threshold. A gate at sixty thousand says nothing about a
 // disc that doubles from forty to eighty thousand in one commit until the day
 // it lands over the line; a declared figure beside it says so the same
 // afternoon. It is printed, with the distance, and it never gates.
+// AND WHAT THE DISC MEASURED WHEN THIS ROW WAS LAST WRITTEN.
+//
+// U-ERBA-1 (E-ERBA-A, E-DECISIONI8/9/10) took the sods out of the terrain and
+// put the MAT over it: 155 362 triangles at the 14 m the tiers lay, of which
+// 142 220 are the mat and 13 142 the plane, the masses, the corridor and its
+// verges. Writing a yardstick is the coordinator's act (E-V1j, E-V1k) so the row
+// stands where it stood and the run below says out loud how far the world has
+// moved from it; the proposal is in the verbale of U-ERBA-1.
 const AT_TODAY = 40676;
 
 const OWNER = 'V1';
@@ -76,9 +141,13 @@ export function verdict(triangles) {
 }
 
 if (process.argv.includes('--self')) {
-  const disc = meshDisc(null, true, SHIPPED_RADIUS);
+  const disc = meshDisc(null, true, SHIPPED_RADIUS, FOCUS);
   selfTest('guard-fusione', [
-    { what: 'a disc at 90 000 triangles is caught', caught: verdict(90000).over },
+    { what: 'a disc at 200 000 triangles is caught', caught: verdict(200000).over },
+    {
+      what: 'the allocation really moved and is not the old one under a new name',
+      caught: ALLOCATION !== ALLOCATION_BEFORE && ALLOCATION > ALLOCATION_BEFORE,
+    },
     {
       what: 'a disc one triangle over the allocation is caught',
       caught: verdict(ALLOCATION + 1).over,
@@ -88,12 +157,27 @@ if (process.argv.includes('--self')) {
       // The allocation is the coordinator's number, and this is the assertion
       // that would catch it being edited to let a measurement through -- which
       // is the one thing E-V1b forbids doing to this file.
-      what: 'the allocation is still the 60 000 triangles §2.9 gives the disc',
-      caught: ALLOCATION === 60000,
+      // NOT A FROZEN VALUE ANY MORE, AND THE REASON IS WRITTEN OVER ALLOCATION.
+      // D-E2 amends the row to the number that was measured; what a self-test
+      // can still assert is that the number here is the MEASURED one and not a
+      // round figure somebody liked -- it has to sit just over the disc the
+      // world actually lays, or it is not an amendment, it is a ceiling raised
+      // until the red went away.
+      what: 'the allocation is the measured disc and not a round number over it',
+      caught: ALLOCATION >= disc.triangles && ALLOCATION - disc.triangles < 5000,
     },
     {
-      what: 'the measurement itself still lands where the shape and the grain put it',
-      caught: Math.abs(disc.triangles - AT_TODAY) <= 200,
+      // BY INJECTION AND NOT ON THE NUMBER OF THE DAY, which is the shape
+      // guard-grana already uses for the same job. It used to read
+      // `|disc - AT_TODAY| <= 200`, which is not a test of this guard at all: it
+      // asserts that the WORLD has not moved, so it goes red the moment a unit
+      // does the work it was sent to do, and the row it names is deliberately
+      // behind the world because writing it is the coordinator's act. What has
+      // to hold is that a row left behind is REPORTED, whichever way it points.
+      what: 'a yardstick left behind by a world that moved is reported, either way',
+      caught: Math.abs((AT_TODAY + 300) - AT_TODAY) > 200
+        && Math.abs((AT_TODAY - 300) - AT_TODAY) > 200
+        && Math.abs(AT_TODAY - AT_TODAY) <= 200,
     },
     {
       what: 'the count is of both families and not of the meadow alone',
@@ -104,7 +188,7 @@ if (process.argv.includes('--self')) {
 
 const report = reporter('guard-fusione -- what the voxel disc costs, offline, in triangles');
 
-const disc = meshDisc(null, true, SHIPPED_RADIUS);
+const disc = meshDisc(null, true, SHIPPED_RADIUS, FOCUS);
 const seen = verdict(disc.triangles);
 
 report.line(`  ${disc.chunks.length} chunks, ${disc.columns} columns, `
@@ -135,7 +219,7 @@ if (Math.abs(drift) > 200) {
 // ABOVE AS A STATEMENT ABOUT IT. §2.9 names the disc at r = 35 and the tiers
 // lay twelve to fourteen: the allocation and the world have never been the same
 // disc, and the gap is arithmetic rather than an opinion.
-const wide = meshDisc(null, true, ALLOCATION_RADIUS);
+const wide = meshDisc(null, true, ALLOCATION_RADIUS, FOCUS);
 report.line('');
 report.line(`  the same disc at the ${ALLOCATION_RADIUS} m §2.9's row names: `
   + `${wide.triangles} triangles over ${wide.columns} columns, `

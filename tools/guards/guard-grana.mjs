@@ -1,4 +1,5 @@
-import { SOD, meshDisc } from '../../src/world/voxel/pure.js';
+import { MANTO, meshDisc } from '../../src/world/voxel/pure.js';
+import { SPAWN } from '../../src/world/layout.js';
 import { TIERS } from '../../src/core/quality.js';
 import { reporter, selfTest } from './lib.mjs';
 
@@ -12,41 +13,55 @@ const SHIPPED_RADIUS = Math.max(...TIERS.map((t) => t.voxelDiscRadius));
 
 // THE TWO DIALS THAT MOVE THE GEOMETRY OF THE WORLD WHILE LOOKING LIKE TASTE.
 //
-// THE DIALS CHANGED AND THE JOB DID NOT. What this guard froze was the tuft:
-// a value noise correlated over 0.30 m, thresholded to plus or minus a voxel,
-// evaluated once per column. That mechanism is gone -- U-V1-F2 swept it in both
-// directions and reported that no setting of it brings the meadow's level runs
-// anywhere near the reference's, and the rebuilding replaced it with the SODS:
-// plates of turf on a lattice, one voxel proud of the plane, in
-// src/world/voxel/worldgen.js.
+// THE DIALS CHANGED TWICE AND THE JOB HAS NOT CHANGED ONCE. What this guard
+// first froze was the TUFT -- a value noise thresholded to plus or minus a voxel
+// -- and then the SODS, plates of turf on a lattice standing one voxel proud of
+// the plane. Both are gone, and E-DECISIONI8 is why in the committente's own
+// words: «e' per questo che il terreno era perfettamente pianeggiante: stavate
+// analizzando i fili d'erba come rilievi». Both mechanisms were readings of the
+// GRASS as terrain. The terrain is one level (guard-piano) and the grass is a
+// MAT of its own at half the step, whose law is gated by guard-erba.
 //
-// What is frozen here are the two numbers of the new mechanism that do exactly
-// what the old two did -- decide the geometry of the whole world while reading
-// as an art choice in any review:
+// So what is frozen here are the two numbers of the new mechanism that do
+// exactly what the old two did -- decide the geometry of the whole world while
+// reading as an art choice in any review:
 //
-//   SOD.cell     how far apart the plates are seated, which is what sets how
-//                LONG a level run is. It is the correlation length under a
-//                different name and it moves the quads of the disc the same way.
-//   SOD.density  how many of those seats carry a plate, which is what sets how
-//                MUCH of the meadow stands a step over the rest -- and with it
-//                how many walls the mesher has to raise.
+//   MANTO.detail  how far from the walker the blades are drawn ONE BY ONE, in
+//                 metres, before the mat is sampled in blocks. It is the single
+//                 largest lever on the price of this world: E-ERBA-A 6.3
+//                 measured that a field with no correlation gives the greedy
+//                 mesher nothing to merge, so every metre of this ring is paid
+//                 for in triangles and it grows with the square.
+//   MANTO.block   how many blades share one height beyond that ring, which is
+//                 what the ring's own price is divided by.
 //
-// SO THIS GUARD DOES NOT RE-MEASURE THEM. It asserts that they are still the
-// values the sweep behind the delivery was run at. A guard that re-derived the
-// "right" value would agree with whatever the file said and catch nothing; what
-// is wanted is that nobody moves them WITHOUT SAYING SO -- which means moving
-// this file too, in the same commit, where a reviewer can see it.
+// AND THE VALUE IS THE ANSWER TO A MEASUREMENT AND NOT A TASTE, WHICH IS WHY IT
+// IS FROZEN RATHER THAN RE-DERIVED. D-E2, the coordinator's answer to «fin dove
+// arrivano i fili», is «fidelity as far as the frame holds»: U-ERBA-1 laid the
+// disc at 3, 4, 6 and 8 metres on a loaded machine at the lowest tier, read the
+// frame on the driver's own clock, and took the largest that keeps it inside
+// 14.0 ms. The table is in the verbale; the answer is six metres, and eight is
+// what fails it. A guard that re-derived the "right" value would agree with
+// whatever the file said and catch nothing; what is wanted is that nobody moves
+// them WITHOUT SAYING SO -- which means moving this file too, in the same
+// commit, where a reviewer can see it.
 //
-// AND IT PRINTS WHAT THE GRAIN COSTS, every run. The frozen constants stop the
+// AND IT PRINTS WHAT THE MAT COSTS, every run. The frozen constants stop the
 // dial from being turned; they say nothing about the ground underneath it
-// moving, and the grain's share of the disc is the number that would show that
+// moving, and the mat's share of the disc is the number that would show that
 // first. It is printed rather than gated because the disc is V1's to rewrite
 // and the total is already gated by guard-fusione: what this adds is that the
 // drift is SEEN while it happens rather than found afterwards.
 
 // The values the sweep was run at, restated here on purpose: two files have to
-// change together or the guard goes red.
-const FROZEN = { cell: 0.60, density: 0.78 };
+// change together or the guard goes red. PROPOSED by U-ERBA-1 (verbale) against
+// the frame table it measured; the row that stood here was the sods' 0.60 m cell
+// and 0.78 density.
+const FROZEN = { detail: 6, block: 4 };
+
+// Where the ring is anchored: the walker's own seat, which is also the pose the
+// campaign judges on. See the note over `focus` in src/world/layers/v1-suolo.js.
+const FOCUS = { x: SPAWN.x, z: SPAWN.z };
 
 // What the tuft cost when the engine was promoted into the foundation, as the
 // oldest yardstick the printed figure is read against.
@@ -87,22 +102,28 @@ const AT_APPROVED = { on: 1.5362, off: 0.1903, carpet: 1.3459 };
 // 3.8 m: 0.3290 grained, 0.0524 bare, 0.2766 for the grain alone.
 // U-FOND-5 (E-FOND-PIANO9): the framed seats come from the reference and the
 // stone's footprint answers the plane: 0.3335 grained, 0.0501 bare, 0.2833.
+// U-ERBA-6 -- this unit, U-ERBA-1 (E-ERBA-A, E-DECISIONI8/9/10): the sods fell
+// out of the terrain and the MAT went in over it, at half the step, with a field
+// of intensity that thins it into the corridor and a band of bare earth that
+// thins with it. The row it proposes is 1.4154 for the mat over a bare 0.1078,
+// and writing it is the coordinator's act, so the row below stands where it
+// stood and every run says out loud how far the world has moved from it.
 const AT_TODAY = { on: 0.3335, off: 0.0502, carpet: 0.2833 };
 
 /** Whether a constant is still the frozen one. Bit for bit: these are dials. */
 export const frozen = (actual, expected) => actual === expected;
 
 if (process.argv.includes('--self')) {
-  const on = meshDisc(null, true, SHIPPED_RADIUS);
-  const off = meshDisc(null, false, SHIPPED_RADIUS);
+  const on = meshDisc(null, true, SHIPPED_RADIUS, FOCUS);
+  const off = meshDisc(null, false, SHIPPED_RADIUS, FOCUS);
   const carpet = on.quadsPerColumn - off.quadsPerColumn;
   selfTest('guard-grana', [
-    { what: 'a lattice cell moved to 0.42 m is caught', caught: !frozen(0.42, FROZEN.cell) },
-    { what: 'a lattice cell nudged to 0.6000001 is caught', caught: !frozen(0.6000001, FROZEN.cell) },
-    { what: 'a density moved from 0.78 to 0.62 is caught', caught: !frozen(0.62, FROZEN.density) },
+    { what: 'a ring widened to 8 m is caught', caught: !frozen(8, FROZEN.detail) },
+    { what: 'a ring nudged to 6.0000001 is caught', caught: !frozen(6.0000001, FROZEN.detail) },
+    { what: 'a block moved from 4 blades to 6 is caught', caught: !frozen(6, FROZEN.block) },
     {
       what: 'the frozen pair passes',
-      caught: frozen(0.60, FROZEN.cell) && frozen(0.78, FROZEN.density),
+      caught: frozen(6, FROZEN.detail) && frozen(4, FROZEN.block),
     },
     {
       // The mechanism this guard exists for, tested on itself rather than on
@@ -122,7 +143,7 @@ if (process.argv.includes('--self')) {
       caught: Math.abs(AT_APPROVED.carpet - AT_TODAY.carpet) >= 5e-4,
     },
     {
-      what: 'the grain really is what the third argument switches off',
+      what: 'the mat really is what the third argument switches off',
       caught: on.quadsPerColumn > off.quadsPerColumn * 2,
     },
   ]);
@@ -136,28 +157,30 @@ export function drifted(carpet) {
 
 const report = reporter('guard-grana -- the two dials of the grain, and what it costs today');
 
-report.check(frozen(SOD.cell, FROZEN.cell),
-  'SOD.cell is the value the sweep was run at',
-  `${SOD.cell} against ${FROZEN.cell}`);
-report.check(frozen(SOD.density, FROZEN.density),
-  'SOD.density is the value the sweep was run at',
-  `${SOD.density} against ${FROZEN.density}`);
+report.check(frozen(MANTO.detail, FROZEN.detail),
+  'MANTO.detail is the radius the frame was measured at',
+  `${MANTO.detail} m against ${FROZEN.detail}`);
+report.check(frozen(MANTO.block, FROZEN.block),
+  'MANTO.block is the block the same table was read with',
+  `${MANTO.block} blades against ${FROZEN.block}`);
 
-const on = meshDisc(null, true, SHIPPED_RADIUS);
-const off = meshDisc(null, false, SHIPPED_RADIUS);
+const on = meshDisc(null, true, SHIPPED_RADIUS, FOCUS);
+const off = meshDisc(null, false, SHIPPED_RADIUS, FOCUS);
 const carpet = on.quadsPerColumn - off.quadsPerColumn;
 const share = carpet / off.quadsPerColumn;
 
 report.line('');
-report.line(`  the disc with the grain  ${on.quadsPerColumn.toFixed(4)} q/col`
+report.line(`  the disc with the mat    ${on.quadsPerColumn.toFixed(4)} q/col`
   + `   (at the foundation ${AT_FOUNDATION.on.toFixed(4)})`);
 report.line(`  the plane and its masses ${off.quadsPerColumn.toFixed(4)} q/col`
   + `   (at the foundation ${AT_FOUNDATION.off.toFixed(4)})`);
-report.line(`  THE GRAIN ALONE          ${carpet.toFixed(4)} q/col`
+report.line(`  THE MAT ALONE            ${carpet.toFixed(4)} q/col`
   + `   (at the foundation, when it was the tuft, ${AT_FOUNDATION.carpet.toFixed(4)})`
   + `, ${(share * 100).toFixed(0)}% of the rest`);
 report.line(`  and in the unit the budget gates on: ${on.triangles} triangles`
-  + `   (${off.triangles} without the grain)`);
+  + `   (${off.triangles} without the mat)`);
+report.line(`  per BLADE column, which is the mat's own denominator: `
+  + `${(on.quadsPerBlade * 2).toFixed(3)} triangles over ${on.blades} of them`);
 
 // WHAT THE COMMITTENTE APPROVED, BESIDE WHAT IS ON THE CARD, EVERY RUN. Not a
 // gate: the price is his to move and V1's to spend. What this refuses to allow
@@ -173,11 +196,11 @@ if (Math.abs(approved) >= 5e-4) {
 
 const gap = drifted(carpet);
 if (gap !== null) {
-  report.note(`the grain's share stands ${gap > 0 ? '+' : ''}${gap.toFixed(4)} q/col from what `
-    + `this file says ships (${AT_TODAY.carpet.toFixed(4)}). U-FOND-2 replaced the tuft with `
-    + 'the sods, took the bank against the stone to nought and started counting the bare '
-    + `earth's own mesh: the row proposed for this file is ${carpet.toFixed(4)} over a bare `
-    + `${off.quadsPerColumn.toFixed(4)}, and writing it is the coordinator's`);
+  report.note(`the mat's share stands ${gap > 0 ? '+' : ''}${gap.toFixed(4)} q/col from what `
+    + `this file says ships (${AT_TODAY.carpet.toFixed(4)}). U-ERBA-1 took the sods out of the `
+    + 'terrain and put the MAT over it, at half the step: the row proposed for this file is '
+    + `${carpet.toFixed(4)} over a bare ${off.quadsPerColumn.toFixed(4)}, and writing it is `
+    + "the coordinator's");
 }
 
 report.end();

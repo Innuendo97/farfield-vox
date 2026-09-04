@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
 import { flowerCensus, flowerField } from '../../src/world/vegetation.js';
 import { flowerLightPoints, groundHeightAt } from '../../src/world/contracts.js';
-import { columnTop, EMPTY } from '../../src/world/voxel/worldgen.js';
+import { columnTop, EMPTY, mantoAt } from '../../src/world/voxel/worldgen.js';
 import { VOXEL } from '../../src/world/voxel/columns.js';
+import { voxelSettings } from '../../src/world/voxel/material.js';
 import { reporter, selfTest } from './lib.mjs';
 
 // THE MEADOW HAS A WHITE FAMILY, IT IS THE TARGET'S WHITE, AND NO WALKER CLIMBS
@@ -48,6 +49,9 @@ const L = (v) => 0.2126 * v.x + 0.7152 * v.y + 0.0722 * v.z;
 // src/world/face-light.js forbids in as many words.
 const SOFFITTO = 1.05;
 const { pale, pistil, cyan, stalk } = censo.pigments;
+// Il livello del PRATO, dal posto che lo pubblica: lo stelo ha un colore suo da
+// E-DECISIONI9.1 e non e piu il righello del bianco. Vedi il passo qui sotto.
+const meadowAlbedo = voxelSettings().albedo;
 const canale = (v) => Math.max(v.x, v.y, v.z);
 
 report.check(canale(pale) <= SOFFITTO, 'the pale is still a pigment',
@@ -76,8 +80,25 @@ report.check(cyan.z > cyan.x * 2, 'the cyan is cool and is not a second white',
 // THE FLOWER FOLLOWS THE MEADOW'S LEVEL AND NOT ITS HUE, which is the design
 // the file states in those words: if V1 takes the meadow down, the white comes
 // down with it or the measured step stops being the step.
-report.check(Math.abs(L(pale) / L(stalk) - censo.paleStep) < 1e-6,
-  'the pale is the seat\'s own level times the step', `${(L(pale) / L(stalk)).toFixed(4)}x`);
+// AND THE LEVEL IT IS MEASURED AGAINST IS THE MEADOW'S OWN, WHICH IS WHAT THIS
+// LINE ALWAYS MEANT AND NO LONGER SAYS BY ACCIDENT. It used to read the level
+// off the STALK, because the stalk was the meadow's pigment unchanged and the
+// two were the same triple. E-DECISIONI9.1 gave the stalk a colour of its own --
+// «un verde piu' intenso, leggermente piu' scuro, MAI MARRONE» -- so reading the
+// step through it now measures the stalk's own 12% and calls it the white's.
+// The seat publishes the meadow, and the seat is what the sentence above names.
+report.check(Math.abs(L(pale) / L(meadowAlbedo) - censo.paleStep) < 1e-6,
+  'the pale is the seat\'s own level times the step',
+  `${(L(pale) / L(meadowAlbedo)).toFixed(4)}x`);
+
+// AND THE STALK IS GREEN AND CAN NEVER GO BROWN, which is the constraint of
+// E-DECISIONI9.1 and the one thing about that family a gate outside a shader can
+// honestly assert. Brown is red over green; this triple has 2.08 of green to one
+// of red where the meadow has 1.66 and the bare earth of the same world has 0.61.
+report.check(stalk.y > stalk.x * 1.8 && stalk.z <= 1e-9,
+  'the stalk is a deeper green than the meadow and carries no red to go brown with',
+  `green over red ${(stalk.y / stalk.x).toFixed(2)}, level `
+  + `${(L(stalk) / L(meadowAlbedo)).toFixed(3)}x the meadow`);
 
 // ------------------------------------------------------------- the pistil
 //
@@ -135,9 +156,19 @@ for (const f of campo) {
   // own arithmetic for the top of that column. The stalk carries the head that
   // far above it and no further, so the two are one equation and it either
   // holds exactly or the flower is standing somewhere else.
+  // AND THE MAT IS BETWEEN THE TWO NOW, WHICH IS THE TARGET'S OWN READING AND NOT
+  // A TOLERANCE EITHER. E-ERBA-A 4 measured two heads at 30 cm and at 15 cm over
+  // the plane and read the difference as the grass under them: «i fiori stanno su
+  // colonne d'erba di altezza diversa», which is E-DECISIONI8.4's «i fiori sono
+  // voxel d'erba + voxel bocciolo col pistillo». So the equation gained one term
+  // and stayed an equation: the plane, the mat, the stalk, half a head. mantoAt
+  // is worldgen's own statement of the mat's height, the same one the store is
+  // written from, so this is still the world checking the flower and not the
+  // flower checking itself.
   const suolo = groundHeightAt(f.x, f.z);
+  const manto = mantoAt(f.x, f.z);
   const scala = f.size / censo.head.nominal;
-  const atteso = suolo + censo.stalk.tall * scala + f.size / 2;
+  const atteso = suolo + manto + censo.stalk.tall * scala + f.size / 2;
   const scarto = Math.abs(f.y - atteso);
   if (scarto > peggiore) peggiore = scarto;
   // AND NOT A VOXEL A WALKER COULD TREAD ON. A flower is drawn and never built:
@@ -157,9 +188,22 @@ for (const f of campo) {
   // in it that could read as an edge.
   const piede = f.y - f.size / 2 - censo.stalk.tall * scala;
   const cima = f.y + f.size / 2;
-  if (piede < suolo - 1e-9) sepolti++;
-  if (cima > suolo + 2 * VOXEL + 1e-9) sospesi++;
-  if (cima - suolo > pianta) pianta = cima - suolo;
+  // NOT SUNK INTO THE MAT EITHER: the foot of the stalk sits ON the blade under
+  // it, so the surface a flower may not be buried in is the mat's top and not
+  // the plane's.
+  if (piede < suolo + manto - 1e-9) sepolti++;
+  // AND THE PLANT IS MEASURED FROM THE TOP OF THE MAT, WHICH IS THE SAME BODY
+  // STATEMENT IN THE WORLD THAT EXISTS. The reading is «a step sweep has nothing
+  // in it that could read as an edge»: the sweep reads groundHeightAt, which is
+  // the PLANE and stays the plane by the committente's own word (E-DECISIONI9.2,
+  // «il camminatore attraversa erba e fiori passandoci attraverso»). What the
+  // two voxels bound is the PLANT -- stalk and head -- and the mat under it is
+  // the world it grows out of, not part of it. Measured from the plane the
+  // tallest flower stands 43 cm and would fail a bound that has nothing to do
+  // with it; measured from its own foot it is 14 cm, which is inside two voxels
+  // as it always was.
+  if (cima > suolo + manto + 2 * VOXEL + 1e-9) sospesi++;
+  if (cima - suolo - manto > pianta) pianta = cima - suolo - manto;
 }
 
 report.check(fuori === 0, 'not one head stands past the meadow',
@@ -169,8 +213,9 @@ report.check(peggiore < 1e-9, 'every head stands on the top of its own column',
 report.check(sepolti === 0, 'no head is sunk into the ground it grows from', `${sepolti}`);
 report.check(costruiti === 0, 'not one head is built into the world it stands in',
   `${campo.length} columns read back from worldgen, all at the height the head was placed on`);
-report.check(sospesi === 0, 'the whole plant is inside two voxels of that ground',
-  `the tallest is ${(pianta * 100).toFixed(1)} cm, and the walker passes through it`);
+report.check(sospesi === 0, 'the whole plant is inside two voxels of the mat it stands on',
+  `the tallest is ${(pianta * 100).toFixed(1)} cm over its own foot, `
+  + 'and the walker passes through all of it');
 
 // HOW THICK THE MEADOW IS SOWN, read off the field the world actually holds
 // rather than off the constant that asks for it: the two differ by the density

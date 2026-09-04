@@ -4,8 +4,8 @@ import {
 } from '../../src/world/terrain-field.js';
 import { groundHeightAt, materialAt } from '../../src/world/contracts.js';
 import {
-  BASE_STEP, MATERIAL, PATH, VOXEL, columnSpec, meadowMoundAt, moundAt, onPaving,
-  pathDrop, pathVerge,
+  BASE_STEP, MANTO, MATERIAL, PATH, VOXEL, columnSpec, mantoAt, meadowMoundAt, moundAt,
+  onPaving, pathDrop, pathVerge,
 } from '../../src/world/voxel/pure.js';
 import { reporter, selfTest } from './lib.mjs';
 
@@ -62,8 +62,23 @@ import { reporter, selfTest } from './lib.mjs';
 const RUN = { from: STAIRS.z + STAIRS.tread * STAIRS.steps, to: 12.0 };
 
 // How far the grass beside the stone has to stand proud of it, in voxels.
-// A 1.3, and the committente's word on it is E-DECISIONI7 A2.
+// A 1.3, and the committente's word on it is E-DECISIONI7 A2. It is the MAT that
+// answers this now and not the terrain: see the note in survey().
 const PROUD = { low: 1, high: 2 };
+
+// WHERE THE BROWN IS COUNTED, in metres out from the edge of the paving, and it
+// is the band the target's own ramp was read over (E-ERBA-A's instrument, run by
+// U-ERBA-1: fondazione/lav/er-campo.py). Nothing here says how much brown there
+// has to be at any one of them -- the number would be a fit against a share of
+// PIXELS and this is a count of COLUMNS. What it says is that the share falls,
+// which is the whole of «diradamento graduale» and the one thing about it that
+// is a property of the world rather than of a frame.
+const BANDS = [
+  { mid: 0.15, what: 'at the kerb' },
+  { mid: 0.45, what: 'half a metre out' },
+  { mid: 0.90, what: 'a metre out' },
+  { mid: 2.20, what: 'past the ramp' },
+];
 
 // And over the apron, where the paving has come up to the meadow's own floor:
 // nought where the meadow is plain, one where a plate of grain has lifted it.
@@ -104,6 +119,7 @@ export function survey() {
     apronProudHigh: -99,
     vergeLow: 99,
     vergeHigh: -99,
+    bands: BANDS.map(() => ({ earth: 0, all: 0 })),
     level: 0,
     levelAt: null,
     floor: 0,
@@ -128,8 +144,41 @@ export function survey() {
       while (columnSpec(i, j, true).mat === MATERIAL.EARTH) { verge++; i += dir; }
       if (verge < seen.vergeLow) seen.vergeLow = verge;
       if (verge > seen.vergeHigh) seen.vergeHigh = verge;
-      // `i` now stands on the first column of meadow beyond the corridor, and
-      // how far it stands over the paving is the whole of the reading.
+      // AND HOW THE BROWN THINS PAST THAT RUN, WHICH IS THE NEW FACT ABOUT THIS
+      // SEAM AND THE ONE THE COMMITTENTE ASKED FOR.
+      //
+      // E-DECISIONI10, nota, his words: «il sentiero sembra piu' largo nel target
+      // per come si interseca al prato e all'erba: da noi ha netti confini verdi
+      // ai margini -- il problema e' il diradamento/infittimento graduale». So
+      // the corridor's own band of bare earth is still the two to four columns
+      // PATH.verge writes, and past it a SHARE of the columns is earth as well,
+      // falling to nothing over MANTO.verge.reach. Counting consecutive columns
+      // cannot see that -- a run of brown that happens to be long is not a wide
+      // verge, it is a draw -- so what is counted here is the share, band by
+      // band, and what is asserted below is that it FALLS.
+      for (let k = 0; k < BANDS.length; k++) {
+        const x = (i0 + 0.5) * VOXEL + dir * (BANDS[k].mid + pathEdge(z, dir));
+        const c = cell(x);
+        if (meadowMoundAt(x, z) > 0 || moundAt(x, z) > 0) continue;
+        const m = columnSpec(c, j, true).mat;
+        if (m === MATERIAL.AIR || m === MATERIAL.STONE || m === MATERIAL.PATH) continue;
+        seen.bands[k].all++;
+        if (m === MATERIAL.EARTH) seen.bands[k].earth++;
+      }
+      // AND THE READING IS TAKEN AT THE KERB, WHICH IS A PLACE AND NOT A COLUMN
+      // THE WALK HAPPENS TO STOP AT.
+      //
+      // It used to be «the first column of meadow beyond the corridor», and that
+      // was the kerb while the brown ended at a column. It does not: past the
+      // written verge a share of the columns is bare earth too, thinning out
+      // over a metre and a half (E-DECISIONI10, and the bands below), so the
+      // first meadow column can be anywhere in that metre and the reading would
+      // be taken wherever the draw put it. The kerb is where the corridor's own
+      // law puts it -- the stone, plus the verge it writes -- so that is where
+      // this stands.
+      i = i0;
+      while (onPaving((i + 0.5) * VOXEL, z)) i += dir;
+      i += dir * pathVerge(z);
       // ON THE MEADOW AND NOT ON A MASS. A mound is allowed to stand against
       // the corridor -- the reference shows its cut banks facing the eye and
       // the corridor, which is E-DECISIONI4 and the reason `EARTH.toPath`
@@ -137,7 +186,25 @@ export function survey() {
       // four voxel mound beside it is a different object.
       const gx = (i + 0.5) * VOXEL;
       if (meadowMoundAt(gx, z) > 0 || moundAt(gx, z) > 0) continue;
-      const proud = columnSpec(i, j, true).top - columnSpec(i - dir, j, true).top;
+      // AND WHAT STANDS PROUD IS THE GRASS AND NOT THE GROUND, WHICH IS WHERE
+      // THIS READING BELONGED ALL ALONG.
+      //
+      // A 1.3 reads «l'erba sporge 1-2 voxel sulla pietra» and this line used to
+      // answer it out of the TERRAIN, because the terrain carried a grain of
+      // sods that stood a voxel over the plane. E-DECISIONI8 retired that
+      // reading and E-ERBA-A 1.2 named the identity in as many words: «che e',
+      // nella vecchia unita', l'erba sporge 1-2 voxel sulla pietra -- la lettura
+      // di A 1.3 ... le due letture non erano in disaccordo: erano la stessa
+      // misura in due unita'». The terrain beside the stone is the PLANE now,
+      // exactly one voxel over the paving and never two; what stands one to two
+      // voxels proud is the mat of blades standing on it, and mantoAt is the
+      // law's own word for how tall it is.
+      // AND IT IS MEASURED FROM THE PAVING'S OWN LEVEL and not from whatever the
+      // column before it turned out to be: with the brown thinning, the column
+      // before the kerb is earth at the MEADOW's level as often as it is verge
+      // at the stone's, and a difference taken against it would read nought.
+      const proud = columnSpec(i, j, true).top - (BASE_STEP - pathDrop(z))
+        + Math.round(mantoAt(gx, z) / VOXEL);
       if (pathDrop(z) === 0) {
         if (proud < seen.apronProudLow) seen.apronProudLow = proud;
         if (proud > seen.apronProudHigh) seen.apronProudHigh = proud;
@@ -189,7 +256,7 @@ if (process.argv.includes('--self')) {
     },
     {
       what: 'a verge of one column a side, or of five',
-      caught: seen.vergeLow >= PATH.verge.min && seen.vergeHigh <= PATH.verge.max,
+      caught: pathVerge(0) >= PATH.verge.min && pathVerge(0) <= PATH.verge.max,
     },
     {
       what: 'the reference\'s taper answered by a width that does not taper',
@@ -247,9 +314,27 @@ for (const t of TAPER) {
 report.line(`  the stone alone: ${(widthAt(9.2) - 2 * pathVerge(9.2)).toFixed(1)} voxels near, `
   + `${(widthAt(4.0) - 2 * pathVerge(4.0)).toFixed(1)} through the middle, `
   + `${(widthAt(-7.0) - 2 * pathVerge(-7.0)).toFixed(1)} in the apron`);
-report.check(seen.vergeLow >= PATH.verge.min && seen.vergeHigh <= PATH.verge.max,
-  `the verges are ${PATH.verge.min} to ${PATH.verge.max} columns of bare earth a side`,
-  `${seen.vergeLow} to ${seen.vergeHigh} over the run`);
+report.check(pathVerge(9.2) >= PATH.verge.min && pathVerge(9.2) <= PATH.verge.max
+  && pathVerge(0) >= PATH.verge.min && pathVerge(0) <= PATH.verge.max
+  && pathVerge(-7) >= PATH.verge.min && pathVerge(-7) <= PATH.verge.max,
+  `the corridor writes ${PATH.verge.min} to ${PATH.verge.max} columns of bare earth a side`,
+  `${pathVerge(9.2)} near, ${pathVerge(0)} through the middle, ${pathVerge(-7)} in the apron`);
+
+// AND THE BROWN THINS PAST THAT BAND INSTEAD OF STOPPING AT IT.
+report.line('');
+const share = seen.bands.map((b) => (b.all ? b.earth / b.all : 0));
+for (let k = 0; k < BANDS.length; k++) {
+  report.line(`  bare earth ${BANDS[k].what.padEnd(18)} `
+    + `${(share[k] * 100).toFixed(1)}% of ${seen.bands[k].all} columns`);
+}
+report.check(share.every((v, k) => k === 0 || v <= share[k - 1] + 1e-9),
+  'and past it the bare earth THINS instead of stopping -- no step back up',
+  share.map((v) => `${(v * 100).toFixed(1)}%`).join(' -> '));
+report.check(share[0] > 0.5 && share[share.length - 1] < 0.02,
+  'from most of the kerb to none of the open meadow, over the ramp MANTO states',
+  `${(share[0] * 100).toFixed(1)}% at the kerb, `
+  + `${(share[share.length - 1] * 100).toFixed(1)}% at ${BANDS[BANDS.length - 1].mid} m, `
+  + `ramp ${MANTO.verge.reach} m`);
 
 // ------------------------------------------------------------------- 3
 report.line('');
