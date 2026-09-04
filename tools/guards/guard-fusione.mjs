@@ -131,7 +131,7 @@ const FOCUS = { x: SPAWN.x, z: SPAWN.z };
 // verges. Writing a yardstick is the coordinator's act (E-V1j, E-V1k) so the row
 // stands where it stood and the run below says out loud how far the world has
 // moved from it; the proposal is in the verbale of U-ERBA-1.
-const AT_TODAY = 185258;
+const AT_TODAY = 184636;
 
 const OWNER = 'V1';
 

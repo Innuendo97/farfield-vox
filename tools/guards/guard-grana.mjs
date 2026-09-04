@@ -110,7 +110,7 @@ const AT_APPROVED = { on: 1.5362, off: 0.1903, carpet: 1.3459 };
 // stood and every run says out loud how far the world has moved from it.
 // U-ERBA-1 (E-ERBA1): the sods left the terrain and the MAT of grass went in
 // over it at half the step: 1.4154 with the mat over a bare 0.1078.
-const AT_TODAY = { on: 1.5190, off: 0.1060, carpet: 1.4130 };
+const AT_TODAY = { on: 1.5140, off: 0.1062, carpet: 1.4078 };
 
 /** Whether a constant is still the frozen one. Bit for bit: these are dials. */
 export const frozen = (actual, expected) => actual === expected;
