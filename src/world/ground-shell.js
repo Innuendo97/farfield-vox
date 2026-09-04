@@ -148,9 +148,22 @@ function buildShell(radius) {
       const b = i * SPOKES + s1;
       const c = (i + 1) * SPOKES + s1;
       const d = (i + 1) * SPOKES + s;
-      // Wound so the face looks up, the way the mesher winds a top.
-      indices[k++] = a; indices[k++] = d; indices[k++] = c;
-      indices[k++] = a; indices[k++] = c; indices[k++] = b;
+      // WOUND SO THE FACE LOOKS UP, AND IT USED TO SAY THAT AND DO THE OTHER.
+      //
+      // The two triangles were a-d-c and a-c-b, and on a ring laid with
+      // x = cos(angle), z = sin(angle) that is CLOCKWISE seen from above: the
+      // geometric normal of every one of them was -R' * sin(dAngle) on y, which
+      // is DOWN. The material is FrontSide, so the whole sheet was culled from
+      // every pose a walker can stand in -- two hundred metres of meadow drawn
+      // as sky, with only a strip a few pixels tall surviving at the horizon
+      // where the projected triangles are so nearly degenerate that the sign of
+      // their area is noise. The stored vertex normal said UP the whole time,
+      // which is why nothing lit wrong: it was not shaded, it was not there.
+      //
+      // Swapping the two corners of each triangle turns the geometric normal
+      // over. It costs nothing and it changes no vertex.
+      indices[k++] = a; indices[k++] = c; indices[k++] = d;
+      indices[k++] = a; indices[k++] = b; indices[k++] = c;
       quads++;
     }
   }
