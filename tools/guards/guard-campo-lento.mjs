@@ -207,10 +207,29 @@ report.check(semiCondivisi(PIGMENT_GLSL, PIGMENT_SEEDS),
   'the shader reads its lattice seeds from the twin and does not keep its own',
   Object.entries(PIGMENT_SEEDS).map(([k, v]) => `${k} ${v.join('/')}`).join(', '));
 
-report.check(!/sampler2D/.test(fragment),
-  'and it still costs no texture read: the meadow declares no sampler at all',
-  'the field is rebuilt in the fragment from the cube\'s own integer cell, so the greedy '
-  + 'fusion keeps the 2.3-3.3x it is worth');
+// IL PIGMENTO NON SI LEGGE DA UNA TEXTURE, ED E' QUESTA LA FRASE -- non «il
+// frammento non dichiara nessun sampler».
+//
+// La riga diceva la seconda perche' finche' il prato non ne aveva nessuno le due
+// erano la stessa cosa. Non lo sono piu': U-ERBA-2 ha costruito quel che
+// E-DECISIONI9.3 chiede -- «ombre vere che seguono il sole» -- come una mappa
+// cotta al worldgen e letta in XZ, e il mandato di quell'unita' la nomina alla
+// lettera: «la mappa e' una texture letta in XZ, non un attributo». Quel che
+// questa guardia difende non lo tocca: la mappa non porta un colore, non entra
+// in pigmentOf, e -- la ragione vera del divieto -- non e' un ATTRIBUTO, quindi
+// la fusione greedy non perde un rettangolo.
+//
+// Quindi la gamba si stringe a quel che protegge, con l'elenco di quel che il
+// prato puo' leggere SCRITTO qui e non dedotto: la grana di E-TEX1 e l'ombra
+// del manto. Un sampler che non sia uno di quei due e' rosso come prima.
+const SAMPLER_AMMESSI = ['tSheets', 'tShade'];
+const sampler = [...fragment.matchAll(/uniform\s+sampler\w*\s+(\w+)/g)].map((m) => m[1]);
+const estranei = sampler.filter((n) => !SAMPLER_AMMESSI.includes(n));
+report.check(estranei.length === 0,
+  'and the only maps the meadow reads are the grain and the mat\'s own shadow',
+  estranei.length ? `it also declares ${estranei.join(', ')}`
+    : `${sampler.join(', ') || 'none'} -- the field itself is still rebuilt in the fragment `
+      + 'from the cube\'s own integer cell, so the greedy fusion keeps the 2.3-3.3x it is worth');
 
 // ------------------------------------------------------- la gamba del quadro
 const frame = process.argv.find((a) => a.startsWith('--frame='));

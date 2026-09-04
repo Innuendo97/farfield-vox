@@ -110,7 +110,13 @@ const AT_APPROVED = { on: 1.5362, off: 0.1903, carpet: 1.3459 };
 // stood and every run says out loud how far the world has moved from it.
 // U-ERBA-1 (E-ERBA1): the sods left the terrain and the MAT of grass went in
 // over it at half the step: 1.4154 with the mat over a bare 0.1078.
-const AT_TODAY = { on: 1.5140, off: 0.1062, carpet: 1.4078 };
+// AND IT MOVED AGAIN, BY 0.0455, AND THE REASON IS THE WIDTH OF THE BLADE.
+// U-ERBA-2 built E-DECISIONI10 G3 -- «larghezza da 3/4 a 1 voxel completo» --
+// under a threshold on the intensity, where the mat is thin and the greedy had
+// nothing left to merge anyway. A blade narrower than its own cell is a box: it
+// leaves the merge, and 1 543 of them over the disc are what this figure carries.
+// The row is PROPOSED here and writing it is the coordinator's (E-V1j, E-V1k).
+const AT_TODAY = { on: 1.5529, off: 0.0996, carpet: 1.4533 };
 
 /** Whether a constant is still the frozen one. Bit for bit: these are dials. */
 export const frozen = (actual, expected) => actual === expected;

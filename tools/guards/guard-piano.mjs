@@ -111,7 +111,12 @@ const RUN_BAND = { low: 5, high: 12 };
 // afternoon rather than on the day it leaves the band.
 // U-ERBA-1 (E-ERBA1): the terrain is one level, so a run at level is the disc
 // itself; what is printed here is the mat's own rung, not the ground's.
-const AT_TODAY = { p50: 13, p90: 130 };
+// AND THEY MOVED BY TWO AND BY ONE, WHICH IS THE MAT'S OWN WIDTH AND NOT THE
+// TERRAIN. U-ERBA-2 let a blade stand narrower than its cell where the mat is
+// thin (E-DECISIONI10 G3, MANTO.slim), so a run of the MAT ends wherever one of
+// them stands apart. The terrain under it has not moved a voxel -- the leg above
+// still reads one level off a mass -- and the row is PROPOSED here.
+const AT_TODAY = { p50: 11, p90: 129 };
 
 /** The tallest step the open meadow is allowed, in voxels. A mass is not the meadow. */
 const OPEN_STEP = 1;
@@ -843,7 +848,9 @@ const seats = seatCensus(SHIPPED_RADIUS);
 report.line('');
 report.line(`  the reference seats ${FRAMED.length} masses in frame `
   + `(worldgen.js FRAMED); of them ${framedTally.laid} are laid, `
-  + `${framedTally.pushed} pushed off the corridor, ${framedTally.dropped} refused`);
+  + `${framedTally.overlapping} overlap the corridor (E-SENT3.2: a seat of the 
+    reference is a DATUM and is not pushed -- the clause is the lattice's), 
+    ${framedTally.dropped} refused`);
 for (const r of seats.rows) {
   report.line(`    x ${r.f.x.toFixed(2).padStart(6)}  z ${r.f.zFoot.toFixed(2).padStart(5)}  `
     + `${r.f.rise} voxel  ->  ${r.foot ? `z ${r.foot.z.toFixed(2)}  ${r.foot.h} voxel  `

@@ -108,7 +108,26 @@ const ALLOCATION_RADIUS = 35;
 // row is here, at the measured number with a hundredth of headroom, with the old
 // one beside it and the authority that moved it named. The frame is the gate
 // that decided it; this one is the gate that keeps it from drifting.
-const ALLOCATION = 187000;
+//
+// AND IT IS EMENDED A SECOND TIME, BY THE SAME RULE AND WITH THE SAME AUTHORITY.
+// U-ERBA-2 built the width E-DECISIONI10 G3 asks for -- «larghezza da 3/4 a 1
+// voxel completo» -- which U-ERBA-1 priced and did not take. A blade narrower
+// than its own cell is a box and not a heightfield, so it leaves the greedy, and
+// the table that chose the threshold it is drawn at is over MANTO.slim in
+// src/world/voxel/worldgen.js:
+//
+//     threshold on the intensity   slim blades   disc, triangles
+//              0.00 (off)                    0       183 802
+//              0.12                        809       186 670
+//              0.20                      1 172       187 862
+//              0.30                      1 543       189 382   <- what ships
+//
+// 0.30 is the half metre from the kerb the committente called «i dintorni del
+// sentiero»; 0.12 is one column of it. The disc measures 189 382 at r = 14 m and
+// the row is proposed at 190 000, the measured number with a third of a per cent
+// of headroom, exactly as the row above it was. THE GATE THAT DECIDED IT IS
+// STILL THE FRAME and it is in the verbale of U-ERBA-2.
+const ALLOCATION = 190000;
 
 /** What §2.9 allocated before D-E2 amended it, kept so the move stays readable. */
 const ALLOCATION_BEFORE = 60000;
@@ -131,7 +150,7 @@ const FOCUS = { x: SPAWN.x, z: SPAWN.z };
 // verges. Writing a yardstick is the coordinator's act (E-V1j, E-V1k) so the row
 // stands where it stood and the run below says out loud how far the world has
 // moved from it; the proposal is in the verbale of U-ERBA-1.
-const AT_TODAY = 184636;
+const AT_TODAY = 189382;
 
 const OWNER = 'V1';
 

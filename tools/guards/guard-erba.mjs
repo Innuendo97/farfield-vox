@@ -1,7 +1,8 @@
 import {
-  BLADE, BLADES_PER_VOXEL, MANTO, MATERIAL, SUB, VOXEL,
-  bladeAtColumn, bladeHeightAt, columnSpec, mantoAt, mantoIntensity, meshDisc,
+  BLADE, BLADES_PER_VOXEL, CHUNK, MANTO, MATERIAL, NO_COLUMN, SUB, SUN_STEPS, VOXEL,
+  bladeAtColumn, bladeHeightAt, chunkColumns, columnSpec, mantoAt, mantoIntensity, meshDisc,
 } from '../../src/world/voxel/pure.js';
+import SKY from '../../assets-src/sky/sky.json' with { type: 'json' };
 import { TIERS } from '../../src/core/quality.js';
 import { SPAWN } from '../../src/world/layout.js';
 import { bladeSettings } from '../../src/world/voxel/material.js';
@@ -9,6 +10,29 @@ import { reporter, selfTest } from './lib.mjs';
 
 /** The pair the mat's own material carries, so this file cannot quote a stale one. */
 const BLADE_FOOT = bladeSettings().base;
+
+// The seal's own bearing, read here and not derived, so the leg below and the
+// injections beside it compare the bake against the FILE and not against a
+// second copy of it.
+const [sunX, sunY, sunZ] = SKY.day.sun.vector;
+const major = Math.max(Math.abs(sunX), Math.abs(sunZ));
+
+/**
+ * The march, on a row of upwind tops handed in, so the rule can be injected.
+ *
+ * The same three lines the bake walks (bakeShade in worldgen.js): the highest
+ * upwind top dropped by how far the beam has climbed to reach it, floored at the
+ * column's own floor. `tops` is what stands one, two ... eight blades upwind, in
+ * SUB-steps above the floor.
+ */
+function shadeOf(tops, floor) {
+  let line = floor;
+  SUN_STEPS.forEach((st, k) => {
+    const h = floor + tops[k] - st.rise;
+    if (h > line) line = h;
+  });
+  return line;
+}
 
 // THE GRASS IS MADE OF VOXELS, AND THIS IS WHAT SAYS SO IN NUMBERS.
 //
@@ -182,6 +206,46 @@ if (process.argv.includes('--self')) {
       what: 'a ramp that steps back up is caught',
       caught: !falls([0.9, 0.5, 0.7, 0.1]),
     },
+    // AND THE SHADOW'S OWN FOUR, injected on the arithmetic and not on a
+    // picture: the two senses of the map's rule, a bearing that has drifted from
+    // the seal, and the width outside its band.
+    {
+      what: 'a line with nothing upwind tall enough to cast it is caught',
+      caught: Math.floor(shadeOf([0, 0, 0, 0, 0, 0, 0, 0], 0)) < 12,
+    },
+    {
+      what: 'and a column left lit under a blade that stands over it is caught',
+      caught: Math.floor(shadeOf([20, 0, 0, 0, 0, 0, 0, 0], 0)) > 0,
+    },
+    {
+      what: 'a mat that really is shaded by its upwind neighbour is not caught either way',
+      caught: Math.floor(shadeOf([20, 0, 0, 0, 0, 0, 0, 0], 0))
+        === Math.floor(20 - SUN_STEPS[0].rise),
+    },
+    {
+      what: 'a march along a bearing the seal does not carry is caught',
+      // Due east, one blade a step, with the seal's own climb: the same test the
+      // leg below applies, on a march the seal does not describe.
+      caught: ![{ di: 1, dj: 0, rise: SUB * sunY / major }].every((st, k) => (
+        st.di === Math.round((k + 1) * sunX / major)
+        && st.dj === Math.round((k + 1) * sunZ / major)
+        && Math.abs(st.rise - (k + 1) * SUB * sunY / major) < 1e-9)),
+    },
+    {
+      what: 'and the march the seal does carry passes it',
+      caught: SUN_STEPS.every((st, k) => (st.di === Math.round((k + 1) * sunX / major)
+        && st.dj === Math.round((k + 1) * sunZ / major)
+        && Math.abs(st.rise - (k + 1) * SUB * sunY / major) < 1e-9)),
+    },
+    {
+      what: 'a blade written down at the whole of its cell is caught, because that is '
+        + 'not a blade that stands apart',
+      caught: ![8].every((w) => w >= MANTO.slim.low && w < MANTO.slim.high),
+    },
+    {
+      what: 'and one at three quarters is not',
+      caught: [6].every((w) => w >= MANTO.slim.low && w < MANTO.slim.high),
+    },
     {
       what: 'the null: the same square read twice gives the same census',
       caught: JSON.stringify(census(mat(OPEN.x, OPEN.z, 120)))
@@ -311,11 +375,129 @@ report.line('');
 report.check(Math.abs(FOOT.fall - 0.16) < 1e-9,
   'the foot of the mat loses the 0.16 E-ERBA-A 1.6 measured on the target, and not a fitted number',
   `${FOOT.fall}`);
-report.line(`  and it keeps ${FOOT.decay} of that loss one blade higher, so the rungs read `
-  + `${[0, 1, 2, 3, 4].map((r) => (1 - FOOT.fall * FOOT.decay ** r).toFixed(3)).join(' ')}`);
-report.line('  against E-ERBA-A 1.6 on the target: 0.844 at the foot, 0.931-0.997 at 5-7 cm, '
-  + '1.015 above it');
+report.line(`  and it keeps ${FOOT.decay} of that loss for every blade of depth, so a face `
+  + 'reads, from the top of its own blade downward, '
+  + `${[0, 1, 2, 3, 4].map((r) => (1 - FOOT.fall * (1 - FOOT.decay ** r)).toFixed(3)).join(' ')}`);
+report.line('  against E-ERBA-A 1.6 on the target: 1.015 above 7 cm, 0.931-0.997 at 5-7 cm, '
+  + '0.844 at the foot of a face that reaches the plane');
+report.line('  AND IT IS COUNTED FROM THE MAT AND NOT FROM THE PLANE (U-ERBA-2): the depth '
+  + 'comes off the map, so a blade on the crown of a mound carries the fall a blade on the '
+  + 'plane carries, which U-ERBA-1 had to declare as an approximation');
 report.line('  the flank over the top, and how far the bounce carries it, are readings of a '
   + 'PIXEL: verbale U-ERBA-1');
+
+// ------------------------------------------------------------------- 9
+//
+// THE SHADOW THE BLADES THROW ON EACH OTHER, GATED ON THE MAP AND NOT ON A
+// PICTURE.
+//
+// E-DECISIONI9.3, the committente's word: «ombre vere che seguono il sole».
+// U-ERBA-2 baked them at worldgen -- a march toward the sun through the mat's
+// own heights, one line a blade column -- and what a guard can hold offline is
+// not how dark the frame came out but whether the map IS a shadow: a column may
+// only carry a line above its own floor if there is something upwind of it tall
+// enough to put it there, and it MUST carry one when there is. Both senses,
+// because one of them alone passes on an empty map and the other alone passes on
+// a map that shades everything.
+//
+// AND THE BEARING IS THE SEAL'S, WHICH IS THE OTHER HALF. The march is read
+// straight out of assets-src/sky/sky.json here, the same file src/core/sky.js
+// hands the world's light through, and compared against the steps the bake
+// actually walked: a map cooked along any other bearing is a second opinion
+// about the hour, and this campaign spent a session removing one of those.
+report.line('');
+const wantSteps = SUN_STEPS.every((s, k) => s.di === Math.round((k + 1) * sunX / major)
+  && s.dj === Math.round((k + 1) * sunZ / major)
+  && Math.abs(s.rise - (k + 1) * SUB * sunY / major) < 1e-9);
+report.check(wantSteps,
+  'the mat is shaded along the bearing the seal carries and not a second one',
+  `elevation ${SKY.day.sun.elevation} deg, azimuth ${SKY.day.sun.azimuth} deg -- `
+  + `${SUN_STEPS.length} steps of ${(SUN_STEPS[0].rise / SUB * BLADE * 100).toFixed(2)} cm of climb`);
+
+// One chunk of the disc that ships, read as the page reads it, with its skirt:
+// every column of its own square is checked against its own upwind neighbours.
+// AND IT IS THE CHUNK THE WALKER STANDS IN, not chunk nought: the ring of full
+// detail is anchored on the spawn, so a chunk at the origin would be read
+// entirely in blocks and the width below would have nothing to find.
+const SHADE_CX = Math.floor(FOCUS.x / VOXEL / CHUNK);
+const SHADE_CZ = Math.floor(FOCUS.z / VOXEL / CHUNK);
+const shadeChunk = chunkColumns(SHADE_CX, SHADE_CZ, CHUNK, true, SHIPPED_RADIUS, FOCUS);
+const bw = shadeChunk.w * BLADES_PER_VOXEL;
+const bo = (SHADE_CX * CHUNK - shadeChunk.ox) * BLADES_PER_VOXEL;
+const boz = (SHADE_CZ * CHUNK - shadeChunk.oz) * BLADES_PER_VOXEL;
+const rung = BLADES_PER_VOXEL * SUB;
+const floorOf = (i, j) => {
+  const t = shadeChunk.top[(j >> 1) * shadeChunk.w + (i >> 1)];
+  return t === NO_COLUMN ? -1 : (t + 1) * rung;
+};
+let shaded = 0;
+let unjustified = 0;
+let missed = 0;
+let sampled = 0;
+for (let j = 0; j < CHUNK * BLADES_PER_VOXEL; j++) {
+  for (let i = 0; i < CHUNK * BLADES_PER_VOXEL; i++) {
+    const a = i + bo;
+    const b = j + boz;
+    const f = floorOf(a, b);
+    if (f < 0) continue;
+    sampled++;
+    const line = shadeChunk.shade[b * bw + a];
+    // What the march would have found, asked again here from the store rather
+    // than taken from the bake: the highest upwind top, dropped by the climb.
+    let want = f;
+    for (const st of SUN_STEPS) {
+      const ai = a + st.di;
+      const aj = b + st.dj;
+      if (ai < 0 || aj < 0 || ai >= bw || aj >= shadeChunk.d * BLADES_PER_VOXEL) continue;
+      const g = floorOf(ai, aj);
+      if (g < 0) continue;
+      // `sky` already carries the floor: it is the top of the blade the LAW puts
+      // on that column, in world SUB-steps, which is exactly what the march
+      // walks through.
+      const top = shadeChunk.sky[aj * bw + ai];
+      if (top - st.rise > want) want = top - st.rise;
+    }
+    if (line > f) {
+      shaded++;
+      // A LINE WITH NOTHING TO CAST IT is the failure this sense catches.
+      if (Math.floor(want) < line) unjustified++;
+    } else if (Math.floor(want) > f) missed++;
+  }
+}
+report.line(`  ${sampled} blade columns of one chunk, ${shaded} of them with the sun `
+  + `stopped above their own floor (${(100 * shaded / sampled).toFixed(1)}%)`);
+report.check(shaded > sampled * 0.2 && unjustified === 0 && missed === 0,
+  'every shaded column has something upwind tall enough to shade it, and every column '
+  + 'that has one is shaded',
+  `${unjustified} lines with nothing to cast them, ${missed} columns left lit under a `
+  + 'blade that stands over them');
+
+// ------------------------------------------------------------------- 10
+//
+// AND THE WIDTH OF THE BLADE, WHICH IS E-DECISIONI10 G3 AND WHICH U-ERBA-1
+// PRICED AND DID NOT TAKE: «larghezza da 3/4 a 1 voxel completo».
+report.line('');
+let slim = 0;
+let widest = 0;
+let narrowest = 8;
+let slimHot = 0;
+for (let j = 0; j < CHUNK * BLADES_PER_VOXEL; j++) {
+  for (let i = 0; i < CHUNK * BLADES_PER_VOXEL; i++) {
+    const w = shadeChunk.slim[(j + boz) * bw + (i + bo)];
+    if (!w) continue;
+    slim++;
+    if (w > widest) widest = w;
+    if (w < narrowest) narrowest = w;
+    const x = (SHADE_CX * CHUNK * BLADES_PER_VOXEL + i + 0.5) * BLADE;
+    const z = (SHADE_CZ * CHUNK * BLADES_PER_VOXEL + j + 0.5) * BLADE;
+    if (mantoIntensity(x, z) >= MANTO.slim.below) slimHot++;
+  }
+}
+report.check(slim > 0 && narrowest >= MANTO.slim.low && widest < MANTO.slim.high
+  && slimHot === 0,
+  'a blade stands between three quarters and the whole of its cell, and only where the '
+  + 'mat is thin enough for it to be free',
+  `${slim} of one chunk stand apart, ${narrowest}/8 to ${widest}/8 wide, none of them where `
+  + `the intensity is over ${MANTO.slim.below}`);
 
 report.end();

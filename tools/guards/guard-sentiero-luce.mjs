@@ -109,6 +109,22 @@ export function writesTerms(source) {
  */
 const RELIEF = /uRelief[A-Z]/;
 
+// AND A SECOND BENDER, WHICH IS THE MAT'S OWN SHADOW, DECLARED THE SAME WAY.
+//
+// U-ERBA-2 built what E-DECISIONI9.3 asked for -- «ombre vere che seguono il
+// sole» -- as a map baked at worldgen along the bearing the seal carries, and a
+// fragment standing under that line has less SUN. That is a material bending
+// the pair it was given, which is exactly what face-light.js says a material
+// may do and exactly what the corridor's relief already does above.
+//
+// SO IT IS ALLOWED THE SAME WAY AND NOT BY WIDENING THE RULE. The line has to
+// name one of the shadow's own uniforms -- the map or how much sun survives
+// under it -- so what still cannot happen is the thing this guard exists for: a
+// fragment that decides for itself where the sun is. The bearing is not in this
+// file at all; it is in assets-src/sky/sky.json, under the seal, and the map is
+// baked from there.
+const SHADE = /uShade[A-Z]|tShade/;
+
 export function lightsTheJoint(source) {
   const bad = [];
   // Every assignment whose left hand side is the light or the terms.
@@ -121,6 +137,9 @@ export function lightsTheJoint(source) {
     // Or the pair being bent by the relief, through a uniform that says so --
     // and never with the joint riding along on it.
     if (RELIEF.test(line) && !/uJoint/.test(line)) continue;
+    // Or the pair being bent by the mat's own shadow, through a uniform that
+    // says so, and never with the joint riding along on it either.
+    if (SHADE.test(line) && !/uJoint/.test(line)) continue;
     bad.push({ line, at: lineOf(source, hit.index) });
   }
   return bad;
