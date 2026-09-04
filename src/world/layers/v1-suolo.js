@@ -99,7 +99,14 @@ const layer = {
     // are one of the three families this layer's engine draws. An asset is
     // needed where it is eaten -- which is also why the ground's own four have
     // left this list: see the head of the file.
-    needs: ['path-joint', 'path-tone', 'path-grain'],
+    // AND THE SHEETS OF THE SOIL, which is this layer's own and not a guest.
+    // 1 247 bytes of grey squares delivered, one to a family and orientation,
+    // cut out of
+    // the day target: the grain INSIDE a face, which research C measured to be
+    // two to five times short on every material of the ground and which no
+    // arithmetic on a cell can produce, because it is a picture of what a face
+    // is made of rather than a field of where the face stands.
+    needs: ['path-joint', 'path-tone', 'path-grain', 'soil-sheets'],
 
     /**
      * @param {object} assets  keyed by asset id, plus what the hub knows
@@ -139,6 +146,10 @@ const layer = {
             grain: assets['path-grain'],
           }
           : null,
+        // Nought is a world with no grain inside its faces, which is the world
+        // that shipped yesterday rather than a broken one: the engine builds a
+        // neutral array of its own and the gain goes to nought with it.
+        sheets: assets['soil-sheets'] || null,
       });
       // ONE GROUP AND NOT TWENTY SIX MESHES, because the hub hangs what a
       // layer built at the moment it built it and the chunks are still being

@@ -6,6 +6,7 @@ import {
   earthSettings, pavingMaterial as makePaving, pavingSettings, runInWorker,
   voxelMaterial, voxelSettings,
 } from './voxel/index.js';
+import { sheetArray } from './voxel/sheet.js';
 
 // THE MEADOW AS CUBES, STANDING IN THE WORLD RATHER THAN ON A BENCH.
 //
@@ -75,6 +76,9 @@ const chunkKey = (cx, cz) => `${cx},${cz}`;
  *                                   which is what it costs to not do this.
  * @param {number}  options.radius   how far the ten centimetre ground reaches,
  *                                   in metres. The tier's, never this file's.
+ * @param {object}  options.sheets   the delivered strip of grey squares, one to
+ *                                   a family: the grain inside a face. Nought
+ *                                   draws the world that shipped without one.
  * @returns {object} the group to hang, the floor the cubes make, and the numbers
  */
 export function createGroundVoxel({
@@ -82,6 +86,7 @@ export function createGroundVoxel({
   boundingFromWorker = true,
   radius = DISC_RADIUS,
   paving = null,
+  sheets = null,
 } = {}) {
   const group = new Group();
   group.name = 'ground-voxel';
@@ -97,7 +102,13 @@ export function createGroundVoxel({
   // chunk list is written. Behind the opening scene nobody is looking at the
   // world while that happens.
 
-  const settings = voxelSettings();
+  // THE GRAIN'S ARRAY, CUT ONCE AND SHARED BY THE THREE FAMILIES. It is one
+  // upload of 1 024 bytes for the whole world, and it is sliced here rather
+  // than in each material for the reason every shared thing in this file is
+  // shared: three copies of one texture is three uploads and three sampler
+  // bindings for one picture that never changes.
+  const sheetArrayTexture = sheetArray(sheets);
+  const settings = { ...voxelSettings(), sheet: sheetArrayTexture };
   // ONE material for the whole disc and not one per chunk, which is what keeps
   // it a run of draws through a single program instead of a program switch a
   // chunk. Where each chunk stands is already in its own model matrix.
@@ -110,7 +121,7 @@ export function createGroundVoxel({
   // face in the world is ONE, and it is small enough that the frustum has
   // nothing to gain by cutting it up (v1-suolo/forma/f1/f2-campo.json: the bare
   // family is 6.5% of the faces).
-  const earthTune = earthSettings();
+  const earthTune = { ...earthSettings(), sheet: sheetArrayTexture };
   const earthMaterial = voxelMaterial(VOXEL, earthTune);
 
   // AND A THIRD FOR THE CORRIDOR, gathered the same way and for the same
@@ -120,7 +131,7 @@ export function createGroundVoxel({
   // rectangles are simply not hung. That is a picture with no paving in it and
   // it is the honest failure -- the alternative is grass drawn over the stone,
   // which is a wrong picture rather than a missing one.
-  const pavingTune = paving ? pavingSettings() : null;
+  const pavingTune = paving ? { ...pavingSettings(), sheet: sheetArrayTexture } : null;
   const pavingMaterial = paving ? makePaving(VOXEL, pavingTune, paving) : null;
   // The bare faces as they arrive, chunk by chunk, in the chunk's own frame:
   // they are moved into the world's when the last one has landed.

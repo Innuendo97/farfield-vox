@@ -291,9 +291,19 @@ function buildTexture(entry, srcPath, outPath, env) {
     }
     ktx[at + 1] = format;
   }
+  // AND ONE ENTRY MAY REFUSE THE MIP CHAIN, which reads like a saving and is a
+  // correctness rule. A texture that ARRIVES as one picture and is cut into
+  // pieces on the page -- an array of small squares travelling as a strip -- has
+  // no mip level of its own that means anything: level one of the strip averages
+  // the last row of a layer with the first row of the one under it, which is
+  // exactly the filtering across a boundary the array was chosen to prevent. Its
+  // chain is generated per slice, after the cut, by the driver. Anything drawn
+  // AS it arrives says nothing here and keeps its chain, because a texture
+  // without one aliases the moment it is minified.
+  const mip = entry.mipmap === false ? [] : ['--generate-mipmap'];
   run(toolchain.ktx.exe, [
     'create',
-    '--generate-mipmap',
+    ...mip,
     ...resize,
     ...ktx,
     srcPath,
