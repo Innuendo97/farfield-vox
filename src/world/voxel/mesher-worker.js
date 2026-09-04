@@ -115,6 +115,12 @@ self.onmessage = (event) => {
       chunk.paving.indices.buffer,
       chunk.mat.positions.buffer, chunk.mat.normals.buffer,
       chunk.mat.indices.buffer,
+      // AND THE MAT'S SHADOW, the one buffer of this handover that is not
+      // geometry: a byte a blade column saying where the sun stops reaching it,
+      // marched at worldgen along the bearing the seal carries. It is moved and
+      // not copied like everything else here, and the page lays it into one
+      // texture over the whole disc.
+      chunk.shade.data.buffer,
     ]);
   }
   self.postMessage({
