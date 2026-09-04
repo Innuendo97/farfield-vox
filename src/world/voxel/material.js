@@ -27,9 +27,22 @@ import {
   JOINT_SOFT, PATH_SKIN, PEB_EDGE, PEB_LEVEL, PEB_MIX, SKIN_REACH, TUNING,
   EARTH as PATH_EARTH, STONE as PATH_STONE, STONE_PALE as PATH_STONE_PALE,
 } from '../path.js';
+// THE GRAIN INSIDE A FACE, AND ITS SEAT IS A FILE OF ITS OWN because three
+// materials read it -- the meadow, the bare earth and the corridor -- and a
+// face coordinate spelled out three times is three chances for two families to
+// disagree about where the middle of a face is. src/world/voxel/sheet.js holds
+// the array, the coordinate and the one line of arithmetic that puts them
+// together, and it holds the analytic sheen beside them, off, for the stone
+// that is not this unit's to light.
+import {
+  FAMILY_LAYERS, LAYER, PAVING_SHEET_METRES, SHEEN_GLSL, SHEET_GLSL, STONE_SHINE,
+  sheetArray, sheetUniforms,
+} from './sheet.js';
 
-// The material of a cube, and the five things the reference was measured to be
-// made of. None of them is a texture and none of them is a byte on the wire.
+// The material of a cube, and the six things the reference was measured to be
+// made of. Five of them are arithmetic and none of those is a byte on the wire;
+// the sixth is one sheet of sixteen grey texels a face, which is 1 247 bytes
+// delivered for the whole world and one texture read a fragment.
 //
 // THE ONE RULE THE BUDGET RESTS ON: nothing that varies per voxel is ever
 // stored. The tint, the joint and the lightened arris are rebuilt here out of
@@ -174,6 +187,58 @@ export function voxelSettings() {
     // the pigment -- at the solved albedo the estimator reads B/R 0.43 against
     // the target's 0.43, where the old pigment read 0.68.
     arrisLean: 0.33,
+    // ------------------------------------------------------------------------
+    // THE GRAIN INSIDE THE FACE, WHICH IS THE ONE THING THIS FRAGMENT HAD NONE
+    // OF -- not a little of, none.
+    //
+    // C 0 measured it on the same window with the same instrument on both
+    // pictures: the near meadow carries 1.16% of luminance inside a face on the
+    // reference and 0.43% here, the middle distance 2.57 against 1.17. Its map
+    // of the detector says the rest without a number -- on the reference it is
+    // lit everywhere, on ours only along the seams between cubes, and inside a
+    // face it is black. That is not a shortfall of variation: measured over the
+    // same window the TOTAL spread is the same on both pictures, 25.7-28.1%
+    // there against 28.6-33.5% here. It is variation at the wrong SCALE. Ours
+    // is all between the cubes and none of it is inside them, which is exactly
+    // the reading the committente gave in his own words.
+    //
+    // So: a sixteen texel grey square a face, mean a half, multiplying the
+    // pigment and not replacing it, out of an array indexed by family and
+    // orientation. The whole arithmetic and the whole argument for its shape
+    // are in src/world/voxel/sheet.js; these are the knobs it takes.
+    //
+    // THE ARRAY ITSELF ARRIVES FROM OUTSIDE. It is a delivered asset and this
+    // file has no loader; the layer that declares the need hands it over. Left
+    // at nought the material builds a neutral array of its own and turns the
+    // term off, so a world with no sheet is the world that shipped yesterday
+    // rather than a black one.
+    sheet: null,
+    // WHICH SLICE A TOP FACE AND A FLANK READ.
+    sheetLayers: new Vector2(...FAMILY_LAYERS.meadow),
+    // AND HOW MUCH EACH IS WORTH, WHICH IS THE FITTED NUMBER.
+    //
+    // It is fitted on OUR frame through OUR chain and not computed from the
+    // reference's per cent, for the reason this campaign has now paid for
+    // twice: a per cent read off a photograph has the reference's light, its
+    // exposure and its tone curve in it, and the same modulation of an albedo
+    // arrives at our own pixel as a different per cent. So the sheet carries
+    // the shape at a fixed deviation and this pair carries the amount, swept at
+    // the pose that judges and read with C's own instrument.
+    //
+    // 1.6, AND IT IS THE READING AND NOT A PREFERENCE. Swept at the pose that
+    // judges over the meadow's own window -- 200 by 50 pixels chosen on the
+    // FAMILY'S MASK, so that every pixel in it is grass and none of it is a
+    // flower or a bank -- and read with the 3x3 low quartile:
+    //
+    //     gain      0     1.4    1.6    1.8    2.0    3.0
+    //     grain  0.36    1.17   1.32   1.48   1.63   2.39   (reference 1.33)
+    //
+    // The pair is one number twice, and that is a limit declared rather than a
+    // saving: a window big enough to measure holds both tops and flanks, so the
+    // instrument cannot say which of the two carries more, and a difference
+    // between them would be invented. The seat for two is here the moment a
+    // reading separates them.
+    sheetGain: new Vector2(1.6, 1.6),
     // THE TWO KNOBS THAT ARE NOT THE VOXEL'S. They are still reachable from
     // here, because a sweep on the page is what they exist for; what they MEAN,
     // and why a delivery ships them at one, is stated once over NEUTRAL_LIFT in
@@ -256,6 +321,34 @@ export function earthSettings() {
     // world is one zone whichever family is standing in it, and two families
     // that drew their own would put a seam down every bank.
     hue: 0.10,
+    // AND ITS OWN SHEET, WHICH IS THE WIDEST GAP IN THE WHOLE DOSSIER: bare
+    // earth carries 2.40% of grain inside a face on the reference against our
+    // 0.51%, four point seven times. One slice serves both orientations here
+    // and the reason is a measurement rather than a saving: at the pose that
+    // judges, the eye is a degree above the horizon and the bare family in the
+    // reference shows FLANKS -- there is no top face of naked earth in the
+    // picture wide enough to cut a second sheet out of, and inventing one would
+    // be the one thing this unit is not allowed to do.
+    sheetLayers: new Vector2(...FAMILY_LAYERS.earth),
+    // AND ITS GAIN IS HALF AGAIN THE MEADOW'S, which is the reference's own
+    // ordering: C 0 reads 2.40% of grain on bare earth against 1.16 to 1.33 on
+    // grass, and the widest gap in the whole dossier is this family's.
+    //
+    // Swept on two windows of the bare family's own mask, both chosen LIT so
+    // that they stand where the reference's own window stands (L 82 and 86
+    // against its 92.5). That constraint is not tidiness. A first pair was
+    // taken on the mask alone, one of them landed in shadow at L 42, and there
+    // 2.4% of luminance is nine tenths of ONE LEVEL: two runs of the same
+    // state, differing nowhere by more than six levels on a channel, read it as
+    // 1.76 and as 1.37. A grain measured under a level is not measured.
+    //
+    //     gain             0     2.2    2.6    3.0
+    //     grain 60x20    0.47   2.01   2.33   2.59
+    //     grain 44x16    0.45   1.89   2.20   2.46
+    //
+    // 2.7 puts the first window on the reference's 2.40 and the second within
+    // six per cent of it.
+    sheetGain: new Vector2(2.7, 2.7),
   };
 }
 
@@ -304,6 +397,27 @@ const FRAGMENT = /* glsl */`
   ${SCENE_LIGHT_GLSL}
   ${FACE_LIGHT_GLSL}
   ${PIGMENT_GLSL}
+  ${SHEET_GLSL}
+  // THE ANALYTIC SHEEN, COMPILED HERE AND CALLED BY NOTHING, WHICH IS THE WHOLE
+  // OF WHAT IT IS FOR TODAY.
+  //
+  // C 1.3 measured what it answers, and it is a fact about STONE: the sunlit
+  // flank of monolith 03 stands at saturation 0.107 where its own shaded front,
+  // the same stone under the sky alone, stands at 0.667. A face that has lost
+  // its pigment and taken the light's colour has a specular term on it. The
+  // reference shows nothing of the kind on grass or on earth -- their sunlit
+  // faces keep their colour -- so no material in this file calls it, and there
+  // is deliberately no knob here that would let one.
+  //
+  // It stands in the program anyway so that it is COMPILED: a chunk written and
+  // never put through a compiler is a chunk that does not build on the day it is
+  // wanted, and the campaign has paid for a shader that failed silently once
+  // already. An uncalled function is stripped before a single instruction is
+  // issued, so it stands here for nothing. The stone is V2's, on another branch,
+  // and this is the seat it inherits -- the exponent, the dielectric F0 and the
+  // normalisation are in src/world/voxel/sheet.js beside it, with the readings
+  // they came from. Exponent ${STONE_SHINE.toFixed(0)}, which is C's own Q2b.
+  ${SHEEN_GLSL}
   ${FOG_GLSL}
 
   void main() {
@@ -334,6 +448,22 @@ const FRAGMENT = /* glsl */`
     // arithmetic is src/world/voxel/pigment.js, and the same file's pure twin
     // answers this call under plain node for the offline chain.
     vec3 albedo = pigmentOf(cell.x, cell.z);
+
+    // ------------------------------------------------------------ the grain
+    // ONE READ, AND IT MULTIPLIES THE PIGMENT RATHER THAN REPLACING IT: the
+    // sheet is grey and has mean a half, so it moves nothing about the colour
+    // of this cube and nothing about the colour of the world at range. Which
+    // slice, and how much of it, comes off the normal that is already here and
+    // off a constant of the material -- no attribute, no varying, no draw.
+    //
+    // THE LAY OF THE SQUARE IS DRAWN OFF THE CELL, one of eight, so a meadow of
+    // ten thousand cubes is not ten thousand copies of one stamp. The hash is
+    // the pigment's own -- there is no second one in this program -- asked a
+    // question no other term asks, so the tint of a cube and the way its sheet
+    // is turned are independent draws.
+    albedo *= sheetGrain(p, n, uVoxel, pixel, vec2(
+      pigHash(cell.x + 131.0, cell.z + cell.y * 17.0 + 57.0),
+      pigHash(cell.z + 401.0, cell.x + cell.y * 29.0 + 233.0)));
 
     // ------------------------------------------ where in the face we stand
     // Distance from the middle of the cube along each axis, with the axis the
@@ -397,11 +527,20 @@ const FRAGMENT = /* glsl */`
  *                          on the page moves the frame without a rebuild
  */
 export function voxelMaterial(voxel, settings) {
+  // THE ARRAY IS BUILT ONCE PER MATERIAL AND SHARED BY REFERENCE when a sheet
+  // was handed over; where none was, sheetArray() answers with a neutral one --
+  // every texel a half -- and the gain below is what actually turns the term
+  // off. A neutral array rather than a null sampler because a null sampler is
+  // a different program on some drivers and the same program on others, and a
+  // world that draws differently depending on which is the defect this campaign
+  // spends its guards on.
+  const sheet = settings.sheet ?? sheetArray(null);
   const material = new ShaderMaterial({
     uniforms: {
       uVoxel: { value: voxel },
       uAlbedo: { value: settings.albedo },
       ...pigmentUniforms(settings),
+      ...sheetUniforms(sheet, settings.sheetLayers, settings.sheetGain),
       uJoint: { value: settings.joint },
       uJointPixels: { value: settings.jointPixels },
       uArris: { value: settings.arris },
@@ -426,6 +565,8 @@ export function voxelMaterial(voxel, settings) {
     const u = material.uniforms;
     u.uAlbedo.value.copy(settings.albedo);
     refreshPigment(u, settings);
+    u.uSheetLayer.value.copy(settings.sheetLayers);
+    u.uSheetGain.value.copy(settings.sheetGain);
     u.uJoint.value = settings.joint;
     u.uJointPixels.value = settings.jointPixels;
     u.uArris.value = settings.arris;
@@ -556,6 +697,54 @@ export function pavingSettings() {
     // it is NOT attempted here -- what is here is the one part of the reading
     // that is a pigment.
     warmth: new Vector3(1.4256, 0.9491, 0.2511),
+    // ------------------------------------------------------------------------
+    // AND HERE IS THAT OTHER HALF, WITH WHAT IT COULD AND COULD NOT TAKE.
+    //
+    // The corridor is the one family of the soil that already had textures --
+    // three of them, 982 347 bytes, sixteen per cent of the whole first frame --
+    // and it still reads 2.7 times smoother than the reference. C 4.2's own
+    // proposal for it was to TAKE AWAY rather than add: rebuild the three maps
+    // more contrasted, with bigger slabs and the brown they lack, and possibly
+    // fold them into two slices of this array.
+    //
+    // TWO THIRDS OF THAT ARE NOT THIS UNIT'S TO DO, and saying so is more use
+    // than half-doing it. The lattice of slabs and the level of each slab are
+    // POSITION along a hundred and eight metres of run -- a ruler whose eight
+    // bits interpolate to a place, not a picture -- and they are baked by
+    // tools/path/ out of the law in src/world/path.js. Neither file is open to
+    // this unit, and a sixteen texel square cannot hold a slab lattice in any
+    // case: the reference's slabs are 20 to 40 px at six metres, which is two
+    // to four voxels, so what tiles at voxel scale is the grain INSIDE a slab
+    // and never the slabs. The other lever, raising GRAIN_GAIN, would put a
+    // number in this file that contradicts path.js -- which is the one thing
+    // the note at the head of this section forbids.
+    //
+    // SO WHAT ENTERS IS THE ONE PIECE THAT IS THIS UNIT'S: the grain inside a
+    // slab, off the same array the meadow reads, laid over the ground on the
+    // corridor's own turn. It is a FOURTH read on this material and that is
+    // stated rather than hidden -- the corridor is 2.8% of the frame's pixels
+    // (44 482 of 1 572 952, measured on the family's own mask) and the bench
+    // says what the fourth read costs there.
+    sheetLayers: new Vector2(LAYER.paving, LAYER.paving),
+    // 2.9, AND ITS SCALE AND ITS LAY WITH IT, because the corridor is the one
+    // family whose sheet has no face to sit on: it inherits neither a scale nor
+    // an orientation and both had to be swept. Over the two windows of the
+    // paving's own mask, against the two figures C 1.5 publishes (2.27 near,
+    // 3.20 at the mid run):
+    //
+    //     gain / repeat   0     2.9/0.25   2.9/0.40
+    //     near          1.11     2.76        2.48
+    //     mid run       1.22     3.15        3.05
+    //
+    // At forty centimetres the near window runs twelve per cent over and the
+    // mid run five under, which is the narrowest pair of the sweep.
+    //
+    // AND THE LAY IS PER SLAB, which is not a refinement: laid straight over the
+    // run this sheet reads as CORRUGATION, and 25, 55 and 90 cm all read the
+    // same way. The paving's own tone map says which piece a fragment is in and
+    // is already fetched, so a turn off it costs nothing -- see the fragment.
+    sheetGain: new Vector2(2.9, 2.9),
+    sheetMetres: PAVING_SHEET_METRES,
   };
 }
 
@@ -593,6 +782,7 @@ const PAVING_FRAGMENT = /* glsl */`
 
   ${SCENE_LIGHT_GLSL}
   ${FACE_LIGHT_GLSL}
+  ${SHEET_GLSL}
   ${FOG_GLSL}
 
   void main() {
@@ -655,6 +845,37 @@ const PAVING_FRAGMENT = /* glsl */`
     // one piece and the next: the spread between slabs is 0.78 of the spread
     // within one.
     albedo *= 1.0 + near * uGrainGain * (grain.g - 0.5);
+
+    // AND THE GRAIN OF THE REFERENCE'S OWN SLAB, off the array the meadow
+    // reads, on the same turn as the tile above it. It has mean a half like
+    // everything else in this file that multiplies, so the level the pigment
+    // was fitted at does not move -- and unlike the tile it does NOT fade with
+    // distance, because the reading it answers is at ten metres: the reference
+    // carries 3.20% of grain inside a face at the mid run against our 1.22%,
+    // and a term that let go at twelve would have answered the near window and
+    // left the far one where it was.
+    // AND A DIFFERENT LAY OF IT ON EVERY SLAB, which is the difference between
+    // stone and corrugated iron. Laid straight over the run the sheet reads as
+    // a ripple: what a cut of one slab of the reference holds is the streaking
+    // ALONG that slab, and a streak tiled over a hundred metres of corridor is
+    // a ripple at every repeat that was tried -- 25, 55 and 90 cm all read the
+    // same way, so it is the content and not the period. In the reference the
+    // grain of a stone runs with the STONE IT IS IN and turns at every joint.
+    //
+    // The draw is the slab's own level, which is already in hand: the tone is
+    // piecewise constant on pieces a hand across, so it is a per-slab number
+    // that costs no read, no varying and no attribute.
+    // AND THE DRAW IS THE TONE ROUNDED TO A BUCKET, which is not tidiness: the
+    // level arrives through a linear filter and carries a little variation
+    // inside a piece, and a fraction of thirty times it turns that variation
+    // into a different lay at every pixel -- measured, and the corridor came
+    // back as speckle at 4.6% where the reference reads 2.2. Rounded to
+    // sixteen buckets the draw is constant on a piece, which is what it is for.
+    float slab = floor(tone * 16.0);
+    float footprint = max(length(fwidth(vWorld.xz)), 1e-6) * uSheetPerMetre;
+    albedo *= sheetOver(sheetLay(turned * uSheetPerMetre,
+      vec2(fract(slab * 0.2135), fract(slab * 0.5077))),
+      uSheetLayer.x, uSheetGain.x, footprint);
 
     // The stone lying on the ground, drawn from its own field so its rim is as
     // round as the frame likes rather than as round as the tile is.
@@ -730,6 +951,10 @@ export function pavingMaterial(voxel, settings, maps) {
       uPebEdge: { value: settings.pebEdge },
       uPebLevel: { value: settings.pebLevel },
       uPebMix: { value: settings.pebMix },
+      // The array is the disc's, shared by reference with the two families
+      // beside this one: one upload for the whole soil.
+      ...sheetUniforms(settings.sheet ?? sheetArray(null),
+        settings.sheetLayers, settings.sheetGain, 1 / settings.sheetMetres),
       // The centreline and the strip's own frame, so the fragment can solve
       // what the old surface carried in two attributes.
       uLine: {
@@ -761,6 +986,9 @@ export function pavingMaterial(voxel, settings, maps) {
     u.uWarmth.value.copy(settings.warmth);
     u.uGrainGain.value = settings.grainGain;
     u.uApronWarm.value = settings.apronWarm;
+    u.uSheetLayer.value.copy(settings.sheetLayers);
+    u.uSheetGain.value.copy(settings.sheetGain);
+    u.uSheetPerMetre.value = 1 / settings.sheetMetres;
   };
 
   return material;
