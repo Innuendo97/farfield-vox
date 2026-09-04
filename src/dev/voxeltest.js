@@ -81,6 +81,22 @@ const camera = new PerspectiveCamera(DEFAULT_FOV, window.innerWidth / window.inn
 const scene = new Scene();
 applySky(scene);
 
+// THE BAG OF ASSETS IS BUILT HERE AND NOT WHERE IT IS FIRST LOADED FROM, and
+// that is the second half of A-7.
+//
+// The disc goes out to the worker a hundred lines below, and the handler that
+// receives it calls plantWhenReady(), which asks this bag whether the grass
+// sheet has landed. The bag used to be declared three hundred and seventy lines
+// further down: a `const` is in its temporal dead zone until the line that
+// declares it runs, so any message that arrived before the module finished
+// evaluating read it and threw. It never had to race to do it -- the tier
+// applied above threw first, module evaluation stopped there, and every chunk
+// the worker sent afterwards hit "Cannot access 'assets' before initialization"
+// for the rest of the page's life. Two symptoms, one ordering: what a callback
+// reads exists before the thing that calls it is started.
+setContentBase(import.meta.env.BASE_URL);
+const assets = new Assets(import.meta.env.BASE_URL).setRenderer(renderer);
+
 // ---------------------------------------------------------------- the field
 //
 // STARTED BEFORE ANYTHING ELSE IS ASKED FOR, and that is the whole point of it
@@ -128,6 +144,10 @@ const build = {
   bytes: 0,
   startedAt: performance.now(),
   finishedAt: 0,
+  // What the QUALITY TIER would have laid, which is not what this bench laid.
+  // Written by the stub of setVoxelDiscRadius below and printed beside RADIUS,
+  // so the two can never be read as one number. Nought until a tier speaks.
+  tierRadius: 0,
 };
 
 const chunkKey = (cx, cz) => `${cx},${cz}`;
@@ -550,6 +570,19 @@ const hub = {
     if (vegetation) vegetation.setQuality(grass);
   },
   setGrassVisible(visible) { if (vegetation) vegetation.setGrassVisible(visible); },
+  // THE LEVER THE TIER PULLS, AND WHY IT DOES NOT MOVE THIS DISC. This is the
+  // first half of A-7: src/core/quality.js has pulled setVoxelDiscRadius on
+  // every soft apply since ef12bc9, this stub did not carry it, and the very
+  // first quality.start() below threw before the page had drawn anything.
+  //
+  // It RECORDS and does not rebuild, because the bench's disc is meshed once,
+  // out in the worker, from `raggio` or from the engine's own default, and it
+  // is started before a tier exists to have an opinion. That is the bench's
+  // subject: it prices a shape the world has not been asked to hold yet. So the
+  // tier's number is kept and PRINTED beside the one that was laid, which is
+  // the one thing that must not be silent -- a bench reading 35 m while the
+  // world it is advising ships 14 is a measurement of nothing.
+  setVoxelDiscRadius(radius) { build.tierRadius = radius; },
   setCloudsVisible(visible) { for (const c of clouds) c.mesh.visible = visible; },
   vegetationStats: () => (vegetation ? vegetation.stats() : null),
   update(elapsed, eye, delta = 0, pitchDegrees = 4.5) {
@@ -561,9 +594,6 @@ const hub = {
 const quality = createQuality({ renderer, hub });
 quality.start();
 renderer.setTiming(true);
-
-setContentBase(import.meta.env.BASE_URL);
-const assets = new Assets(import.meta.env.BASE_URL).setRenderer(renderer);
 
 // Only the pieces this corner actually draws, asked for by name. The demo adds
 // NOTHING to the manifest: every id below is already in the delivery and
@@ -714,7 +744,8 @@ function repaintNote() {
   const done = build.finishedAt
     ? `${(build.finishedAt - build.startedAt).toFixed(0)} ms` : 'in corso';
   note.innerHTML = `<b>PROVA VOXEL</b> — un angolo dell'hub
-disco ${RADIUS} m a ${VOXEL * 100} cm · ${build.columns} colonne · ${build.quads} quad
+disco ${RADIUS} m a ${VOXEL * 100} cm${build.tierRadius && build.tierRadius !== RADIUS
+    ? ` (il tier ne chiede ${build.tierRadius})` : ''} · ${build.columns} colonne · ${build.quads} quad
 fusione ${build.quadsPerColumn.toFixed(3)} quad/colonna (dentro ${build.insidePerColumn.toFixed(3)})
 muratura 05: ${masonry ? masonry.blocks : '--'} blocchi, ${masonry ? masonry.courses : '--'} corsi
 disco pronto in ${done} · blocco peggiore ${build.worstTaskMs.toFixed(1)} ms
