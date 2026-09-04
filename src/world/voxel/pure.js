@@ -71,6 +71,33 @@ export {
   underAt,
 } from './columns.js';
 
+// AND THE PIGMENT, which is the reason this door had to widen. The offline
+// chain that carries a material through the light, the tone curve and the grade
+// to a pixel used to lift the meadow's albedo out of material.js as TEXT,
+// because it was one triple and a regular expression could reach it. It is a
+// FIELD now -- a colour that depends on where the cube stands -- and no regular
+// expression reaches a field. So the field is a pure function, it lives beside
+// the shader that reproduces it, and it comes out through here: the chain and
+// the guards import the arithmetic the page draws with rather than a model of
+// it. That is residuo 1 of E-FOND-PIANO11, and it is the same argument as the
+// one over meshChunk above -- an offline tool that has to open a browser to ask
+// the question stops being able to ask it.
+export {
+  ALBEDO,
+  FAMILY,
+  PIGMENT,
+  PIGMENT_GLSL,
+  PIGMENT_SEEDS,
+  pigField,
+  pigHash,
+  pigNoise,
+  pigTint,
+  pigmentCensus,
+  pigmentOf,
+  pigmentUniforms,
+  refreshPigment,
+} from './pigment.js';
+
 export {
   COURSE,
   LENGTHS,
