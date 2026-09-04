@@ -271,12 +271,48 @@ export const VERGE_OFFSET = 0.34;
 //
 // AND IT IS HALF WIDTHS IN METRES, so pathCoord and pathEdge below are unchanged
 // in shape and in every reader: what moved is the number they scale.
+//
+// AND THE WAIST IS GONE, WHICH IS THE COMMITTENTE'S OWN READING AND A
+// MEASUREMENT (E-DECISIONI11.4: «ancora troppo stretto: misurando in lontananza
+// la prospettiva lo stringe, ma la larghezza resta piu' o meno la stessa per
+// tutto il sentiero: verifica»).
+//
+// VERIFIED, AND HE IS RIGHT. The width above was read as a count of voxels along
+// rows of the picture -- a reading in PIXELS that the perspective is still in.
+// Taken instead in metres of world on the plane the fitted camera puts at
+// nought, with the ruler the two units before this one settled on -- the two
+// crossings of half a share of green on each flank of the corridor, found on the
+// picture being measured and not assumed (fondazione/lav/u4-largh.py) -- the
+// reference and this world read:
+//
+//     z          +7.50   +6.15   +3.94   +1.89
+//     TARGET      1.19    1.22    1.46    1.57 m
+//     ours        1.13    0.95    0.79    0.80 m
+//     the law     1.57    1.06    1.00    1.00 m
+//
+// The reference does not narrow down the run at all: it holds 1.2 m through the
+// middle of the field and OPENS toward the far end. Ours halves. The eight to
+// twelve voxels the reading above found in the middle of the field are the
+// STONE CORE and not the corridor -- U-SENT-2 measured that the reference's
+// paving is never more than half stone even in its own middle and that its earth
+// runs a metre and a half past the kerb -- so a ruler that stops at the pale
+// stone stops inside the corridor, and it did.
+//
+// WHAT MOVES IS THE WAIST AND NOTHING ELSE. The near end (the apron the walker
+// stands on) and the flare in front of the bottom step are both read where the
+// reference shows them and both stay. The middle of the field goes from 0.50 to
+// 0.78 of a half width and the far stretch to 0.86, which puts the law at 1.56
+// and 1.72 m -- the reference's own 1.2 and 1.5 plus the two tenths of a metre
+// the mat of grass covers at the kerb, measured on our own render at the same
+// ruler. The stone core inside it is still eight to twelve voxels, because
+// SPREAD in ../path.js is a fraction of THIS number and the crossing moves out
+// with it.
 const PATH_WIDTH = [
   [12.0, 1.00],
   [9.1, 1.00],
   [8.1, 0.90],
-  [6.0, 0.50],
-  [-3.0, 0.50],
+  [6.0, 0.83],
+  [-3.0, 0.92],
   [-5.5, 1.20],
   [PATH_STAIR_Z, 1.20],
 ];
