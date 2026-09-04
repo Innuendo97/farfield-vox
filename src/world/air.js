@@ -2,7 +2,6 @@ import { ShaderMaterial, Vector2, Vector3 } from 'three';
 import {
   HEIGHT_FOG, SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS, SKY_UNIFORMS,
 } from '../core/sky.js';
-import { STRIP_REACH } from './path-strip.js';
 
 // THE SEAT OF THE AIR, and of the surface that stands in it.
 //
@@ -462,9 +461,9 @@ export const DETAIL = {
 // ratio, so it reads round; from a steep pose close to the walker it does not.
 //
 // WHAT CHANGES IS WHAT IS STORED, NOT HOW MUCH. The atlas's Nyquist limits what
-// can be DRAWN, not what can be SAID. src/world/path-strip.js carries a strip
-// laid along the run whose every texel holds ONE number — how far the nearest
-// joint edge is, in millimetres — and the frame compares that against a width.
+// can be DRAWN, not what can be SAID. The retired src/world/path-strip.js laid a
+// strip along the run whose every texel held ONE number — how far the nearest
+// joint edge was, in millimetres — and the frame compared that against a width.
 // Eight bits of distance interpolate to a POSITION, and a position survives a
 // coarser texel than an edge does: measured against the lattice it is a ruler
 // for, the joint's edge lands within 2.80 mm of where the paving puts it at the
@@ -484,6 +483,37 @@ export const DETAIL = {
 // than the stone beside it — that is a pigment, and pigments live in the albedo.
 // Putting it on the light would make the joint a function of the hour and would
 // reach the one pair of numbers every other guard in this file is weighed on.
+// HOW FAR THE STRIP'S FIELD IS ALLOWED TO SAY, in metres, and what one code is
+// worth.
+//
+// IT LIVED IN src/world/path-strip.js AND THAT FILE IS GONE, so it is here, in
+// the shader that is the only thing left reading it. Both halves of the number
+// are decisions with a failure behind them and they travel with it.
+//
+// NOT SIGNED, because a signed field averages to nothing in the middle of a
+// slab. A mip level, or an anisotropic tap, is a MEAN of the field over a
+// footprint; take the mean of a signed distance across two joints and the
+// positive and negative halves cancel somewhere in the middle of the stone, and
+// the frame draws a joint there -- a joint that is not in the paving, standing
+// at a fixed offset, running the length of the path. Unsigned, the mean of a
+// footprint containing a joint moves AWAY from zero: the joint thins and softens
+// as it gets further away and then stops being drawn.
+//
+// SIXTY-FOUR MILLIMETRES because past that the answer stops being used. The
+// frame draws stone wherever the distance is over a joint's half width, and the
+// widest joint in the paving is a hundred and five millimetres -- so anything
+// past about a finger's breadth from an edge is the same answer, "stone".
+//
+// AND IT HAS NO CALLER TODAY, WHICH IS SAID HERE RATHER THAN LEFT TO BE FOUND.
+// The only surface that ever passed `strip` to createBakedMaterial was the bent
+// grid, and the corridor is columns of V1's disc with a material of its own.
+// Both this and DETAIL above are therefore inert: the branches are still
+// written, still correct, and reached by nobody. This file is the coordinator's
+// PART TWO -- parked, not frozen -- so the retirement is declared for whoever
+// takes the baked surface out of here rather than taken by the soil session on
+// its way past.
+const STRIP_REACH = 0.064;
+
 export const STRIP = {
   // Where it dies, in metres from the eye.
   //

@@ -30,7 +30,7 @@ import { fogUniforms, FOG_GLSL, FOG_RADIANCE } from './air.js';
 // between them.
 //
 // WHAT IT DOES NOT TAKE IS THE DISTANCE TERM, and that is measured rather than
-// preferred. The height fog of terrain.js, at the density the meadow is
+// preferred. The height fog of src/world/air.js, at the density the meadow is
 // calibrated at, is 93 per cent at the crest of the nearest ring and saturated
 // at every vertex behind it (s2-dev5/VERBALE.md, passo 3). Evaluating it here
 // would replace three rings — a lit green band, a blue one behind it, and a

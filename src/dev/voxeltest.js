@@ -16,7 +16,6 @@ import {
   SCENE_LIGHT_UNIFORMS, SKY_UNIFORMS, applySky, setSceneLight, setSkyPreset,
 } from '../core/sky.js';
 import { setAir } from '../world/air.js';
-import { createTerrain } from '../world/terrain.js';
 import { createVegetation } from '../world/vegetation.js';
 import { engrave, loadEngravingFont } from '../world/engraving.js';
 import { AREA_CENTER, MONOLITHS } from '../world/layout.js';
@@ -539,7 +538,7 @@ function setNight(on) {
 
 // ---------------------------------------------------------------- the pieces
 
-let terrain = null;
+let dressed = false;
 let vegetation = null;
 let engraved = false;
 const wantedGrass = { grass: null };
@@ -569,31 +568,21 @@ const assets = new Assets(import.meta.env.BASE_URL).setRenderer(renderer);
 // Only the pieces this corner actually draws, asked for by name. The demo adds
 // NOTHING to the manifest: every id below is already in the delivery and
 // already counted, so criticalBytes cannot move whatever this page does.
-const WANTED = [
-  'terrain-albedo', 'terrain-light', 'terrain-detail', 'terrain-path',
-  'grass-atlas',
-];
+const WANTED = ['grass-atlas'];
 
 Promise.all(WANTED.map((id) => assets.load(id).catch((error) => {
   console.warn(`${id} not delivered: ${error.message}`);
   return null;
 })))
   .then(() => {
-    // The delivered ground, unmodified, and it is here for the paving.
-    //
-    // It also does the second job the recommendation gives it: beyond the disc
-    // it IS the shell — one draw call over two hundred metres, already bent to
-    // spend its resolution where the eye is, already carrying the air. No lane
-    // proposed it and it is the cheapest piece of the whole plan.
-    terrain = createTerrain({
-      albedo: assets.get('terrain-albedo'),
-      light: assets.get('terrain-light'),
-      detail: assets.get('terrain-detail'),
-      strip: assets.get('terrain-path'),
-      lightScale: TERRAIN.lightScale,
-      radius: RADIUS,
-    });
-    for (const mesh of terrain.meshes) scene.add(mesh);
+    // THE DELIVERED GROUND USED TO BE HUNG HERE, and it is gone with the file
+    // that built it. It was the bent grid of src/world/terrain.js, kept for the
+    // paving and doing a second job beyond the disc as a cheap shell; the paving
+    // is columns of the disc now and the shell is src/world/ground-shell.js, so
+    // what it was here for is drawn by the two pieces this page already builds.
+    // This corner does not hang the sheet yet -- repairing the page is A-7's own
+    // job at step 8, and it is broken for other reasons as well.
+    dressed = true;
     plantWhenReady();
   })
   .catch((error) => console.warn('corner not dressed:', error.message));
@@ -793,7 +782,7 @@ window.vox = {
    * arrived, which is exactly what happened the first time. Nothing here is
    * measured until this is true.
    */
-  ready: () => Boolean(build.finishedAt && terrain && vegetation && masonry && engraved),
+  ready: () => Boolean(build.finishedAt && dressed && vegetation && masonry && engraved),
   longTasks,
   frameGaps,
   chunks: () => chunks.length,

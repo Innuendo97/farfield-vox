@@ -24,10 +24,11 @@ export const AREA_HARD_RADIUS = 21;
 export const WALK_SPEED = 3.0;
 export const RUN_SPEED = 4.5;
 
-// The playable ground is 40x40 m, but the plane has to reach far enough that
-// its far edge dissolves in the fog instead of drawing a false horizon across
-// the middle of the reference framing.
-export const GROUND_SIZE = 400;
+// GROUND_SIZE = 400 STOOD HERE AND HAD NO READER, checked over the whole tree by
+// name and by import when E-V1f.4 named it and again at this step. It described
+// a four hundred metre plane that this branch never had: what reaches is the
+// disc of cubes at the tier's radius and the sheet at a hundred metres, and the
+// second of those is E-V5h's own number in src/world/ground-shell.js.
 
 // There was a COLORS table and a FOG pair here — a ground green, a path grey,
 // a stone slate, a sky blue, a fog blue, and a near and far distance for a

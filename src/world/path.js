@@ -19,9 +19,10 @@ import {
 // this file already knows, and nothing fetched. There is no texel grid in a
 // cosine.
 //
-// AND THE SEED IT IS BUILT ON IS src/world/path-strip.js, WHOLE. That file is
-// the ground's, and its doctrine is this one's capital: the atlas's Nyquist
-// limits what can be DRAWN, not what can be SAID. A texel that holds HOW FAR the
+// AND THE SEED IT IS BUILT ON WAS src/world/path-strip.js, WHOLE. That file was
+// the ground's and it is retired -- the corridor is columns of V1's disc and the
+// strip it laid had no reader left -- but its doctrine is this one's capital:
+// the atlas's Nyquist limits what can be DRAWN, not what can be SAID. A texel that holds HOW FAR the
 // nearest joint edge is reconstructs a POSITION between two samples, and a
 // position interpolates -- so the frame draws an edge finer than the texel that
 // told it where the edge was. Everything about the joints below is that idea, on
@@ -43,8 +44,8 @@ import {
 // and the moment this file reaches src/core/sky.js it stops being readable
 // outside a browser -- which would mean the shapes of the paving could only be
 // measured through a render. What hangs the surface on the scene is
-// src/world/layers/v3-sentiero.js, the same split the ground already has between
-// path-strip.js and terrain.js.
+// src/world/layers/v3-sentiero.js, which is the same split the ground kept
+// between its own arithmetic and its own mesh for as long as it had a mesh.
 
 // ---------------------------------------------------------------- the frame
 //

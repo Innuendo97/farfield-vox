@@ -4,11 +4,14 @@ import {
 
 // The shape of the ground, as arithmetic.
 //
-// This is the single definition of where the ground is. The Blender scene that
-// bakes the terrain reads it through tools/terrain/export-heightfield.mjs, the
-// runtime mesh is built from the same numbers, and the player walks on a grid
-// sampled from it. Nothing else is allowed to have an opinion about the height
-// of a point, or the walker and the picture stop agreeing.
+// WHAT IS LEFT OF IT, AND WHAT IT IS STILL FOR. This was the single definition
+// of where the ground is: a mesh was built from these numbers and the walker
+// walked on a grid sampled from them. The world is a store of blocks now
+// (src/world/voxel/worldgen.js) and the height of a point is answered by
+// groundHeightAt in src/world/contracts.js out of that store. What survives here
+// is the two things the store is written FROM -- the one literal the base of the
+// disc stands at, and where the corridor runs and how wide -- read by the
+// generator and never copied.
 //
 // THE GROUND IS A PLANE, AND IT IS THE REFERENCE THAT SAYS SO.
 //
@@ -349,70 +352,25 @@ export function heightAt() {
   return BASE_LEVEL;
 }
 
-// ------------------------------------------------------------------- the grid
-
-/**
- * The ground mesh, and the sheet of texture wrapped on it.
- *
- * One surface has to be both the floor under the walker's feet and the meadow
- * that reaches the water, which is two very different demands on resolution. It
- * is done by spacing the vertices unevenly: the grid is uniform in its own
- * index space and that space is bent by a power law on the way to metres, so
- * the rows crowd together near the walker and spread out towards the rim.
- *
- * The texture coordinate is the index, not the position, so the atlas is bent
- * the same way and spends its resolution where the eye is.
- */
-export const GRID = {
-  // Vertices per side. The cost is vertex work, which is not what an integrated
-  // GPU runs out of; what matters is that the near ground is dense enough to
-  // carry the lip along the path.
-  samples: 192,
-  // Half extent in metres. Far enough that the rim is already extinguished by
-  // the fog rather than drawing a line across the frame.
-  half: 100,
-  // Above 1 crowds the vertices towards the centre. At 2.2 the walkable area
-  // takes about two thirds of the grid and two thirds of the atlas.
-  bend: 2.2,
-  centreX: AREA_CENTER.x,
-  centreZ: AREA_CENTER.z,
-};
-
-/** Normalised grid coordinate in -1..1 to metres from the centre. */
-export function gridToOffset(t) {
-  return Math.sign(t) * Math.abs(t) ** GRID.bend * GRID.half;
-}
-
-/** Metres from the centre back to the normalised grid coordinate. */
-export function offsetToGrid(metres) {
-  const t = Math.abs(metres) / GRID.half;
-  return Math.sign(metres) * t ** (1 / GRID.bend);
-}
-
-/** World position of a texture coordinate, both in 0..1. */
-export function uvToWorld(u, v) {
-  return {
-    x: GRID.centreX + gridToOffset(u * 2 - 1),
-    z: GRID.centreZ + gridToOffset(v * 2 - 1),
-  };
-}
-
-/** Texture coordinate of a world position, both in 0..1. */
-export function worldToUv(x, z) {
-  return {
-    u: (offsetToGrid(x - GRID.centreX) + 1) / 2,
-    v: (offsetToGrid(z - GRID.centreZ) + 1) / 2,
-  };
-}
-
-/** Extent of the walker's height grid, in metres; outside it the field is flat. */
-export const FIELD = {
-  centreX: AREA_CENTER.x,
-  centreZ: AREA_CENTER.z,
-  size: 72,
-  spacing: 0.28125,
-};
-
-FIELD.samples = Math.round(FIELD.size / FIELD.spacing) + 1;
-FIELD.originX = FIELD.centreX - FIELD.size / 2;
-FIELD.originZ = FIELD.centreZ - FIELD.size / 2;
+// ------------------------------------------------------------- what is gone
+//
+// THE BENT GRID AND THE WALKER'S OWN SHEET, AND NEITHER LEFT A READER BEHIND.
+//
+// GRID, gridToOffset, offsetToGrid, uvToWorld and worldToUv described a square
+// of 192 by 192 vertices bent by a power law so the rows crowded near the
+// walker, and the atlas of the ground was bent with it. The mesh that used them
+// was src/world/terrain.js and it is retired at this step: the meadow is cubes
+// out to the tier's radius, a sheet from there to a hundred metres, and the
+// corridor is columns of the disc. Nothing in src reads the bend now.
+//
+// FIELD was a 72 m square sampled every 0.28125 m for the walker to stand on. It
+// lost its last reader when the contract began reading the block store, and
+// A 2.6 had already recorded that it had none.
+//
+// THE SEVEN TOOLS THAT STILL ASK FOR THE BEND are the outer chain, and they are
+// step 8's by A 4.6: tools/terrain/build-mesh.mjs:8, tools/terrain/lib/
+// pattern.mjs:8, tools/terrain/ground-shading.mjs:6, tools/lighting/
+// shadow-bearing.mjs:4, tools/lighting/staircase.mjs:5, tools/terrain/probe.mjs:5
+// and tools/turf/turf-rule.mjs:5. Every one of them paints or measures the atlas
+// the meadow no longer wears. They are listed here so that the day one of them
+// is run, what is missing has a name and a reason.

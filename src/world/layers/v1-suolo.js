@@ -1,4 +1,3 @@
-import { createTerrain } from '../terrain.js';
 import { createGroundVoxel } from '../ground-voxel.js';
 import { createGroundShell } from '../ground-shell.js';
 import { DISC_RADIUS } from '../voxel/index.js';
@@ -6,58 +5,54 @@ import { setGroundDiscRadius } from '../contracts.js';
 
 // THE SOIL. Owned by V1.
 //
-// THE CUBES ARE THE WORLD NOW, AND THE SWITCH THAT SAID OTHERWISE IS GONE.
+// THE CUBES ARE THE WORLD NOW, AND THE BENT GRID IS GONE WITH THE LAST THING IT
+// DREW.
 //
-// It stood behind `?voxsuolo=1` for as long as there were two grounds and the
-// campaign still had to be able to walk on the old one. There are not two any
-// more: the meadow is cubes to the tier's radius, a snapped sheet from there to
-// a hundred metres, and the bent grid is cut down to the paving it still draws.
-// A switch between them would now be a switch between a world and a hole.
+// There were two grounds, then one and a remnant: the meadow became cubes to the
+// tier's radius and a sheet from there to a hundred metres, and what was left of
+// src/world/terrain.js was the corridor and the few square metres under a
+// block's own footprint. The corridor became COLUMNS of this disc at step 4, and
+// on the day it did, the remnant had nothing left to draw -- 6 145 quads laid
+// under cubes that cover them, and it had already had to drop its own corridor
+// band to stop fighting the paving for the same millimetre. It is deleted rather
+// than cut down a second time.
 //
-// HOW THE THREE STAND TOGETHER, WHICH IS DECLARED AND NOT INCIDENTAL:
+// HOW THE TWO THAT ARE LEFT STAND TOGETHER, WHICH IS DECLARED AND NOT INCIDENTAL:
 //
 //   inside the disc   ten centimetre cubes, carrying the carpet the committente
 //                     chose (E-DECISIONI.1) -- the grain, the piles against the
-//                     stone and the piles in the open meadow.
-//   on the paving     the disc lays no column at all and the sheet stands aside
-//                     from it too, so what is drawn there is the delivered
-//                     ground, untouched, which is the whole point of the paving
-//                     surviving the pivot. It is why the bent grid is cut down
-//                     rather than deleted, and why the four assets below stay.
-//                     AND "THE PAVING" IS THE CORRIDOR'S OWN ANSWER NOW, not the
-//                     engine's ruler: see the injection below.
-//   under the blocks  the same: a block's own footprint has no cubes in it.
+//                     stone and the piles in the open meadow -- and the corridor
+//                     as one of the families of their tops.
+//   under the blocks  a block's own footprint has no cubes in it; what is under
+//                     it is the plane the meadow around it stands on, answered
+//                     by groundHeightAt and drawn by nothing, because a block
+//                     covers it and a body is kept out of it.
 //   beyond the disc   the SHEET, src/world/ground-shell.js, one draw out to a
-//                     hundred metres, snapped to the same step and wearing the
-//                     disc's own material by reference.
+//                     hundred metres, on the same step and at the same level as
+//                     the cubes' own tops, wearing their material by reference.
 //   past a hundred    V5's, and nothing of V1's reaches there any more.
 //   the grass         is still planted on the FIELD and not on the cubes, so a
 //                     card can sit a quarter of a metre out over the same range.
-//   the walker        stands on the FIELD too, for the same reason and out by
-//                     the same amount. Neither is fixed here and both are D4's:
-//                     the one seat that answers for the world's floor is
-//                     groundHeightAt in src/world/contracts.js.
+//   the walker        stands on the STORE now (step 6), which is the one seat
+//                     that answers for the world's floor: groundHeightAt in
+//                     src/world/contracts.js.
 //
-// AND THE PILES ARE THE OPEN QUESTION UNDER THAT LAST LINE. The carpet now
-// stands three to six voxels proud of the field in the open meadow, so where
-// the old tuft put the walker at most a voxel out, a pile puts them up to sixty
-// centimetres under the cubes they can see. It is priced, it is the committente's
-// choice, and it is the strongest argument yet for pointing groundHeightAt at
-// topAt below -- which is D4's act and not this file's.
+// AND THE PILES ARE THE OPEN QUESTION UNDER THAT LAST LINE, for the grass and
+// not for the walker any more: the carpet stands two to four voxels proud of the
+// field in the open meadow, so a card planted on the field can sit that far
+// under the cubes it grows out of. It is priced, it is the committente's choice,
+// and the seat that would close it is V4's.
 //
-// NEITHER OF THOSE LAST TWO IS FIXED HERE, and that is a boundary and not an
-// omission: the height every other piece of the world reads is groundHeightAt in
-// src/world/contracts.js, there is exactly one of it, and pointing it at the
-// cubes is a change to that file. What this publishes instead is topAt below,
-// which is the answer that seat will read.
-//
-// THE ASSETS BELOW GO WITH THE GRID, all four of them, and two of them are worth
-// naming: `terrain-detail` is the material of the paving under the walker's own
-// feet and `terrain-path` is where the joints of that paving are. Both belong to
-// the run of the path rather than to the meadow, so they are V3's to claim when
-// the path becomes geometry of its own. They are declared here because today
-// they are handed to the ground's material, and a need is stated where it is
-// eaten.
+// AND THE GROUND'S FOUR ATLASES ARE NOT ASKED FOR HERE ANY MORE. They were
+// declared because the grid ate them; nothing eats them now -- the meadow's
+// colour is arithmetic in src/world/voxel/material.js and the paving's is its
+// own three maps -- so the need goes with the mesh, which is the rule this file
+// already kept. THE DELIVERY IS NOT TOUCHED: terrain-albedo, terrain-light,
+// terrain-detail and terrain-path are still declared critical in
+// assets-src/assets.d/v1-suolo.json and still downloaded, because retiring them
+// is E-V4f.4's joint act of V1, V3 and V4 through the coordinator and not a
+// layer's to take alone. What has changed is the fact that condition was waiting
+// on: the atlas has NO reader at all now, where it had 16.85% of one.
 
 
 /**
@@ -90,9 +85,6 @@ const layer = {
 
   meshes: [],
 
-  /** What the ground came to, for the hub's own handles. */
-  built: null,
-
   /** The voxel disc. */
   voxel: null,
 
@@ -100,14 +92,14 @@ const layer = {
   shell: null,
 
   dress: {
-    // AND THE PAVING'S THREE MAPS ARE THIS LAYER'S NEED NOW.
+    // AND THE PAVING'S THREE MAPS ARE THIS LAYER'S ONLY NEED NOW.
     //
     // They were declared by the layer that hung the corridor's own surface, and
     // that surface is gone: the corridor is columns of THIS disc and its tops
     // are one of the three families this layer's engine draws. An asset is
-    // needed where it is eaten, so the need moved with the mesh that eats it.
-    needs: ['terrain-albedo', 'terrain-light', 'terrain-detail', 'terrain-path',
-      'path-joint', 'path-tone', 'path-grain'],
+    // needed where it is eaten -- which is also why the ground's own four have
+    // left this list: see the head of the file.
+    needs: ['path-joint', 'path-tone', 'path-grain'],
 
     /**
      * @param {object} assets  keyed by asset id, plus what the hub knows
@@ -134,18 +126,6 @@ const layer = {
       // reads, so there is nothing to inject and no pair of answers that could
       // drift apart.
 
-      layer.built = createTerrain({
-        albedo: assets['terrain-albedo'],
-        light: assets['terrain-light'],
-        // The material the bent atlas cannot hold at that size, and where the
-        // joints of it are: see DETAIL and STRIP in src/world/air.js. Both go
-        // to the ground alone and not to the stair.
-        detail: assets['terrain-detail'],
-        strip: assets['terrain-path'],
-        radius,
-      });
-      layer.meshes = layer.built.meshes;
-
       layer.voxel = createGroundVoxel({
         ...wanted,
         radius,
@@ -165,7 +145,7 @@ const layer = {
       // cut in a worker at that moment. A group is on the scene from the
       // start and the chunks arrive into it, which is also what keeps every
       // one of them separately visible to the frustum.
-      layer.meshes = [...layer.meshes, layer.voxel.group];
+      layer.meshes = [layer.voxel.group];
 
       // AND THE SHEET, BUILT HERE AND NOT IN THE WORKER (E-V1d.2). It is a few
       // thousand vertices of arithmetic on a field that is already in the
@@ -185,14 +165,12 @@ const layer = {
       });
       layer.meshes = [...layer.meshes, layer.shell.mesh];
 
-      // The handle the measurements are taken through, and it now carries all
-      // three grounds: what the disc came to, what the sheet came to, and what
-      // is left of the grid.
+      // The handle the measurements are taken through, and it carries both
+      // grounds: what the disc came to and what the sheet came to.
       window.voxsuolo = layer.voxel;
       window.voxsuolo.shell = layer.shell.built;
-      window.voxsuolo.legacy = layer.built.built;
 
-      return layer.built;
+      return layer.voxel;
     },
   },
 
