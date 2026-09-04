@@ -74,8 +74,12 @@ export const lands = (rung, target, tolerance = TOLERANCE) => Math.abs(rung - ta
 const composite = await renderChain();
 
 if (process.argv.includes('--self')) {
-  const before = orientationLadder(composite, BEFORE_THE_REFIT.light);
-  const top = composite(faceColour([0, 1, 0], BEFORE_THE_REFIT.light));
+  // WITH THE BOUNCE AT NOUGHT, and that is the whole point of the check. This
+  // reproduces a frame that was MEASURED on the world as it stood before the
+  // refit, and that world's light had two terms. Asking it to reproduce that
+  // frame through the third term would be asking the chain to be wrong.
+  const before = orientationLadder(composite, BEFORE_THE_REFIT.light, MEADOW_ALBEDO, [0, 0, 0]);
+  const top = composite(faceColour([0, 1, 0], BEFORE_THE_REFIT.light, MEADOW_ALBEDO, [0, 0, 0]));
   selfTest('guard-scala', [
     {
       what: 'the chain reproduces the top face the render was measured at before the refit',

@@ -65,6 +65,21 @@ export const EARTH_FIELD = pigmentCensus('earth');
 export const MEADOW_ALBEDO = MEADOW_FIELD.albedo.p50;
 export const EARTH_ALBEDO = EARTH_FIELD.albedo.p50;
 
+/**
+ * src/world/face-light.js GROUND_BOUNCE, read rather than restated -- the third
+ * term's colour and its strength, and READ for the same reason the exposure
+ * above is: a second copy of a fitted number is a model that keeps predicting
+ * the world of the day it was written, and this chain is what a guard believes.
+ *
+ * As TEXT and not as an import, again for the reason the exposure is: the seat
+ * reaches three.js, and a chain that needed a browser to answer would not be a
+ * chain anyone could gate on.
+ */
+const BOUNCE_SEAT = source('src/world/face-light.js');
+export const BOUNCE_SHARE = Number(/BOUNCE_SHARE = ([0-9.]+)/.exec(BOUNCE_SEAT)[1]);
+export const GROUND_BOUNCE = /BOUNCE_GROUND = \[([0-9.]+), ([0-9.]+), ([0-9.]+)\]/
+  .exec(BOUNCE_SEAT).slice(1, 4).map((v) => Number(v) * BOUNCE_SHARE);
+
 /** What the meadow's material hands faceLightUniforms as its own exposure. */
 export const LIGHT_SCALE = json('assets-src/terrain/terrain.json').lightScale * GROUND_EXPOSURE;
 
@@ -110,11 +125,17 @@ export function readLight() {
  * factor here because a delivery ships it at one -- guard-lift.mjs is what
  * keeps that true.
  */
-export function faceColour(n, light, albedo = MEADOW_ALBEDO) {
+export function faceColour(n, light, albedo = MEADOW_ALBEDO, bounce = GROUND_BOUNCE) {
   const sun = sunVector(light.elevation, light.azimuth);
   const [ts, tk] = faceTerms(n, sun);
-  return [0, 1, 2].map((c) => albedo[c] * LIGHT_SCALE
-    * (ts * light.sunBeam[c] * light.sunStrength + tk * light.skyBalance[c] * light.skyStrength));
+  const gs = Math.max(sun[1], 0);
+  return [0, 1, 2].map((c) => albedo[c] * LIGHT_SCALE * (
+    ts * light.sunBeam[c] * light.sunStrength + tk * light.skyBalance[c] * light.skyStrength
+    // The third term: the ground of this world, lit by the same two terms on
+    // its own upward normal, seen again through the share of the hemisphere
+    // below the face. src/world/face-light.js faceLightOf(), in this language.
+    + bounce[c] * (1 - tk) * (gs * light.sunBeam[c] * light.sunStrength
+      + light.skyBalance[c] * light.skyStrength)));
 }
 
 async function loadLut() {
@@ -186,14 +207,15 @@ export async function renderChain() {
  * @param {object} light from readLight()
  * @param {number[]} albedo the material's own pigment
  */
-export function orientationLadder(composite, light, albedo = MEADOW_ALBEDO) {
+export function orientationLadder(composite, light, albedo = MEADOW_ALBEDO,
+  bounce = GROUND_BOUNCE) {
   const faces = [
     { name: 'top', normal: [0, 1, 0] },
     { name: 'flank 270 (west)', normal: flank(270) },
     { name: 'flank 180 (south)', normal: flank(180) },
   ];
   const rungs = faces.map((face) => {
-    const rgb = composite(faceColour(face.normal, light, albedo));
+    const rgb = composite(faceColour(face.normal, light, albedo, bounce));
     return { ...face, rgb, lum: encodedLum(rgb) };
   }).sort((a, b) => b.lum - a.lum);
   return rungs.map((rung) => ({ ...rung, rung: rung.lum / rungs[0].lum }));
