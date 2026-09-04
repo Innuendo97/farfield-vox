@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { REPO_ROOT } from '../grade/lib/framing.mjs';
 import { writeCleanPng } from '../grade/lib/png.mjs';
 import {
-  GRAIN, PATH_SKIN, PEB_EDGE, SKIN_REACH,
+  GRAIN, PATH_SKIN, PEB_EDGE, RELIEF, SKIN_REACH,
   grainAt, grainTone, paveAt, skinPitch, skinToWorld,
 } from '../../src/world/path.js';
 
@@ -187,11 +187,30 @@ function paintJoint() {
   return out;
 }
 
-/** THE LEVEL of the piece under a point, at its own coarser pitch. */
+/**
+ * THE LEVEL of the piece under a point, and HOW FAR IT STANDS PROUD, at their
+ * own coarser pitch.
+ *
+ * TWO CHANNELS AND ONE FETCH, and that is why the height rides here rather than
+ * in a map of its own. The two fields are the same kind of thing -- piecewise
+ * constant on pieces a hand across, painted from the same seat, sampled at the
+ * same point by the same fragment -- so a second file would buy a second sampler
+ * and a second fetch for a field that wants neither. What it costs is the second
+ * channel of a map that compresses well because it is flat inside a piece.
+ *
+ * RED is the level, nought for the earth between and over the stones and one for
+ * the palest slab. GREEN is the relief, nought at the corridor's floor and one
+ * at RELIEF.high -- a centimetre, which is E-DECISIONI10 S1's own number.
+ */
 function paintTone() {
-  const out = new Uint8Array(TONE_W * TONE_H);
+  const out = new Uint8Array(TONE_W * TONE_H * 3);
   let lo = 255;
   let hi = 0;
+  let liftLo = 255;
+  let liftHi = 0;
+  // The mean of `inSlot * lift`, which is the number the fragment writes its
+  // wall term about so the term cannot move the level: RELIEF.mean in ../path.js.
+  let slotLift = 0;
   for (let j = 0; j < TONE_H; j++) {
     const v = (j + 0.5) / TONE_H;
     for (let i = 0; i < TONE_W; i++) {
@@ -202,20 +221,47 @@ function paintTone() {
       // two pieces, and the boundary between two pieces is the one place this
       // map has any structure at all. A piece is eight texels across here, so
       // there is nothing finer for a mean to protect against.
-      const code = Math.round(paveAt(x, z).tone * 255);
-      out[j * TONE_W + i] = code;
+      const seat = paveAt(x, z);
+      slotLift += seat.inSlot ? seat.lift / RELIEF.high : 0;
+      const code = Math.round(seat.tone * 255);
+      const lift = Math.round(seat.lift / RELIEF.high * 255);
+      out[(j * TONE_W + i) * 3] = code;
+      out[(j * TONE_W + i) * 3 + 1] = lift;
       lo = Math.min(lo, code);
       hi = Math.max(hi, code);
+      liftLo = Math.min(liftLo, lift);
+      liftHi = Math.max(liftHi, lift);
     }
   }
   const [px, pz] = skinPitch([TONE_W, TONE_H]);
   process.stdout.write(`painted ${TONE_W}x${TONE_H} of tone, pitch `
-    + `${(px * 1000).toFixed(2)} x ${(pz * 1000).toFixed(2)} mm; runs ${lo}..${hi}\n`);
+    + `${(px * 1000).toFixed(2)} x ${(pz * 1000).toFixed(2)} mm; runs ${lo}..${hi}, `
+    + `relief ${liftLo}..${liftHi} of 255 `
+    + `(${(liftHi / 255 * RELIEF.high * 1000).toFixed(1)} mm at the tallest)\n`);
+  const mean = slotLift / (TONE_W * TONE_H);
+  process.stdout.write(`  the wall term's own mean over the strip is ${mean.toFixed(4)}; `
+    + `RELIEF.mean carries ${RELIEF.mean.toFixed(4)}\n`);
+  // AND IT IS REFUSED HERE AND NOT FOUND IN A FRAME. The wall term is written
+  // about this mean so that it is contrast and not a dimmer; a literal that has
+  // drifted from the map it describes moves the LEVEL of the paving, which is a
+  // number two gates are ratios of.
+  if (Math.abs(mean - RELIEF.mean) > 0.004) {
+    throw new Error(`RELIEF.mean is ${RELIEF.mean} and the strip's own mean is `
+      + `${mean.toFixed(4)}: the wall term would move the level of the paving`);
+  }
   // THE SECOND THING THAT MUST BE TRUE: the paving is pieces and not one stone.
   if (hi - lo < 60) {
     throw new Error(`the tone runs only ${hi - lo} codes: the pieces are all one stone`);
   }
-  noLineAlongTheRun(out, TONE_W, TONE_H, 'the tone', 1);
+  // AND THE SAME OF THE RELIEF. A strip whose pieces all stood at one height is
+  // a strip with no relief in it, and the fragment would draw NOTHING rather
+  // than draw it wrong -- which is the shape of failure that costs a delivery.
+  if (liftHi - liftLo < 60) {
+    throw new Error(`the relief runs only ${liftHi - liftLo} codes: `
+      + 'the pieces all stand at one height');
+  }
+  noLineAlongTheRun(out, TONE_W, TONE_H, 'the tone', 3);
+  noLineAlongTheRun(out, TONE_W, TONE_H, 'the relief', 3, 1);
   return out;
 }
 
@@ -263,11 +309,11 @@ const LINE_SIGMAS = 5;
 // this bar.
 const LINE_SHARE = 0.02;
 
-function noLineAlongTheRun(map, w, h, name, stride) {
+function noLineAlongTheRun(map, w, h, name, stride, channel = 0) {
   const column = new Float64Array(w);
   for (let i = 0; i < w; i++) {
     let sum = 0;
-    for (let j = 0; j < h; j++) sum += map[(j * w + i) * stride];
+    for (let j = 0; j < h; j++) sum += map[(j * w + i) * stride + channel];
     column[i] = sum / h;
   }
   const apart = [];
@@ -372,7 +418,7 @@ for (const [name, map, w, h, channels] of [
   // down anywhere and the delivery does not say which it did. A grey file has
   // one channel and one meaning.
   ['path-joint', paintJoint(), WIDTH, HEIGHT, 1],
-  ['path-tone', paintTone(), TONE_W, TONE_H, 1],
+  ['path-tone', paintTone(), TONE_W, TONE_H, 3],
   ['path-grain', paintGrain(), GRAIN_SIDE, GRAIN_SIDE, 3],
 ]) {
   const path = join(OUT_DIR, `${name}.png`);
