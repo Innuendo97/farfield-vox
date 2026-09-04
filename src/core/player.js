@@ -49,7 +49,18 @@ const PLAYER_RADIUS = 0.45;
 // second test is what keeps that from turning a hillside into a wall: a drop
 // only counts as a ledge if it is steeper than anything a slope could be, so a
 // long stride taken on a slow machine still walks downhill.
+//
+// AND THE CEILING IS COMPARED WITH A TENTH OF A MILLIMETRE OF SLACK, WHICH IS
+// ABOUT THE LAST DIGIT OF A DOUBLE AND NOT ABOUT THE RULE. The ground is ten
+// centimetre cubes and the tallest bank the meadow cuts is three of them: three
+// tenths, which is this ceiling exactly and on purpose. But the height comes out
+// of the generator as (2 + 1) * 0.10, and that is 0.30000000000000004 where the
+// literal here is 0.29999999999999999 -- one unit in the last place over, so a
+// step the world was built to allow was refused 235 times, and a walker who
+// climbed a mound could not come down its cut side. The slack is smaller than
+// anything a body could feel and four orders larger than the error it absorbs.
 const MAX_STEP_DOWN = 0.30;
+const LEDGE_EPS = 1e-4;
 const LEDGE_SLOPE = 2.0;
 
 // And whatever is still a drop after that is taken over a few frames rather
@@ -329,7 +340,7 @@ export class Player {
     if (moved <= 1e-6) return;
     const isLedge = (x, z) => {
       const drop = start - this.#groundHeight(x, z);
-      return drop > MAX_STEP_DOWN && drop > moved * LEDGE_SLOPE;
+      return drop > MAX_STEP_DOWN + LEDGE_EPS && drop > moved * LEDGE_SLOPE;
     };
     if (!isLedge(toX, toZ)) return;
     if (!isLedge(toX, fromZ)) this.position.z = fromZ;
