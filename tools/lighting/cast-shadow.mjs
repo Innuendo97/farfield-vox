@@ -5,7 +5,7 @@ import { readSun, sunVector } from './sun.mjs';
 //
 // Three tools needed this same answer and were each about to work it out for
 // themselves: the guard that asked which way up a light map is, the fit of the
-// canopy (tools/terrain/fit-canopy.mjs), and the mask of the ground the
+// canopy (tools/terrain/fit-canopy.mjs, retired at step 8), and the mask of the
 // reference does not contradict. Three copies of one geometry is how this
 // project ended up with three suns, so there is one here instead.
 //

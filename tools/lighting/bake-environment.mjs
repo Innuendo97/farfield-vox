@@ -233,9 +233,16 @@ function irradiance(preset) {
  * angle it comes to a thirtieth of the sky's irradiance, which no daylight is.
  * So its HUE is taken from here — the beam the air lets through, which reddens
  * on its own as a preset puts the sun lower — and its STRENGTH is fitted
- * against the reference by tools/lighting/fit-scene-light.mjs and kept in
- * `sunStrength` of this file, which is the one number of this chain that is
- * neither measured off the sky nor derived from it.
+ * against the reference and kept in `sunStrength` of this file, which is the one
+ * number of this chain that is neither measured off the sky nor derived from it.
+ *
+ * WHAT DID THE FITTING HAS BEEN RETIRED. tools/lighting/fit-scene-light.mjs
+ * predicted a patch of the reference by sampling the ground's two atlases and
+ * pushing the result through the composite; both atlases left the delivery at
+ * step 8, because the meadow has been cubes with their colour in a shader since
+ * the rifondazione, and the tool went with them. The two magnitudes stand where
+ * that fit left them and a rebake of the probe keeps them; the instrument that
+ * moves them next has to read the ground this world actually draws.
  */
 function sceneLight(preset, previous) {
   const e = irradiance(preset);
@@ -275,8 +282,8 @@ function sceneLight(preset, previous) {
       // unit peak, so it reddens by itself as a preset puts the sun lower.
       sunBeam: beam.map((v) => Number((v / peak).toFixed(6))),
       // And the two magnitudes, which are the only fitted numbers in the chain.
-      // tools/lighting/fit-scene-light.mjs writes them; a rebake of the probe
-      // keeps them.
+      // Nothing writes them today -- see the note above -- and a rebake of the
+      // probe keeps whatever they are.
       skyStrength: typeof previous?.day?.skyStrength === 'number'
         ? previous.day.skyStrength : null,
       sunStrength: typeof strength === 'number' ? strength : null,
