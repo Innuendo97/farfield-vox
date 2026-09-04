@@ -1,9 +1,9 @@
 import {
-  CHUNK, MATERIAL, NO_COLUMN, VOXEL, matAt, topAt, underAt,
+  BLADE, BLADES_PER_VOXEL, CHUNK, MATERIAL, NO_COLUMN, SUB, VOXEL, matAt, topAt, underAt,
 } from './columns.js';
 import {
-  BASE_STEP, DISC_RADIUS, EARTH, EMPTY, FACING, chunkColumns, chunkList as genChunkList,
-  columnCentre, earthFacing,
+  BASE_STEP, CENTRE, DISC_RADIUS, EARTH, EMPTY, FACING, chunkColumns,
+  chunkList as genChunkList, columnCentre, earthFacing,
 } from './worldgen.js';
 
 // THE GREEDY MESHER OVER THE BLOCK STORE.
@@ -64,9 +64,10 @@ import {
 // reach past this door to ask.
 export { VOXEL, CHUNK, NO_COLUMN, MATERIAL, matAt, topAt } from './columns.js';
 export {
-  BASE_STEP, CENTRE, DISC_RADIUS, EARTH, FRAMED, MOUND, PATH, SOD, bareRaisedAt, chunkColumns,
-  columnCentre, columnSpec, columnTop, earthFacing, framedTally, meadowMoundAt, moundAt,
-  moundBankAt, moundCutAt, onPaving, pathDrop, pathVerge, sodAt,
+  BASE_STEP, BLADE, BLADES_PER_VOXEL, CENTRE, DISC_RADIUS, EARTH, FRAMED, MANTO, MOUND, PATH, SUB,
+  bareRaisedAt, bladeAtColumn, bladeCentre, bladeHeightAt, chunkColumns,
+  columnCentre, columnSpec, columnTop, earthFacing, framedTally, mantoAt, mantoIntensity,
+  meadowMoundAt, moundAt, moundBankAt, moundCutAt, onPaving, pathDrop, pathVerge,
 } from './worldgen.js';
 
 // The six orientations, in the order the material reads them: the top first,
@@ -129,13 +130,13 @@ const QUAD_INDEX = [0, 1, 2, 0, 2, 3];
  * @param {number} radius how far the disc reaches, in metres
  * @returns {object} chunk-relative geometry, its counts and its box
  */
-export function meshChunk(cx, cz, grain = true, radius = DISC_RADIUS) {
+export function meshChunk(cx, cz, grain = true, radius = DISC_RADIUS, focus = CENTRE) {
   const n = CHUNK;
   // The chunk and a skirt of one column either side, so a wall on the chunk's
   // own edge is measured against the ground beyond it rather than against
   // nothing. The generator writes the skirt into the same store, so this pass
   // never has to ask for a column a second time.
-  const store = chunkColumns(cx, cz, n, grain, radius);
+  const store = chunkColumns(cx, cz, n, grain, radius, focus);
   const ox = cx * n;
   const oz = cz * n;
 
@@ -175,6 +176,16 @@ export function meshChunk(cx, cz, grain = true, radius = DISC_RADIUS) {
   // meshes, three draws for the whole disc -- and the corridor gives back the
   // draw its own surface used to cost.
   const paving = [];
+  // AND A FOURTH, FOR THE MAT OF GRASS. It is the family E-DECISIONI8 asked
+  // for -- «nel target l'erba e' rappresentata da voxel piu' o meno lunghi» --
+  // and it is kept apart from the meadow's own tops for the same reason the
+  // earth is kept apart from them: a rectangle of the ground and a rectangle of
+  // a blade may never merge into one, and they are lit and pigmented by two
+  // settings of one material rather than by one.
+  const mat = [];
+  // How many blade columns of this chunk's own square carry a blade at all,
+  // which is the denominator the mat's own price is read per.
+  let blades = 0;
   // How many of the walls exist only because something ends here -- the rim of
   // the disc, or a verge of the paving -- rather than because the ground
   // stepped. Counted apart because it is the one part of this number that does
@@ -318,31 +329,186 @@ export function meshChunk(cx, cz, grain = true, radius = DISC_RADIUS) {
         const z0 = (along ? a : b) * VOXEL;
         const x1 = x0 + (along ? run * VOXEL : VOXEL);
         const z1 = z0 + (along ? VOXEL : run * VOXEL);
-        // The face sits on the boundary the neighbour is across, and the two
-        // corners are taken so the winding turns the front of it outwards.
-        if (face === FACE.EAST) {
-          push(face, x1, yLow, z0, x1, yTop, z0, x1, yTop, z1, x1, yLow, z1, fam);
-        } else if (face === FACE.WEST) {
-          push(face, x0, yLow, z1, x0, yTop, z1, x0, yTop, z0, x0, yLow, z0, fam);
-        } else if (face === FACE.SOUTH) {
-          push(face, x1, yLow, z1, x1, yTop, z1, x0, yTop, z1, x0, yLow, z1, fam);
-        } else {
-          push(face, x0, yLow, z0, x0, yTop, z0, x1, yTop, z0, x1, yLow, z0, fam);
-        }
+        // AND A CUT WALL IS TWO RECTANGLES AND NOT ONE, WHICH IS THE MOUND THE
+        // COMMITTENTE ASKED FOR.
+        //
+        // E-DECISIONI8.3, his words: «nel target si vedono circa due voxel di
+        // TERRA + un voxel di PRATO; nel dopo tre voxel terra con la faccia
+        // superiore del terzo verde». E-ERBA-A 3 measured it -- 11 +/- 2 cm of
+        // brown under 7 +/- 2 cm of green, and the green one's SIDE is green,
+        // not just its top.
+        //
+        // The store has always been able to say that: `under` runs `depth`
+        // voxels below a top of its own material, and columnSpec writes the cut
+        // one voxel shallower for exactly this. What could not say it was this
+        // pass, which drew one rectangle for a whole wall and gave it one
+        // family. So the top CUBE of a cut wall is laid as meadow and the rest
+        // as soil, and the two are the same run, at the same two ends, split at
+        // one height.
+        //
+        // IT COSTS ONE QUAD PER CUT WALL AND NOTHING ELSE. Measured over the
+        // disc that ships that is the banks of the masses alone -- the numbers
+        // are in the verbale -- and it buys the one reading of E-DECISIONI8 that
+        // no colour and no texture could have given.
+        const cap = fam === SOIL ? Math.max(yLow, h * VOXEL) : yTop;
+        const lay = (lo, hi, family) => {
+          if (hi <= lo) return;
+          // The face sits on the boundary the neighbour is across, and the two
+          // corners are taken so the winding turns the front of it outwards.
+          if (face === FACE.EAST) {
+            push(face, x1, lo, z0, x1, hi, z0, x1, hi, z1, x1, lo, z1, family);
+          } else if (face === FACE.WEST) {
+            push(face, x0, lo, z1, x0, hi, z1, x0, hi, z0, x0, lo, z0, family);
+          } else if (face === FACE.SOUTH) {
+            push(face, x1, lo, z1, x1, hi, z1, x0, hi, z1, x0, lo, z1, family);
+          } else {
+            push(face, x0, lo, z0, x0, hi, z0, x1, hi, z0, x1, lo, z0, family);
+          }
+        };
+        lay(yLow, cap, fam);
+        lay(cap, yTop, MEADOW);
         b += run;
       }
     }
   };
-
   // +x and -x stand on the x axis and run along z; +z and -z the other way.
   wall(FACE.EAST, false, 1, 0);
   wall(FACE.WEST, false, -1, 0);
   wall(FACE.SOUTH, true, 0, 1);
   wall(FACE.NORTH, true, 0, -1);
 
+  // ---------------------------------------------------------------- the mat
+  //
+  // THE FOURTH FAMILY, ON A LATTICE OF ITS OWN, AND IT IS THE SAME PASS TWICE.
+  //
+  // Everything above meshes a heightfield of columns: tops merged where the
+  // level and the family agree, walls run along a bearing where the level and
+  // the floor agree. The mat is a heightfield too -- one height a blade column,
+  // four blade columns to a column of world -- so it is meshed by the same two
+  // loops in the sub-lattice's own units, and every level in here is counted in
+  // BLADES above y = 0 rather than in cubes.
+  //
+  // WHY IT IS A SECOND PASS AND NOT THE FIRST ONE WIDENED. The two lattices do
+  // not share a cell, a step or a floor: a blade stands ON the top of the
+  // column under it, so its floor moves with the mound it is standing on, and
+  // folding that into the loop above would put a division by two in the middle
+  // of the pass that lays the whole world. Kept apart, each pass is arithmetic
+  // over one grid, and the mat can be switched off without touching the ground.
+  //
+  // AND IT IS ONE DRAW AND NO ATTRIBUTE. The family is which MESH a rectangle
+  // ends up in, exactly as the earth and the paving are, so the rule at the top
+  // of this file holds bit for bit: nothing per voxel travels on a vertex.
+  const b = BLADES_PER_VOXEL;
+  const bn = n * b;
+  const bw = store.w * b;
+  const bo = 1 * b;
+  // AND THE VERTICAL UNIT IS A QUARTER OF A BLADE. The mat is a heightfield like
+  // any other and every level below is an integer of THIS, which is what keeps
+  // the merge a comparison of two whole numbers while the mat itself is free to
+  // stand at a height that is not a whole blade (./columns.js, SUB).
+  const step = BLADE / SUB;
+  const rung = b * SUB;
+  // The level of the ground under a blade column, and of the top of its blades,
+  // both in blades above nought. EMPTY where no column stands.
+  const bIndex = (i, j) => (j + bo) * bw + (i + bo);
+  const bFloor = (i, j) => {
+    const h = at(i >> 1, j >> 1);
+    return h === EMPTY ? EMPTY : (h + 1) * rung;
+  };
+  const bTop = (i, j) => {
+    const f = bFloor(i, j);
+    return f === EMPTY ? EMPTY : f + store.blade[bIndex(i, j)];
+  };
+
+  const bUsed = new Uint8Array(bn * bn);
+  for (let j = 0; j < bn; j++) {
+    for (let i = 0; i < bn; i++) {
+      if (bUsed[j * bn + i]) continue;
+      const f = bFloor(i, j);
+      if (f === EMPTY) continue;
+      const t = bTop(i, j);
+      // A blade column with nothing on it draws no top: what is there is the
+      // ground's own top face, and the pass above has already laid it.
+      if (t <= f) continue;
+      const same = (a, c) => !bUsed[c * bn + a] && bTop(a, c) === t && bFloor(a, c) < t;
+      let w = 1;
+      while (i + w < bn && same(i + w, j)) w++;
+      let d = 1;
+      grow: while (j + d < bn) {
+        for (let k = 0; k < w; k++) {
+          if (!same(i + k, j + d)) break grow;
+        }
+        d++;
+      }
+      for (let q = 0; q < d; q++) for (let a = 0; a < w; a++) bUsed[(j + q) * bn + i + a] = 1;
+      blades += w * d;
+      const y = t * step;
+      const x0 = i * BLADE;
+      const z0 = j * BLADE;
+      const x1 = (i + w) * BLADE;
+      const z1 = (j + d) * BLADE;
+      mat.push([FACE.TOP, x0, y, z0, x0, y, z1, x1, y, z1, x1, y, z0]);
+    }
+  }
+
+  const bWall = (face, along, dix, diz) => {
+    for (let a = 0; a < bn; a++) {
+      let c = 0;
+      while (c < bn) {
+        const i = along ? c : a;
+        const j = along ? a : c;
+        const t = bTop(i, j);
+        const f = bFloor(i, j);
+        if (f === EMPTY || t <= f) { c++; continue; }
+        // WHAT THE NEIGHBOUR HIDES IS EVERYTHING UP TO ITS OWN TOP, and that is
+        // the whole of the rule: below its ground it is ground, above its
+        // ground and below its own blades it is blade. So the face this column
+        // shows runs from the higher of its own floor and the neighbour's top,
+        // up to its own top -- and where there is no neighbour at all (the rim
+        // of the disc, the corridor's hole) the blade shows its whole side.
+        const nt = bTop(i + dix, j + diz);
+        const low = nt === EMPTY ? f : Math.max(f, nt);
+        if (low >= t) { c++; continue; }
+        let run = 1;
+        while (c + run < bn) {
+          const i2 = along ? c + run : a;
+          const j2 = along ? a : c + run;
+          if (bTop(i2, j2) !== t) break;
+          const f2 = bFloor(i2, j2);
+          if (f2 === EMPTY || f2 >= t) break;
+          const n2 = bTop(i2 + dix, j2 + diz);
+          if ((n2 === EMPTY ? f2 : Math.max(f2, n2)) !== low) break;
+          run++;
+        }
+        const yTop = t * step;
+        const yLow = low * step;
+        const x0 = (along ? c : a) * BLADE;
+        const z0 = (along ? a : c) * BLADE;
+        const x1 = x0 + (along ? run * BLADE : BLADE);
+        const z1 = z0 + (along ? BLADE : run * BLADE);
+        if (face === FACE.EAST) {
+          mat.push([face, x1, yLow, z0, x1, yTop, z0, x1, yTop, z1, x1, yLow, z1]);
+        } else if (face === FACE.WEST) {
+          mat.push([face, x0, yLow, z1, x0, yTop, z1, x0, yTop, z0, x0, yLow, z0]);
+        } else if (face === FACE.SOUTH) {
+          mat.push([face, x1, yLow, z1, x1, yTop, z1, x0, yTop, z1, x0, yLow, z1]);
+        } else {
+          mat.push([face, x0, yLow, z0, x0, yTop, z0, x1, yTop, z0, x1, yLow, z0]);
+        }
+        c += run;
+      }
+    }
+  };
+  bWall(FACE.EAST, false, 1, 0);
+  bWall(FACE.WEST, false, -1, 0);
+  bWall(FACE.SOUTH, true, 0, 1);
+  bWall(FACE.NORTH, true, 0, -1);
+
   const packed = pack(quads, columns, rim, tops, cx, cz);
   packed.earth = packFaces(earth);
   packed.paving = packFaces(paving);
+  packed.mat = packFaces(mat);
+  packed.blades = blades;
   return packed;
 }
 
@@ -359,6 +525,19 @@ function packFaces(quads) {
   const normals = new Int8Array(count * 12);
   const indices = count * 4 > 65535
     ? new Uint32Array(count * 6) : new Uint16Array(count * 6);
+  // AND THE BOX, WHICH THIS PASS DID NOT USED TO GATHER BECAUSE THE TWO
+  // FAMILIES IT SERVED WERE HUNG AS ONE MESH EACH AND NEVER CULLED. The mat is
+  // hung a chunk at a time -- it is the one family big enough that the frustum
+  // has something to gain -- so its pieces need a sphere, and gathering it in
+  // the loop that already walks every corner costs nothing where walking them a
+  // second time on the walker's own thread was the longest thing this file's
+  // caller used to do.
+  let lo = Infinity;
+  let hi = -Infinity;
+  let x0 = Infinity;
+  let x1 = -Infinity;
+  let z0 = Infinity;
+  let z1 = -Infinity;
   for (let q = 0; q < count; q++) {
     const it = quads[q];
     const face = it[0];
@@ -370,13 +549,30 @@ function packFaces(quads) {
       positions[o] = it[1 + v * 3];
       positions[o + 1] = it[2 + v * 3];
       positions[o + 2] = it[3 + v * 3];
+      if (positions[o] < x0) x0 = positions[o];
+      if (positions[o] > x1) x1 = positions[o];
+      if (positions[o + 1] < lo) lo = positions[o + 1];
+      if (positions[o + 1] > hi) hi = positions[o + 1];
+      if (positions[o + 2] < z0) z0 = positions[o + 2];
+      if (positions[o + 2] > z1) z1 = positions[o + 2];
       normals[o] = nx;
       normals[o + 1] = ny;
       normals[o + 2] = nz;
     }
     for (let k = 0; k < 6; k++) indices[q * 6 + k] = q * 4 + QUAD_INDEX[k];
   }
-  return { positions, normals, indices, quads: count };
+  return {
+    positions,
+    normals,
+    indices,
+    quads: count,
+    sphere: count ? {
+      x: (x0 + x1) / 2,
+      y: (lo + hi) / 2,
+      z: (z0 + z1) / 2,
+      radius: 0.5 * Math.hypot(x1 - x0, hi - lo, z1 - z0),
+    } : null,
+  };
 }
 
 /**
@@ -471,20 +667,25 @@ function pack(quads, columns, rim, tops, cx, cz) {
  * 3 638 triangles and one draw in a budget of its own (E-V3g, §2.9); it is part
  * of the disc now and it is priced with the disc.
  */
-export function meshDisc(onChunk, grain = true, radius = DISC_RADIUS) {
+export function meshDisc(onChunk, grain = true, radius = DISC_RADIUS, focus = CENTRE) {
   let quads = 0;
   let earthQuads = 0;
   let pavingQuads = 0;
+  let matQuads = 0;
   let columns = 0;
+  let blades = 0;
   let rim = 0;
   const chunks = [];
   for (const { cx, cz } of chunkList(radius)) {
-    const chunk = meshChunk(cx, cz, grain, radius);
-    if (chunk.quads === 0 && chunk.earth.quads === 0 && chunk.paving.quads === 0) continue;
-    quads += chunk.quads + chunk.earth.quads + chunk.paving.quads;
+    const chunk = meshChunk(cx, cz, grain, radius, focus);
+    if (chunk.quads === 0 && chunk.earth.quads === 0
+      && chunk.paving.quads === 0 && chunk.mat.quads === 0) continue;
+    quads += chunk.quads + chunk.earth.quads + chunk.paving.quads + chunk.mat.quads;
     earthQuads += chunk.earth.quads;
     pavingQuads += chunk.paving.quads;
+    matQuads += chunk.mat.quads;
     columns += chunk.columns;
+    blades += chunk.blades;
     rim += chunk.rim;
     chunks.push(chunk);
     if (onChunk) onChunk(chunk);
@@ -494,10 +695,18 @@ export function meshDisc(onChunk, grain = true, radius = DISC_RADIUS) {
     quads,
     earthQuads,
     pavingQuads,
+    // THE MAT IS IN THE TOTAL AND IT IS ALSO ITS OWN NUMBER, because it is the
+    // one family that can move the disc's price by an order of magnitude and
+    // the first question anyone will ask of a frame that got dearer is which
+    // of the four did it.
+    matQuads,
     columns,
+    blades,
     rim,
     triangles: quads * 2,
     quadsPerColumn: columns ? quads / columns : 0,
+    /** What one blade column of the mat costs, which is E-ERBA-A 6.3's number. */
+    quadsPerBlade: blades ? matQuads / blades : 0,
     // The same ratio with the edges of the piece taken out, which is the figure
     // that carries to a world: a disc of fourteen metres is a third edge and a
     // world is almost none.

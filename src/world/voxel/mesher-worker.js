@@ -48,7 +48,7 @@ import { MONOLITHS } from '../layout.js';
 self.onmessage = (event) => {
   const woke = performance.now();
   const {
-    grain = true, tile = 512, block = '05', radius = DISC_RADIUS,
+    grain = true, tile = 512, block = '05', radius = DISC_RADIUS, focus = null,
   } = event.data || {};
 
   const tileStarted = performance.now();
@@ -87,13 +87,20 @@ self.onmessage = (event) => {
 
   const started = performance.now();
   let quads = 0;
+  let matQuads = 0;
   let columns = 0;
+  let blades = 0;
   let rim = 0;
   for (const { cx, cz } of list) {
-    const chunk = meshChunk(cx, cz, grain, radius);
-    if (chunk.quads === 0) continue;
+    // WHERE THE MAT IS DRAWN BLADE BY BLADE ARRIVES AS DATA, exactly the way the
+    // radius does, so the door does not move for it either: what the caller does
+    // not say, the engine's own default answers (the middle of the disc).
+    const chunk = meshChunk(cx, cz, grain, radius, focus || undefined);
+    if (chunk.quads === 0 && chunk.mat.quads === 0) continue;
     quads += chunk.quads;
+    matQuads += chunk.mat.quads;
     columns += chunk.columns;
+    blades += chunk.blades;
     rim += chunk.rim;
     // The other two families' three buffers travel with the chunk's own and are
     // handed over the same way: they are the same three things -- corners, an
@@ -106,14 +113,19 @@ self.onmessage = (event) => {
       chunk.earth.indices.buffer,
       chunk.paving.positions.buffer, chunk.paving.normals.buffer,
       chunk.paving.indices.buffer,
+      chunk.mat.positions.buffer, chunk.mat.normals.buffer,
+      chunk.mat.indices.buffer,
     ]);
   }
   self.postMessage({
     kind: 'done',
     radius,
     quads,
+    matQuads,
     columns,
+    blades,
     rim,
+    quadsPerBlade: blades ? matQuads / blades : 0,
     quadsPerColumn: columns ? quads / columns : 0,
     insidePerColumn: columns ? (quads - rim) / columns : 0,
     elapsedMs: performance.now() - started,
