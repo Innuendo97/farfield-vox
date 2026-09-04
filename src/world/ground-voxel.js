@@ -2,9 +2,9 @@ import {
   BufferAttribute, BufferGeometry, Group, Mesh, Sphere, Vector3,
 } from 'three';
 import {
-  BLADE, CHUNK, DISC_RADIUS, NO_COLUMN, VOXEL,
+  BLADE, CENTRE, CHUNK, DISC_RADIUS, NO_COLUMN, VOXEL,
   bladeSettings, earthSettings, pavingMaterial as makePaving, pavingSettings, runInWorker,
-  voxelMaterial, voxelSettings,
+  shadeMap, voxelMaterial, voxelSettings,
 } from './voxel/index.js';
 import { sheetArray } from './voxel/sheet.js';
 
@@ -157,7 +157,14 @@ export function createGroundVoxel({
   // 0.20 of a cube where the truth is 0.50, because it was counting those false
   // edges. The pigment stays on the world's column all the same: see uCellRatio
   // in ./material.js.
-  const bladeTune = { ...bladeSettings(), sheet: sheetArrayTexture };
+  // AND ITS SHADOW, WHICH IS ONE TEXTURE OVER THE WHOLE DISC AND NOT ONE A
+  // CHUNK -- for exactly the reason the material is one and not one a chunk. A
+  // map per chunk is a uniform per chunk, so a material per chunk, so the
+  // program switch the four materials of this file exist to avoid. The chunks
+  // write their own squares into it as they land, which is also what makes it
+  // arrive WITH the geometry it describes rather than a frame behind it.
+  const shade = shadeMap(CENTRE.x, CENTRE.z, radius);
+  const bladeTune = { ...bladeSettings(), sheet: sheetArrayTexture, shade };
   const bladeMaterial = voxelMaterial(BLADE, bladeTune);
   // The bare faces as they arrive, chunk by chunk, in the chunk's own frame:
   // they are moved into the world's when the last one has landed.
@@ -417,6 +424,11 @@ export function createGroundVoxel({
     const started = performance.now();
     if (message.kind === 'chunk') {
       if (message.chunk.quads) land(message.chunk);
+      // THE SHADOW BEFORE THE BLADES IT IS ABOUT, so no frame ever draws a mat
+      // whose map is still empty: an empty byte is «the sun reaches the plane»,
+      // which would flash one chunk of unshaded grass into the picture on the
+      // frame it lands. It costs the upload of a square of bytes.
+      if (message.chunk.shade) shade.put(message.chunk.shade);
       if (message.chunk.mat && message.chunk.mat.quads) {
         const { cx, cz } = message.chunk;
         build.matQuads += message.chunk.mat.quads;
