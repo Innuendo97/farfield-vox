@@ -3,9 +3,10 @@ import { join } from 'node:path';
 import { REPO_ROOT } from '../grade/lib/framing.mjs';
 import { writeCleanPng } from '../grade/lib/png.mjs';
 import {
-  GRAIN, PATH_SKIN, PEB_EDGE, RELIEF, SKIN_REACH,
+  GRAIN, JOINT_LIP, PATH_SKIN, PEB_EDGE, RELIEF, SKIN_REACH,
   grainAt, grainTone, paveAt, skinPitch, skinToWorld,
 } from '../../src/world/path.js';
+import { smoothstep } from '../../src/world/terrain-field.js';
 
 // Paints the three maps the corridor is drawn from.
 //
@@ -222,7 +223,16 @@ function paintTone() {
       // map has any structure at all. A piece is eight texels across here, so
       // there is nothing finer for a mean to protect against.
       const seat = paveAt(x, z);
-      slotLift += seat.inSlot ? seat.lift / RELIEF.high : 0;
+      // THE SAME EASING THE FRAGMENT WRITES THE TERM WITH, and not the mask.
+      // The wall term is `smoothstep(0, JOINT_LIP[1], depth) * lift`, so a mean
+      // taken over the binary mask would be the mean of a different term -- and
+      // this literal exists precisely so the term cannot move the level. The
+      // depth of a point inside a slot is how far the nearest stone is: half the
+      // slot's own width less half the distance to its middle, and `jm` is that
+      // distance doubled because everything on this ruler is `second minus best`
+      // (see crackDistance in ../../src/world/path.js).
+      const depth = Math.max(0, (seat.gape - seat.jm) / 2);
+      slotLift += smoothstep(0, JOINT_LIP[1], depth) * (seat.lift / RELIEF.high);
       const code = Math.round(seat.tone * 255);
       const lift = Math.round(seat.lift / RELIEF.high * 255);
       out[(j * TONE_W + i) * 3] = code;
