@@ -1,5 +1,5 @@
 import {
-  pathCentreX, pathCoord, pathEdge, pathHalfWidth, pathRun, smoothstep,
+  clamp01, pathCentreX, pathCoord, pathEdge, pathHalfWidth, pathRun, smoothstep,
 } from './terrain-field.js';
 
 // THE CORRIDOR, AND IT IS A SURFACE OF ITS OWN FROM HERE ON.
@@ -401,6 +401,151 @@ export const JOINT_CUT = 0.46;
 // the difference between a crack and a joint, and it is the whole of it.
 export const CRACK = { share: 0.05, width: 0.0045, wander: 0.16 };
 
+// ========================================================================
+// THE TILES: WHERE THE STONE THINS INTO THE EARTH, AND HOW FAR EACH PIECE
+// STANDS PROUD.
+//
+// E-DECISIONI10 S1 to S4, the committente's own words: «e' a piano col
+// selciato, ma ha TASSELLI che sporgono in maniera diversa -- non voxel
+// completi: tasselli con altezza fino a 1 cm sopra il piano; ogni tassello e'
+// giustificato, ha la sua parte scura dovuta all'ombreggiatura della sporgenza,
+// e colori leggermente diversi fra loro»; «i tasselli di pietra non sono solo al
+// centro: si DIRADANO alternandosi ai tasselli di terra bruna, NON scomparendo
+// di netto come oggi, ma in maniera morbida».
+//
+// NEITHER OF THE TWO IS A NEW GENERATOR. The lattice below already cuts the
+// corridor into pieces a hand across and already decides, per piece, whether it
+// is stone or the bare ground between the stones -- `bare`, whose share is one
+// of the two tunings. What the two objects here add is a THIRD ARGUMENT to that
+// share, which is where the piece stands across the run, and a HEIGHT for the
+// piece, which is a number the lattice always could have said and nobody had
+// asked for.
+
+// HOW THE STONE THINS ACROSS THE RUN.
+//
+// MEASURED, AND THE MEASUREMENT IS THE WHOLE OF THE DEFECT. Read on the day
+// target at the fitted camera and on this world's own render at the same pose,
+// against the distance from the corridor's OWN kerb -- the crossing of half a
+// share of green, found on each picture rather than assumed
+// (fondazione/lav/se-mis.py) -- the share of the corridor's surface that reads
+// as pale stone runs, over the mid stretch:
+//
+//     from the kerb  -0.70  -0.50  -0.35  -0.20  -0.08  +0.06 m
+//     TARGET          47.6   54.9   47.8   42.9   40.3   27.5 %
+//     ours            55.3   53.6   50.8   59.3   66.9   89.5 %
+//
+// The two curves go opposite ways, and that is the sentence. The reference's
+// paving is never more than half stone even in its own middle and it gives the
+// stone UP as it reaches the grass; ours is at its most stone exactly where it
+// meets the grass, which is «netti confini verdi ai margini» read off the
+// surface instead of off the outline.
+//
+// THE SHARE IS THE THING THAT MOVES, and it moves with the LATERAL POSITION
+// rather than with a distance from an edge, because the corridor's own edge
+// wobbles and a share tied to it would wobble with it.
+export const SPREAD = {
+  // Where the thinning begins and where the stone has gone, as a fraction of the
+  // corridor's own nominal half width (pathHalfWidth, which is smooth; pathEdge
+  // is the one with the noise in it and is deliberately not read here).
+  //
+  // PAST ONE, WHICH IS THE POINT. `to` is beyond the nominal edge, so the last
+  // stone does not fall on the last column of the corridor: a few pieces surface
+  // out on the brown of the verge, which is S4 -- «ai margini del sentiero,
+  // sulla terra bruna, ci sono i tasselli di sentiero» -- and it is what stops
+  // the crossing being a line.
+  from: 0.30,
+  to: 1.15,
+  // How much of the thinning survives past the last stone of the run. Nought
+  // would leave a ghost of the paving's composition in the ground where the
+  // paving has ended; it fades with pathRun for the same reason the mat's own
+  // ramp does (MANTO.verge in ../world/voxel/worldgen.js).
+  fade: 1.0,
+};
+
+// HOW FAR A PIECE STANDS PROUD OF THE CORRIDOR'S FLOOR, in metres.
+//
+// A CENTIMETRE AT THE TOP, WHICH IS HIS NUMBER AND NOT A FIT: «tasselli con
+// altezza fino a 1 cm sopra il piano». Every piece draws its own out of its own
+// name, so «sporgono in maniera diversa» is the distribution and not a jitter on
+// one height.
+//
+// AND IT IS NOT GEOMETRY, AND THE NUMBERS SAY WHY. A centimetre is a tenth of
+// this world's cell: laid as real steps it would want a sub-lattice of the
+// corridor's tops with a vertical face on every piece -- about 1 250 pieces over
+// the twenty eight square metres of corridor the disc carries, ten triangles
+// each with the walls, so 12 500 against the 98 the whole corridor costs today,
+// and every one of those walls is 2.1 pixels tall at five metres and under one
+// past nine, which is a shimmer and not a stone. Painted, it is one number a
+// piece in a map that already exists at the right pitch, one extra fetch, and it
+// is exact at every distance because the frame draws it at the frame's own
+// resolution. The measurement that decides it is in §2.3 of the verbale: at the
+// pose the campaign judges on, the reference's own relief reads as a dark ring
+// round each piece 1.7 cm wide and 17 levels deep, and only 4 of those 17 levels
+// are directional. A tenth of a cell of true geometry cannot be bought with
+// 12 400 triangles to draw four levels.
+export const RELIEF = {
+  // The tallest a piece stands.
+  high: 0.010,
+  // What a piece of BARE GROUND stands, as a share of that: the soil between and
+  // over the stones is what the stones are bedded IN, so it lies lower than they
+  // do and the stones read as laid on it rather than as set into it.
+  earth: 0.35,
+  // How much of the sun a piece's own shadow takes off the piece it falls on, at
+  // a full step. ONE IS THE PHYSICS -- a shadowed patch keeps the sky and loses
+  // the beam -- and it is written as a number rather than assumed so the guard
+  // can hold it there.
+  shade: 1.0,
+  // And how much of BOTH terms the walls of a slot take, at a full step. A slot
+  // between two pieces standing a centimetre proud is a groove: it sees less of
+  // the sky as well as less of the sun, which is why this one multiplies the
+  // pair rather than the beam. Fitted through the chain on a real render at the
+  // fitted camera -- see the verbale -- against the reference's own contrast
+  // inside the corridor's surface: 19.4% of the local level against our 15.2.
+  wall: 0.80,
+  // AND THE MEAN THE TERM ABOVE TAKES, SO IT CANNOT MOVE THE LEVEL.
+  //
+  // This is the grain's own doctrine, and it is not tidiness: the level of this
+  // stone was fitted against the meadow beside it and both readings E-V3g is
+  // gated on are RATIOS between this surface and that one, so a contrast term
+  // that also darkened the whole corridor would move a gate without moving
+  // anything anybody asked for (material.js, «THE LEVEL IS A WALL»). The wall
+  // term is therefore written about its OWN mean over the strip -- the share of
+  // the strip that is inside a slot times the height of the piece there -- and
+  // the painter prints that mean every run so this literal can be checked
+  // against the map it describes.
+  mean: 0.0866,
+};
+
+/**
+ * How far a piece of the paving stands over the corridor's floor, in metres.
+ *
+ * ASKED AT THE PIECE AND NOT AT THE POINT, like everything else about a piece:
+ * a height that varied across a slab would be a slab that is not flat, and what
+ * the reference shows is flat pieces at different heights.
+ */
+function pieceLift(id, bare) {
+  const h = hash2(Math.round(id * 8191) + 1201, 5233);
+  return RELIEF.high * (bare ? RELIEF.earth : 1) * h;
+}
+
+/**
+ * The share of pieces that are bare ground rather than stone, at a seat.
+ *
+ * THE TUNING'S OWN SHARE IS THE FLOOR AND THE LATERAL TERM IS WHAT RISES: at the
+ * middle of the run the answer is E-V3d's measurement unchanged (2 to 9 per cent
+ * over the middle stretch, 5 to 17 over the apron -- which is the DEPTH half of
+ * the thinning, already measured and already here), and toward the verge it
+ * climbs to one. A term that replaced the tuning instead of standing on it would
+ * be throwing away the reading that the apron carries more earth than the reach.
+ */
+function bareShare(base, x, z) {
+  const half = pathHalfWidth(z);
+  if (!(half > 0)) return base;
+  const q = Math.abs(x - pathCentreX(z)) / half;
+  const out = smoothstep(SPREAD.from, SPREAD.to, q) * pathRun(z) * SPREAD.fade;
+  return base + (1 - base) * out;
+}
+
 /** Nearest site of a jittered lattice, and the joint between the two nearest. */
 function lattice(px, pz) {
   const ix = Math.floor(px);
@@ -474,6 +619,21 @@ function seatNorthing(fx, fz) {
   const ax = fx - SHIFT[0];
   const az = fz - SHIFT[1];
   return az * TURN_COS + ax * TURN_SIN;
+}
+
+/**
+ * The whole world point a lattice seat stands at, brought back out of the turn.
+ *
+ * THE WARP IS NOT UNDONE, and it does not have to be: what reads this is a SHARE
+ * over a ramp a metre and a half wide, and the warp moves a seat by at most a
+ * fifth of a block. Undoing it would want the inverse of a noise field, which
+ * does not exist; carrying the error is 8 cm on a ramp of 150, and it is
+ * declared here rather than hidden in a tolerance.
+ */
+function seatWorld(fx, fz) {
+  const ax = fx - SHIFT[0];
+  const az = fz - SHIFT[1];
+  return { x: ax * TURN_COS - az * TURN_SIN, z: az * TURN_COS + ax * TURN_SIN };
 }
 
 /** How many pieces a block is cut into, from its own name and its tuning. */
@@ -566,8 +726,13 @@ export function paveAt(x, z) {
     gape = CRACK.width;
   }
 
+  // THE SEAT AND NOT THE POINT, which is the same rule the tuning above is asked
+  // by and for the same reason: a share evaluated per point steps across the
+  // middle of a piece and leaves half a slab bare, which is the film the
+  // committente threw out three times (see `tune`).
+  const home = seatWorld(piece.seatX, piece.seatZ);
   const bare = hash2(Math.round(piece.id * 8191) + 53, 971)
-    < tune.bare[Math.min(3, cut) - 1];
+    < bareShare(tune.bare[Math.min(3, cut) - 1], home.x, home.z);
   // THE IDENTITY OF A PIECE IS A LEVEL AND NOT A TINT, and that is a measurement
   // against the reading this chapter opened with. Between one slab and the next
   // the plan reference spreads its luminance by 25.0% of the mean and its
@@ -587,6 +752,9 @@ export function paveAt(x, z) {
     // measured spread of the level between one piece and the next. The tuning's
     // own level moves the whole ramp without touching that spread.
     tone: bare ? 0 : clamp01(tune.level * (0.62 + 0.25 * (level - 0.5) * 2.4)),
+    // AND HOW FAR THE PIECE STANDS PROUD, which is the datum U-SENT-2 added and
+    // the painter carries in the second channel of the tone strip. See RELIEF.
+    lift: pieceLift(piece.id, bare),
   };
 }
 
