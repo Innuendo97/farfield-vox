@@ -1,14 +1,16 @@
 import { createHash } from 'node:crypto';
 import {
-  BASE_STEP, CENTRE, CHUNK, FRAMED, MATERIAL, MOUND, NO_COLUMN, SOD, VOXEL, cellMaterialAt,
+  BASE_STEP, CENTRE, CHUNK, DISC_RADIUS, FRAMED, MATERIAL, MOUND, NO_COLUMN, SOD, VOXEL,
+  cellMaterialAt,
   chunkColumns, clearColumn, columnCount, columnSpec, columnTop, createColumns, depthAt,
-  framedTally, matAt, meadowMoundAt, moundAt, moundCutAt, onPaving, paintTop, PATH, raise,
-  setTop, storeBytes, topAt, underAt,
+  framedTally, matAt, meadowMoundAt, moundAt, moundCutAt, onPaving, paintTop, PATH, pathDrop,
+  raise, setTop, storeBytes, topAt, underAt,
 } from '../../src/world/voxel/pure.js';
 // AND THE CONTRACT, because from step 6 the walker's floor is not the law any
 // more: it is the store, read through a cache of tiles that only this file's
 // last leg can prove answers the same thing the frame is cut from.
-import { groundHeightAt, setGroundDiscRadius } from '../../src/world/contracts.js';
+import { builtHeightAt, groundHeightAt, setGroundDiscRadius } from '../../src/world/contracts.js';
+import { PLATFORM, STAIRS } from '../../src/world/layout.js';
 import { TIERS } from '../../src/core/quality.js';
 import { TUNING } from '../../src/core/presence.js';
 import { reporter, selfTest } from './lib.mjs';
@@ -17,6 +19,30 @@ import { reporter, selfTest } from './lib.mjs';
 // Nothing is injected: the corridor is columns of this disc now, so both arms
 // below read the same world the page draws without being told anything.
 const SHIPPED_RADIUS = Math.max(...TIERS.map((t) => t.voxelDiscRadius));
+
+// AND THE RADIUS THE SHAPE OF A MASS IS READ AT, WHICH IS NOT THE SAME NUMBER.
+//
+// Everything this file gates about the FLOOR -- the plane, the runs, the risers,
+// the step against the body's ceiling, the store against the walker -- is asked
+// of the disc that ships, because that is the ground that exists. But the three
+// readings under 3b are not about the ground that exists: «taglia 1,5-3,5 m,
+// spaziatura 3-6 m, alte 2-4 voxel» is a reading of what a meadow of these
+// masses TYPICALLY looks like, and that is a property of the LAW -- the lattice,
+// the seats, MOUND's own dials -- and not of where the disc happens to be cut.
+//
+// AT FOURTEEN METRES THE SAMPLE IS EIGHT MASSES, and it is eight for a reason
+// that has nothing to do with the meadow: a mass the rim cuts in half is dropped
+// rather than measured (see massCensus), and at fourteen metres more than half
+// of them touch the rim, the corridor or a stone. Eight objects is a p50 that
+// moves a whole voxel if one of them is laid differently, and E-FOND-PIANO8
+// carried «the census measures 8 whole masses» to this step as a residue for
+// exactly that reason.
+//
+// So the shape is read over the disc the GENERATOR defines -- DISC_RADIUS, the
+// engine's own default -- where the same law lays the same masses over six times
+// the area. Nothing about the world changes: this is a wider window on one law,
+// and the window is declared here rather than left as a number in a call.
+const CENSUS_RADIUS = DISC_RADIUS;
 
 // THE GROUND IS A PLANE WITH THINGS PUT ON IT, AND THIS IS WHAT SAYS SO.
 //
@@ -90,14 +116,19 @@ const MASS_STEP = 3;
 // 0.30 is 0.29999999999999999. So the world's tallest bank is over the body's
 // ceiling by one unit in the last place, and the step DOWN off it is refused.
 //
-// IT IS COUNTED AND PRINTED AND NOT GATED, and the reason is ownership: the
-// lever is either MOUND.scarp.high, which is the meadow's and was ratified at
-// three by E-FOND-PIANO8 on the reference's own reading, or MAX_STEP_DOWN,
-// which is the body's. Neither is this file's to move, and a guard that went
-// red on a number nobody in this session may change would be a guard that gets
-// switched off. So it is a note with a count, so that the afternoon it moves is
-// the afternoon it is seen.
+// AND IT IS GATED NOW, BECAUSE THE COMPARISON GREW A TOLERANCE AND THE THING IT
+// COUNTED WENT TO NOUGHT. It stood here as a note with a count -- 214 pairs of
+// columns the body would not step down off -- because the two levers, the dial
+// of the bank and the body's ceiling, belonged to two other sessions and a
+// guard that goes red on a number nobody may move is a guard that gets switched
+// off. E-FOND-PIANO9 moved the third thing instead: the comparison itself takes
+// a tenth of a millimetre of slack (LEDGE_EPS in src/core/player.js), which is
+// four orders larger than the error of a double and smaller than anything a
+// body could feel. So a step the world was built to allow is allowed, and a
+// step that is genuinely over the ceiling is a defect this file may now fail on.
 const BODY_MAX_DOWN = 0.30;
+/** src/core/player.js:LEDGE_EPS, re-declared: it is not exported either. */
+const BODY_EPS = 1e-4;
 
 // THE REFERENCE'S OWN READING OF THE MASSES, in the units it was read in.
 // A §1.2 and E-V1h: two to four voxels tall, one and a half to three and a half
@@ -173,7 +204,10 @@ export function survey(radius) {
       const z = (j + 0.5) * VOXEL;
       if (onPaving(x, z)) {
         flat.paving++;
-        if (h !== BASE_STEP - PATH.drop) {
+        // A NORTHING AND NOT A CONSTANT: over the apron at the foot of the run
+        // the paving stands at the meadow's own floor, so its top face meets the
+        // lowest riser instead of a voxel under it. PATH.lift in worldgen.js.
+        if (h !== BASE_STEP - pathDrop(z)) {
           flat.pavingOff++;
           if (!flat.pavingWorst) flat.pavingWorst = { i, j, h };
         }
@@ -236,7 +270,7 @@ export function survey(radius) {
           // The drop as the BODY reads it: two faces out of the contract's own
           // arithmetic, subtracted, and compared the way player.js compares it.
           const down = Math.abs((h + 1) * VOXEL - (prev + 1) * VOXEL);
-          if (down > BODY_MAX_DOWN) {
+          if (down > BODY_MAX_DOWN + BODY_EPS) {
             bodyOver++;
             if (down > bodyWorst) { bodyWorst = down; bodyAt = { x, z }; }
           }
@@ -370,6 +404,32 @@ export function massCensus(radius, only = null) {
     g10: q(gaps, 0.1), g50: q(gaps, 0.5), g90: q(gaps, 0.9),
     cutOverScarp,
   };
+}
+
+/**
+ * The drop from the lowest tread of the run to the ground just south of it.
+ *
+ * ROW BY ROW ACROSS THE WHOLE WIDTH OF THE RUN, and against the floor the hub
+ * itself hands the walker -- max(the meadow, the worked stone) -- because that
+ * is the number the body compares. The two columns are the one under the tread
+ * and the one beyond the riser, half a voxel either side of the foot, so what
+ * is measured is the step a foot really takes and not a slope read over a metre.
+ */
+export function stairFoot() {
+  const footZ = STAIRS.z + STAIRS.tread * STAIRS.steps;
+  const floorAt = (x, z) => Math.max(groundHeightAt(x, z), builtHeightAt(x, z));
+  let rows = 0;
+  let worst = 0;
+  let over = 0;
+  for (let i = Math.round((STAIRS.x - STAIRS.width / 2) / VOXEL);
+    i <= Math.round((STAIRS.x + STAIRS.width / 2) / VOXEL); i++) {
+    const x = (i + 0.5) * VOXEL;
+    const drop = floorAt(x, footZ - VOXEL / 2) - floorAt(x, footZ + VOXEL / 2);
+    rows++;
+    if (drop > worst) worst = drop;
+    if (drop > BODY_MAX_DOWN + BODY_EPS) over++;
+  }
+  return { rows, worst, over };
 }
 
 /**
@@ -575,6 +635,22 @@ if (process.argv.includes('--self')) {
       caught: OPEN_STEP === 1 && seen.openOver === 0,
     },
     {
+      what: 'a bank of three voxels read as a drop the body would refuse',
+      caught: (2 + 1) * VOXEL <= BODY_MAX_DOWN + BODY_EPS,
+    },
+    {
+      what: 'a slack so wide that a bank of four voxels would slip through it',
+      caught: (3 + 1) * VOXEL > BODY_MAX_DOWN + BODY_EPS,
+    },
+    {
+      what: 'a corridor laid a voxel under the lowest riser, so its foot is a ledge',
+      caught: stairFoot().over === 0 && stairFoot().rows > 0,
+    },
+    {
+      what: 'the shape of a mass read off eight objects instead of a hundred',
+      caught: massCensus(CENSUS_RADIUS).n > 3 * massCensus(SHIPPED_RADIUS).n,
+    },
+    {
       what: 'the law and the store agree over a whole chunk, skirt included',
       caught: lawAgreesWithStore(0, 0, true, SHIPPED_RADIUS).agree,
     },
@@ -673,30 +749,46 @@ report.check(MOUND.scarp.high <= MASS_STEP && MOUND.scarp.low >= 2,
   `MOUND.scarp is ${MOUND.scarp.low}-${MOUND.scarp.high}`);
 report.line(`  the masses keep their own bank: MOUND.scarp ${MOUND.scarp.low}-${MOUND.scarp.high} `
   + `voxels, one height to a mass, and the bank against the stone stands at ${MOUND.bank.high}`);
-report.line(`  the body reads ${seen.bodyOver} of those pairs as a drop over its own `
-  + `${BODY_MAX_DOWN.toFixed(2)} m, the worst ${seen.bodyWorst.toPrecision(17)} m`
+report.line(`  the tallest bank is (${MOUND.scarp.high - 1} + 1) * VOXEL = `
+  + `${(MOUND.scarp.high * VOXEL).toPrecision(17)} m and the body's ceiling is `
+  + `${BODY_MAX_DOWN.toPrecision(17)}: one unit in the last place apart, which is what `
+  + `the ${BODY_EPS} m of slack in the comparison is for`);
+report.check(seen.bodyOver === 0,
+  'and the body refuses no step down anywhere on the disc, so a walker who climbs a mass '
+  + 'comes off it on the cut side',
+  `${seen.bodyOver} pairs refused, the worst ${seen.bodyWorst.toPrecision(17)} m`
   + `${seen.bodyAt ? ` at (${seen.bodyAt.x.toFixed(1)}, ${seen.bodyAt.z.toFixed(1)})` : ''}`);
-if (seen.bodyOver > 0) {
-  report.note(`the tallest bank this meadow cuts is (${MOUND.scarp.high - 1} + 1) * VOXEL = `
-    + `${(MOUND.scarp.high * VOXEL).toPrecision(17)} m and the body's own ceiling is `
-    + `${BODY_MAX_DOWN.toPrecision(17)}: over it by one unit in the last place, so `
-    + `src/core/player.js refuses the step DOWN off ${seen.bodyOver} pairs of columns. The `
-    + 'walker climbs a mound and cannot come off it on the cut side. The two levers are '
-    + 'MOUND.scarp.high (V1, ratified at three by E-FOND-PIANO8) and MAX_STEP_DOWN (V8): '
-    + "neither is this unit's, and the count is here so the choice is made on a number");
-}
+
+// AND THE ONE PLACE THE DROP WAS NOT AN ARTEFACT OF A DOUBLE: the foot of the
+// run. src/world/stairs.js draws the lowest riser from its tread down to nought
+// and the corridor used to be laid a voxel under that, so the ground fell 0.3167
+// m away from the stone exactly where a foot leaves it -- a third of a metre, on
+// 23 of the 40 rows across the run. PATH.lift in src/world/voxel/worldgen.js
+// stands the apron at the meadow's own floor, and what is left is the riser.
+const foot = stairFoot();
+report.line(`  at the foot of the run, over ${foot.rows} rows across its width: the lowest tread `
+  + `stands ${(PLATFORM.height / STAIRS.steps).toFixed(4)} m and the ground south of it `
+  + `${foot.worst.toFixed(4)} m below at worst`);
+report.check(foot.over === 0,
+  'and stepping off the bottom tread is a step and not a ledge, on every row of the run',
+  `${foot.over} rows drop more than ${BODY_MAX_DOWN.toFixed(2)} m`);
 
 // ------------------------------------------------------------------- 3b
 //
 // AND THE MASSES ARE COUNTED AS OBJECTS, because that is what the committente's
 // own words call them (E-DECISIONI4: «composizioni, cumuli ben orchestrati»)
 // and a share of columns cannot tell a meadow of masses from a meadow of noise.
-// They are gathered from the law over the whole shipped disc and measured in
-// the units the reference was read in.
-const census = massCensus(SHIPPED_RADIUS);
+// They are gathered from the law over the disc the generator defines -- see
+// CENSUS_RADIUS above for why that and not the disc that ships -- and measured
+// in the units the reference was read in.
+const census = massCensus(CENSUS_RADIUS);
+const shipped = massCensus(SHIPPED_RADIUS);
 report.line('');
-report.line(`  ${census.pieces} masses on the disc, one to every ${census.perM2.toFixed(0)} m2 of `
-  + `meadow; ${census.n} of them stand whole inside it and are the ones measured below`);
+report.line(`  ${census.pieces} masses over the ${CENSUS_RADIUS} m the law lays, one to every `
+  + `${census.perM2.toFixed(0)} m2 of meadow; ${census.n} of them stand whole and are the ones `
+  + 'measured below');
+report.line(`  on the ${SHIPPED_RADIUS} m disc that ships: ${shipped.pieces} masses, `
+  + `${shipped.n} of them whole, one to every ${shipped.perM2.toFixed(0)} m2`);
 report.check(census.tallLow >= MASS.tall.low && census.tallHigh <= MASS.tall.high,
   `every whole mass stands ${MASS.tall.low} to ${MASS.tall.high} voxels tall, as the reference reads`,
   `they run ${census.tallLow} to ${census.tallHigh}`);

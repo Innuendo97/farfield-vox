@@ -5,7 +5,7 @@ import {
 import { groundHeightAt, materialAt } from '../../src/world/contracts.js';
 import {
   BASE_STEP, MATERIAL, PATH, VOXEL, columnSpec, meadowMoundAt, moundAt, onPaving,
-  pathVerge,
+  pathDrop, pathVerge,
 } from '../../src/world/voxel/pure.js';
 import { reporter, selfTest } from './lib.mjs';
 
@@ -35,6 +35,13 @@ import { reporter, selfTest } from './lib.mjs';
 //     where the meadow is plain, two where a plate of grain has lifted it. That
 //     band is the reading of A 1.3, and it is what an eye actually sees of this
 //     whole rebuild.
+//     AND OVER THE APRON IT GIVES THAT VOXEL BACK, which is the same statement
+//     and not an exception to it: the paving's top face meets what the corridor
+//     arrives at, and over the last tread before the run that is the lowest
+//     riser, which src/world/stairs.js draws down to nought. So the level is
+//     asked against PATH.lift's own law rather than against one number, and the
+//     proud is read in two bands -- one to two along the run, nought to one over
+//     the apron, where the stone has come up to the meadow's own floor.
 //   * THE WIDTH. Twenty voxels under the walker's own feet, eight to twelve
 //     through the middle of the field, twenty four in the apron at the step: the
 //     reference's own taper (A 1.3, E-DECISIONI7 A4), which the straight ramp
@@ -57,6 +64,10 @@ const RUN = { from: STAIRS.z + STAIRS.tread * STAIRS.steps, to: 12.0 };
 // How far the grass beside the stone has to stand proud of it, in voxels.
 // A 1.3, and the committente's word on it is E-DECISIONI7 A2.
 const PROUD = { low: 1, high: 2 };
+
+// And over the apron, where the paving has come up to the meadow's own floor:
+// nought where the meadow is plain, one where a plate of grain has lifted it.
+const APRON_PROUD = { low: 0, high: 1 };
 
 // The reference's taper, in voxels of FULL width -- stone and both verges -- at
 // the three northings it is read at, with the tolerance each reading carries. A
@@ -88,6 +99,9 @@ export function survey() {
     rows: 0,
     proudLow: 99,
     proudHigh: -99,
+    apronRows: 0,
+    apronProudLow: 99,
+    apronProudHigh: -99,
     vergeLow: 99,
     vergeHigh: -99,
     level: 0,
@@ -124,13 +138,19 @@ export function survey() {
       const gx = (i + 0.5) * VOXEL;
       if (meadowMoundAt(gx, z) > 0 || moundAt(gx, z) > 0) continue;
       const proud = columnSpec(i, j, true).top - columnSpec(i - dir, j, true).top;
-      if (proud < seen.proudLow) seen.proudLow = proud;
-      if (proud > seen.proudHigh) seen.proudHigh = proud;
+      if (pathDrop(z) === 0) {
+        if (proud < seen.apronProudLow) seen.apronProudLow = proud;
+        if (proud > seen.apronProudHigh) seen.apronProudHigh = proud;
+      } else {
+        if (proud < seen.proudLow) seen.proudLow = proud;
+        if (proud > seen.proudHigh) seen.proudHigh = proud;
+      }
     }
 
     // The level of the paving itself, and the walker's floor over it.
     const top = columnSpec(i0, j, true).top;
-    const off = Math.abs(top - (BASE_STEP - PATH.drop));
+    if (pathDrop(z) === 0) seen.apronRows++;
+    const off = Math.abs(top - (BASE_STEP - pathDrop(z)));
     if (off > seen.level) { seen.level = off; seen.levelAt = [i0, j]; }
     const walked = groundHeightAt((i0 + 0.5) * VOXEL, z);
     if (Math.abs(walked - (top + 1) * VOXEL) > seen.floor) {
@@ -162,6 +182,10 @@ if (process.argv.includes('--self')) {
     {
       what: `grass standing ${seen.proudLow} to ${seen.proudHigh} voxels proud`,
       caught: seen.proudLow >= PROUD.low && seen.proudHigh <= PROUD.high,
+    },
+    {
+      what: 'a corridor that keeps its voxel of drop right up to the lowest riser',
+      caught: seen.apronRows > 0,
     },
     {
       what: 'a verge of one column a side, or of five',
@@ -200,12 +224,17 @@ report.line(`  ${seen.rows} rows of corridor, from z ${seen.southmost.toFixed(2)
 
 // ------------------------------------------------------------------- 1
 report.check(seen.level === 0,
-  `the paving stands at ${BASE_STEP - PATH.drop}, one voxel under the floor of the meadow`,
+  `the paving stands at ${BASE_STEP - PATH.drop} along the run and at ${BASE_STEP} over `
+  + `the ${PATH.lift.toFixed(2)} m of apron, where it meets the lowest riser`,
   seen.levelAt ? `off by ${seen.level} at column ${seen.levelAt[0]},${seen.levelAt[1]}`
-    : 'every row of it');
+    : `every row of it, ${seen.apronRows} of them apron`);
 report.check(seen.proudLow >= PROUD.low && seen.proudHigh <= PROUD.high,
   `and the grass beside it stands ${PROUD.low} to ${PROUD.high} voxels proud, as A 1.3 reads`,
   `${seen.proudLow} to ${seen.proudHigh} voxels over the run`);
+report.check(seen.apronProudLow >= APRON_PROUD.low && seen.apronProudHigh <= APRON_PROUD.high,
+  `and ${APRON_PROUD.low} to ${APRON_PROUD.high} over the apron, where the stone has come up `
+  + 'to the floor the grass stands on',
+  `${seen.apronProudLow} to ${seen.apronProudHigh} over ${seen.apronRows} rows`);
 
 // ------------------------------------------------------------------- 2
 report.line('');
