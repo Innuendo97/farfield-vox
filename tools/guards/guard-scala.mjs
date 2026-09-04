@@ -1,5 +1,5 @@
 import {
-  GROUND_EXPOSURE, LIGHT_SCALE, MEADOW_ALBEDO, encodedLum, faceColour,
+  GROUND_EXPOSURE, LIGHT_SCALE, MEADOW_ALBEDO, MEADOW_FIELD, encodedLum, faceColour,
   orientationLadder, readLight, renderChain,
 } from '../lighting/render-chain.mjs';
 import { reporter, selfTest } from './lib.mjs';
@@ -128,6 +128,30 @@ report.check(lands(bottom, TARGET.rocks.bottom),
   'and on the reading taken where the target\'s own orientations are known',
   `${bottom.toFixed(4)} against ${TARGET.rocks.bottom} (${TARGET.rocks.from}), `
   + `off by ${Math.abs(bottom - TARGET.rocks.bottom).toFixed(4)}`);
+
+// AND THE BAND THE MIDDLE OF WHICH IS BEING QUOTED. The pigment stopped being
+// one triple when it became a field, so "the material" is now a DISTRIBUTION and
+// the ladder is read at its median. The tone curve is not a straight line, so a
+// pale column and a dark one do not compress by the same factor and the rung is
+// not exactly invariant to which end of the band a column sits at. How much it
+// is not is printed here rather than assumed: the two ends of the field, carried
+// through the same chain. If that spread ever came to be wider than the
+// estimator's own null, reading the ladder at one column would stop being an
+// honest summary of the meadow -- and this is the line that would say so.
+report.line('');
+report.line('  WITNESS, not gated -- the field is a band and this is the middle of it:');
+for (const [name, tint] of [['the darkest twentieth', MEADOW_FIELD.p05],
+  ['the median column ', MEADOW_FIELD.p50], ['the palest twentieth', MEADOW_FIELD.p95]]) {
+  const rung = orientationLadder(composite, light, MEADOW_ALBEDO.map((c) => c * tint / MEADOW_FIELD.p50));
+  report.line(`    ${name}  tint ${tint.toFixed(4)}   top ${rung[0].rgb.map((v) => v.toFixed(0)).join(',').padEnd(12)}`
+    + `  bottom rung ${rung[2].rung.toFixed(4)}`);
+}
+report.line(`    the band's spread on the bottom rung is `
+  + `${(() => {
+    const at = (t) => orientationLadder(composite, light,
+      MEADOW_ALBEDO.map((c) => c * t / MEADOW_FIELD.p50))[2].rung;
+    return Math.abs(at(MEADOW_FIELD.p95) - at(MEADOW_FIELD.p05)).toFixed(4);
+  })()}, against an estimator null of ${NULL_BOTTOM}`);
 
 report.line('');
 report.line(`  WITNESS, not gated -- the middle rung ${middle.toFixed(4)}:`);
