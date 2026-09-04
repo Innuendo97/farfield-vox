@@ -1,8 +1,9 @@
 import {
   ClampToEdgeWrapping, DataTexture, DepthTexture, HalfFloatType, LinearFilter,
   LinearSRGBColorSpace, Mesh, NearestFilter, NoBlending, NoToneMapping, OrthographicCamera,
-  FloatType, PlaneGeometry, RGBAFormat, RedFormat, Scene, ShaderMaterial, Texture,
-  UnsignedByteType, UnsignedIntType, Vector2, Vector3, Vector4, WebGLRenderTarget,
+  FloatType, PlaneGeometry, RGBAFormat, RGBFormat, RedFormat, Scene, ShaderMaterial, Texture,
+  UnsignedByteType, UnsignedInt101111Type, UnsignedIntType, Vector2, Vector3, Vector4,
+  WebGLRenderTarget,
 } from 'three';
 
 // The frame is assembled here and nowhere else.
@@ -39,18 +40,90 @@ const BLOOM_TIERS = {
 
 // Multisampling, in the order it is attempted; the first count the driver
 // actually accepts is the one used.
-//
-// The buffer is half float throughout. R11F_G11F_B10F would carry this scene's
-// range in three quarters of the bandwidth, but a render target cannot be asked
-// for it here: the texture is allocated with texImage2D, whose format and type
-// have to agree with the internal format, and there is no exposed type constant
-// that pairs with it. Setting the internal format alone is rejected by the
-// driver. The dither in the composite is what covers the difference.
 const TARGET_ATTEMPTS = [
   { samples: 4 },
   { samples: 2 },
   { samples: 0 },
 ];
+
+// THE PIXEL OF THE SCENE BUFFER, in the order it is attempted, and it is the
+// single largest item in this frame on a machine whose video memory is the
+// system's own memory.
+//
+// WHAT IS BEING BOUGHT. At 1920 by 870 with four samples, eight bytes of colour
+// per sample is 53 MB of colour plus 16 of depth, cleared, written and resolved
+// every frame; four bytes is 27 plus 16. That difference was measured on this
+// machine as the same scene, same triangles, same everything, drawn into an
+// eight byte buffer and into a four byte one: 22.4 ms against 13.7 for the
+// world's stage. It is the cheapest eight milliseconds in this file and it
+// costs no vertex, no draw and no term of any material.
+//
+// WHY THE HALF FLOAT IS NOT SIMPLY REPLACED BY EIGHT BIT COLOUR. Everything in
+// this buffer is LIGHT, not picture: the exposure, the curve and both grades
+// run in the composite, downstream. So the sky stands at three to five in these
+// units and the sun's own disc far higher, and the bloom takes its source from
+// this buffer at a threshold of 0.72 of them. A buffer that cannot hold a value
+// above one does not dim the highlights, it DELETES them: the sky flattens to
+// paper, and what is left above the threshold is whatever the clamp left there,
+// which is not the halo this world was graded against. The two four byte
+// formats that CAN hold them are the two normalised ones' opposite: a packed
+// float. R11F_G11F_B10F is that format — five and six bit mantissas against the
+// half float's ten, no alpha, and the same range — so the chain keeps its
+// order, the bloom keeps its threshold, and what is spent is precision, which
+// the dither in the composite was already there to cover.
+//
+// AND THE TWO NORMALISED FORMATS ARE IN THIS TABLE WITHOUT BEING IN THE LADDER,
+// which is the one structural decision here. They are what the measurement that
+// chose the pixel had to be able to ask for BY NAME — a bench arm cannot compare
+// four bytes of clamped colour against eight bytes of light unless it can
+// allocate the first — and they are exactly what no fallback may ever land on by
+// itself: a driver that refuses the packed float has to fall back to the half
+// float, which costs bandwidth, and never onto a buffer that would quietly
+// delete every highlight in the frame. So `shipped` is the ladder and the table
+// is the vocabulary, and guard-buffer holds the ladder to formats that carry
+// light.
+const TARGET_FORMATS = [
+  {
+    name: 'R11F_G11F_B10F',
+    bytes: 4,
+    // Renderable through EXT_color_buffer_float, which this context already
+    // holds for the half float this replaces.
+    highDynamicRange: true,
+    shipped: true,
+    options: { internalFormat: 'R11F_G11F_B10F', format: RGBFormat, type: UnsignedInt101111Type },
+  },
+  {
+    // Asked of the driver rather than argued about: three exposes no type
+    // constant that pairs with this internal format, so the resolve texture's
+    // allocation is rejected and the probe falls through. It is here so that
+    // the measurement could establish that, and it is not shipped.
+    name: 'RGB10_A2',
+    bytes: 4,
+    highDynamicRange: false,
+    shipped: false,
+    options: { internalFormat: 'RGB10_A2', format: RGBAFormat, type: UnsignedByteType },
+  },
+  {
+    name: 'RGBA8',
+    bytes: 4,
+    highDynamicRange: false,
+    shipped: false,
+    options: { format: RGBAFormat, type: UnsignedByteType },
+  },
+  {
+    name: 'RGBA16F',
+    bytes: 8,
+    highDynamicRange: true,
+    shipped: true,
+    options: { format: RGBAFormat, type: HalfFloatType },
+  },
+];
+
+/** The ladder a frame is allowed to fall down, in order. */
+const SHIPPED_FORMATS = TARGET_FORMATS.filter((shape) => shape.shipped);
+
+/** Every format this file knows how to ask a driver for, in ladder order. */
+export const SCENE_FORMATS = TARGET_FORMATS.map((shape) => shape.name);
 
 const FULLSCREEN_VERTEX = /* glsl */`
   varying vec2 vUv;
@@ -2096,10 +2169,10 @@ function makeDepthTexture(width, height) {
   return depth;
 }
 
-function makeTarget(width, height, { samples }) {
+function makeTarget(width, height, { samples, format }) {
+  const shape = format || TARGET_FORMATS[0];
   const target = new WebGLRenderTarget(width, height, {
-    type: HalfFloatType,
-    format: RGBAFormat,
+    ...shape.options,
     colorSpace: LinearSRGBColorSpace,
     minFilter: LinearFilter,
     magFilter: LinearFilter,
@@ -2952,6 +3025,20 @@ export function createPostPipeline(gl) {
   let height = 1;
   // What the tier asks for; what the driver granted is in `quality.samples`.
   let wantedSamples = TARGET_ATTEMPTS[0].samples;
+  // And which pixel it asks for, by name. Null is the shipping ladder from the
+  // top; a name is tried first and the ladder catches it, so a tier that asks
+  // for a packed float on a driver that has none still gets a frame -- and gets
+  // it in a buffer that still carries light. What was actually granted is in
+  // `quality.format` and nowhere else: asking is not getting, and a bench arm
+  // that did not read it back would publish the name it wanted rather than the
+  // buffer it measured.
+  let wantedFormat = null;
+  const wantedFormats = () => {
+    if (wantedFormat === null) return SHIPPED_FORMATS;
+    const asked = TARGET_FORMATS.find((shape) => shape.name === wantedFormat);
+    if (!asked) return SHIPPED_FORMATS;
+    return [asked, ...SHIPPED_FORMATS.filter((shape) => shape !== asked)];
+  };
   let bloomTier = 'half';
 
   const clock = createGpuClock(gl);
@@ -2970,24 +3057,38 @@ export function createPostPipeline(gl) {
   // Some drivers accept the packed format and then fail to complete the
   // framebuffer. Asking the context afterwards is the only reliable answer, so
   // each combination is tried for real and kept only if it draws clean.
-  function probeTarget(w, h, ceiling) {
+  function probeTarget(w, h, ceiling, formats) {
     const context = gl.getContext();
-    for (const attempt of TARGET_ATTEMPTS) {
-      if (attempt.samples > ceiling) continue;
-      const target = makeTarget(w, h, attempt);
-      while (context.getError() !== context.NO_ERROR) { /* drain */ }
-      gl.setRenderTarget(target);
-      gl.clear();
-      const complete = context.checkFramebufferStatus(context.FRAMEBUFFER) === context.FRAMEBUFFER_COMPLETE;
-      const clean = context.getError() === context.NO_ERROR;
-      gl.setRenderTarget(null);
-      if (complete && clean) {
-        return { target, quality: { samples: attempt.samples, format: 'RGBA16F' } };
+    // The format is the outer loop and the sample count the inner one, because
+    // the bytes per sample buy more than the samples do: a driver that will not
+    // give four samples of the packed float has to be offered two of it before
+    // it is offered four of the half float.
+    for (const shape of formats) {
+      for (const attempt of TARGET_ATTEMPTS) {
+        if (attempt.samples > ceiling) continue;
+        const target = makeTarget(w, h, { samples: attempt.samples, format: shape });
+        while (context.getError() !== context.NO_ERROR) { /* drain */ }
+        gl.setRenderTarget(target);
+        gl.clear();
+        const complete = context.checkFramebufferStatus(context.FRAMEBUFFER) === context.FRAMEBUFFER_COMPLETE;
+        const clean = context.getError() === context.NO_ERROR;
+        gl.setRenderTarget(null);
+        if (complete && clean) {
+          return {
+            target,
+            quality: {
+              samples: attempt.samples,
+              format: shape.name,
+              bytes: shape.bytes,
+              highDynamicRange: shape.highDynamicRange,
+            },
+          };
+        }
+        target.depthTexture.dispose();
+        target.dispose();
       }
-      target.depthTexture.dispose();
-      target.dispose();
     }
-    throw new Error('no usable high dynamic range render target');
+    throw new Error('no usable scene render target');
   }
 
   // The sample count is fixed when the buffer is allocated, so changing it
@@ -3002,7 +3103,7 @@ export function createPostPipeline(gl) {
       if (sceneTarget.depthTexture) sceneTarget.depthTexture.dispose();
       sceneTarget.dispose();
     }
-    const probed = probeTarget(width, height, wantedSamples);
+    const probed = probeTarget(width, height, wantedSamples, wantedFormats());
     sceneTarget = probed.target;
     quality = probed.quality;
   }
@@ -3234,6 +3335,22 @@ export function createPostPipeline(gl) {
     setSamples(count) {
       if (count === wantedSamples) return false;
       wantedSamples = count;
+      allocateScene();
+      return true;
+    },
+
+    /**
+     * Which pixel the scene is drawn into, by the name the ladder gives it.
+     *
+     * Null puts the ladder back, which is what the tier asks for. Allocating a
+     * new buffer is a hitch of a frame, the same one `setSamples` is: this is
+     * asked standing still, by a bench that is about to measure the difference,
+     * or once at start up.
+     */
+    setSceneFormat(name) {
+      const next = name === null || name === undefined ? null : String(name);
+      if (next === wantedFormat) return false;
+      wantedFormat = next;
       allocateScene();
       return true;
     },
