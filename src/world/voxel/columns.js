@@ -55,6 +55,52 @@ export const VOXEL = 0.10;
 // already exists, with its heights quantised. Anything that reintroduces a
 // second step reintroduces that defect, however it is dressed up.
 
+// AND THE MAT OF GRASS IS NOT THAT DEFECT, WHICH IS WHY IT IS WRITTEN HERE AND
+// NOT SMUGGLED IN SOMEWHERE ELSE.
+//
+// What the note above refuses is a LADDER of sizes anchored to the world: a
+// ring measured for the middle of the hub, wrong by an order of magnitude under
+// the walker's own feet at the rim. That is a second step whose relation to the
+// first depends on WHERE you stand, and it is the defect that read 134 pixels a
+// cube against the target's 12.
+//
+// The blade is the opposite of that. It is one step, the same everywhere, and
+// it is a whole DIVISION of the step above -- two blades to a cube on each
+// axis, four blade columns to a column of world -- so a blade boundary is
+// always a cube boundary or the exact middle of one, no seam anywhere has to be
+// invented, and the arithmetic stays in whole numbers. The relation between the
+// two is a constant of this file and not a function of a place.
+//
+// AND IT IS THE TARGET'S OWN MEASUREMENT AND NOT A CONVENIENCE. E-ERBA-A read
+// the blade of grass at 5.5-6.0 cm -- 0.60 of our cube, with a control that
+// reads 1.087 where the truth is 1.000 -- and the coordinator took 5 cm over
+// the 6 (D-E1 = A) because the 17% it costs in fidelity is bought back in every
+// seam of the world. The three answers and their prices are written over MANTO
+// in ./worldgen.js.
+
+/** The step of the mat, in metres. */
+export const BLADE = 0.05;
+
+/** How many blades a column of the world is wide, on each axis. */
+export const BLADES_PER_VOXEL = 2;
+
+// AND HOW FINELY THE MAT IS MEASURED UPWARD, WHICH IS NOT THE SAME NUMBER.
+//
+// The blade is 5 cm wide because that is what the target's blade measures
+// (E-ERBA-A 1.1) and because it is a whole division of the cube. Its HEIGHT is
+// kept in quarters of that, and the reason is E-DECISIONI10 G3: «erba e steli
+// possono avere altezze diverse dai voxel normali -- voxel PIU' BASSI,
+// composizioni piu' minuziose dove serve (infittimento/diradamento attorno a
+// creste, prominenze, pilastri, sentiero)». A mat that could only be one, two or
+// three blades tall cannot thin out «in maniera GRADUALE e giustificata»; it can
+// only step.
+//
+// FOUR AND NOT MORE, and the bound is the byte: a height in quarter blades over
+// a mat that stands five blades at its tallest is twenty of the two hundred and
+// fifty five a byte holds, and the rest is headroom nothing has asked for. It
+// costs no triangle -- see bladeAtColumn() in ./worldgen.js.
+export const SUB = 4;
+
 // Columns per side of a chunk. Sixty four because that is the tiling the sweep
 // over the walker's positions was measured with, including the penalty for the
 // merges that die at a chunk's edge: changing it here would make the demo's
@@ -121,7 +167,49 @@ export function createColumns(ox, oz, w, d) {
     mat: new Uint8Array(w * d),
     under: new Uint8Array(w * d),
     depth: new Uint8Array(w * d),
+    // AND THE MAT, AT FOUR TIMES THE RESOLUTION AND ONE BYTE A BLADE.
+    //
+    // A SIXTH ARRAY AND NOT A SIXTH FIELD OF A COLUMN, because it is not a
+    // property of a column: there are FOUR of these to every column of the
+    // world, and folding four heights into one byte of a column would be the
+    // sub-lattice written down as a bit trick instead of as a grid.
+    //
+    // WHAT IT COSTS. Four bytes a column on top of the five the store already
+    // holds -- so nine, not five -- and at the largest disc any tier lays that
+    // is 4.4 MB if every column were resident at once, which none of them is:
+    // the store is cut per chunk, on demand, and thrown away when its mesh is
+    // made. The peak is one chunk's worth, 17 424 bytes at CHUNK 64 with the
+    // skirt, and it never leaves the worker: the mat travels as TRIANGLES like
+    // everything else.
+    //
+    // AND THE SKIRT COMES FOR FREE. The blade rectangle is the column
+    // rectangle doubled, so the one column of skirt the store already carries
+    // is two blades of skirt -- which is one more than the mesher needs to
+    // compare a blade against its neighbour across a chunk's edge.
+    blade: new Uint8Array(w * BLADES_PER_VOXEL * d * BLADES_PER_VOXEL),
   };
+}
+
+/** Where a global blade column sits in a store's mat, or -1 if outside it. */
+export function bladeIndex(store, bx, bz) {
+  const i = bx - store.ox * BLADES_PER_VOXEL;
+  const j = bz - store.oz * BLADES_PER_VOXEL;
+  const w = store.w * BLADES_PER_VOXEL;
+  if (i < 0 || j < 0 || i >= w || j >= store.d * BLADES_PER_VOXEL) return -1;
+  return j * w + i;
+}
+
+/** How many blades stand on one column of the mat. Nought outside the store. */
+export function bladeAt(store, bx, bz) {
+  const k = bladeIndex(store, bx, bz);
+  return k < 0 ? 0 : store.blade[k];
+}
+
+/** Lays the mat on one column of the sub-lattice. */
+export function setBlade(store, bx, bz, h) {
+  const k = bladeIndex(store, bx, bz);
+  if (k < 0) return;
+  store.blade[k] = h;
 }
 
 /** Where a global column sits in a store's arrays, or -1 if it is outside it. */
@@ -258,5 +346,5 @@ export function columnCount(store) {
 /** How many bytes a store holds, so the cost of a disc can be added up. */
 export function storeBytes(store) {
   return store.top.byteLength + store.mat.byteLength
-    + store.under.byteLength + store.depth.byteLength;
+    + store.under.byteLength + store.depth.byteLength + store.blade.byteLength;
 }
