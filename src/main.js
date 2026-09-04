@@ -586,13 +586,31 @@ function plantWhenReady() {
   // With no scene up there is no closure between the ask and the answer.
   const plantBytes = wanted.reduce((sum, id) => sum + assets.bytesOf(id), 0);
   let plantLanded = 0;
-  const ask = introBus
-    ? (id) => assets.load(id).then((value) => {
-      plantLanded += assets.bytesOf(id);
-      introBus.report('plant', plantBytes ? plantLanded / plantBytes : 1);
-      return value;
-    })
-    : (id) => assets.load(id);
+  const landed = (id) => {
+    plantLanded += assets.bytesOf(id);
+    if (introBus) introBus.report('plant', plantBytes ? plantLanded / plantBytes : 1);
+  };
+  // AND AN ID THIS DELIVERY DOES NOT CARRY IS NOT A REASON TO PLANT NOTHING.
+  //
+  // bagFor() states the contract twenty lines up: "An asset that has not landed
+  // comes back undefined, which is what every layer already checks for". A
+  // Promise.all over the asks made that sentence FALSE -- one id the manifest
+  // does not have and the whole arrival was skipped, so a tree whose assets had
+  // not been built came up with no meadow, no flowers and no trees for the sake
+  // of a sheet of five hundred bytes. Measured, on exactly that tree.
+  //
+  // So a miss is reported by name and turned into the null the layers already
+  // read, and everything that DID land is planted. It is reported and not
+  // swallowed: a delivery that disagrees with the register is a real defect and
+  // the console is where it has to say so.
+  const ask = (id) => assets.load(id)
+    .then((value) => { landed(id); return value; })
+    .catch((error) => {
+      console.warn(`[plant] "${id}" is not in this delivery (${error.message}): `
+        + 'the layers that read it draw without it');
+      landed(id);
+      return null;
+    });
   Promise.all(wanted.map(ask))
     .then(() => generated())
     .then((relit) => hub.plant({
