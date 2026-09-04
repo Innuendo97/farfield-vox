@@ -11,6 +11,20 @@ import {
 // import attribute is what lets the same line be read by node and by the
 // bundler, which is the property this whole half of the engine rests on.
 import ROCK_PLAN from '../../../assets-src/rocks/rocks.json' with { type: 'json' };
+// AND THE SUN, FROM THE ONE FILE THAT IS ALLOWED TO SAY WHERE IT IS.
+//
+// The mat's shadow is the first thing this engine builds that depends on the
+// HOUR, and the campaign spent a session removing second opinions about that.
+// So the bearing is not an elevation and an azimuth typed into this file: it is
+// `day.sun.vector` out of assets-src/sky/sky.json, the same object src/core/
+// sky.js hands the whole world's light through, and it is under the seal that
+// tools/lighting/sun-seal.json holds. A re-seal moves the shadows along with
+// everything else, which is the property that makes it ONE sun, and guard-erba
+// refuses a map baked along any other bearing than this file's.
+//
+// The same import attribute as the rocks above, and for the same reason: node
+// reads this line offline and the bundler reads it inside the worker.
+import SKY from '../../../assets-src/sky/sky.json' with { type: 'json' };
 
 // HOW THE GROUND IS BUILT, IN AN ORDER THAT IS DECLARED.
 //
@@ -609,6 +623,40 @@ export const MANTO = {
   // the mat is thin there. Fitted against the ramp of green above -- the sweep
   // and its table are in the verbale of U-ERBA-1.
   ground: 0.75,
+  // ------------------------------------------------- AND HOW WIDE A BLADE IS
+  //
+  // E-DECISIONI10 G3: «larghezza da 3/4 a 1 voxel completo, altezza variabile».
+  // U-ERBA-1 did not build it and priced it instead, and the price is the whole
+  // of why this is a threshold and not a field: a blade narrower than its own
+  // cell no longer merges with the cell beside it, so it becomes a box of its
+  // own -- ten triangles against the 0.84 a blade column costs today.
+  //
+  // WHERE IT IS FREE IS WHERE THE COMMITTENTE ASKED FOR IT, and that is not a
+  // coincidence. Under `below` the mat is thin (G3 again: «puo' essere molto
+  // bassa, dintorni del sentiero»), so a blade there already has all four of its
+  // flanks in the air -- its neighbours are absent or shorter -- and narrowing
+  // it takes nothing out of the greedy that the greedy still had. Where the mat
+  // is closed the same change costs a factor of two and a half on the largest
+  // family in the world, against 1.72 ms of margin, so it is not made there and
+  // the reason is that number and not a taste.
+  //
+  // AND THE WIDTH IS A DRAW AND NOT A CONSTANT, because «da 3/4 a 1» is a range
+  // and a mat of blades all at three quarters is as regular as a mat of blades
+  // all at one. Eighths, so the inset is a whole number of anything that has to
+  // divide it, and six to eight is exactly the committente's band.
+  //     soglia   fili stretti   tri del disco   sul tetto di 187 000
+  //      0.00            0          183 802          0.983x
+  //      0.12          809          186 670          0.998x
+  //      0.20        1 172          187 862          1.005x
+  //      0.30        1 543          189 382          1.013x   <- what ships
+  //
+  // 0.30 IS A BAND HALF A METRE WIDE FROM THE KERB and 0.12 is one column: the
+  // first is «i dintorni del sentiero» and the second is a line nobody can read.
+  // The disc it costs is 189 382 triangles against an allocation of 187 000, so
+  // the allocation is EMENDED to the measured number and declared (R4, D-E2:
+  // «l'allocazione si emenda al numero misurato»), and the gate it is actually
+  // judged on is the frame -- the table is in the verbale of U-ERBA-2.
+  slim: { below: 0.30, low: 6, high: 8 },
   // ------------------------------------------------------- and what it costs
   //
   // HOW FAR THE BLADES ARE DRAWN ONE BY ONE, in metres from the walker's own
@@ -655,6 +703,74 @@ const MANTO_LADDER = MANTO.law.reduce((acc, p) => {
   acc.push((acc.length ? acc[acc.length - 1] : 0) + p);
   return acc;
 }, []);
+
+// =========================================================================
+// THE SUN'S MARCH THROUGH THE MAT, WHICH IS THE SHADOW THE COMMITTENTE ASKED
+// FOR (E-DECISIONI9.3) AND THE ONE THING THE STAIR COULD NOT GIVE.
+//
+// U-ERBA-1 built the stair E-DECISIONI10 G4 relaxed to -- a fall off the height
+// above the plane, three instructions, no read -- and priced the baked map at
+// 313 kB and one texture read, and did not take it. The reason it is taken now
+// is that the picture was then measured three ways and all three say the same
+// thing (E-LUCE7 residuo 1): flank over top 0.473 against 0.617, the profile
+// inside a face flat to the third figure against 1.122 -> 0.956, and a dark
+// family of 5.7% at level 39 where the reference carries 46.9% AT LEVEL 50.
+// HALF THE REFERENCE'S GRASS IS ITS OWN INTERNAL SHADOW, and a term that is a
+// function of height alone cannot draw a population: it draws the same fall on
+// every column, so it moves the whole picture a little and splits it not at all.
+//
+// WHAT A MARCH IS, AND WHY IT IS THE CHEAP WAY ROUND. The mat is a heightfield
+// and the sun is one bearing, so "is this point in shadow" is the oldest
+// question a heightfield answers: walk toward the sun a few steps, and take the
+// highest thing you find, dropped by how far the beam has climbed to get there.
+// The answer is a HEIGHT -- the line between light and shadow on this column --
+// and it is the same for every fragment standing on that column, which is why
+// it is baked once per blade column at worldgen and not solved per fragment.
+//
+// IT IS EIGHT STEPS AND THE BOUND IS ARITHMETIC AND NOT A TASTE. A step is one
+// blade along the major axis of the bearing; at this seal the beam climbs
+// 5.44 cm for each of them. The mat stands five blades at its tallest, which is
+// 25 cm -- spent in under five steps -- and what the last three buy is the bank
+// of a mound, which is two to five voxels and is the only other thing on this
+// lattice tall enough to throw a shadow onto the mat past its own foot. Nine
+// steps and beyond can only be bought by a taller world than this one has.
+const SUN_MARCH = 8;
+
+// The march itself, closed once at load: for each step, where to look and how
+// far the beam has climbed by then.
+//
+// AND THE MAJOR AXIS IS SOLVED AND NOT ASSUMED. At this seal the bearing is
+// almost due west -- 0.985 of x against 0.174 of z -- so a march that stepped
+// whole blades along x would be right today and would silently sample every
+// other column the day a re-seal turned the sun. Stepping along whichever axis
+// is larger keeps every step exactly one blade of the lattice and never skips a
+// column, whatever the bearing is.
+export const SUN_STEPS = (() => {
+  const [sx, sy, sz] = SKY.day.sun.vector;
+  const major = Math.max(Math.abs(sx), Math.abs(sz));
+  const steps = [];
+  for (let k = 1; k <= SUN_MARCH; k++) {
+    steps.push({
+      di: Math.round(k * sx / major),
+      dj: Math.round(k * sz / major),
+      // How high the beam stands above this column by then, in SUB-steps of a
+      // blade: the step is BLADE / major long on the ground and the beam climbs
+      // sy of it, and a SUB-step is BLADE / SUB.
+      rise: k * SUB * sy / major,
+    });
+  }
+  return steps;
+})();
+
+// How many COLUMNS of skirt a store must carry for that march to stay inside it.
+//
+// The mesher needs one column -- two blades -- to compare a blade against its
+// neighbour across a chunk's edge, and the mat's own note in ./columns.js says
+// so. The sun needs as many blades as it marches, or the blades along a chunk's
+// upwind edge would be shaded against nothing and every chunk would draw a
+// bright seam down its own side. This is that number in columns, and it is the
+// only thing in this file that decides how wide a store is.
+export const SUN_SKIRT = Math.max(1, Math.ceil(SUN_MARCH / BLADES_PER_VOXEL));
 
 // ------------------------------------------------------------- the seats
 //
@@ -781,21 +897,31 @@ function pathEdgeGap(x, z) {
  * is both beside the corridor and beside a mass gets the lower of the two
  * rather than an argument between them.
  */
-export function mantoIntensity(x, z) {
-  // 1. THE CORRIDOR, and it is the term the committente named the defect of.
-  //    Nought at the edge of the stone, one by `reach` metres out, and smooth
-  //    the whole way: a linear ramp would have a corner at each end and the
-  //    corner is the thing being removed.
+export function mantoVerge(x, z) {
+  // THE CORRIDOR, and it is the term the committente named the defect of.
+  // Nought at the edge of the stone, one by `reach` metres out, and smooth the
+  // whole way: a linear ramp would have a corner at each end and the corner is
+  // the thing being removed.
+  //
+  // AND IT IS A FUNCTION OF ITS OWN, because two callers want THIS and not the
+  // whole field: the mat's own thinning, which wants all three terms, and the
+  // BROWN of the verge in columnSpec step 3b, which wants the corridor and
+  // nothing else. E-SENT3 residuo 1 is what separated them -- see the note
+  // there. It is a pure function of the gap to the stone, so where the corridor
+  // goes the verge goes with it, in every register it is ever fitted to.
   const gap = pathEdgeGap(x, z);
-  let i = 1;
-  if (gap < MANTO.verge.reach) {
-    const t = Math.min(1, Math.max(0, gap / MANTO.verge.reach));
-    const smooth = t * t * (3 - 2 * t);
-    // FADED WITH THE PAVING ITSELF. Past the last stone there is no corridor to
-    // thin the mat beside, so the ramp goes with it rather than leaving a ghost
-    // of a path in the grass where the path has ended.
-    i = 1 - pathRun(z) * (1 - (MANTO.verge.low + (1 - MANTO.verge.low) * smooth));
-  }
+  if (gap >= MANTO.verge.reach) return 1;
+  const t = Math.min(1, Math.max(0, gap / MANTO.verge.reach));
+  const smooth = t * t * (3 - 2 * t);
+  // FADED WITH THE PAVING ITSELF. Past the last stone there is no corridor to
+  // thin the mat beside, so the ramp goes with it rather than leaving a ghost
+  // of a path in the grass where the path has ended.
+  return 1 - pathRun(z) * (1 - (MANTO.verge.low + (1 - MANTO.verge.low) * smooth));
+}
+
+export function mantoIntensity(x, z) {
+  // 1. THE CORRIDOR, above, on its own.
+  const i = mantoVerge(x, z);
 
   // 2. THE THINNER PLACES OF THE OPEN MEADOW. A slow field, so what it draws is
   //    a place and not a speckle; the blades' own law is already uncorrelated
@@ -1326,7 +1452,7 @@ let framedCells = null;
 
 /** What became of the reference's seats, so a table that misses is not silent. */
 export const framedTally = {
-  laid: 0, pushed: 0, dropped: 0, cells: 0, refused: 0,
+  laid: 0, overlapping: 0, dropped: 0, cells: 0, refused: 0,
 };
 
 /**
@@ -1365,21 +1491,33 @@ function buildFramed() {
     // The centre, from the foot of the cut: the chord stands `MOUND.cut` of the
     // way in from the southern extent, so the centre is that much further north.
     const z = f.zFoot - across * (1 - MOUND.cut);
-    // AND THE CORRIDOR STILL EXCLUDES IT. The paving is laid before the masses
-    // and returns, so a mass that reached it would not be laid over it -- it
-    // would be CUT by it, at whatever height its profile had where the stone
-    // began, which is the half metre of cliff U-FOND-4 measured on one mound at
-    // the west verge. The reference puts this mass beside the corridor and the
-    // corridor is where our own fit put it, so the seat is moved OFF the paving
-    // by exactly the overlap rather than dropped: the picture's composition is
-    // kept and the corridor's one invariant with it.
+    // AND THE CORRIDOR NO LONGER MOVES IT, WHICH IS A DECISION AND IS E-SENT3.2.
+    //
+    // The clearance below is real and it is the LATTICE's: a seat drawn by this
+    // world's own arithmetic may not overlap the paving, because the paving is
+    // laid first and returns, so a mass that reached it would be CUT by it at
+    // whatever height its profile had where the stone began -- the half metre of
+    // cliff U-FOND-4 measured on one mound at the west verge.
+    //
+    // THESE FOUR SEATS ARE NOT DRAWN BY THIS WORLD'S ARITHMETIC. They are read
+    // off the reference's own pixels, in the reference's own coordinates, and
+    // that is the whole of what FRAMED is for. When U-SENT-3 put the corridor on
+    // the target's register the right-hand seat came out 0.48 m inside this
+    // clause and was pushed 0.48 m, which is 86 px in frame: the reference draws
+    // that mass 1.52 m from its own axis and the clause demands 1.81 (half width
+    // 0.795 + wander 0.148 + the mass's long radius 0.865). Two of those three
+    // are numbers fitted by other units, so what the push was really doing was
+    // moving a DATUM to fit a FIT. E-SENT3 put the fork to the coordinator with
+    // those numbers and the answer is this: the reference's seats are data and
+    // they do not move; the clause holds for the lattice, where it belongs.
+    //
+    // What it costs is measured rather than assumed and it is in the verbale of
+    // U-ERBA-2: the overlap is counted here, and the worst riser the corridor
+    // cuts into that mass is read on the disc that ships.
     const centre = pathCentreX(z);
     const clear = pathHalfWidth(z) + PATH.wander + along;
-    let x = f.x;
-    if (pathRun(z) > 0 && Math.abs(x - centre) < clear) {
-      x = centre + Math.sign(x - centre || 1) * clear;
-      framedTally.pushed++;
-    }
+    const x = f.x;
+    if (pathRun(z) > 0 && Math.abs(x - centre) < clear) framedTally.overlapping++;
     // AND NOTHING GROWS ON THE WAY IN OR THROUGH THE MASONRY. The way in is the
     // committente's own reading named twice -- the seven steps are all in view
     // in the reference and none in ours -- and a mound rising through a block is
@@ -1628,7 +1766,21 @@ export function columnSpec(ix, iz, grain = true, radius = DISC_RADIUS) {
       // Measured before the sign was fixed, the share of bare columns ran
       // 87 / 78 / 56 / 32 per cent over the four bands, where the last one is
       // open meadow and has to be nought.
-      if (hash2(ix * 3319 + 55, iz * 7717 + 91) < (1 - mantoIntensity(x, z)) * MANTO.ground) {
+      // AND IT IS THE CORRIDOR'S RAMP AND NOT THE MEADOW'S FIELD, WHICH IS
+      // RESIDUO 1 OF E-SENT3 AND THE REASON THIS LINE MOVED.
+      //
+      // It used to ask `mantoIntensity`, which is the ramp MULTIPLIED by the
+      // slow field of the open meadow -- and that field is a noise in WORLD
+      // coordinates. So how much brown stood beside the stone was partly a
+      // property of where the corridor happened to run: when U-SENT-3 moved the
+      // corridor onto the target's own register, the band 0.35 to 0.85 m out
+      // went from 7.9% to 2.3% at the middle distance without a line of this
+      // file changing, and the gain U-SENT-2 measured turned out never to have
+      // been anchored. The verge is the CORRIDOR's, so it is asked of the
+      // corridor: `mantoVerge` is term one of the field on its own, a function
+      // of the gap and of nothing else, and the brown now goes where the stone
+      // goes.
+      if (hash2(ix * 3319 + 55, iz * 7717 + 91) < (1 - mantoVerge(x, z)) * MANTO.ground) {
         under = MATERIAL.EARTH;
         depth = 1;
         return { top, mat: MATERIAL.EARTH, under, depth };
@@ -1701,8 +1853,19 @@ export const EMPTY = -1e9;
  * @param {number} radius
  */
 export function chunkColumns(cx, cz, n, grain = true, radius = DISC_RADIUS, focus = CENTRE) {
-  const span = n + 2;
-  const store = createColumns(cx * n - 1, cz * n - 1, span, span);
+  // THE SKIRT IS AS WIDE AS THE SUN MARCHES, AND ONLY WHEN THE SUN MARCHES.
+  //
+  // See SUN_SKIRT above: a chunk that could not look upwind past its own edge
+  // would shade its upwind blades against nothing and draw a bright seam down
+  // its own side. But that is the MAT's need, and a caller that does not ask for
+  // the mat is not asking for its shadow either -- the walker's floor is one of
+  // those, and it cuts a tile of sixteen columns dozens of times a lap
+  // (src/world/contracts.js). For it the skirt is the one column the mesher's
+  // own comparison across an edge needs, and the tile stays the 18 x 18 it has
+  // always been instead of becoming 24 x 24 for a mat nobody reads.
+  const skirt = grain ? SUN_SKIRT : 1;
+  const span = n + 2 * skirt;
+  const store = createColumns(cx * n - skirt, cz * n - skirt, span, span);
   for (let j = 0; j < span; j++) {
     for (let i = 0; i < span; i++) {
       const ix = store.ox + i;
@@ -1757,6 +1920,24 @@ function layMat(store, focus) {
   const reach = focus.detail ?? MANTO.detail;
   const detail = reach * reach;
   const block = focus.block ?? MANTO.block;
+  // AND THE MAT AS THE LAW WOULD HAVE DRAWN IT, WHICH IS NOT ALWAYS THE MAT
+  // THIS PASS LAYS, AND IS WHAT THE SUN IS MARCHED THROUGH.
+  //
+  // Beyond the ring a block of N by N blades stands at one height, because that
+  // is the only lever the triangle budget has (see the note over MANTO.block).
+  // What that costs is not fidelity of SHAPE alone: a plateau of four blades has
+  // no blade taller than itself within four blades, so nothing on it can shade
+  // anything, and the far field -- which at the pose the campaign judges on is
+  // most of the frame -- loses its shadow along with its steps.
+  //
+  // The shadow is a TEXTURE and not triangles, so it does not have to pay that
+  // lever. The march below walks the mat the LAW draws, at the blade, wherever
+  // the geometry stands; what the eye then gets on a plateau is the light and
+  // shade of the blades that would have been there, which is the high frequency
+  // the budget took away, handed back for one hash a column and no triangle. It
+  // is declared as exactly that in the verbale, and it is not an invention: the
+  // law is the same one the near field is drawn from.
+  const fine = new Uint8Array(bw * bd);
   for (let j = 0; j < bd; j++) {
     for (let i = 0; i < bw; i++) {
       const bx = bx0 + i;
@@ -1781,8 +1962,129 @@ function layMat(store, focus) {
       // patch of N by N stands at one height and the mesher merges it.
       const ax = near ? bx : Math.floor(bx / block) * block;
       const az = near ? bz : Math.floor(bz / block) * block;
-      const h = bladeAtColumn(ax, az, mantoIntensity(x, z));
+      // The field of intensity is asked ONCE and both answers take it: it is
+      // the expensive half of this loop -- a noise, a mass and the stone -- and
+      // the two heights differ only in WHICH blade column the law is drawn at.
+      const i0 = mantoIntensity(x, z);
+      const h = bladeAtColumn(ax, az, i0);
       store.blade[j * bw + i] = h;
+      fine[j * bw + i] = near ? h : bladeAtColumn(bx, bz, i0);
+      // AND HOW WIDE IT STANDS, WHICH IS DRAWN ONLY WHERE IT IS FREE (MANTO.slim)
+      // AND ONLY WHERE THE BLADE IS DRAWN ONE BY ONE. Inside a block of the LOD
+      // the mesher is merging a patch of blades into one rectangle on purpose;
+      // insetting them there would be paying the block's whole saving back to
+      // undo the block.
+      if (h && near && i0 < MANTO.slim.below) {
+        const r = hash2(bx * 2699 + 131, bz * 5077 + 617);
+        const w = MANTO.slim.low
+          + Math.min(MANTO.slim.high - MANTO.slim.low,
+            Math.floor(r * (MANTO.slim.high - MANTO.slim.low + 1)));
+        if (w < MANTO.slim.high) store.slim[j * bw + i] = w;
+      }
+    }
+  }
+  bakeShade(store, fine);
+}
+
+/**
+ * The fifth pass: where the sun stops reaching the mat, one byte a blade column.
+ *
+ * THE SHADOW E-DECISIONI9.3 ASKED FOR, AND IT IS A MARCH AND NOT A RENDER. See
+ * SUN_MARCH above for why it exists at all and why it is eight steps; this is
+ * the loop.
+ *
+ * IT RUNS AFTER THE MAT AND NOT INSIDE IT, and that is not tidiness: a blade
+ * needs the heights of the blades UPWIND of it, and inside the laying loop half
+ * of those have not been laid yet. Two passes over one array is the cheapest
+ * shape this can have, and the second one touches nothing but bytes.
+ *
+ * EVERY HEIGHT IN HERE IS AN INTEGER OF ONE UNIT -- a SUB-step of a blade above
+ * y = 0 -- and that is what keeps the whole march whole-number arithmetic: the
+ * floor of a column is (top + 1) voxels, a voxel is SUB * BLADES_PER_VOXEL
+ * SUB-steps, and the mat's own height is already kept in them. The one number
+ * that is not an integer is how far the beam has climbed, and it is floored once
+ * at the end rather than at every step.
+ *
+ * AND WHAT IT ASKS OF A COLUMN IS ITS TOP AND NOT ITS FAMILY. A mound's bank, a
+ * paving stone and a blade of grass all block the sun the same way, so what the
+ * march takes is the highest thing standing on the column it looks at, mat
+ * included. Where no column stands at all -- the rim of the disc, the corridor's
+ * own hole before the paving fills it -- there is nothing to cast and the step
+ * passes.
+ *
+ * @param {Uint8Array} fine the mat as the LAW draws it, blade by blade, which
+ *                          beyond the ring is not the mat that is MESHED: see
+ *                          the note in layMat for why the sun walks the first
+ *                          and the triangles are cut from the second.
+ */
+function bakeShade(store, fine) {
+  const b = BLADES_PER_VOXEL;
+  const bw = store.w * b;
+  const bd = store.d * b;
+  // How many SUB-steps of a blade one voxel of the world is worth.
+  const rung = b * SUB;
+  // The top of the ground under a blade column, in SUB-steps above y = 0, or
+  // -1 where no column stands under it.
+  const floorOf = (i, j) => {
+    const t = store.top[((j >> 1)) * store.w + (i >> 1)];
+    return t === NO_COLUMN ? -1 : (t + 1) * rung;
+  };
+  const cap = (v) => (v < 0 ? 0 : v > 255 ? 255 : v);
+  for (let j = 0; j < bd; j++) {
+    for (let i = 0; i < bw; i++) {
+      const f = floorOf(i, j);
+      if (f < 0) continue;
+      // Both lines start at the floor, which is the honest starting answer and
+      // also the one an empty world gives: the sun reaches down to the ground
+      // and there is no canopy over it.
+      let sun = f;
+      let canopy = f;
+      for (const s of SUN_STEPS) {
+        const ai = i + s.di;
+        const aj = j + s.dj;
+        // OFF THE STORE IS "NOTHING THERE" AND NOT "STOP", because a store's
+        // edge is an edge of THIS pass and not of the world: inside the disc the
+        // skirt is as wide as the march, so this only ever happens in the skirt
+        // itself, whose own bytes nobody reads.
+        if (ai < 0 || aj < 0 || ai >= bw || aj >= bd) continue;
+        const g = floorOf(ai, aj);
+        if (g < 0) continue;
+        const top = g + fine[aj * bw + ai];
+        // THE SUN'S LINE: the neighbour's top dropped by how far the beam has
+        // climbed to get here. It moves when the sun moves.
+        const h = top - s.rise;
+        if (h > sun) sun = h;
+      }
+      // AND THE SECOND LINE IS THIS COLUMN'S OWN CANOPY: the top of the blade
+      // the LAW puts here, which beyond the ring is NOT the top of the blade the
+      // mesher draws.
+      //
+      // It carries two things at once and both are the same sentence -- the
+      // light of a place is the light of the mat that is really there.
+      //
+      //   * THE FALL E-ERBA-A 1.6 MEASURED, against the variable its own
+      //     instrument uses. That instrument reads the profile INSIDE a face,
+      //     from its top down to its foot, and it separates tall faces (dark at
+      //     the foot) from short ones (not dark at all) -- which is exactly
+      //     "how far below the top of this blade" and not "how high above the
+      //     plane". U-ERBA-1 wrote the second because on a plane with a closed
+      //     mat the two agree; they part on a mound, and the second was declared
+      //     an approximation there. This is the first, so there is nothing left
+      //     to approximate.
+      //   * AND THE LOD'S OWN ERROR, PAID BACK IN LIGHT INSTEAD OF TRIANGLES.
+      //     Beyond the ring a block of blades is drawn at one height because the
+      //     frame cannot afford the steps; the light does not have to be raised
+      //     with the surface. A fragment standing above the blade the law puts
+      //     under it is lit as that blade's top is lit -- in sun or in shade,
+      //     and with the fall of its own depth -- so the plateau carries the
+      //     light and shade of the mat it stands for, at the blade, for one
+      //     hash a column and not one triangle.
+      canopy = f + fine[j * bw + i];
+      // Floored and not rounded: a line half a quarter-blade high is a line the
+      // quarter-blade below it is still lit at, and rounding up would darken a
+      // cube the sun does reach.
+      store.shade[j * bw + i] = cap(Math.floor(sun));
+      store.sky[j * bw + i] = cap(Math.floor(canopy));
     }
   }
 }
