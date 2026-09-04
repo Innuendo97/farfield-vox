@@ -146,7 +146,33 @@ function storeAt(ix, iz) {
   const key = `${cx},${cz}`;
   let store = tiles.get(key);
   if (store === undefined) {
-    store = chunkColumns(cx, cz, TILE, true, discRadius);
+    // AND IT ASKS FOR THE GROUND WITHOUT THE MAT, WHICH IS WHAT THIS SEAT HAS
+    // ALWAYS MEANT AND HAS NOT ALWAYS SAID.
+    //
+    // The third argument used to reach the answer -- it drew the plates of turf
+    // that stood a voxel over the plane -- and this call passed `true` because
+    // the floor moved with them. E-DECISIONI8 retired the plates and U-ERBA-1
+    // took them out: the terrain is ONE LEVEL and what stands in those pixels is
+    // the MAT, which is a lattice of its own that no column's top carries and
+    // that the walker passes straight through (E-DECISIONI9.2). So `grain` has
+    // not reached a top since that day, and every tile this seat cut has been
+    // laying a mat of grass nobody reads.
+    //
+    // U-ERBA-2 made that waste worth naming. The mat's shadow is marched at
+    // worldgen, and the march needs to look upwind past a store's own edge, so a
+    // store that lays a mat carries a skirt as wide as the sun reaches
+    // (SUN_SKIRT): a tile of sixteen went from 18 x 18 columns to 24 x 24, which
+    // is 78% more of the 926 ns each that this cache exists to amortise -- and
+    // it bought the walker nothing at all, because the answer below is `top` and
+    // `mat` and never the blade.
+    //
+    // With `false` the tile is the ground and nothing else: the same four
+    // arrays, the same doors, the same answer to the millimetre, cut back to the
+    // skirt the mesher's own comparison needs. VERIFIED AND NOT ASSUMED --
+    // guard-piano walks 61 572 columns of this store against the mesher's and
+    // guard-sentiero-cucitura reads the corridor's seam at 0.00 mm, both with
+    // the mat off here and on there.
+    store = chunkColumns(cx, cz, TILE, false, discRadius);
     if (tiles.size >= CACHED_TILES) tiles.delete(tiles.keys().next().value);
     tiles.set(key, store);
   }
