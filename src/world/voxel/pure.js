@@ -25,6 +25,11 @@ export {
   BLADES_PER_VOXEL,
   SUB,
   MANTO,
+  // The sun's march through the mat and the skirt it costs a store, so the
+  // guard that gates the shadow map reads the same bearing the bake used
+  // instead of deriving a second one from the seal.
+  SUN_SKIRT,
+  SUN_STEPS,
   MATERIAL,
   CHUNK,
   DISC_RADIUS,
@@ -54,6 +59,7 @@ export {
   pathVerge,
   mantoAt,
   mantoIntensity,
+  mantoVerge,
 } from './mesher.js';
 
 // AND THE STORE ITSELF, because a guard that asserts the world is a plane has
