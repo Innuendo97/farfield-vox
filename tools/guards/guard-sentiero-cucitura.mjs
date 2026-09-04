@@ -1,6 +1,6 @@
-import { STAIRS } from '../../src/world/layout.js';
+import { SPAWN, STAIRS } from '../../src/world/layout.js';
 import {
-  pathCentreX, pathEdge, pathHalfWidth, pathRun,
+  PATH_LINE, pathCentreX, pathEdge, pathHalfWidth, pathRun,
 } from '../../src/world/terrain-field.js';
 import { groundHeightAt, materialAt } from '../../src/world/contracts.js';
 import {
@@ -60,6 +60,31 @@ import { reporter, selfTest } from './lib.mjs';
 // the frame. Walked at a step of one voxel, so nothing between two samples is
 // missed.
 const RUN = { from: STAIRS.z + STAIRS.tread * STAIRS.steps, to: 12.0 };
+
+// WHERE THE CORRIDOR STANDS ACROSS THE FRAME, AND IT IS A READING OFF THE DAY
+// REFERENCE RATHER THAN A COPY OF THE LAW IT GATES.
+//
+// This is the one thing about the corridor that no other leg here can miss:
+// every reading above is taken ACROSS the centreline, so a centreline in the
+// wrong place answers all of them and draws the path through the meadow anyway.
+// It is not a hypothetical -- it is what shipped until U-SENT-3, a metre and a
+// third east of where the reference puts the stone at the front of the frame.
+//
+// THE READING. For every row of farfield-day-voxel-target.png, the two crossings
+// of 50 % greenness either side of the corridor, taken to the plane y = 0
+// through POSE_VOX_DAY; the centre is the midpoint. Over 42 rows from z = -12.25
+// to z = +6.08, fitted in the law's own form:
+//
+//     near end   +0.617 +/- 0.043 m at z = 8.8
+//     far end    +0.265 +/- 0.083 m at z = -14.3, against STAIRS.x = 0.25
+//
+// THE TOLERANCES ARE THREE OF THOSE SIGMAS AND NOTHING ELSE. A band chosen for
+// comfort would be a band that admits whatever is written today; a band at three
+// times the reading's own error is a band the reading can defend. And the second
+// leg is the sharper one to fail: it does not ask where the reference's corridor
+// is at all, it asks that the corridor arrives at the built stair -- which is
+// the one fact about the path that two independent measurements agree on.
+const REGISTER = { nearX: 0.617, nearTol: 0.130, stairTol: 0.250 };
 
 // How far the grass has to stand proud of the stone, in voxels, PAST THE RAMP --
 // where the mat is at full intensity. A 1.3, and the committente's word on it is
@@ -296,6 +321,18 @@ if (process.argv.includes('--self')) {
       what: 'the contract calling the corridor something other than stone',
       caught: materialAt(pathCentreX(4), 4) === 'sentiero',
     },
+    {
+      what: 'the centreline a metre out of the reference\'s register, which is what shipped',
+      caught: Math.abs(pathCentreX(PATH_LINE.nearZ) - REGISTER.nearX) <= REGISTER.nearTol,
+    },
+    {
+      what: 'a corridor that walks past the staircase instead of arriving at it',
+      caught: Math.abs(pathCentreX(RUN.from) - STAIRS.x) <= REGISTER.stairTol,
+    },
+    {
+      what: 'a walker put down beside his own path',
+      caught: onPaving(SPAWN.x, SPAWN.z),
+    },
   ]);
 }
 
@@ -377,5 +414,25 @@ report.line('  -- and it cannot be otherwise: there is one surface, and both rea
 report.check(onPaving(pathCentreX(4), 4) && materialAt(pathCentreX(4), 4) === 'sentiero',
   'the engine and the contract answer the same about where the stone is',
   'both say sentiero at the centreline');
+
+// ------------------------------------------------------------------- 5
+report.line('');
+const nearOff = pathCentreX(PATH_LINE.nearZ) - REGISTER.nearX;
+report.check(Math.abs(nearOff) <= REGISTER.nearTol,
+  `the centreline stands within ${REGISTER.nearTol} m of where the reference's own corridor `
+  + `stands at the front of the frame (${REGISTER.nearX} m at z ${PATH_LINE.nearZ})`,
+  `${pathCentreX(PATH_LINE.nearZ).toFixed(3)} written, ${nearOff >= 0 ? '+' : ''}`
+  + `${nearOff.toFixed(3)} m off the reading`);
+const stairOff = pathCentreX(RUN.from) - STAIRS.x;
+report.check(Math.abs(stairOff) <= REGISTER.stairTol,
+  `and it arrives at the staircase, within ${REGISTER.stairTol} m of the run's own axis`,
+  `${pathCentreX(RUN.from).toFixed(3)} at the bottom step against STAIRS.x ${STAIRS.x}, `
+  + `${stairOff >= 0 ? '+' : ''}${stairOff.toFixed(3)} m`);
+const spawnOff = SPAWN.x - pathCentreX(SPAWN.z);
+report.check(onPaving(SPAWN.x, SPAWN.z),
+  'and the walker is put down ON it, which is what makes the first step a step on stone',
+  `spawn at x ${SPAWN.x}, ${Math.abs(spawnOff).toFixed(3)} m `
+  + `${spawnOff >= 0 ? 'east' : 'west'} of the centreline, `
+  + `edge at ${pathEdge(SPAWN.z, spawnOff >= 0 ? 1 : -1).toFixed(3)} m`);
 
 report.end();
