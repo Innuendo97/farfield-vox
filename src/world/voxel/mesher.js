@@ -65,8 +65,10 @@ import {
 export { VOXEL, CHUNK, NO_COLUMN, MATERIAL, matAt, topAt } from './columns.js';
 export {
   BASE_STEP, BLADE, BLADES_PER_VOXEL, CENTRE, DISC_RADIUS, EARTH, FRAMED, MANTO, MOUND, PATH, SUB,
+  SUN_SKIRT, SUN_STEPS,
   bareRaisedAt, bladeAtColumn, bladeCentre, bladeHeightAt, chunkColumns,
   columnCentre, columnSpec, columnTop, earthFacing, framedTally, mantoAt, mantoIntensity,
+  mantoVerge,
   meadowMoundAt, moundAt, moundBankAt, moundCutAt, onPaving, pathDrop, pathVerge,
 } from './worldgen.js';
 
@@ -132,10 +134,12 @@ const QUAD_INDEX = [0, 1, 2, 0, 2, 3];
  */
 export function meshChunk(cx, cz, grain = true, radius = DISC_RADIUS, focus = CENTRE) {
   const n = CHUNK;
-  // The chunk and a skirt of one column either side, so a wall on the chunk's
-  // own edge is measured against the ground beyond it rather than against
-  // nothing. The generator writes the skirt into the same store, so this pass
-  // never has to ask for a column a second time.
+  // The chunk and a skirt either side, so a wall on the chunk's own edge is
+  // measured against the ground beyond it rather than against nothing, and so
+  // the sun's march can look upwind past that edge. The generator writes the
+  // skirt into the same store and decides how wide it is (SUN_SKIRT), so this
+  // pass never has to ask for a column a second time and never has to be told
+  // that number.
   const store = chunkColumns(cx, cz, n, grain, radius, focus);
   const ox = cx * n;
   const oz = cz * n;
@@ -186,6 +190,9 @@ export function meshChunk(cx, cz, grain = true, radius = DISC_RADIUS, focus = CE
   // How many blade columns of this chunk's own square carry a blade at all,
   // which is the denominator the mat's own price is read per.
   let blades = 0;
+  // And how many of them stand apart, which is the voice the width's own price
+  // is read on.
+  let slimBlades = 0;
   // How many of the walls exist only because something ends here -- the rim of
   // the disc, or a verge of the paving -- rather than because the ground
   // stepped. Counted apart because it is the one part of this number that does
@@ -434,7 +441,12 @@ export function meshChunk(cx, cz, grain = true, radius = DISC_RADIUS, focus = CE
   const b = BLADES_PER_VOXEL;
   const bn = n * b;
   const bw = store.w * b;
-  const bo = 1 * b;
+  // WHERE THIS CHUNK'S OWN FIRST BLADE SITS IN THE STORE'S RECTANGLE, ASKED OF
+  // THE STORE AND NOT WRITTEN DOWN. It used to be one column of skirt, and it is
+  // four now, because the sun's march needs to look upwind past a chunk's edge
+  // (SUN_SKIRT in ./worldgen.js). Taking it off the store's own origin means this
+  // pass never has to be told again when that number moves.
+  const bo = (ox - store.ox) * b;
   // AND THE VERTICAL UNIT IS A QUARTER OF A BLADE. The mat is a heightfield like
   // any other and every level below is an integer of THIS, which is what keeps
   // the merge a comparison of two whole numbers while the mat itself is free to
@@ -453,7 +465,51 @@ export function meshChunk(cx, cz, grain = true, radius = DISC_RADIUS, focus = CE
     return f === EMPTY ? EMPTY : f + store.blade[bIndex(i, j)];
   };
 
+  // HOW WIDE A BLADE STANDS, IN EIGHTHS OF ITS CELL, and nought is the whole
+  // cell -- which is every blade this mat had before E-DECISIONI10 G3 was built.
+  const bSlim = (i, j) => (i < -bo || j < -bo || i + bo >= bw || j + bo >= bw
+    ? 0 : store.slim[bIndex(i, j)]);
+
   const bUsed = new Uint8Array(bn * bn);
+
+  // ------------------------------------------------ the blades that stand apart
+  //
+  // «LARGHEZZA DA 3/4 A 1 VOXEL COMPLETO» (E-DECISIONI10 G3), and a blade that
+  // is narrower than its cell is a box and not a heightfield: nothing merges
+  // with it along either axis, and it shows all four of its flanks for their
+  // whole height because there is air on every side of it.
+  //
+  // SO IT IS CUT FIRST AND TAKEN OUT OF THE GREEDY, rather than special-cased
+  // inside it. The greedy below then runs over exactly the mat it has always run
+  // over -- whole cells, merged on level -- and the two passes cannot interfere.
+  // What this costs is stated where the width is decided (MANTO.slim in
+  // ./worldgen.js) and it is why the width is drawn only where the mat is thin.
+  for (let j = 0; j < bn; j++) {
+    for (let i = 0; i < bn; i++) {
+      const w8 = bSlim(i, j);
+      if (!w8) continue;
+      bUsed[j * bn + i] = 1;
+      const f = bFloor(i, j);
+      if (f === EMPTY) continue;
+      const t = bTop(i, j);
+      if (t <= f) continue;
+      blades += 1;
+      slimBlades += 1;
+      const e = BLADE * (1 - w8 / 8) * 0.5;
+      const x0 = i * BLADE + e;
+      const z0 = j * BLADE + e;
+      const x1 = (i + 1) * BLADE - e;
+      const z1 = (j + 1) * BLADE - e;
+      const yTop = t * step;
+      const yLow = f * step;
+      mat.push([FACE.TOP, x0, yTop, z0, x0, yTop, z1, x1, yTop, z1, x1, yTop, z0]);
+      mat.push([FACE.EAST, x1, yLow, z0, x1, yTop, z0, x1, yTop, z1, x1, yLow, z1]);
+      mat.push([FACE.WEST, x0, yLow, z1, x0, yTop, z1, x0, yTop, z0, x0, yLow, z0]);
+      mat.push([FACE.SOUTH, x1, yLow, z1, x1, yTop, z1, x0, yTop, z1, x0, yLow, z1]);
+      mat.push([FACE.NORTH, x0, yLow, z0, x0, yTop, z0, x1, yTop, z0, x1, yLow, z0]);
+    }
+  }
+
   for (let j = 0; j < bn; j++) {
     for (let i = 0; i < bn; i++) {
       if (bUsed[j * bn + i]) continue;
@@ -490,6 +546,9 @@ export function meshChunk(cx, cz, grain = true, radius = DISC_RADIUS, focus = CE
       while (c < bn) {
         const i = along ? c : a;
         const j = along ? a : c;
+        // A blade that stands apart was cut whole, with all four of its flanks,
+        // in the pass above.
+        if (bSlim(i, j)) { c++; continue; }
         const t = bTop(i, j);
         const f = bFloor(i, j);
         if (f === EMPTY || t <= f) { c++; continue; }
@@ -499,17 +558,23 @@ export function meshChunk(cx, cz, grain = true, radius = DISC_RADIUS, focus = CE
         // shows runs from the higher of its own floor and the neighbour's top,
         // up to its own top -- and where there is no neighbour at all (the rim
         // of the disc, the corridor's hole) the blade shows its whole side.
-        const nt = bTop(i + dix, j + diz);
+        // AND A NEIGHBOUR THAT STANDS APART HIDES NOTHING. A blade narrower than
+        // its cell has air on every side of it, so the face beside it shows its
+        // whole height -- which is the other half of what the width costs, and
+        // the half that falls on the blades this pass draws rather than on the
+        // narrow one itself.
+        const nt = bSlim(i + dix, j + diz) ? EMPTY : bTop(i + dix, j + diz);
         const low = nt === EMPTY ? f : Math.max(f, nt);
         if (low >= t) { c++; continue; }
         let run = 1;
         while (c + run < bn) {
           const i2 = along ? c + run : a;
           const j2 = along ? a : c + run;
+          if (bSlim(i2, j2)) break;
           if (bTop(i2, j2) !== t) break;
           const f2 = bFloor(i2, j2);
           if (f2 === EMPTY || f2 >= t) break;
-          const n2 = bTop(i2 + dix, j2 + diz);
+          const n2 = bSlim(i2 + dix, j2 + diz) ? EMPTY : bTop(i2 + dix, j2 + diz);
           if ((n2 === EMPTY ? f2 : Math.max(f2, n2)) !== low) break;
           run++;
         }
@@ -537,11 +602,44 @@ export function meshChunk(cx, cz, grain = true, radius = DISC_RADIUS, focus = CE
   bWall(FACE.SOUTH, true, 0, 1);
   bWall(FACE.NORTH, true, 0, -1);
 
+  // ----------------------------------------------- and the shadow, as texels
+  //
+  // THE ONE THING OF THE MAT THAT DOES NOT TRAVEL AS TRIANGLES, AND IT IS THE
+  // RULE AND NOT AN EXCEPTION TO IT. The head of this file refuses a property
+  // per voxel on a VERTEX, because a corner of a greedy rectangle is not a cube
+  // and cannot carry what a cube is; the mat's shadow is exactly such a
+  // property, and what it travels as instead is a picture of the ground in XZ,
+  // read by the place in the world it is a property OF. Two bytes a blade column
+  // of this chunk's own square -- where the sun stops and where the canopy
+  // closes -- the skirt staying behind, having done its work in the bake, and
+  // the page laying them into one texture over the whole disc.
+  //
+  // AND IT IS CUT OUT HERE RATHER THAN POSTED WHOLE because the store's
+  // rectangle is the chunk plus a skirt as wide as the sun marches, and a skirt
+  // posted with every chunk would be four ninths of the bytes on the wire for a
+  // band the neighbour is already sending.
+  // TWO BYTES A TEXEL AND ONE READ, which is the whole reason they are
+  // interleaved here rather than sent as two pictures: the sun's line and the
+  // canopy's are asked at the same place at the same moment, so they are one
+  // fetch of an RG texel and not two of an R one.
+  const shade = new Uint8Array(bn * bn * 2);
+  for (let j = 0; j < bn; j++) {
+    for (let i = 0; i < bn; i++) {
+      const k = bIndex(i, j);
+      shade[(j * bn + i) * 2] = store.shade[k];
+      shade[(j * bn + i) * 2 + 1] = store.sky[k];
+    }
+  }
+
   const packed = pack(quads, columns, rim, tops, cx, cz);
   packed.earth = packFaces(earth);
   packed.paving = packFaces(paving);
   packed.mat = packFaces(mat);
   packed.blades = blades;
+  packed.slimBlades = slimBlades;
+  // Where those texels stand in the world, in blade columns, so the page never
+  // has to work out from a chunk index what the mesher already knows.
+  packed.shade = { bx: ox * b, bz: oz * b, side: bn, data: shade };
   return packed;
 }
 
@@ -707,6 +805,9 @@ export function meshDisc(onChunk, grain = true, radius = DISC_RADIUS, focus = CE
   let matQuads = 0;
   let columns = 0;
   let blades = 0;
+  // And how many of them stand apart, which is the voice the width's own price
+  // is read on.
+  let slimBlades = 0;
   let rim = 0;
   const chunks = [];
   for (const { cx, cz } of chunkList(radius)) {
