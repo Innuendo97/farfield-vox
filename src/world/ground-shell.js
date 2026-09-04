@@ -70,6 +70,33 @@ export const SHELL_REACH = 100;
 const OVERLAP = 0.6;
 
 /**
+ * How far under the floor the cubes draw the overlapping part of the sheet is
+ * laid, in metres.
+ *
+ * THE FLICKER OF E-DECISIONI11, AND IT IS ARITHMETIC. «Dove il prato del mondo
+ * vuoto si interseca col disco c'e' una SOVRAPPOSIZIONE DI TEXTURE che causa un
+ * FLICKER» -- and also at the junction with the path. Inside thirty five metres
+ * `shellHeightAt` is (BASE_STEP + 1) * VOXEL, which is exactly the height the
+ * mesher draws the top face of a base column at, and the corridor stands on the
+ * same plane since it came to the floor of the meadow. So over the whole of the
+ * overlap the sheet and the disc are COPLANAR, two surfaces at the same depth
+ * with two different materials on them, and which of the two a pixel gets is
+ * decided by the last bit of a depth buffer. That is not a defect of either
+ * surface: it is a state neither of them can win.
+ *
+ * The overlap exists because the rim of the disc is a staircase of ten
+ * centimetre steps and a sheet cut to meet it exactly would have to reproduce
+ * that staircase -- so it stays, and what changes is that the sheet passes
+ * UNDER the cubes rather than through them. Two millimetres is a fiftieth of the
+ * step and forty times the smallest difference the depth buffer can hold at the
+ * rim of the disc, and it is covered by the cubes for the whole of its length:
+ * the first ring that is NOT under a cube stands at the contract's own height,
+ * so nothing outside the disc has moved by a micron and the sheet's own shape
+ * past the rim is the shape the contract states.
+ */
+const SINK = 0.002;
+
+/**
  * Rings and spokes.
  *
  * THE RESOLUTION IS SPENT WHERE THE EYE IS, the way the grid this replaces
@@ -101,6 +128,7 @@ function ringRadius(i, inner) {
  */
 function buildShell(radius) {
   const inner = Math.max(0, radius - OVERLAP);
+  let sunk = 0;
   const vertices = (RINGS + 1) * SPOKES;
   const positions = new Float32Array(vertices * 3);
   // Straight up, on every one of them. The material's light is analytic on the
@@ -116,14 +144,18 @@ function buildShell(radius) {
       const x = AREA_CENTER.x + Math.cos(a) * r;
       const z = AREA_CENTER.z + Math.sin(a) * r;
       const o = (i * SPOKES + s) * 3;
+      // Under the cubes where there are cubes over it, and at the contract's own
+      // height everywhere else. See SINK.
+      const under = r < radius ? SINK : 0;
       // In the mesh's own frame, which stands at the middle of the world: the
       // material rebuilds the cell out of the fragment's position, and a
       // hundred metres of it either side of nought is the smallest range this
       // shape can be written in.
       positions[o] = x - AREA_CENTER.x;
-      positions[o + 1] = shellHeightAt(r);
+      positions[o + 1] = shellHeightAt(r) - under;
       positions[o + 2] = z - AREA_CENTER.z;
       normals[o + 1] = 127;
+      if (under > 0) sunk++;
     }
   }
 
@@ -174,7 +206,7 @@ function buildShell(radius) {
   geometry.setIndex(new BufferAttribute(indices.subarray(0, k), 1));
   geometry.computeBoundingSphere();
   return {
-    geometry, quads, vertices, triangles: quads * 2, inner,
+    geometry, quads, vertices, triangles: quads * 2, inner, sunk, sink: SINK,
   };
 }
 
@@ -209,6 +241,10 @@ export function createGroundShell({ radius, material }) {
       vertices: built.vertices,
       quads: built.quads,
       triangles: built.triangles,
+      // How many vertices of the sheet stand under the cubes, and by how much:
+      // the guard reads these rather than re-deriving the overlap. See SINK.
+      sunk: built.sunk,
+      sink: built.sink,
     },
   };
 }
