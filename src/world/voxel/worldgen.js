@@ -1,6 +1,6 @@
 import { AREA_CENTER, MONOLITHS, PLATFORM, STAIRS } from '../layout.js';
 import {
-  BASE_LEVEL, PATH_STONE_END_Z, pathCentreX, pathCoord, pathEdge, pathHalfWidth, pathRun,
+  BASE_LEVEL, pathCentreX, pathCoord, pathEdge, pathHalfWidth, pathRun,
 } from '../terrain-field.js';
 import {
   BLADE, BLADES_PER_VOXEL, MATERIAL, NO_COLUMN, SUB, VOXEL,
@@ -1153,7 +1153,7 @@ export const FACING = { NORTH: 1, SOUTH: 2, EAST: 3, WEST: 4 };
 //
 // SO IT IS A PASS OF THIS PIPELINE, laid after the base and before the masses:
 //
-//   the core     `top` at the floor less PATH.drop, `mat` PATH
+//   the core     `top` at the floor, `mat` PATH -- PATH.drop is nought
 //   the verges   the same top, `mat` EARTH, two to four columns a side
 //   the masses   never on it -- a mound cannot grow out of the corridor
 //   the grain    never on it -- the paving is flat, and the meadow beside it is
@@ -1177,40 +1177,35 @@ export const FACING = { NORTH: 1, SOUTH: 2, EAST: 3, WEST: 4 };
 export const PATH = {
   // How far below the floor of the meadow the paving lies, in voxels.
   //
-  // ONE, AND IT IS THE MEASUREMENT AND NOT A SETTING. The reference is read
-  // twice on this and the two readings are the same: at the block feet the mat
-  // of grass stands ON the line at y = 0 with its blades one or two voxels over
-  // it (A §1.1), and along the corridor the line falls on the PAVING with the
-  // grass cubes beside it standing between one and two voxels above (A §1.3).
-  // A corridor level with the floor would put the nearest grass at NOUGHT
-  // voxels proud wherever the grain has not lifted it, and the reading never
-  // reads nought. One voxel down, the plain meadow beside the stone stands one
-  // proud and a grained plate stands two -- which is the band, by construction,
-  // with no term written to buy it.
-  drop: 1,
-  // How far back from the foot of the run the paving gives that voxel up
-  // again, in metres.
+  // NOUGHT, AND THE COMMITTENTE SAID SO IN AS MANY WORDS. E-DECISIONI10 S1: «e'
+  // a piano col selciato, ma ha TASSELLI che sporgono in maniera diversa -- non
+  // voxel completi: tasselli con altezza fino a 1 cm sopra il piano». The
+  // corridor is LEVEL with the meadow's floor and what stands proud of it is a
+  // centimetre of tile, which is a tenth of a cell and therefore not a cell.
   //
-  // THE LAST STRETCH OF THE CORRIDOR STANDS AT THE MEADOW'S OWN FLOOR, BECAUSE
-  // THAT IS WHERE THE STAIR'S STONE ENDS. src/world/stairs.js draws the lowest
-  // riser from its tread down to NOUGHT -- the meadow's drawn floor -- and the
-  // corridor was laid a voxel under that, so the ground fell away from the run
-  // exactly where a foot leaves it: 0.3167 m from the lowest tread down to the
-  // stone, at three seats of the disc, against a body that will not take a step
-  // down of more than 0.30 (src/core/player.js). Level with the floor the drop
-  // is the riser itself, 0.2167 m, which is a step and not a ledge.
+  // WHAT THE ONE WAS, AND WHY IT WENT. It was a measurement, and a sound one:
+  // the reference reads its grass one to two voxels over the line the paving
+  // falls on (A §1.1 and §1.3), and a corridor level with the floor would put
+  // the nearest grass at NOUGHT voxels proud wherever nothing had lifted it. The
+  // reading is unchanged and the thing that lifts the grass is no longer the
+  // corridor being sunk: E-DECISIONI8 made the grass a MAT of blades standing on
+  // the plane, and E-ERBA1 built it -- one to five blades over every meadow
+  // column, median two, which is exactly the one to two voxels the reading asks
+  // for and is now bought by the blades that are there rather than by a step in
+  // the ground under them. Sinking the stone as well would count the same
+  // centimetres twice.
   //
-  // AND IT IS CURED HERE AND NOT IN THE RUN. Moving the lowest tread would be a
-  // change to V2's fitted staircase -- its height is the platform's, measured
-  // off the reference framing -- to fix a foundation that laid its own ground
-  // low. The ground is this file's.
-  //
-  // ONE TREAD, WHICH IS THE RUN'S OWN UNIT. The stretch has to be wide enough
-  // to be a piece of paving rather than a lip, and there is exactly one length
-  // in this corner of the world that was measured: the tread the risers stand
-  // on. It comes to three columns, and what the eye is given is the last course
-  // of the corridor stepping up to meet the stone it arrives at.
-  lift: STAIRS.tread,
+  // AND IT GIVES BACK THE APRON'S OWN EXCEPTION. With the corridor a voxel down,
+  // the last stretch of it had to be lifted back to the floor or the ground fell
+  // 0.3167 m away from the lowest tread of the stair against a body that will
+  // not take a step down of more than 0.30 (src/core/player.js) -- so there was
+  // a `lift` of one tread, a northing where the drop changed, and a rule in
+  // every guard that reads the corridor's height. Level, the step from the
+  // lowest tread to the stone is the riser itself, 0.2167 m, which is a step and
+  // not a ledge, and the whole of that machinery has nothing left to be the
+  // price of. STATE: CAMBIA -- src/world/voxel/worldgen.js:PATH.drop, and
+  // `pathDrop` with it.
+  drop: 0,
   // The bare earth either side of the stone, in columns per side.
   //
   // TWO TO FOUR, BY POSITION AND NOT ONE NUMBER, which is the committente's own
@@ -1220,6 +1215,14 @@ export const PATH = {
   // rows. So it is tied to the width: the narrow middle of the field carries
   // the narrow verge and the two wide ends carry the wide one, which is what a
   // band of trodden ground does and what a constant cannot be.
+  //
+  // AND SINCE U-SENT-2 IT IS NO LONGER A LINE. The verge still writes
+  // MATERIAL.EARTH -- the mat of grass stands on earth and not on stone, and
+  // that is what those columns are for -- but its TOP is drawn by the paving's
+  // own material now (see ./mesher.js), where the share of pieces that are bare
+  // ground climbs to one across the same band. So what the eye is given at the
+  // crossing is pieces of stone thinning out among pieces of earth, and the
+  // column boundary the verge is counted in is not a boundary of anything drawn.
   verge: { min: 2, max: 4, at: 0.5, per: 0.7 },
   // The most the two noises in pathEdge can push an edge past the nominal half
   // width, in metres: 0.105 of wobble and 0.0434 of wander, both at their own
@@ -1231,10 +1234,12 @@ export const PATH = {
 /**
  * How far under the meadow's floor the corridor lies at a northing, in voxels.
  *
- * One everywhere, and NOUGHT over the apron where the run begins: see PATH.lift.
+ * NOUGHT, EVERYWHERE, and it is kept as a function of the northing because the
+ * fifteen readers that ask it are asking the right question and the answer is
+ * this file's to change. See PATH.drop for why the answer is what it is.
  */
 export function pathDrop(z) {
-  return z <= PATH_STONE_END_Z + PATH.lift ? 0 : PATH.drop;
+  return PATH.drop;
 }
 
 /** How many columns of bare earth line each side of the stone at a northing. */
@@ -1510,7 +1515,7 @@ export function columnSpec(ix, iz, grain = true, radius = DISC_RADIUS) {
   const on = corridorAt(x, z);
   if (on >= 0) {
     return {
-      // A NORTHING AND NOT A CONSTANT, and only over the apron: see PATH.lift.
+      // THE MEADOW'S OWN FLOOR: see PATH.drop, which is nought.
       top: top - pathDrop(z),
       // THE VERGE IS EARTH BECAUSE EARTH.verge SAYS SO, and it is read here
       // rather than assumed. The dial is E-V1j's answer C -- the lembo is bare
