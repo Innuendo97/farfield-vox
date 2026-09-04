@@ -230,9 +230,12 @@ export function survey(radius) {
       const z = (j + 0.5) * VOXEL;
       if (onPaving(x, z)) {
         flat.paving++;
-        // A NORTHING AND NOT A CONSTANT: over the apron at the foot of the run
-        // the paving stands at the meadow's own floor, so its top face meets the
-        // lowest riser instead of a voxel under it. PATH.lift in worldgen.js.
+        // AT THE MEADOW'S OWN FLOOR, at every northing. U-SENT-2 took the
+        // corridor's voxel of drop out (E-DECISIONI10 S1, «e' a piano col
+        // selciato»), so this is the same test as the one above it and not an
+        // exception to it -- and it is kept apart because the corridor is a
+        // THIRD thing on the plane and a guard that stopped naming it would stop
+        // noticing the day it moved again. PATH.drop in worldgen.js.
         if (h !== BASE_STEP - pathDrop(z)) {
           flat.pavingOff++;
           if (!flat.pavingWorst) flat.pavingWorst = { i, j, h };
@@ -715,7 +718,8 @@ report.check(seen.flat.offPlaneOffMass === 0,
     : `${seen.flat.offPlaneOffMass} columns are not`);
 report.line(`  ${seen.flat.offPlane} of them stand over the plane, and all of them are masses`);
 report.check(seen.flat.pavingOff === 0,
-  `and every column of the corridor stands one voxel under it, at ${BASE_STEP - PATH.drop}`,
+  `and every column of the corridor stands at that same floor, ${BASE_STEP - PATH.drop}: `
+  + 'it is level with the meadow and raises no wall at its kerb',
   seen.flat.pavingWorst
     ? `column ${seen.flat.pavingWorst.i},${seen.flat.pavingWorst.j} stands at `
       + `${seen.flat.pavingWorst.h}`
@@ -782,8 +786,9 @@ report.check(seen.bodyOver === 0,
 // run. src/world/stairs.js draws the lowest riser from its tread down to nought
 // and the corridor used to be laid a voxel under that, so the ground fell 0.3167
 // m away from the stone exactly where a foot leaves it -- a third of a metre, on
-// 23 of the 40 rows across the run. PATH.lift in src/world/voxel/worldgen.js
-// stands the apron at the meadow's own floor, and what is left is the riser.
+// 23 of the 40 rows across the run. The corridor stands at the meadow's own
+// floor everywhere now (PATH.drop, src/world/voxel/worldgen.js), so what is left
+// here is the riser itself and the reading below is of that.
 const foot = stairFoot();
 report.line(`  at the foot of the run, over ${foot.rows} rows across its width: the lowest tread `
   + `stands ${(PLATFORM.height / STAIRS.steps).toFixed(4)} m and the ground south of it `
