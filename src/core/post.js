@@ -821,7 +821,29 @@ ${DEPTH_GLSL}
     float v = (0.5 + c.g * (n - 1.0)) / n;
     vec3 low = texture2D(tLut, vec2((slice + u) / n, v)).rgb;
     vec3 high = texture2D(tLut, vec2((min(slice + 1.0, n - 1.0) + u) / n, v)).rgb;
-    return mix(low, high, t);
+    vec3 graded = mix(low, high, t);
+    // AND THE FLOOR IS CLOSED HERE, WHICH IS NOT A TASTE.
+    //
+    // The cube is fitted and then written into eight bit pixels, so its answer
+    // to a fragment with NO LIGHT IN IT is not exactly black: the corner texel
+    // of the shipped cube rounds to (0, 0, 1) and that one level of blue is
+    // what a black fragment comes out as. Measured on this machine, world
+    // hidden and the buffer left at its own clear: a linear nought developed
+    // through the whole chain reads (0, 0, 1), and it reads (0, 0, 0) with this
+    // stage alone switched off. A grade may bend a picture; it may not put
+    // light where the world put none, and the places that notice are exactly
+    // the ones with none — a shadowed joint of the paving, the underside of a
+    // tuft — where one level of blue and no red is a COLOUR and not a shade.
+    //
+    // So the cube is anchored on its own black rather than corrected by a
+    // number somebody chose: what it returns for black is taken off, and the
+    // remainder is stretched back over the range it left. White is unmoved
+    // because the shipped cube's white corner is exactly 255 and the stretch is
+    // by (1 - black); mid grey moves by half a level of blue, which is the
+    // half level the round put there. It is one more tap on a texture already
+    // resident and sampled twice.
+    vec3 black = texture2D(tLut, vec2(0.5 / (n * n), 0.5 / n)).rgb;
+    return clamp((graded - black) / max(1.0 - black, vec3(1e-4)), 0.0, 1.0);
   }
 
   vec3 encodeSrgb(vec3 c) {
