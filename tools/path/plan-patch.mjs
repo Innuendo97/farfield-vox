@@ -11,13 +11,13 @@ import {
 //   node tools/path/plan-patch.mjs --z=-4 --out=v3-sentiero/dev1/piano-medio.png
 //   node tools/path/plan-patch.mjs --z=8  --out=v3-sentiero/dev1/piano-apron.png
 //
-// WHAT IT IS FOR AND WHAT IT IS NOT. check-slabs.mjs --plan and the shape
-// reading both want a square of paving seen from straight above at 3.0 mm a
-// pixel, which is what sentiero-texture.png is. Getting one out of the running
+// WHAT IT IS FOR AND WHAT IT IS NOT. The shape reading wants a square of paving
+// seen from straight above at 3.0 mm a pixel, which is what sentiero-texture.png
+// is, and so did tools/terrain/check-slabs.mjs --plan before it was retired at
+// step 8 with the ground atlas whose lattice it predicted. Getting one out of the running
 // world costs a browser, a delivery and a pose; getting one out of the generator
 // costs a second. So this is the BENCH a coat of paint is chosen on, and it is
-// not the verdict: check-slabs says so itself -- the verdict is always a real
-// render at the plan's own pose, which is the only thing that carries the shader. The gap
+// not the verdict: the verdict is always a real render at the plan's own pose, which is the only thing that carries the shader. The gap
 // between this and that render is measured and written down rather than assumed
 // to be nought.
 //
