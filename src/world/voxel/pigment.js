@@ -439,14 +439,31 @@ export const PIGMENT_GLSL = /* glsl */`
     return uSlow * zone + uMid * mid + uGrain * grain;
   }
 
-  // The albedo of one column, band closed, hue riding the slow octave so that
-  // the colour moves by zones exactly as the level does.
-  vec3 pigmentOf(float x, float z) {
-    float t = clamp(1.0 + pigField(x, z), uTintFloor, uTintCeil);
+  // The level of one column, band closed.
+  float pigTintOf(float x, float z) {
+    return clamp(1.0 + pigField(x, z), uTintFloor, uTintCeil);
+  }
+
+  // AND THE TURN OF ITS COLOUR, WHICH IS A SEAT OF ITS OWN FOR A READER AND NOT
+  // FOR TIDINESS. The hue rides the slow octave so the colour moves by zones
+  // exactly as the level does. The ray-marched field of ./campo-material.js
+  // takes its LEVEL out of a texel the worker wrote -- one producer for a texel
+  // -- and still has to draw this, so the two programs call ONE function
+  // instead of spelling one pair of seeds twice, which is the same argument as
+  // the one over this file's own head. The amount is an argument because the
+  // families differ in it (a meadow varies along green and bare earth does
+  // not), and a uniform read in here would tie the seat to whichever family
+  // happened to own the program.
+  vec3 pigHueOf(float x, float z, float amount) {
     float slowScale = 1.0 / uSlowCubes;
     float h = pigNoise(x * slowScale + ${g(PIGMENT_SEEDS.hue[0])},
                        z * slowScale + ${g(PIGMENT_SEEDS.hue[1])}) - 0.5;
-    return uAlbedo * t * vec3(1.0 - uHue * h, 1.0 + uHue * h, 1.0 - uHue * h);
+    return vec3(1.0 - amount * h, 1.0 + amount * h, 1.0 - amount * h);
+  }
+
+  // The albedo of one column: the two above, in the order they were fitted in.
+  vec3 pigmentOf(float x, float z) {
+    return uAlbedo * pigTintOf(x, z) * pigHueOf(x, z, uHue);
   }
 `;
 
