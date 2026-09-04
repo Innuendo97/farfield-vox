@@ -1,7 +1,8 @@
 import {
-  BufferAttribute, DataTexture, DoubleSide, DynamicDrawUsage, InstancedBufferAttribute,
-  InstancedBufferGeometry, Mesh, RGBAFormat, ShaderMaterial, Sphere, SRGBColorSpace,
-  UnsignedByteType, Vector2, Vector3,
+  BufferAttribute, ClampToEdgeWrapping, DataTexture, DoubleSide, DynamicDrawUsage,
+  InstancedBufferAttribute, InstancedBufferGeometry, LinearFilter,
+  LinearMipmapLinearFilter, Mesh, RedFormat, RGBAFormat, ShaderMaterial, Sphere,
+  SRGBColorSpace, UnsignedByteType, Vector2, Vector3,
 } from 'three';
 import { SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS, SUN_DIRECTION } from '../core/sky.js';
 import { BAKED_TERMS_GLSL, FOG_GLSL, fogUniforms, GROUND_EXPOSURE } from './air.js';
@@ -1063,6 +1064,49 @@ const BAND_SPINE = 0.20;
 const BAND_TOP = 0.18;
 
 /**
+ * That seat, taken: the two widths above, rasterised at sixteen and delivered.
+ *
+ * WHAT MOVES AND WHAT DOES NOT. The shape and the share do not move -- the sheet
+ * is drawn FROM these two constants by tools/materia/foglio.mjs, so its mean is
+ * BAND_SPINE + BAND_TOP * (1 - BAND_SPINE) by construction and the far family's
+ * own uniform is still the same arithmetic on the same pair. What moves is where
+ * the shape LIVES: a rectangle in assets-src/materia/fogli.json rather than two
+ * smoothsteps, which is what lets the next reading of the reference's pistil --
+ * C 1.6 counts it at 22 to 40 per cent of a head on nine samples, and its edges
+ * are not straight -- enter without a shader being edited.
+ *
+ * AND THE SOFTENING GETS BETTER FOR FREE. The two smoothsteps softened over one
+ * screen pixel through an fwidth, which is the right width at exactly one
+ * distance; a sheet softens over the FOOTPRINT, and a head receding towards the
+ * exchange ring climbs its own mip chain until the last level returns the
+ * sheet's mean -- which is the number the far family paints its single quad
+ * with. The two halves of the meadow arrive at one colour by construction.
+ *
+ * @param {import('three').Texture} sheet the delivered 16x16, or nought
+ */
+function bandSheet(sheet) {
+  // No sheet is no pistil, and that is a head this campaign has already shipped
+  // rather than a broken one. A one texel picture of nought so the sampler is
+  // never null: a null sampler is a different program on some drivers and the
+  // same one on others.
+  const texture = sheet || new DataTexture(new Uint8Array([0]), 1, 1, RedFormat);
+  // CLAMPED, and not as a formality: each side of a head carries its own [0,1]
+  // square, so a wrap would fetch the far edge of the band for the near edge of
+  // a face.
+  texture.wrapS = ClampToEdgeWrapping;
+  texture.wrapT = ClampToEdgeWrapping;
+  // LINEAR in magnification, because a head is fourteen pixels across and a
+  // sixteen texel sheet on it is about a texel a pixel: nearest would put a
+  // staircase down the middle of every flower in the frame, and linear softens
+  // by very nearly the single pixel the fwidth this replaces was softening by.
+  texture.magFilter = LinearFilter;
+  texture.minFilter = texture.mipmaps && texture.mipmaps.length > 1
+    ? LinearMipmapLinearFilter : LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+/**
  * The pale's own hue, at unit luminance, from the target's heads.
  *
  * FITTED IN THE FRAME AND NOT SAMPLED OFF THE PICTURE, for the reason the whole
@@ -1484,20 +1528,29 @@ const FLOWER_FRAGMENT = /* glsl */`
   varying float vFog;
 
   uniform vec3 uFogColour;
-  uniform vec2 uPistilBand;  // the spine down the face, and the band under the lid
+  uniform sampler2D tBand;   // the pistil, as a sixteen texel sheet with a mask
 
   void main() {
-    // THE PISTIL: the spine down the middle of the face and the band under the
-    // top of it, both in the face's own coordinate, both softened by exactly
-    // one pixel of screen space. A hard step at a head fourteen pixels wide is
-    // a band that crawls as the walker moves -- the same lesson the blades'
-    // cut-out learned, and the same cure, on the same instruction.
-    vec2 grain = fwidth(vFace.xy) + 1e-4;
-    float reach = uPistilBand.x * 0.5;
-    float spine = 1.0 - smoothstep(reach - grain.x, reach + grain.x, abs(vFace.x - 0.5));
-    float lid = smoothstep(1.0 - uPistilBand.y - grain.y,
-      1.0 - uPistilBand.y + grain.y, vFace.y);
-    float band = max(spine, lid) * vFace.z;
+    // THE PISTIL, AND IT IS A SHEET NOW RATHER THAN TWO SMOOTHSTEPS.
+    //
+    // What it draws is the same shape and the same share: the spine down the
+    // middle of the face and the lid under the top of it, at the two widths
+    // U-PIG-2 fitted, rasterised at sixteen by tools/materia/foglio.mjs into
+    // assets-src/materia/flower-band.png. The seat was already here -- every
+    // side of the head arrives with its own [0,1] square in vFace.xy -- and it
+    // was left ready for exactly this, with no vertex to move.
+    //
+    // WHAT THE SHEET BUYS, since the still is the same still. The shape becomes
+    // DATA: the next reading of the reference's pistil enters as a rectangle in
+    // fogli.json and not as an edit to a shader. And the softening at range
+    // becomes the mip chain's instead of a fwidth's -- the fwidth softened over
+    // one pixel at every distance, which is right at one distance; a mip level
+    // softens over the footprint, and as a head shrinks towards the exchange
+    // ring the last level it reaches is the sheet's own mean, which is the
+    // share the far family paints its quad with. The two halves of the meadow
+    // meet at the same colour by construction rather than by a number written
+    // twice.
+    float band = texture2D(tBand, vFace.xy).r * vFace.z;
 
     // No sheet, no cut-out and no alpha: a flower is a solid, so the one thing
     // it needs of the air is what is in front of it.
@@ -1935,7 +1988,7 @@ function createFarFlowers({ height, lightScale, pigments, ring }) {
  * out of flowerAt() so that what is drawn is a subset of what the contract
  * publishes, never a second sowing beside it.
  */
-function createFlowers({ height, lightScale, pigments }) {
+function createFlowers({ height, lightScale, pigments, band }) {
   const geometry = flowerGeometry();
   const offsets = ringOffsets(FLOWER_RADIUS_MAX, FLOWER_CELL);
   const capacity = Math.ceil(offsets.length * FLOWER_PER_CELL * FLOWER_SHARE * 1.6) + 64;
@@ -1961,7 +2014,9 @@ function createFlowers({ height, lightScale, pigments }) {
       uCyan: { value: pigments.cyan },
       uStalk: { value: pigments.stalk },
       uHeadShade: { value: HEAD_SHADE },
-      uPistilBand: { value: new Vector2(BAND_SPINE, BAND_TOP) },
+      // The sheet, or nothing: a head with no sheet is a head with no pistil,
+      // which is the flower that shipped before this one and not a black one.
+      tBand: { value: band },
       // At the GROUND's exposure, because what a flower is lit by is the meadow
       // it stands in: the same line src/world/voxel/material.js asks for, so a
       // cube and the flower at its foot cannot disagree about the hour.
@@ -2066,7 +2121,7 @@ function createFlowers({ height, lightScale, pigments }) {
  *                         point, and the exposure the ground is lit at
  */
 export function createVegetation({
-  grassAtlas, height, lightScale = TERRAIN.lightScale,
+  grassAtlas, flowerBand = null, height, lightScale = TERRAIN.lightScale,
 }) {
   if (!grassAtlas || !height) {
     return {
@@ -2115,7 +2170,17 @@ export function createVegetation({
   // and the near half and the far half of one meadow have to be the same
   // flower seen at two ranges.
   const pigments = flowerPigments();
-  const flowers = createFlowers({ height, lightScale, pigments });
+  // THE PISTIL'S SHEET, DRESSED ONCE FOR THE ONE MATERIAL THAT READS IT.
+  //
+  // CLAMPED, and it is not a formality: each side of a head gets its own [0,1]
+  // square, so a wrap would fetch the far edge of the band for the near edge of
+  // a face. LINEAR in magnification because a head is fourteen pixels wide and
+  // a sixteen texel sheet on it is about one texel a pixel -- which is where a
+  // nearest filter would put a staircase down the middle of every flower in the
+  // frame, and where the linear one softens by very nearly the single pixel the
+  // fwidth this replaces was softening by.
+  const band = bandSheet(flowerBand);
+  const flowers = createFlowers({ height, lightScale, pigments, band });
   // And the far half, which starts where the solids stop. It is handed the
   // solids' own radius uniform, so the exchange is one number and not two.
   const far = createFarFlowers({ height, lightScale, pigments, ring: flowers.ring });

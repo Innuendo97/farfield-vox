@@ -45,11 +45,20 @@ const layer = {
     // fragment below no longer declares it and the tool that painted it is
     // gone, which is also how assets-src/vegetation/palette.json loses its last
     // consumer instead of being patched (E-V4f.3).
-    needs: ['grass-atlas'],
+    // AND ONE MORE, WHICH IS A HUNDRED AND FIFTY BYTES AND IS NOT A SHEET OF
+    // BLADES. The flower's pistil was two smoothsteps in the fragment; it is
+    // now the same shape delivered as a sixteen texel mask, so what the
+    // reference says about where the yellow sits can enter as a rectangle in
+    // assets-src/materia/fogli.json instead of as a shader edit. The head is
+    // still a cube with no picture ON it: this is a mask of WHERE the second
+    // pigment goes, which is a different thing and costs a hundred and fifty
+    // bytes to say exactly.
+    needs: ['grass-atlas', 'flower-band'],
 
     build(assets) {
       layer.vegetation = createVegetation({
         grassAtlas: assets['grass-atlas'],
+        flowerBand: assets['flower-band'] || null,
         // Where the ground is, which the hub knows and no delivery carries.
         height: assets.height,
       });
