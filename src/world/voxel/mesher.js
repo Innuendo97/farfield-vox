@@ -3,7 +3,7 @@ import {
 } from './columns.js';
 import {
   BASE_STEP, CENTRE, DISC_RADIUS, EARTH, EMPTY, FACING, chunkColumns,
-  chunkList as genChunkList, columnCentre, earthFacing,
+  chunkList as genChunkList, columnCentre, earthFacing, onPaving,
 } from './worldgen.js';
 
 // THE GREEDY MESHER OVER THE BLOCK STORE.
@@ -212,6 +212,35 @@ export function meshChunk(cx, cz, grain = true, radius = DISC_RADIUS, focus = CE
   // second pass over the same ground. On a meadow whose tops are all grass it
   // costs one byte compare a cell and changes nothing; the day the corridor is
   // laid as columns of stone it is what keeps the paving out of the meadow.
+  // WHICH FAMILY A TOP BELONGS TO, AND IT IS NOT THE MATERIAL ALONE.
+  //
+  // The corridor writes two to four columns of MATERIAL.EARTH either side of its
+  // stone (PATH.verge in ./worldgen.js) and the mat of grass stands on them,
+  // which is what those columns are for. But their SURFACE is the corridor's:
+  // E-DECISIONI10 S2 and S3 -- «anche la TERRA BRUNA e' a tasselli, non una
+  // texture piana» and «i tasselli di pietra non sono solo al centro: si
+  // DIRADANO alternandosi ai tasselli di terra bruna» -- and a verge painted by
+  // the meadow's flat brown while the stone beside it is pieces would put the
+  // hard line back one column further out, which is the defect being closed.
+  //
+  // So a top of earth that stands ON the corridor is drawn by the paving, whose
+  // own law thins its stone into earth across exactly that band (SPREAD in
+  // ../path.js). The question is asked of `onPaving`, which is the generator's
+  // own footprint and not a second opinion about it; nothing about the store
+  // changes, and neither does what the walker stands on.
+  const family = new Uint8Array(n * n);
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
+      const mat = material(i, j);
+      if (mat === MATERIAL.PATH) family[j * n + i] = STONE;
+      else if (mat !== MATERIAL.EARTH) family[j * n + i] = MEADOW;
+      else {
+        const c = columnCentre(ox + i, oz + j);
+        family[j * n + i] = onPaving(c.x, c.z) ? STONE : SOIL;
+      }
+    }
+  }
+
   const used = new Uint8Array(n * n);
   for (let j = 0; j < n; j++) {
     for (let i = 0; i < n; i++) {
@@ -219,7 +248,12 @@ export function meshChunk(cx, cz, grain = true, radius = DISC_RADIUS, focus = CE
       const h = at(i, j);
       if (h === EMPTY) continue;
       const mat = material(i, j);
-      const same = (a, b) => !used[b * n + a] && at(a, b) === h && material(a, b) === mat;
+      const fam = family[j * n + i];
+      // AND THE FAMILY IS PART OF THE KEY AND NOT ONLY THE MATERIAL. Two columns
+      // of earth, one on the corridor and one off it, are two materials as far
+      // as the picture is concerned; merged into one rectangle they would be one.
+      const same = (a, b) => !used[b * n + a] && at(a, b) === h
+        && material(a, b) === mat && family[b * n + a] === fam;
       let w = 1;
       while (i + w < n && same(i + w, j)) w++;
       let d = 1;
@@ -237,8 +271,7 @@ export function meshChunk(cx, cz, grain = true, radius = DISC_RADIUS, focus = CE
       const z1 = (j + d) * VOXEL;
       // Wound so the face looks up: seen from above the corners run clockwise
       // in x and z, which is counter-clockwise about +Y.
-      push(FACE.TOP, x0, y, z0, x0, y, z1, x1, y, z1, x1, y, z0,
-        mat === MATERIAL.EARTH ? SOIL : mat === MATERIAL.PATH ? STONE : MEADOW);
+      push(FACE.TOP, x0, y, z0, x0, y, z1, x1, y, z1, x1, y, z0, fam);
     }
   }
 
