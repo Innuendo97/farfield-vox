@@ -2,8 +2,8 @@ import {
   BufferAttribute, BufferGeometry, Group, Mesh, Sphere, Vector3,
 } from 'three';
 import {
-  CHUNK, DISC_RADIUS, NO_COLUMN, VOXEL,
-  earthSettings, pavingMaterial as makePaving, pavingSettings, runInWorker,
+  BLADE, CHUNK, DISC_RADIUS, NO_COLUMN, VOXEL,
+  bladeSettings, earthSettings, pavingMaterial as makePaving, pavingSettings, runInWorker,
   voxelMaterial, voxelSettings,
 } from './voxel/index.js';
 import { sheetArray } from './voxel/sheet.js';
@@ -87,6 +87,7 @@ export function createGroundVoxel({
   radius = DISC_RADIUS,
   paving = null,
   sheets = null,
+  focus = null,
 } = {}) {
   const group = new Group();
   group.name = 'ground-voxel';
@@ -133,6 +134,31 @@ export function createGroundVoxel({
   // which is a wrong picture rather than a missing one.
   const pavingTune = paving ? { ...pavingSettings(), sheet: sheetArrayTexture } : null;
   const pavingMaterial = paving ? makePaving(VOXEL, pavingTune, paving) : null;
+
+  // AND A FOURTH FOR THE MAT OF GRASS -- one for the whole disc, like the other
+  // three, and its pieces hung a CHUNK AT A TIME, which is the one place this
+  // family parts company with the earth and the paving.
+  //
+  // THE REASON IS THE SIZE AND IT IS MEASURED. The bare earth is 6.5% of the
+  // faces of this disc and the paving is fifty two rectangles: gathering either
+  // into one mesh costs a draw and saves twenty five, and the frustum had
+  // nothing to gain on either. The mat is the biggest family in the world by an
+  // order of magnitude, and the pose the campaign judges on stands at the
+  // southern rim looking north -- so nearly half of it is behind the walker on
+  // any frame. Hung as one mesh the card draws all of it every frame; hung a
+  // chunk at a time the renderer's own sphere test throws away the half that is
+  // not there, and what it costs is one draw a chunk.
+  // AND IT IS BUILT AT THE BLADE'S OWN STEP AND NOT THE WORLD'S, which is a
+  // measurement and not a tidy-up: everything the fragment rebuilds out of a
+  // cube -- the joint at its edges, the lightened arris along its upper one,
+  // which slice of the grain is laid on it -- has to be the size of the cube
+  // being drawn. Built at the world's step the mat drew a joint straight through
+  // the middle of every blade, and E-ERBA-A's own estimator read our blade at
+  // 0.20 of a cube where the truth is 0.50, because it was counting those false
+  // edges. The pigment stays on the world's column all the same: see uCellRatio
+  // in ./material.js.
+  const bladeTune = { ...bladeSettings(), sheet: sheetArrayTexture };
+  const bladeMaterial = voxelMaterial(BLADE, bladeTune);
   // The bare faces as they arrive, chunk by chunk, in the chunk's own frame:
   // they are moved into the world's when the last one has landed.
   const soil = [];
@@ -149,6 +175,9 @@ export function createGroundVoxel({
     // How many of the faces of the disc are the bare earth of the mounds, which
     // is the second family and the one extra draw.
     earthQuads: 0,
+    // And how many are the mat of grass, which is the fourth and the one that
+    // can move the price of this disc by an order of magnitude.
+    matQuads: 0,
     columns: 0,
     rim: 0,
     quadsPerColumn: 0,
@@ -387,7 +416,12 @@ export function createGroundVoxel({
     // share of the work and the gate is about how long it holds the frame.
     const started = performance.now();
     if (message.kind === 'chunk') {
-      land(message.chunk);
+      if (message.chunk.quads) land(message.chunk);
+      if (message.chunk.mat && message.chunk.mat.quads) {
+        const { cx, cz } = message.chunk;
+        build.matQuads += message.chunk.mat.quads;
+        land({ cx, cz, ...message.chunk.mat }, bladeMaterial, `ground-mat-${cx},${cz}`);
+      }
       // The bare faces and the paving are KEPT rather than hung: see
       // landGathered.
       if ((message.chunk.earth && message.chunk.earth.quads)
@@ -462,7 +496,7 @@ export function createGroundVoxel({
     // corridor rides along for the same reason and with the same force: the
     // thread that cuts the disc is the one that has to know where the ground is
     // not its own, and it cannot ask.
-    worker = runInWorker({ grain: true, radius }, receive);
+    worker = runInWorker({ grain: true, radius, focus }, receive);
   }
 
   return {
@@ -470,6 +504,7 @@ export function createGroundVoxel({
     settings,
     material,
     earthMaterial,
+    bladeMaterial,
     pavingMaterial,
     pavingTune,
     build,

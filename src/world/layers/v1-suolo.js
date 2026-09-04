@@ -2,6 +2,7 @@ import { createGroundVoxel } from '../ground-voxel.js';
 import { createGroundShell } from '../ground-shell.js';
 import { DISC_RADIUS } from '../voxel/index.js';
 import { setGroundDiscRadius } from '../contracts.js';
+import { SPAWN } from '../layout.js';
 
 // THE SOIL. Owned by V1.
 //
@@ -73,10 +74,35 @@ import { setGroundDiscRadius } from '../contracts.js';
 function asked() {
   const query = new URLSearchParams(window.location.search);
   const asAsked = Number(query.get('voxradius'));
+  // AND THE SAME HANDLE FOR THE MAT: how far the blades are drawn one by one.
+  // It is a MEASURING handle and never a preference, exactly as the radius
+  // above is, and it exists because the answer that ships had to be measured on
+  // this page before it could be written into MANTO -- D-E2, «fidelity as far
+  // as the frame holds». Anything but a positive number reads as "nobody said".
+  //
+  // AND IT IS READ OFF THE STRING AND NOT OFF Number(null), WHICH IS THE ONE
+  // TRAP THIS HANDLE HAS AND THE RADIUS ABOVE DOES NOT. `Number(null)` is
+  // NOUGHT, not NaN; the radius escapes it because a radius of nought is
+  // nonsense and the test is `> 0`, but a detail ring of nought is a LEGITIMATE
+  // measurement -- it is the null arm of the bench, the mat drawn entirely in
+  // blocks -- so the same test would have to be `>= 0` and would then read
+  // "nobody said" as "draw no blades at all". It did: measured on the page, the
+  // world shipped its mat in blocks of six everywhere, 26 831 quads where the
+  // law asks for 71 110, and the frames judged before this line was written are
+  // frames of that world.
+  const raw = query.get('voxdetail');
+  const askedDetail = raw === null ? Number.NaN : Number(raw);
+  // And the block the mat is sampled in beyond that ring, which is the other
+  // half of the same measurement: the ring decides the near field and the block
+  // decides everything past it, and the frame is paid for by both.
+  const rawBlock = query.get('voxblock');
+  const askedBlock = rawBlock === null ? Number.NaN : Number(rawBlock);
   return {
     dispose: query.get('voxdispose') !== '0',
     boundingFromWorker: query.get('voxbound') !== 'walk',
     radius: Number.isFinite(asAsked) && asAsked > 0 ? asAsked : null,
+    detail: Number.isFinite(askedDetail) && askedDetail >= 0 ? askedDetail : null,
+    block: Number.isFinite(askedBlock) && askedBlock >= 1 ? askedBlock : null,
   };
 }
 
@@ -150,6 +176,30 @@ const layer = {
         // that shipped yesterday rather than a broken one: the engine builds a
         // neutral array of its own and the gain goes to nought with it.
         sheets: assets['soil-sheets'] || null,
+        // WHERE THE MAT OF GRASS IS DRAWN BLADE BY BLADE, and it is the SPAWN
+        // rather than the middle of the disc.
+        //
+        // The disc is centred on the hub and the walker starts at its southern
+        // rim looking north, which is also the pose the whole campaign judges
+        // on: measured from the centre, the ring of full detail would land in
+        // the far field of every frame the committente has ever been shown and
+        // the near field -- the five to seven metres where E-ERBA-A can resolve
+        // a blade at all -- would be drawn in blocks. So the ring is anchored
+        // where the eye is.
+        //
+        // AND IT DOES NOT FOLLOW THE WALKER YET, WHICH IS DECLARED AND NOT
+        // HIDDEN. The disc is cut once, in a worker, and re-cut only when the
+        // tier moves it; a ring that followed the body would mean re-meshing
+        // the chunks it crosses as they are crossed, which is a step of its own
+        // and is proposed in the verbale of U-ERBA-1 rather than smuggled in
+        // here. What ships is a mat that is finest where the world is entered
+        // and where it is judged.
+        focus: {
+          x: SPAWN.x,
+          z: SPAWN.z,
+          detail: wanted.detail ?? undefined,
+          block: wanted.block ?? undefined,
+        },
       });
       // ONE GROUP AND NOT TWENTY SIX MESHES, because the hub hangs what a
       // layer built at the moment it built it and the chunks are still being
