@@ -1,10 +1,14 @@
 import { createHash } from 'node:crypto';
 import {
-  BASE_STEP, CENTRE, CHUNK, MATERIAL, MOUND, NO_COLUMN, SOD, VOXEL, cellMaterialAt,
+  BASE_STEP, CENTRE, CHUNK, FRAMED, MATERIAL, MOUND, NO_COLUMN, SOD, VOXEL, cellMaterialAt,
   chunkColumns, clearColumn, columnCount, columnSpec, columnTop, createColumns, depthAt,
-  matAt, meadowMoundAt, moundAt, moundCutAt, onPaving, paintTop, PATH, raise, setTop,
-  storeBytes, topAt, underAt,
+  framedTally, matAt, meadowMoundAt, moundAt, moundCutAt, onPaving, paintTop, PATH, raise,
+  setTop, storeBytes, topAt, underAt,
 } from '../../src/world/voxel/pure.js';
+// AND THE CONTRACT, because from step 6 the walker's floor is not the law any
+// more: it is the store, read through a cache of tiles that only this file's
+// last leg can prove answers the same thing the frame is cut from.
+import { groundHeightAt, setGroundDiscRadius } from '../../src/world/contracts.js';
 import { TIERS } from '../../src/core/quality.js';
 import { TUNING } from '../../src/core/presence.js';
 import { reporter, selfTest } from './lib.mjs';
@@ -74,6 +78,27 @@ const OPEN_STEP = 1;
 // voxel size, so the picture and the body ask for the same ceiling.
 const MASS_STEP = 3;
 
+// AND THE BODY'S OWN CEILING, RE-DECLARED, BECAUSE IT IS NOT EXPORTED AND IT IS
+// THE ONE NUMBER THIS FILE CANNOT REACH.
+//
+// src/core/player.js:52 refuses a step down when the drop is STRICTLY greater
+// than 0.30 m and steeper than any slope could be. src/core/presence.js's
+// TUNING.ground.maxM is 0.30 too and this file already gates against it -- but
+// it gates the step in VOXELS times VOXEL, and the body compares METRES it read
+// out of the contract. Those two are not the same number in doubles: a bank of
+// three voxels reaches the walker as (2 + 1) * 0.10 = 0.30000000000000004, and
+// 0.30 is 0.29999999999999999. So the world's tallest bank is over the body's
+// ceiling by one unit in the last place, and the step DOWN off it is refused.
+//
+// IT IS COUNTED AND PRINTED AND NOT GATED, and the reason is ownership: the
+// lever is either MOUND.scarp.high, which is the meadow's and was ratified at
+// three by E-FOND-PIANO8 on the reference's own reading, or MAX_STEP_DOWN,
+// which is the body's. Neither is this file's to move, and a guard that went
+// red on a number nobody in this session may change would be a guard that gets
+// switched off. So it is a note with a count, so that the afternoon it moves is
+// the afternoon it is seen.
+const BODY_MAX_DOWN = 0.30;
+
 // THE REFERENCE'S OWN READING OF THE MASSES, in the units it was read in.
 // A §1.2 and E-V1h: two to four voxels tall, one and a half to three and a half
 // metres across, three to six metres apart, never two touching. The spacing is
@@ -81,6 +106,31 @@ const MASS_STEP = 3;
 // generator holds by construction, and the tails belong to the hub's own
 // furniture rather than to the lattice.
 const MASS = { tall: { low: 2, high: 4 }, wide: { low: 1.5, high: 3.5 }, gap: { low: 3.0, high: 6.0 } };
+
+// HOW FAR A MASS MAY STAND FROM THE PLACE THE REFERENCE PUTS IT, in voxels.
+//
+// TWO, AND IT IS THE READING'S OWN REPEATABILITY AND NOT A TOLERANCE CHOSEN TO
+// PASS. FRAMED in src/world/voxel/worldgen.js carries where the reference's own
+// masses stand, measured through the fitted camera; swept over the estimator's
+// four dials the same three seats come back within 0.2 m of each other, and 0.2
+// m is two voxels. So a world that puts one of them further than that from its
+// seat is further out than the picture is uncertain, which is the only thing
+// that can honestly be gated here.
+//
+// AND IT IS THE FOOT OF THE CUT THAT IS COMPARED, at the seat's own column of x
+// and nowhere else. A mass is measured off a picture by the one part of it a
+// picture shows without ambiguity -- where its flank meets the floor -- and two
+// seats that merge into one object have not moved any ground, so a comparison
+// against a centroid would fail on a merge instead of on a displacement.
+const SEAT_VOXELS = 2;
+
+// HOW FAR EITHER SIDE OF THE EYE THE BAND THE STEP EXISTS FOR RUNS, in metres.
+// U-FOND-4's residual 1: at six to nine metres the reference carries two masses
+// and the lattice carried none, and that stretch is the part of the frame the
+// committente's own eye lands on first.
+const BAND = { near: 6, far: 9, masses: 2 };
+/** Where the fitted camera stands, from the pose the whole campaign is judged on. */
+const EYE = { x: 0.599, z: 14.215 };
 
 const NO = -1e7;
 
@@ -144,6 +194,9 @@ export function survey(radius) {
   let worstStep = 0;
   let overMass = 0;
   let worstAt = null;
+  let bodyOver = 0;
+  let bodyWorst = 0;
+  let bodyAt = null;
   const risers = new Map();
   const sweep = (alongX) => {
     const a0 = alongX ? j0 : i0;
@@ -180,6 +233,13 @@ export function survey(radius) {
           if (step > OPEN_STEP && !onMass(x, z) && !onMass(prevAt.x, prevAt.z)) openOver++;
           if (step > worstStep) { worstStep = step; worstAt = { x, z }; }
           if (step > MASS_STEP) overMass++;
+          // The drop as the BODY reads it: two faces out of the contract's own
+          // arithmetic, subtracted, and compared the way player.js compares it.
+          const down = Math.abs((h + 1) * VOXEL - (prev + 1) * VOXEL);
+          if (down > BODY_MAX_DOWN) {
+            bodyOver++;
+            if (down > bodyWorst) { bodyWorst = down; bodyAt = { x, z }; }
+          }
         }
         prev = h; prevAt = { x, z };
       }
@@ -198,6 +258,9 @@ export function survey(radius) {
     worstStep,
     worstAt,
     overMass,
+    bodyOver,
+    bodyWorst,
+    bodyAt,
     runs: runs.length,
     p10: at(0.10),
     p50: at(0.50),
@@ -221,7 +284,7 @@ export function survey(radius) {
  * far from its nearest neighbour, and whether the earth it shows is its own
  * bank's height. Nothing here is a picture and nothing is a share of columns.
  */
-export function massCensus(radius) {
+export function massCensus(radius, only = null) {
   const i0 = Math.round((CENTRE.x - radius) / VOXEL);
   const i1 = Math.round((CENTRE.x + radius) / VOXEL);
   const j0 = Math.round((CENTRE.z - radius) / VOXEL);
@@ -272,16 +335,26 @@ export function massCensus(radius) {
         stack.push(q);
       }
     }
-    pieces++;
-    if (part.some((p) => p.edge)) continue;
     const xs = part.map((p) => p.x);
     const zs = part.map((p) => p.z);
+    // A FILTER ON THE PIECE AND NOT ON ITS COLUMNS, so a mass that straddles the
+    // edge of a band is counted once, where its own middle is, and never twice.
+    if (only && !only({
+      x: (Math.min(...xs) + Math.max(...xs)) / 2,
+      z: (Math.min(...zs) + Math.max(...zs)) / 2,
+    })) continue;
+    pieces++;
+    if (part.some((p) => p.edge)) continue;
     masses.push({
       x: (Math.min(...xs) + Math.max(...xs)) / 2,
       z: (Math.min(...zs) + Math.max(...zs)) / 2,
       w: Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs)) + VOXEL,
       h: Math.max(...part.map((p) => p.m)),
     });
+  }
+  if (!masses.length) {
+    return { n: 0, pieces, perM2: 0, tallLow: 0, tallHigh: 0,
+      w10: 0, w50: 0, w90: 0, g10: 0, g50: 0, g90: 0, cutOverScarp };
   }
   const gaps = masses.map((m) => Math.min(...masses.filter((o) => o !== m)
     .map((o) => Math.hypot(m.x - o.x, m.z - o.z)))).filter(Number.isFinite).sort((a, b) => a - b);
@@ -297,6 +370,51 @@ export function massCensus(radius) {
     g10: q(gaps, 0.1), g50: q(gaps, 0.5), g90: q(gaps, 0.9),
     cutOverScarp,
   };
+}
+
+/**
+ * Where the built meadow puts its flank under one column of x, and how tall.
+ *
+ * Searched over a window round the seat's own foot, so a mass that is not there
+ * reads as absent instead of as the next mass up the field.
+ */
+function footAt(x, zRef, radius, window = 1.5) {
+  const i = Math.round(x / VOXEL - 0.5);
+  for (let j = Math.round((zRef + window) / VOXEL); j >= Math.round((zRef - window) / VOXEL); j--) {
+    const z = (j + 0.5) * VOXEL;
+    const cx = (i + 0.5) * VOXEL;
+    if (onPaving(cx, z) || columnTop(i, j, true, radius) < NO) continue;
+    const m = meadowMoundAt(cx, z);
+    if (m > 0) return { z, h: m };
+  }
+  return null;
+}
+
+/**
+ * The reference's own seats against the masses the world builds on them.
+ *
+ * THIS IS THE LEG STEP 6 EXISTS FOR. Everything else in this file asserts that
+ * the meadow has the SHAPE the reference reads -- how tall, how wide, how far
+ * apart. None of it could say that a mass stands WHERE the picture has one,
+ * because until this step nothing in the world claimed to.
+ */
+export function seatCensus(radius) {
+  const rows = [];
+  for (const f of FRAMED) {
+    const foot = footAt(f.x, f.zFoot, radius);
+    rows.push({
+      f,
+      foot,
+      off: foot ? Math.abs(foot.z - f.zFoot) / VOXEL : Infinity,
+    });
+  }
+  // And the band the step exists for, counted as objects the way the census
+  // above counts them.
+  const inBand = massCensus(radius, (m) => {
+    const d = Math.hypot(m.x - EYE.x, m.z - EYE.z);
+    return d >= BAND.near && d <= BAND.far;
+  });
+  return { rows, band: inBand.pieces, worst: Math.max(...rows.map((r) => r.off)) };
 }
 
 /** Whether the law and the store answer the same for every column of a chunk. */
@@ -364,6 +482,50 @@ export function editsHold() {
   return said;
 }
 
+/**
+ * Whether the walker's floor is the top of the store, on every column of a disc.
+ *
+ * THE LEG A-3 ASKED FOR, IN BOTH DIRECTIONS. The contract used to read the LAW
+ * -- columnSpec, evaluated per point -- and the leg above proved the law and the
+ * store agree, which made the two the same answer by transitivity. From step 6
+ * the contract reads the store through a cache of tiles of its own, so the
+ * transitive proof is gone and this is what replaces it: every column, both
+ * ways. Where a column stands, the contract answers its drawn face; where none
+ * does, it answers the plane and NOT a column's face, so a cache that handed
+ * back a stale tile would show up as a floor over a hole.
+ */
+export function contractReadsTheStore(radius, injected = 0) {
+  setGroundDiscRadius(radius);
+  const i0 = Math.round((CENTRE.x - radius) / VOXEL);
+  const i1 = Math.round((CENTRE.x + radius) / VOXEL);
+  const j0 = Math.round((CENTRE.z - radius) / VOXEL);
+  const j1 = Math.round((CENTRE.z + radius) / VOXEL);
+  let checked = 0;
+  let onColumn = 0;
+  let onPlane = 0;
+  for (let j = j0; j <= j1; j++) {
+    for (let i = i0; i <= i1; i++) {
+      const x = (i + 0.5) * VOXEL;
+      const z = (j + 0.5) * VOXEL;
+      if (Math.hypot(x - CENTRE.x, z - CENTRE.z) > radius) continue;
+      const top = columnTop(i, j, true, radius);
+      // `injected` is the self test's own hand on the answer: nought in every
+      // real run, one voxel when the file is asked to prove that it would catch
+      // a floor that had drifted off the store by the smallest thing there is.
+      const said = groundHeightAt(x, z) + injected;
+      checked++;
+      if (top > NO) {
+        onColumn++;
+        if (said !== (top + 1) * VOXEL) return { agree: false, i, j, said, top, checked };
+      } else {
+        onPlane++;
+        if (said !== (BASE_STEP + 1) * VOXEL) return { agree: false, i, j, said, top, checked };
+      }
+    }
+  }
+  return { agree: true, checked, onColumn, onPlane };
+}
+
 /** A fingerprint of a chunk's four arrays: data, never a picture (E-V5j). */
 export function fingerprint(cx, cz, grain, radius) {
   const store = chunkColumns(cx, cz, CHUNK, grain, radius);
@@ -419,6 +581,26 @@ if (process.argv.includes('--self')) {
     {
       what: 'a store told to hand back a column it was never given says so',
       caught: topAt(createColumns(0, 0, 2, 2), 5, 5) === NO_COLUMN,
+    },
+    {
+      what: "the contract's floor is the store's top on every column of the disc",
+      caught: contractReadsTheStore(SHIPPED_RADIUS).agree,
+    },
+    {
+      what: 'and a floor read one voxel over the store is caught on the first column',
+      caught: !contractReadsTheStore(SHIPPED_RADIUS, VOXEL).agree,
+    },
+    {
+      what: 'every seat the reference gives is laid, and none was refused',
+      caught: framedTally.dropped === 0 && framedTally.laid === FRAMED.length,
+    },
+    {
+      what: 'a seat moved half a metre off its reading would be over the tolerance',
+      caught: 0.5 / VOXEL > SEAT_VOXELS,
+    },
+    {
+      what: 'the masses in frame stand where the reference puts them',
+      caught: seatCensus(SHIPPED_RADIUS).worst <= SEAT_VOXELS,
     },
     ...editsHold().map(([what, caught]) => ({ what: `the store: ${what}`, caught })),
   ]);
@@ -491,6 +673,18 @@ report.check(MOUND.scarp.high <= MASS_STEP && MOUND.scarp.low >= 2,
   `MOUND.scarp is ${MOUND.scarp.low}-${MOUND.scarp.high}`);
 report.line(`  the masses keep their own bank: MOUND.scarp ${MOUND.scarp.low}-${MOUND.scarp.high} `
   + `voxels, one height to a mass, and the bank against the stone stands at ${MOUND.bank.high}`);
+report.line(`  the body reads ${seen.bodyOver} of those pairs as a drop over its own `
+  + `${BODY_MAX_DOWN.toFixed(2)} m, the worst ${seen.bodyWorst.toPrecision(17)} m`
+  + `${seen.bodyAt ? ` at (${seen.bodyAt.x.toFixed(1)}, ${seen.bodyAt.z.toFixed(1)})` : ''}`);
+if (seen.bodyOver > 0) {
+  report.note(`the tallest bank this meadow cuts is (${MOUND.scarp.high - 1} + 1) * VOXEL = `
+    + `${(MOUND.scarp.high * VOXEL).toPrecision(17)} m and the body's own ceiling is `
+    + `${BODY_MAX_DOWN.toPrecision(17)}: over it by one unit in the last place, so `
+    + `src/core/player.js refuses the step DOWN off ${seen.bodyOver} pairs of columns. The `
+    + 'walker climbs a mound and cannot come off it on the cut side. The two levers are '
+    + 'MOUND.scarp.high (V1, ratified at three by E-FOND-PIANO8) and MAX_STEP_DOWN (V8): '
+    + "neither is this unit's, and the count is here so the choice is made on a number");
+}
 
 // ------------------------------------------------------------------- 3b
 //
@@ -524,6 +718,33 @@ report.check(census.cutOverScarp === 0,
   'and every cut bank is the riser its own mass carries and no other',
   `${census.cutOverScarp} columns are cut deeper than their mass is banked`);
 
+// ------------------------------------------------------------------- 3c
+//
+// AND THE MASSES IN FRAME STAND WHERE THE REFERENCE STANDS THEM. Everything
+// above is a shape; this is a composition, and it is the one thing a lattice
+// could never be asked for.
+const seats = seatCensus(SHIPPED_RADIUS);
+report.line('');
+report.line(`  the reference seats ${FRAMED.length} masses in frame `
+  + `(worldgen.js FRAMED); of them ${framedTally.laid} are laid, `
+  + `${framedTally.pushed} pushed off the corridor, ${framedTally.dropped} refused`);
+for (const r of seats.rows) {
+  report.line(`    x ${r.f.x.toFixed(2).padStart(6)}  z ${r.f.zFoot.toFixed(2).padStart(5)}  `
+    + `${r.f.rise} voxel  ->  ${r.foot ? `z ${r.foot.z.toFixed(2)}  ${r.foot.h} voxel  `
+      + `(${r.off.toFixed(1)} voxel out)` : 'NO MASS ON THAT COLUMN'}`);
+}
+report.check(framedTally.dropped === 0 && framedTally.laid === FRAMED.length,
+  'every seat the reference gives is laid',
+  `${framedTally.dropped} of ${FRAMED.length} were refused by the stone or the way in`);
+report.check(seats.worst <= SEAT_VOXELS,
+  `and each one stands within ${SEAT_VOXELS} voxels of where the picture puts it   `
+  + `(worst ${seats.worst.toFixed(1)})`,
+  `worst ${seats.worst.toFixed(1)} voxels against ${SEAT_VOXELS}`);
+report.check(seats.band >= BAND.masses,
+  `and the band the eye lands on first -- ${BAND.near} to ${BAND.far} m from the pose -- `
+  + `carries ${seats.band} masses against the reference's ${BAND.masses}`,
+  `${seats.band} against ${BAND.masses}`);
+
 // ------------------------------------------------------------------- 4
 const agree = lawAgreesWithStore(0, 0, true, SHIPPED_RADIUS);
 report.line('');
@@ -536,6 +757,13 @@ const broken = edits.filter(([, ok]) => !ok);
 report.check(broken.length === 0,
   `the store's write side does what it says, on all ${edits.length} counts`,
   broken.map(([what]) => what).join('; '));
+
+const floor = contractReadsTheStore(SHIPPED_RADIUS);
+report.check(floor.agree,
+  `and the walker's floor is the top of that store on all ${floor.checked} columns of the disc   `
+  + `(${floor.onColumn} on a column, ${floor.onPlane} on the plane under the masonry)`,
+  floor.agree ? '' : `at ${floor.i},${floor.j} the contract says ${floor.said} `
+    + `over a column at ${floor.top}`);
 
 const store = chunkColumns(0, 0, CHUNK, true, SHIPPED_RADIUS);
 report.line('');
