@@ -81,14 +81,54 @@ export function smoothstep(edge0, edge1, x) {
 
 // ------------------------------------------------------------------ the path
 
-// Where the path runs, in metres. Both numbers are read off the reference at
-// the target pose and then expressed in world space: the centreline passes
-// under the walker a little west of the axis and straightens as it reaches the
-// stairs, and the strip narrows with distance the way the reference shows.
+// Where the path runs, in metres: a ramp between two northings, the far end at
+// the foot of the stair and the near one at the front of the frame.
+//
+// THE NEAR END IS MEASURED ON THE DAY REFERENCE NOW, AND IT USED TO BE READ.
+// What stood here said the centreline "passes under the walker a little west of
+// the axis" -- nearX at -0.74 -- and that sentence was taken off the picture by
+// eye, without a projector. Held up against the reference through the fitted
+// frame it is wrong by more than a metre: the corridor the day reference draws
+// stands 1.0 to 1.3 m EAST of ours over the whole stretch the frame resolves.
+//
+// THE RULER, AND WHY IT IS NOT THIS FILE'S OWN NUMBERS. For every row of the
+// picture, the two crossings of 50 % greenness either side of the corridor,
+// smoothed over 15 cm along the row and taken to the plane y = 0 through
+// POSE_VOX_DAY; the centre is the midpoint of the pair. It is defined on the
+// image being measured, it is the same test on the reference and on a render,
+// and it is the point the corridor is looked at. A band counted off OUR
+// centreline measures, on the reference, half meadow -- which is what every
+// lateral reading of this campaign did until it was caught.
+//
+// THE READING, over 42 rows from z = -12.25 to z = +6.08. Fitted in the form
+// this line already has, with the stair end held where the stair is:
+//
+//     nearX  = +0.617 +/- 0.043 m       residual 0.20 m rms
+//     today's pair, unfitted                      1.00 m rms
+//
+// and with BOTH ends free the far one comes back at +0.265 +/- 0.083 against
+// the 0.25 the stair actually stands at (layout.js STAIRS.x). So the far end is
+// NOT refitted: the reference's corridor points at the staircase, and that
+// agreement -- 1.5 cm, a fifth of the reading's own error, on a measurement
+// that knows nothing of layout.js -- is evidence for the anchor rather than a
+// reason to move it.
+//
+// THE RESIDUAL IS THE REFERENCE'S OWN EDGE AND NOT THE INSTRUMENT'S. Run on a
+// render of this world, the same ruler recovers this file's own law to 3 cm
+// (nearX -0.708 read against -0.740 written, 0.10 m rms). Twice that on the
+// reference is the wander of a hand-drawn verge, and it is why the third
+// decimal is not written down here: 0.62 is what a 4 cm error bar can say.
+//
+// AND THE RAMP RUNS THE OTHER WAY NOW. It used to drift west by a metre as it
+// came toward the eye; it drifts east by four tenths. The shape of the ramp is
+// untouched -- a straight line through the same 42 rows fits no better than the
+// smoothstep (0.198 against 0.202 m rms), so there is nothing in the reading to
+// buy a new form with, and the fragment that mirrors this function would have
+// had to be rewritten to spend it.
 const PATH_STAIR_Z = -14.3;
 const PATH_NEAR_Z = 8.8;
 const PATH_STAIR_X = 0.25;
-const PATH_NEAR_X = -0.74;
+const PATH_NEAR_X = 0.62;
 
 /**
  * The centreline's four numbers, published.
@@ -120,10 +160,14 @@ export const PATH_LINE = {
 // deep. A literal here would be that sum copied, and a copy is what goes stale
 // the day the run is refitted.
 //
-// THE OTHER NORTHING STAYS WHERE IT IS. pathCentreX reads PATH_STAIR_Z as one
-// end of its ramp -- a fact about where the path POINTS -- and the two targets
-// give no base for moving that line. The two were separated for that reason and
-// they stay separated.
+// THE OTHER NORTHING STAYS WHERE IT IS, AND THERE IS A BASE FOR IT NOW.
+// pathCentreX reads PATH_STAIR_Z as one end of its ramp -- a fact about where
+// the path POINTS -- and it used to be held there for want of any measurement.
+// The ruler above supplies one and it holds the line: fitted free, the ramp's
+// far end lands 1.5 cm from where the stair stands. What it still cannot say is
+// the NORTHING, because the last rows it can read stop around z = -12 and past
+// them a metre of ground is two pixels of picture. So the two stay separated:
+// one is measured and confirmed, the other is out of the instrument's reach.
 //
 // AND IT IS PUBLISHED NOW, because the generator needs this same northing and
 // must not sum it again: the paving stands at the meadow's own floor over the
@@ -280,12 +324,14 @@ export function pathCoord(x, z) {
  * How much path there is at this northing: 1 along the run, falling to 0 where
  * the stone ends and again at the south rim of the field.
  *
- * IT DOES NOT REACH THE STAIRS, AND THAT IS THE READING AND NOT AN OVERSIGHT.
- * The paving used to be run down to the bottom step at -14.3 on the assumption
- * that stone met stair. The night target puts its last stone at -9.1 and leaves
- * the five metres to the step under grass — so the run ends there, and what
- * covers the join is the meadow, which is already what grows wherever this
- * answers nought.
+ * IT REACHES THE BOTTOM STEP, AND THE PARAGRAPH THAT SAID OTHERWISE WAS STALE.
+ * The run used to be stopped at z = -9.1 on a reading of the NIGHT picture,
+ * which leaves five metres of grass between the last stone and the stair. The
+ * day picture says the paving arrives at the step, the day picture is the one
+ * that judges, and PATH_STONE_END_Z above has been that step since -- so what
+ * this function has actually answered for several steps now is a run that ends
+ * at the lowest riser. The old reason was left written beside the new number,
+ * which is the drift a comment is most dangerous for.
  */
 export function pathRun(z) {
   return smoothstep(PATH_STONE_END_Z, PATH_STONE_END_Z + PATH_STONE_FADE, z)
