@@ -11,7 +11,6 @@
     "build": "vite build",
     "preview": "vite preview",
     "setup:tools": "powershell -ExecutionPolicy Bypass -NonInteractive -File tools/setup-tools.ps1 -SkipBlender",
-    "turf": "node tools/turf/build-turf.mjs",
     "assets:build": "node tools/build-assets.mjs",
     "guard:all": "node tools/guards/all.mjs",
     "suns:check": "node tools/lighting/check-suns.mjs",
