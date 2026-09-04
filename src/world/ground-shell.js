@@ -1,8 +1,6 @@
 import { BufferAttribute, BufferGeometry, Mesh } from 'three';
-import { basinProfile } from './contracts.js';
-import { heightAt } from './terrain-field.js';
+import { shellHeightAt } from './contracts.js';
 import { AREA_CENTER } from './layout.js';
-import { VOXEL } from './voxel/index.js';
 
 // THE SHELL: THE GROUND FROM THE RIM OF THE DISC OUT TO THE END OF V1'S WORLD.
 //
@@ -11,8 +9,8 @@ import { VOXEL } from './voxel/index.js';
 // session owns, and it cannot keep going as cubes: at thirty five metres a disc
 // of them is three hundred and twenty thousand triangles before a single one of
 // them is more than a pixel wide. So past the rim the meadow is a SHEET, and
-// what makes it the same meadow is that its heights are the same field snapped
-// to the same step and its material is the same material, by reference.
+// what makes it the same meadow is that it starts at the floor the cubes DRAW,
+// on the same step, wearing the same material by reference.
 //
 // WHERE IT STOPS, AND WHOSE DECISION THAT IS. A hundred metres, and it is
 // E-V5h's: V1's world ends there and V5's frame begins. The bent grid this
@@ -21,18 +19,39 @@ import { VOXEL } from './voxel/index.js';
 // gate would have failed V5 for a plane of V1's. A circle and not a square is
 // most of the fix on its own.
 //
-// WHAT IT IS SHAPED ON. `basinProfile` in src/world/contracts.js, which is the
-// seat where the two sessions already agreed how far the ground beyond the disc
-// has fallen: nought inside thirty five metres with a level tangent, a fitted
-// cone of 0.1239 m per metre past sixty, and the tamest curve anybody could
-// write between them. It is read and not reproduced -- a second copy of that
-// shape here would be the exact defect contracts.js exists to prevent.
+// WHAT IT IS SHAPED ON, AND WHERE THAT SHAPE LIVES. `shellHeightAt` in
+// src/world/contracts.js -- the seat where the two sessions already agreed how
+// far the ground beyond the disc has fallen, and where the height a walker
+// standing on this sheet is answered from. It is read and not reproduced: this
+// file used to carry its own copy of that arithmetic and the contract carried
+// another, and by this step the two were a voxel apart with nothing pinning
+// them together. One statement, two readers, and the mesh below is one of them.
 //
-// AND IT IS ADDED TO THE FIELD, NOT SUBSTITUTED FOR IT. Inside thirty five
-// metres the basin is nought, so out to there the shell is the walkable field
-// itself, snapped to the step -- which is why it welds onto the cubes at ANY
-// radius the tier hands it and not only at thirty five. Past thirty five the
-// basin takes it away from the field and down, and nobody walks there.
+// AND IT IS LAID ON THE FLOOR THE DISC DRAWS, WHICH IS NOT THE FIELD, AND THAT
+// ONE VOXEL WAS THE SEAM.
+//
+// The sheet used to be laid on `heightAt` -- the walkable field, which is a
+// voxel BELOW nought so that the top face of a base column lands exactly on
+// nought (see BASE_LEVEL in ./terrain-field.js). But the eye is never given the
+// field: it is given the face above it. So the cubes ended at nought, the sheet
+// began at minus a tenth, and the ground stepped down ten centimetres all the
+// way round the rim -- measured at 100 mm on 164 of 360 bearings, and it is the
+// residue E-FOND-PIANO2 carried to this step.
+//
+// Laid on the floor the disc DRAWS, there is nothing to step down: inside
+// thirty five metres the basin is nought, so out to there the sheet is the same
+// plane as the meadow's own tops, which is why it welds onto the cubes at ANY
+// radius the tier hands it and not only at thirty five. What still stands over
+// it at the rim is the grain -- the one voxel the meadow's own sods stand on the
+// floor, everywhere inside the disc as well as at its edge -- and the corridor's
+// own trench, one voxel under, which is the measurement A 1.3 takes along the
+// whole run. Neither is a seam: they are the meadow, arriving at the rim as
+// itself.
+//
+// AND THE BASIN IS MEASURED FROM NOUGHT, WHICH IS WHAT ITS OWN SEAT SAYS. The
+// two arms of standing water were fitted against a ground plane at nought
+// (A 1.1); the sheet that carried them was a voxel under it. Past thirty five
+// the water is now where the contract puts it and not a step below.
 
 /** How far V1's own world reaches, in metres. E-V5h. */
 export const SHELL_REACH = 100;
@@ -75,20 +94,6 @@ function ringRadius(i, inner) {
 }
 
 /**
- * The height of the sheet at a point, snapped to the voxel step.
- *
- * SNAPPED, AND THAT IS THE WHOLE OF WHAT MAKES IT THE SAME MEADOW. An unsnapped
- * sheet meeting a snapped disc reads as two materials: the cubes terrace and the
- * ground beyond them does not, and the eye finds the line in one frame. Rounded
- * rather than floored for the same reason columnTop is -- so the sheet straddles
- * the field instead of sitting half a step under it.
- */
-function shellHeight(x, z) {
-  const r = Math.hypot(x - AREA_CENTER.x, z - AREA_CENTER.z);
-  return Math.round((heightAt(x, z) + basinProfile(r)) / VOXEL) * VOXEL;
-}
-
-/**
  * The sheet, as one indexed mesh.
  *
  * @param {number} radius  where the disc of cubes ends, in metres
@@ -116,7 +121,7 @@ function buildShell(radius) {
       // hundred metres of it either side of nought is the smallest range this
       // shape can be written in.
       positions[o] = x - AREA_CENTER.x;
-      positions[o + 1] = shellHeight(x, z);
+      positions[o + 1] = shellHeightAt(r);
       positions[o + 2] = z - AREA_CENTER.z;
       normals[o + 1] = 127;
     }

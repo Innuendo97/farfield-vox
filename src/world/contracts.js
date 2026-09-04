@@ -1,4 +1,3 @@
-import { heightAt } from './terrain-field.js';
 import { stairHeightAt as stairRunHeight } from './stairs.js';
 import { flowerField } from './vegetation.js';
 import { PLATFORM } from './layout.js';
@@ -183,15 +182,17 @@ function storeAt(ix, iz) {
  * THE WAY THE SHEET SNAPS -- not a flourish: the walker's hard radius is 21 m
  * and the disc reaches 14, so seven metres of what he can walk on are sheet,
  * and an unsnapped answer there would have him riding a smooth field over
- * terraced ground for a third of his own range. That branch is step 7's, when
- * the shell inside 35 m becomes the plane too.
+ * terraced ground for a third of his own range.
  *
- * The arithmetic of the sheet is ground-shell.js's shellHeight, RE-DECLARED and
- * not imported, and that is a debt named rather than hidden: the sheet is built
- * in a session file and the contract cannot import a layer without the layer's
- * whole dependency graph following it into every tool that reads a height. The
- * two are pinned together by guard-lift's own leg rather than by an import --
- * see the note there.
+ * AND THE ARITHMETIC OF THE SHEET IS NOW ONE STATEMENT, WHICH IS A DEBT PAID.
+ * It was re-declared here, character for character against ground-shell.js,
+ * with a note saying the two were pinned by a leg of guard-lift -- and there
+ * was no such leg: the copy was held together by nothing at all, and it was a
+ * voxel out from the day the meadow's floor stopped being the field. So the
+ * height of the sheet is `shellHeightAt` below, in the same seat as the basin
+ * it is made of, and ground-shell.js READS it. The direction is the one that
+ * always worked: the layer already imports this file for basinProfile, and
+ * nothing of three.js comes back the other way.
  */
 export function groundHeightAt(x, z) {
   const ix = Math.floor(x / VOXEL);
@@ -207,7 +208,7 @@ export function groundHeightAt(x, z) {
   // there is the plane the meadow around it stands on -- see above.
   if (r <= discRadius) return (BASE_STEP + 1) * VOXEL;
   // And beyond it, the sheet.
-  return Math.round((heightAt(x, z) + basinProfile(r)) / VOXEL) * VOXEL;
+  return shellHeightAt(r);
 }
 
 // ----------------------------------------------------------- the basin
@@ -248,11 +249,12 @@ export function groundHeightAt(x, z) {
 // r = 49.6. If that stretch reads wrong in a picture, it is this stretch that
 // is wrong and not the cone, and it is twenty-five metres of ground wide.
 //
-// AND IT DOES NOT REACH heightAt. This is stated here rather than in
-// terrain-field.js on purpose: that file IS the walkable floor, and the basin
-// is the one shape in this world that must never be added to it -- a walker who
-// found it would walk off the edge of the disc into a slope. contracts.js reads
-// terrain-field and not the other way round, so from here it cannot.
+// AND IT DOES NOT REACH THE WALKABLE FLOOR. This is stated here rather than in
+// the generator on purpose: the base of the disc is the walkable floor, and the
+// basin is the one shape in this world that must never be added to it -- a
+// walker who found it would walk off the edge of the disc into a slope. It is
+// added to the floor the disc DRAWS, once, in `shellHeightAt` below, and only
+// past thirty five metres, where nobody stands.
 
 /** Where the walkable disc ends and the shell begins, in metres. */
 const BASIN_SHELL_R = 35;
@@ -291,6 +293,34 @@ export function basinProfile(r) {
   const t = (r - BASIN_SHELL_R) / span;
   const end = -BASIN_SLOPE * (BASIN_JOIN_R - BASIN_APEX_R);
   return end * (3 * t * t - 2 * t * t * t) - BASIN_SLOPE * span * (t * t * t - t * t);
+}
+
+/**
+ * Where the sheet beyond the disc stands, in metres, r from the middle.
+ *
+ * THE ONE STATEMENT OF IT, read by the mesh that draws the sheet
+ * (src/world/ground-shell.js) and by the floor above that answers for a walker
+ * standing on it. Two copies of this is what the campaign had until step 7, and
+ * they had already parted company by a voxel.
+ *
+ * IT STARTS AT THE FLOOR THE DISC DRAWS AND NOT AT THE WALKABLE FIELD. The
+ * meadow's own field sits one voxel under nought so that the TOP FACE of a base
+ * column lands on nought (BASE_LEVEL in ./terrain-field.js), and the eye is
+ * given the face. A sheet laid on the field met the cubes ten centimetres low
+ * all the way round the rim; laid on `(BASE_STEP + 1) * VOXEL` it meets them
+ * exactly, at any radius a tier hands the disc.
+ *
+ * SNAPPED TO THE STEP, because an unsnapped sheet meeting a snapped disc reads
+ * as two materials -- the cubes terrace and the ground beyond them does not --
+ * and because the walker's hard radius is 21 m against a disc of 14: seven
+ * metres of what he can walk on are sheet, and a smooth answer there would have
+ * him riding a ramp over ground drawn in steps.
+ *
+ * @param {number} r  metres from the middle of the world
+ * @returns {number} the height of the sheet, in metres
+ */
+export function shellHeightAt(r) {
+  return Math.round(((BASE_STEP + 1) * VOXEL + basinProfile(r)) / VOXEL) * VOXEL;
 }
 
 // ------------------------------------------------------- the worked stone
