@@ -51,8 +51,11 @@ import { sheetArray } from './voxel/sheet.js';
 // written down is src/core/quality.js. `DISC_RADIUS` is the engine's default and
 // is used HERE only as the answer to "nobody said" — a radius decided in this
 // file would be a second opinion about the size of the world, which is exactly
-// what the constant existed to prevent. What is beyond the disc is the shell,
-// src/world/ground-shell.js, which draws from the rim out to a hundred metres.
+// what the constant existed to prevent. WHAT IS BEYOND THE DISC IS NO LONGER
+// THIS FILE'S BUSINESS AT ALL: there was a sheet out to a hundred metres, and
+// E-DECISIONI13 replaced it with ground -- terraces, a ridge, a boundary a body
+// walks into -- which the FIELD draws (src/world/voxel/campo-field.js). The
+// radius here is how far the greedy is asked to cut and nothing more.
 
 /**
  * How many frames the world is given to itself before the field is sampled.
@@ -88,7 +91,24 @@ export function createGroundVoxel({
   paving = null,
   sheets = null,
   focus = null,
+  // WHETHER THE MAT IS CUT AT ALL, AND WHICH FAMILIES ARE HUNG.
+  //
+  // THIS IS WHAT IS LEFT OF THE DISC AFTER E-DECISIONI14. The meadow, its bare
+  // earth and its 172 608 triangles of blade are drawn by the FIELD now
+  // (src/world/voxel/campo-field.js), out of the same store this engine cuts.
+  // What the greedy still owns is the corridor -- three baked maps and a law of
+  // slabs that are V3's and that no ray reproduces -- so what ships asks for
+  // `families: ['paving']` and `grain: false`, and the disc costs the ground's
+  // own 0.65 quads a column instead of the mat's 4.2.
+  //
+  // The whole disc is still buildable, and that is not a leftover: it is the
+  // only way the two representations can be priced against each other inside a
+  // single opening of the page (`?suolo=cubi`, and see E-V7k for why two
+  // openings are two machines).
+  grain = true,
+  families = null,
 } = {}) {
+  const wants = (name) => families === null || families.includes(name);
   const group = new Group();
   group.name = 'ground-voxel';
   // EVERY CHUNK IS DRAWN THE MOMENT IT LANDS, and the alternative was measured
@@ -163,9 +183,13 @@ export function createGroundVoxel({
   // program switch the four materials of this file exist to avoid. The chunks
   // write their own squares into it as they land, which is also what makes it
   // arrive WITH the geometry it describes rather than a frame behind it.
-  const shade = shadeMap(CENTRE.x, CENTRE.z, radius);
-  const bladeTune = { ...bladeSettings(), sheet: sheetArrayTexture, shade };
-  const bladeMaterial = voxelMaterial(BLADE, bladeTune);
+  // AND THE MAT'S SHADOW IS A TEXTURE OVER THE WHOLE DISC, so it is not
+  // allocated at all where no mat is cut: the field marches the same eight
+  // steps over the same heights at the moment it shades.
+  const shade = grain && wants('mat') ? shadeMap(CENTRE.x, CENTRE.z, radius) : null;
+  const bladeMaterial = shade
+    ? voxelMaterial(BLADE, { ...bladeSettings(), sheet: sheetArrayTexture, shade })
+    : null;
   // The bare faces as they arrive, chunk by chunk, in the chunk's own frame:
   // they are moved into the world's when the last one has landed.
   const soil = [];
@@ -356,8 +380,10 @@ export function createGroundVoxel({
    * it saves is the surface.
    */
   function landGathered() {
-    build.earthQuads = landFamily(soil, 'earth', earthMaterial, 'ground-earth');
-    if (pavingMaterial) {
+    if (wants('earth')) {
+      build.earthQuads = landFamily(soil, 'earth', earthMaterial, 'ground-earth');
+    }
+    if (pavingMaterial && wants('paving')) {
       build.pavingQuads = landFamily(soil, 'paving', pavingMaterial, 'ground-paving');
     }
     soil.length = 0;
@@ -423,13 +449,13 @@ export function createGroundVoxel({
     // share of the work and the gate is about how long it holds the frame.
     const started = performance.now();
     if (message.kind === 'chunk') {
-      if (message.chunk.quads) land(message.chunk);
+      if (message.chunk.quads && wants('meadow')) land(message.chunk);
       // THE SHADOW BEFORE THE BLADES IT IS ABOUT, so no frame ever draws a mat
       // whose map is still empty: an empty byte is «the sun reaches the plane»,
       // which would flash one chunk of unshaded grass into the picture on the
       // frame it lands. It costs the upload of a square of bytes.
-      if (message.chunk.shade) shade.put(message.chunk.shade);
-      if (message.chunk.mat && message.chunk.mat.quads) {
+      if (message.chunk.shade && shade) shade.put(message.chunk.shade);
+      if (bladeMaterial && message.chunk.mat && message.chunk.mat.quads) {
         const { cx, cz } = message.chunk;
         build.matQuads += message.chunk.mat.quads;
         land({ cx, cz, ...message.chunk.mat }, bladeMaterial, `ground-mat-${cx},${cz}`);
@@ -508,7 +534,7 @@ export function createGroundVoxel({
     // corridor rides along for the same reason and with the same force: the
     // thread that cuts the disc is the one that has to know where the ground is
     // not its own, and it cannot ask.
-    worker = runInWorker({ grain: true, radius, focus }, receive);
+    worker = runInWorker({ grain, radius, focus }, receive);
   }
 
   return {

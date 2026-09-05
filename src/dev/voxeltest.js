@@ -608,7 +608,7 @@ Promise.all(WANTED.map((id) => assets.load(id).catch((error) => {
     // THE DELIVERED GROUND USED TO BE HUNG HERE, and it is gone with the file
     // that built it. It was the bent grid of src/world/terrain.js, kept for the
     // paving and doing a second job beyond the disc as a cheap shell; the paving
-    // is columns of the disc now and the shell is src/world/ground-shell.js, so
+    // is columns of the disc now and the ground beyond it is the field, so
     // what it was here for is drawn by the two pieces this page already builds.
     // This corner does not hang the sheet yet -- repairing the page is A-7's own
     // job at step 8, and it is broken for other reasons as well.
