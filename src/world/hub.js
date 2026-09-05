@@ -65,7 +65,7 @@ export function buildHub() {
   // What the quality tier has asked for. It is held here rather than pushed
   // straight through because the tier is chosen before the meadow exists, and a
   // lever set on nothing has to survive until there is something to set it on.
-  const wanted = { grass: null, voxelDiscRadius: null };
+  const wanted = { grass: null, voxelDiscRadius: null, groundDetail: null };
 
   /**
    * Builds every layer that has something to build at this arrival and hangs
@@ -88,6 +88,9 @@ export function buildHub() {
       // raise(): a layer that wants it asks for it by name the way it asks for
       // a texture, rather than reaching into the governor itself.
       voxelDiscRadius: wanted.voxelDiscRadius,
+      // And how finely the ground is resolved, which travels the same way and
+      // is the tier's answer to a machine rather than anybody's taste.
+      groundDetail: wanted.groundDetail,
     };
     for (const l of layersAt(arrival)) {
       l[arrival].build(bag);
@@ -95,6 +98,7 @@ export function buildHub() {
     }
   }
 
+  const soil = layer('v1-suolo');
   const green = layer('v4-verde');
   const stone = layer('v2-pietra');
   const weather = layer('v6-cielo-nuvole');
@@ -143,6 +147,20 @@ export function buildHub() {
      */
     setVoxelDiscRadius(radius) {
       wanted.voxelDiscRadius = radius;
+    },
+
+    /**
+     * How finely the ground is resolved: pixels a cell must cover.
+     *
+     * HELD AND PUSHED, WHICH IS THE OPPOSITE OF THE RADIUS ABOVE AND FOR A GOOD
+     * REASON. The disc had to be re-cut to change size, so a tier that moved
+     * afterwards left it alone. This is ONE UNIFORM on one material: a tier
+     * that moves reaches it on the next frame, with nothing thrown away and
+     * nothing rebuilt, which is what a soft lever should have been all along.
+     */
+    setGroundDetail(gain) {
+      wanted.groundDetail = gain;
+      soil.setGroundDetail(gain);
     },
 
     /** Development handle: the grass alone, so its cost can be measured. */

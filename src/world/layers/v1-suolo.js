@@ -205,7 +205,13 @@ const layer = {
       const u = layer.campo.material.uniforms;
       if (wanted.campoSteps) u.uSteps.value = wanted.campoSteps;
       if (wanted.campoTop !== null) u.uTopLevel.value = wanted.campoTop;
+      // THE TIER'S OWN ANSWER FIRST, THE ADDRESS'S OVER IT. What ships is
+      // quality.js's groundDetail; `campolod` is the handle it was measured
+      // with and it wins where it is given, which is what a measuring handle is
+      // for.
+      if (assets.groundDetail) u.uLodGain.value = assets.groundDetail;
       if (wanted.campoLod) u.uLodGain.value = wanted.campoLod;
+      layer.lodFromAddress = Boolean(wanted.campoLod);
       if (wanted.campoDither !== null) u.uDither.value = wanted.campoDither;
       u.uHorizon.value = wanted.campoShadow ? 1 : 0;
       u.uDebug.value = wanted.campoDebug;
@@ -243,6 +249,18 @@ const layer = {
    */
   topAt(x, z) {
     return layer.voxel ? layer.voxel.topAt(x, z) : null;
+  },
+
+  /**
+   * How finely the ground is resolved, from the tier that decided it.
+   *
+   * ONE UNIFORM, so a tier that moves reaches the next frame. The address wins
+   * where it was given: a measurement taken at a stated gain has to stay at it
+   * while the governor is free to move the tier under it.
+   */
+  setGroundDetail(gain) {
+    if (!layer.campo || !gain || layer.lodFromAddress) return;
+    layer.campo.material.uniforms.uLodGain.value = gain;
   },
 
   update(frame) {

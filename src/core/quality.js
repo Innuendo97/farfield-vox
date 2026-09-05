@@ -116,6 +116,15 @@ export const TIERS = [
     // Owners in brackets, so a reader knows whose number this is before
     // touching it. The disc's reach is measured: see the block over TIERS.
     voxelDiscRadius: 14,   // [V1] metres of ten centimetre ground from the centre
+    // HOW FINELY THE GROUND IS RESOLVED, as how many pixels a cell of the
+    // ray-marched field has to cover before a ray may stop at it. It is a
+    // tier's lever in exactly the sense E-V1a allows -- fewer SAMPLES of the
+    // same world, never a different one -- and it is the same lever
+    // voxelDiscRadius used to be, moved onto the thing that draws the ground
+    // now. 24 is what the scintillation was measured against at the top tiers
+    // (see uLodGain in src/world/voxel/campo-material.js); the tiers under
+    // them coarsen it, which is worth 3.1 ms at the bottom.
+    groundDetail: 24,   // [V1] pixels a cell must cover before a ray stops
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
@@ -138,6 +147,7 @@ export const TIERS = [
     // Owners in brackets, so a reader knows whose number this is before
     // touching it. The disc's reach is measured: see the block over TIERS.
     voxelDiscRadius: 14,   // [V1] metres of ten centimetre ground from the centre
+    groundDetail: 24,   // [V1] pixels a cell must cover before a ray stops
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
@@ -160,6 +170,7 @@ export const TIERS = [
     // Owners in brackets, so a reader knows whose number this is before
     // touching it. The disc's reach is measured: see the block over TIERS.
     voxelDiscRadius: 14,   // [V1] metres of ten centimetre ground from the centre
+    groundDetail: 32,   // [V1] pixels a cell must cover before a ray stops
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
@@ -175,6 +186,7 @@ export const TIERS = [
     // touching it. TWELVE and not fourteen: the only lever this tier has on the
     // ground is how much of it there is. 119 614 triangles against 151 470.
     voxelDiscRadius: 12,   // [V1] metres of ten centimetre ground from the centre
+    groundDetail: 40,   // [V1] pixels a cell must cover before a ray stops
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
@@ -319,6 +331,9 @@ export function createQuality({ renderer, hub }) {
     // the sense that matters here -- it allocates nothing and blocks nothing --
     // but the ground reads it once, when it is built: see hub.setVoxelDiscRadius.
     hub.setVoxelDiscRadius(tier.voxelDiscRadius);
+    // And how finely the ground is resolved, which unlike the radius above is
+    // one uniform and therefore reaches the frame that is drawn next.
+    hub.setGroundDetail(tier.groundDetail);
     renderer.setBloomTier(tier.bloom);
   }
 
