@@ -2,7 +2,8 @@ import { stairHeightAt as stairRunHeight } from './stairs.js';
 import { flowerField } from './vegetation.js';
 import { PLATFORM } from './layout.js';
 import {
-  BASE_STEP, CENTRE, MATERIAL, NO_COLUMN, VOXEL, chunkColumns, matAt, topAt,
+  BASE_STEP, MATERIAL, NO_COLUMN, VOXEL, clearColumn, columnSpec, createColumns,
+  matAt, setFlank, setTop, topAt,
 } from './voxel/mesher.js';
 // THE PLATEAU, which is where the meadow's own law stops and the boundary's
 // begins. It is a property of the WORLD -- the committente's «l'area giocabile
@@ -117,23 +118,72 @@ import { PLATEAU } from './voxel/confine.js';
 // so a cache that is to stay warm over a lap has to hold rather more than the
 // nine around one foot. At 1 620 bytes a tile, sixty four of them are 104 KB,
 // against the 2.45 MB a resident disc would be.
+//
+// ===========================================================================
+// AND A TILE IS FILLED ONE COLUMN AT A TIME, WHICH IS THE ONE THING THE TABLE
+// ABOVE COULD NOT SEE, BECAUSE THE WALKER IS NOT THE ONLY READER ANY MORE.
+//
+// Everything above is reasoned about a FOOT: six points a frame, all six in one
+// tile, so a first touch of 324 columns is bought back within the step. That is
+// still true and none of it is retracted. What arrived afterwards is a reader
+// that does not walk -- the meadow's own accents. The flower lattice asks this
+// seat about every candidate it sows, in RING order (sorted by distance), which
+// visits the whole circumference of a ring before it comes back; at eighteen
+// metres that circumference is more tiles than the cache holds, so every single
+// call was a first touch and every first touch cut 324 columns to answer about
+// ONE. MEASURED, on the far family's own sweep of twenty five metres: 311 000
+// columns computed to place 5 303 flowers -- fifty nine columns a flower -- and
+// 743 ms of a walker's thread for one sweep of a family that sweeps continuously
+// while anybody is walking (U-PERF-4 §2).
+//
+// So the rectangle is allocated whole and RUN column by column, on demand,
+// through the same `columnSpec` and the same three doors `chunkColumns` writes
+// through. It is not a second law and not a second store: it is the same law,
+// asked about the columns somebody actually asks about. A walker who crosses a
+// tile now pays one column instead of 324 and the rest arrive under his feet as
+// he needs them; the scattered reader pays exactly what it asks for.
+//
+// WHAT PROVES IT: guard-piano's `contractReadsTheStore`, which already walked
+// every column of the disc and compared this seat against `columnTop` -- the law
+// itself, asked point by point -- in both directions. It did not have to be told
+// anything about this change, and a lazy fill that answered anything but the
+// law would fail it on the first column.
+//
+// AND THE MAT IS NOT LAID, which used to be the second half of the saving and is
+// now the whole of it: `chunkColumns` runs `layMat` when the grain is asked for
+// and this seat never asked for it, so the only thing lost with the rectangle
+// loop is the loop.
 const TILE = 16;
 const CACHED_TILES = 64;
 const tiles = new Map();
 
+// WHAT THIS SEAT HAS ACTUALLY COMPUTED, so that the cost of asking it is a
+// NUMBER and not a stopwatch. `asks` is how many times somebody wanted the floor
+// or the material; `columns` is how many columns of law that came to; `cuts` is
+// how many tiles were seated. The ratio of the first two is the whole of what
+// U-PERF-4 repaired -- it stood at fifty nine and stands at one -- and it is a
+// COUNT, so a guard can gate it on any machine at any load, which is what
+// E-V5j asks of anything that is asserted rather than printed.
+const asked = { asks: 0, columns: 0, cuts: 0 };
+
+/** How much law this seat has run, for the guard that gates the ratio. */
+export function storeCost() { return { ...asked }; }
+
 /**
- * The store the column (ix, iz) lives in, cut if it has not been cut yet.
+ * The store the column (ix, iz) lives in, with that column run into it.
  *
  * IT IS THE SAME ARITHMETIC THE WORKER MESHES FROM, through the same door and
  * the same four arrays, so the floor the walker stands on and the floor the
  * frame draws are one store and not two readings of one law.
  */
 function storeAt(ix, iz) {
+  asked.asks += 1;
   const cx = Math.floor(ix / TILE);
   const cz = Math.floor(iz / TILE);
   const key = `${cx},${cz}`;
-  let store = tiles.get(key);
-  if (store === undefined) {
+  let tile = tiles.get(key);
+  if (tile === undefined) {
+    asked.cuts += 1;
     // AND IT ASKS FOR THE GROUND WITHOUT THE MAT, WHICH IS WHAT THIS SEAT HAS
     // ALWAYS MEANT AND HAS NOT ALWAYS SAID.
     //
@@ -170,11 +220,50 @@ function storeAt(ix, iz) {
     // which is a property of the world and not of a tier. What a tier still
     // decides is how much of it is drawn as CUBES, and that is a question for
     // the layer and not for the floor.
-    store = chunkColumns(cx, cz, TILE, false, PLATEAU, CENTRE, true);
-    if (tiles.size >= CACHED_TILES) tiles.delete(tiles.keys().next().value);
-    tiles.set(key, store);
+    //
+    // NO SKIRT, because there is nobody to compare across an edge: the two
+    // readers below ask about the column they were handed and never about its
+    // neighbour. `chunkColumns` carries one for the mesher's own comparison and
+    // this seat has never used it.
+    //
+    // AND THE TILE THAT FALLS OFF THE BACK IS THE TILE THAT COMES ON THE FRONT.
+    // The cache is a fixed number of tiles, so at a steady state every new one
+    // is an eviction, and allocating the arrays again for it costs the same
+    // sixteen kilobytes of blade lattice this seat does not read -- measured at
+    // a tenth of the sweep in the allocator and another fifteenth in the
+    // collector. The evicted tile's arrays are reseated instead: nothing is
+    // cleared but `run`, because a column is only ever read after `run` has said
+    // it was laid, and both readers below ask about the column they handed in.
+    const oldest = tiles.size >= CACHED_TILES ? tiles.keys().next().value : null;
+    if (oldest !== null) {
+      tile = tiles.get(oldest);
+      tiles.delete(oldest);
+      tile.store.ox = cx * TILE;
+      tile.store.oz = cz * TILE;
+      tile.run.fill(0);
+    } else {
+      tile = {
+        store: createColumns(cx * TILE, cz * TILE, TILE, TILE),
+        run: new Uint8Array(TILE * TILE),
+      };
+    }
+    tiles.set(key, tile);
   }
-  return store;
+  const k = (iz - cz * TILE) * TILE + (ix - cx * TILE);
+  if (!tile.run[k]) {
+    tile.run[k] = 1;
+    asked.columns += 1;
+    const spec = columnSpec(ix, iz, false, PLATEAU, true);
+    // Through the store's own doors and in the order `chunkColumns` writes
+    // them, so that a column laid here and the same column laid there are one
+    // statement written once.
+    if (spec.top === NO_COLUMN) clearColumn(tile.store, ix, iz, spec.mat);
+    else {
+      setTop(tile.store, ix, iz, spec.top, spec.mat);
+      setFlank(tile.store, ix, iz, spec.under, spec.depth);
+    }
+  }
+  return tile.store;
 }
 
 /**

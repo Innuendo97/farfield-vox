@@ -62,7 +62,15 @@ import {
 // now and not the law: the walker's floor and the material under his foot are
 // two questions about the four arrays, and the seat that answers them may not
 // reach past this door to ask.
-export { VOXEL, CHUNK, NO_COLUMN, MATERIAL, matAt, topAt } from './columns.js';
+//
+// AND THE THREE WRITE DOORS, on the same terms. That seat cuts a tile of the
+// store and, from U-PERF-4, RUNS it one column at a time as it is asked (see
+// storeAt there); the columns it lays go in through the doors `chunkColumns`
+// lays its own through, so a column laid for a foot and a column laid for a mesh
+// are one statement written once instead of two.
+export {
+  VOXEL, CHUNK, NO_COLUMN, MATERIAL, clearColumn, createColumns, matAt, setFlank, setTop, topAt,
+} from './columns.js';
 export {
   BASE_STEP, BLADE, BLADES_PER_VOXEL, CENTRE, DISC_RADIUS, EARTH, FRAMED, MANTO, MOUND, PATH, SUB,
   SUN_SKIRT, SUN_STEPS,
