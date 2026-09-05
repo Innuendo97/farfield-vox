@@ -1,6 +1,6 @@
 import { SPAWN, STAIRS } from '../../src/world/layout.js';
 import {
-  PATH_LINE, pathCentreX, pathEdge, pathHalfWidth, pathRun,
+  pathCentreX, pathEdge, pathHalfWidth, pathRun,
 } from '../../src/world/terrain-field.js';
 import { groundHeightAt, materialAt } from '../../src/world/contracts.js';
 import {
@@ -72,20 +72,47 @@ const RUN = { from: STAIRS.z + STAIRS.tread * STAIRS.steps, to: 12.0 };
 // third east of where the reference puts the stone at the front of the frame.
 //
 // THE READING. For every row of farfield-day-voxel-target.png, the two crossings
-// of 50 % greenness either side of the corridor, taken to the plane y = 0
-// through POSE_VOX_DAY; the centre is the midpoint. Over 42 rows from z = -12.25
-// to z = +6.08, fitted in the law's own form:
+// of half a share of greenness either side of the corridor, taken to the plane
+// y = 0 through POSE_VOX_DAY, and inside them the centroids of the pale stone
+// and of stone and earth together; 217 rows gathered into 32 bins of 0.4 m of
+// northing (fondazione/lav/s5-asse.py, s5-curva.py).
 //
-//     near end   +0.617 +/- 0.043 m at z = 8.8
-//     far end    +0.265 +/- 0.083 m at z = -14.3, against STAIRS.x = 0.25
+// AND IT IS FOUR SEATS ALONG THE RUN AND NOT ONE AT THE FRONT OF IT, WHICH IS
+// THE LEG THAT WAS MISSING. What stood here asked the centreline for ONE number,
+// at one northing, against one fitted end -- and one number is a test a straight
+// line passes. The reference's corridor is not straight: it turns four times
+// over the thirteen metres the frame resolves. So the register is read at the
+// two crests, at the trough between them and at the near end, and a corridor
+// that runs anywhere between those four without going through them fails here.
+//
+//     z = -1.75   +0.672 +/- 0.034 m     the crest to the east
+//     z = +0.75   +0.128 +/- 0.032       the trough to the west
+//     z = +4.25   +0.769 +/- 0.028       the second crest
+//     z = +7.80   -0.502 +/- 0.049       the near end, under the walker
 //
 // THE TOLERANCES ARE THREE OF THOSE SIGMAS AND NOTHING ELSE. A band chosen for
 // comfort would be a band that admits whatever is written today; a band at three
-// times the reading's own error is a band the reading can defend. And the second
-// leg is the sharper one to fail: it does not ask where the reference's corridor
-// is at all, it asks that the corridor arrives at the built stair -- which is
-// the one fact about the path that two independent measurements agree on.
-const REGISTER = { nearX: 0.617, nearTol: 0.130, stairTol: 0.250 };
+// times the reading's own error is a band the reading can defend. Each sigma is
+// that seat's own -- the bins within 0.6 m of it, weighted -- so the near end,
+// where the walker hides a verge and the reading is thinnest, is allowed the
+// widest band and the middle of the field the narrowest.
+//
+// AND THE STAIR LEG IS AN ANCHOR NOW AND NOT A CORROBORATION. It used to be
+// reported as two independent measurements agreeing to 1.5 cm: the ruler's own
+// far end and STAIRS.x. That agreement is withdrawn -- the rows that carried the
+// ruler's far end were reading the reference's own staircase, which projects
+// eight metres nearer the eye than ours (PATH_CENTRE in terrain-field.js). What
+// the leg still asks is the thing it was always sharpest at: that the corridor
+// ARRIVES at the built stair rather than walking past it.
+const REGISTER = {
+  seats: [
+    { z: -1.75, x: 0.672, tol: 0.101 },
+    { z: 0.75, x: 0.128, tol: 0.097 },
+    { z: 4.25, x: 0.769, tol: 0.084 },
+    { z: 7.80, x: -0.502, tol: 0.147 },
+  ],
+  stairTol: 0.250,
+};
 
 // How far the grass has to stand proud of the stone, in voxels, PAST THE RAMP --
 // where the mat is at full intensity. A 1.3, and the committente's word on it is
@@ -354,7 +381,21 @@ if (process.argv.includes('--self')) {
     },
     {
       what: 'the centreline a metre out of the reference\'s register, which is what shipped',
-      caught: Math.abs(pathCentreX(PATH_LINE.nearZ) - REGISTER.nearX) <= REGISTER.nearTol,
+      caught: REGISTER.seats.every((r) => Math.abs(pathCentreX(r.z) - r.x) <= r.tol),
+    },
+    {
+      // The defect the committente named in E-DECISIONI14: a corridor that
+      // arrives at both ends and ignores everything between them. The single
+      // seat this register used to carry could not see it, and a straight line
+      // through the two outermost seats misses the two in the middle by four and
+      // by six times their own tolerance.
+      what: 'a corridor ruled straight between the two ends the register pins',
+      caught: (() => {
+        const a = REGISTER.seats[0];
+        const b = REGISTER.seats[REGISTER.seats.length - 1];
+        const line = (z) => a.x + (b.x - a.x) * (z - a.z) / (b.z - a.z);
+        return REGISTER.seats.some((r) => Math.abs(line(r.z) - r.x) > r.tol);
+      })(),
     },
     {
       what: 'a corridor that walks past the staircase instead of arriving at it',
@@ -452,12 +493,14 @@ report.check(onPaving(pathCentreX(4), 4) && materialAt(pathCentreX(4), 4) === 's
 
 // ------------------------------------------------------------------- 5
 report.line('');
-const nearOff = pathCentreX(PATH_LINE.nearZ) - REGISTER.nearX;
-report.check(Math.abs(nearOff) <= REGISTER.nearTol,
-  `the centreline stands within ${REGISTER.nearTol} m of where the reference's own corridor `
-  + `stands at the front of the frame (${REGISTER.nearX} m at z ${PATH_LINE.nearZ})`,
-  `${pathCentreX(PATH_LINE.nearZ).toFixed(3)} written, ${nearOff >= 0 ? '+' : ''}`
-  + `${nearOff.toFixed(3)} m off the reading`);
+for (const seat of REGISTER.seats) {
+  const off = pathCentreX(seat.z) - seat.x;
+  report.check(Math.abs(off) <= seat.tol,
+    `the centreline stands within ${seat.tol.toFixed(3)} m of where the reference's own `
+    + `corridor stands at z ${seat.z.toFixed(2)} (${seat.x >= 0 ? '+' : ''}${seat.x.toFixed(3)} m)`,
+    `${pathCentreX(seat.z).toFixed(3)} written, ${off >= 0 ? '+' : ''}`
+    + `${off.toFixed(3)} m off the reading`);
+}
 const stairOff = pathCentreX(RUN.from) - STAIRS.x;
 report.check(Math.abs(stairOff) <= REGISTER.stairTol,
   `and it arrives at the staircase, within ${REGISTER.stairTol} m of the run's own axis`,
