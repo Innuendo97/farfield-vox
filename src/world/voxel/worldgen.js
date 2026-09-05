@@ -12,6 +12,13 @@ import {
 // import attribute is what lets the same line be read by node and by the
 // bundler, which is the property this whole half of the engine rests on.
 import ROCK_PLAN from '../../../assets-src/rocks/rocks.json' with { type: 'json' };
+// AND THE EDGE OF THE WORLD, WHICH IS GROUND AND THEREFORE THIS FILE'S BUSINESS
+// EVEN THOUGH ITS SHAPE IS NOT. ./confine.js states the plateau, the fall
+// quantised into terraces and the ridge that closes the horizon
+// (E-DECISIONI13); this file lays them as COLUMNS, through the same four
+// arrays and the same doors as the meadow, so that the boundary is one more
+// stretch of the same store and never a second representation.
+import { confineSteps } from './confine.js';
 // AND THE SUN, FROM THE ONE FILE THAT IS ALLOWED TO SAY WHERE IT IS.
 //
 // The mat's shadow is the first thing this engine builds that depends on the
@@ -1648,18 +1655,51 @@ export function columnCentre(ix, iz) {
  * @param {number} ix  global voxel index along x
  * @param {number} iz  global voxel index along z
  * @param {boolean} grain  whether the sods are part of the ground
- * @param {number} radius  how far the disc reaches, in metres
+ * @param {number} radius  how far the PLATEAU reaches, in metres
+ * @param {boolean} beyond  whether there is ground past the plateau at all.
+ *          FALSE is the disc of cubes -- a rim, and air outside it -- and it is
+ *          what every greedy reader has always asked for. TRUE is the WORLD:
+ *          past the rim the columns keep coming, terraced, out of ./confine.js
+ *          (E-DECISIONI13). One law, two reaches, and the two agree column for
+ *          column everywhere both of them lay one.
  * @returns {{top: number, mat: number, under: number, depth: number}} the
  *          column, with `top` at NO_COLUMN and `mat` saying why where none
  *          stands
  */
-export function columnSpec(ix, iz, grain = true, radius = DISC_RADIUS) {
+export function columnSpec(ix, iz, grain = true, radius = DISC_RADIUS, beyond = false) {
   const { x, z } = columnCentre(ix, iz);
   const gone = (why) => ({ top: NO_COLUMN, mat: why, under: MATERIAL.AIR, depth: 0 });
 
-  // 2. THE SEATS. The rim of the disc first, because it is the cheapest test
-  //    and because a column outside it is not this engine's ground at all.
-  if (Math.hypot(x - CENTRE.x, z - CENTRE.z) > radius) return gone(MATERIAL.AIR);
+  // 2. THE SEATS. The rim of the plateau first, because it is the cheapest test
+  //    and because what stands outside it is a different stretch of ground.
+  //
+  //    AND OUTSIDE IT THERE IS GROUND NOW, WHICH IS THE ONE SENTENCE OF THIS
+  //    FUNCTION E-DECISIONI13 REWROTE. It used to be air -- «a column outside
+  //    it is not this engine's ground at all» -- because everything past the
+  //    disc was a sheet somebody else drew. The sheet is gone: past the rim the
+  //    world falls away in terraces towards the water and climbs into the ridge
+  //    that closes the horizon, and every one of those is a column of this
+  //    store like any other. The `beyond` argument is what lets the greedy disc
+  //    keep its rim while the field takes the world, and NOT a second law: both
+  //    branches leave through the same door with the same four fields.
+  if (Math.hypot(x - CENTRE.x, z - CENTRE.z) > radius) {
+    if (!beyond) return gone(MATERIAL.AIR);
+    return {
+      // The plateau's own floor, plus however many steps the boundary has
+      // fallen or climbed. The base is the SAME literal the meadow stands on,
+      // so the first terrace is one cube under the last column of the meadow
+      // and there is no seam at the rim to measure.
+      top: BASE_STEP + confineSteps(x, z, CENTRE),
+      mat: MATERIAL.GRASS,
+      // AND THE RISERS ARE EARTH, WHICH IS THE TARGET'S OWN READING OF A
+      // TERRACE: green treads on brown walls. The mesher already splits a cut
+      // wall one voxel from its top and lays that cube as meadow (E-DECISIONI8.3,
+      // «due voxel di TERRA + un voxel di PRATO»), so writing the flank as soil
+      // here is the whole of what a terraced hillside needs.
+      under: MATERIAL.EARTH,
+      depth: 1,
+    };
+  }
   if (insideBlock(x, z)) return gone(MATERIAL.STONE);
 
   // 1. THE BASE. One literal, and it is the only place a height is decided.
@@ -1830,8 +1870,8 @@ export function columnSpec(ix, iz, grain = true, radius = DISC_RADIUS) {
  * at the store instead, or it and the picture will part company. Today the
  * pipeline is the whole of the world and the two agree by construction.
  */
-export function columnTop(ix, iz, grain = true, radius = DISC_RADIUS) {
-  const spec = columnSpec(ix, iz, grain, radius);
+export function columnTop(ix, iz, grain = true, radius = DISC_RADIUS, beyond = false) {
+  const spec = columnSpec(ix, iz, grain, radius, beyond);
   return spec.top === NO_COLUMN ? EMPTY : spec.top;
 }
 
@@ -1860,7 +1900,9 @@ export const EMPTY = -1e9;
  * @param {boolean} grain
  * @param {number} radius
  */
-export function chunkColumns(cx, cz, n, grain = true, radius = DISC_RADIUS, focus = CENTRE) {
+export function chunkColumns(
+  cx, cz, n, grain = true, radius = DISC_RADIUS, focus = CENTRE, beyond = false,
+) {
   // THE SKIRT IS AS WIDE AS THE SUN MARCHES, AND ONLY WHEN THE SUN MARCHES.
   //
   // See SUN_SKIRT above: a chunk that could not look upwind past its own edge
@@ -1878,7 +1920,7 @@ export function chunkColumns(cx, cz, n, grain = true, radius = DISC_RADIUS, focu
     for (let i = 0; i < span; i++) {
       const ix = store.ox + i;
       const iz = store.oz + j;
-      const spec = columnSpec(ix, iz, grain, radius);
+      const spec = columnSpec(ix, iz, grain, radius, beyond);
       // Through the store's own door and not into its arrays, so that the
       // write side steps 4 and 5 will edit through is the one this pass
       // already uses, and a defect in it is a defect the disc shows today.

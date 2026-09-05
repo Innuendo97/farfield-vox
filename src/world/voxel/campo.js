@@ -1,14 +1,14 @@
 // THE FIELD: THE SAME GROUND, KEPT AS A PICTURE INSTEAD OF AS TRIANGLES.
 //
-// A texel a blade -- five centimetres -- holding the four numbers a fragment
-// needs to rebuild the mat and the floor under it, plus a pyramid of MAXIMA so
-// a ray can skip the empty air over them. This file is the ARITHMETIC of that
-// picture and nothing else: no three.js, no texture, no upload. It is reachable
-// from ./pure.js, which is what lets a guard lay the same texel offline and
-// compare it against the block store, and it is the reason the field can never
-// become a second opinion about where the ground is -- every byte below is
-// written out of the store the greedy mesher reads, through the same
-// columnSpec/layMat that cut the disc.
+// A texel a blade -- five centimetres near the walker, forty out to the ridge
+// -- holding the four numbers a fragment needs to rebuild the mat and the floor
+// under it, plus a pyramid so a ray can skip the empty air over them. This file
+// is the ARITHMETIC of that picture and nothing else: no three.js, no texture,
+// no upload. It is reachable from ./pure.js, which is what lets a guard lay the
+// same texel offline and compare it against the block store, and it is the
+// reason the field can never become a second opinion about where the ground is
+// -- every byte below is written out of the store the greedy mesher reads, or
+// out of the one law that store is filled from.
 //
 // WHY A TEXEL AND NOT A VERTEX. The rule at the head of ./mesher.js is that
 // nothing per voxel may ride on a vertex attribute, because that is what lets a
@@ -17,20 +17,48 @@
 // needs comes out of one texture read at the cell the ray stopped in.
 //
 // ---------------------------------------------------------------------------
+// TWO WINDOWS, AND WHY THE SECOND ONE HAD TO EXIST (phase two, E-DECISIONI14).
+//
+// Phase one drew the field over the DISC and left everything past it to a sheet
+// that ran to a hundred metres. E-DECISIONI13 retired that sheet: past the
+// plateau the ground falls in terraces to the water and climbs into a ridge
+// that closes the horizon, and all of it is columns. A field that only reached
+// the walker's own fifty metres would therefore end in mid air.
+//
+// So there are two pictures and one program:
+//
+//   THE NEAR WINDOW  5 cm a texel, 51.2 m across, FOLLOWING THE WALKER, updated
+//                    toroidally as they walk. It is the meadow blade by blade.
+//   THE FAR WINDOW   40 cm a texel, 409.6 m across, STANDING STILL over the
+//                    middle of the world. It is the boundary: the terraces, the
+//                    ridge, and the same meadow read eight times coarser.
+//
+// AND THE FAR ONE DOES NOT MOVE, WHICH IS THE WHOLE OF WHY IT IS CHEAP. The
+// walker never leaves the plateau -- thirty five metres of a four hundred metre
+// picture -- so a window centred on the WORLD covers everything they can ever
+// see, is built once, and is never updated again. A far window that followed
+// the eye would pay a toroidal update for a view that does not change.
+//
+// The two are exactly a factor of EIGHT apart, which is not a taste: it makes a
+// far texel line up with level three of the near pyramid, so the same traversal
+// walks both with one level counter and the seam between them is a change of
+// which texture answers and nothing else.
+//
+// ---------------------------------------------------------------------------
 // WHAT ONE TEXEL HOLDS, AND WHY EACH CHANNEL IS THE ONE IT IS.
 //
-//   R  the TOP of the column including its blade, in SUB-steps of a blade above
-//      y = 0. That is the unit ./columns.js already keeps the mat and its
-//      shadow in -- a quarter of a blade, 1.25 cm -- so a voxel is exactly
-//      eight of them and nothing is quantised twice. One byte spans 3.19 m,
-//      over the tallest thing this lattice carries.
-//   G  the top of the GROUND under the blade, same unit. The pair is what makes
-//      a mound a piece of the field instead of a second representation: the
-//      ray sees one solid up to G and a blade from G to R.
-//   B  what the column is made of, how narrow its blade stands, and whether it
-//      is there at all -- packed, because the plane's own column reads R = 0
-//      and G = 0 (BASE_STEP + 1 is nought) and would otherwise be
-//      indistinguishable from a hole in the disc.
+//   R  the BLADE standing on this column, measured from the ground under it, in
+//      SUB-steps of a blade -- a quarter of a blade, 1.25 cm, which is the unit
+//      ./columns.js already keeps the mat in, so nothing is quantised twice.
+//      One byte spans 3.19 m, over ten times the tallest blade the law draws.
+//   G  the top of the GROUND, in whole VOXELS, biased by CAMPO_BIAS so that a
+//      byte can hold ground BELOW the plateau as well as above it. The pair is
+//      what makes a mound a piece of the field instead of a second
+//      representation: the ray sees one solid up to G and a blade over it.
+//   B  what the column is made of, how narrow its blade stands, whether it is
+//      there at all, and whether its WALL is soil -- packed, because the
+//      plateau's own column reads a blade of nought and would otherwise be
+//      indistinguishable from a hole.
 //   A  the tint of the COLUMN, which is the pigment's own field sampled at the
 //      integer column exactly as the fragment of ./material.js samples it. It
 //      is written here rather than hashed in the shader for the reason §2.4 of
@@ -39,57 +67,194 @@
 //      nothing. The hue rides the slow octave and is still drawn in the
 //      fragment, because it is a second field and not this one.
 //
+// WHY THE HEIGHT IS TWO UNITS AND NOT ONE, WHICH IS THE CHANGE PHASE TWO FORCED.
+// Phase one kept both R and G as the ABSOLUTE height in quarter-blades: one
+// byte, 3.19 m, and every ground in the world stood between nought and the
+// tallest mound. The boundary breaks that in both directions at once -- the
+// basin falls ten metres and the ridge climbs fifteen -- and a quarter-blade
+// byte cannot hold twenty five metres. Splitting the pair is what makes it fit
+// WITHOUT losing a millimetre of either: the ground is always a whole number of
+// voxels, so counting it in voxels loses nothing at all and buys 25.5 m of
+// range; and the blade, which is the thing that needs the fine unit, keeps it,
+// measured from the ground it stands on instead of from y = 0.
+//
 // WHAT IS NOT IN A TEXEL, ON PURPOSE. The line where the sun stops reaching a
 // column -- ./worldgen.js bakes it into store.shade -- is NOT stored. It is a
-// march over R along the seal's own bearing, and the field can walk it at the
-// moment it shades, out of the very same heights, for eight fetches that the
-// measurement says are free. A stored copy would be a second answer to a
+// march over the tops along the seal's own bearing, and the field can walk it
+// at the moment it shades, out of the very same heights, for eight fetches that
+// the measurement says are free. A stored copy would be a second answer to a
 // question the picture already contains, and it would stop following the sun.
 // ---------------------------------------------------------------------------
 
 import {
   BLADE, BLADES_PER_VOXEL, CHUNK, MATERIAL, NO_COLUMN, SUB, VOXEL,
 } from './columns.js';
-import { MANTO, chunkColumns } from './worldgen.js';
+import { CENTRE, MANTO, chunkColumns, columnSpec } from './worldgen.js';
 import { PIGMENT, pigTint } from './pigment.js';
 
 /** How many SUB-steps of a blade one voxel of the world is worth. */
 export const CAMPO_RUNG = BLADES_PER_VOXEL * SUB;
 
 /**
- * The shape of the picture, and every number in it is a power of two on
+ * How far below y = 0 a ground byte can reach, in VOXELS.
+ *
+ * A HUNDRED, AND IT IS THE BOUNDARY'S OWN NUMBER AND NOT A ROUND ONE. The basin
+ * falls 9.85 m at the far window's own edge (204.8 m) and the ridge crowns at
+ * 15.4 m over the plateau at its tallest bearing; a bias of a hundred voxels
+ * puts the byte's range at -10.0 m to +15.5 m, which holds both with the
+ * boundary's dials at their delivered values and little to spare either way.
+ * THE GUARD ASSERTS THAT, sweeping the law rather than trusting this comment --
+ * the day V5 raises the ridge, it fails there instead of drawing a flat crown.
+ *
+ * What is outside it is the DIAGONAL CORNERS of the far window, past 207 m,
+ * where the basin has fallen past ten metres. They are clamped, they stand
+ * behind the ridge or under three quarters of the air's own haze at every pose
+ * a walker can reach, and they are declared here rather than found later.
+ */
+export const CAMPO_BIAS = 100;
+
+/**
+ * Where each level of the pyramid stands in the one texture that carries them
+ * all, and why they are in ONE texture rather than in a mip chain.
+ *
+ * A mip chain is the natural home for a pyramid and it is the wrong one here.
+ * The window moves toroidally, so a tile's write has to land at level L at a
+ * position that is level L's own; three.js reaches a mip level of a data
+ * texture only through a full re-upload of the image, and the raw path needs
+ * the texture object out of the renderer's private properties. Laid side by
+ * side in one level-nought image, every write is the SAME call at a different
+ * rectangle, the sampler needs no mip filtering at all (every fetch is a
+ * texelFetch at level nought, which is what the DDA wants anyway), and the
+ * shader's own addressing is one offset it is handed.
+ *
+ * What it costs is the space between the levels: 1536 x 1024 against the
+ * 1365 x 1024 the levels themselves come to, so 1.5 MB of the six is padding.
+ */
+function campoAtlas(shape) {
+  const origins = [{ x: 0, y: 0 }];
+  let x = shape.side;
+  let y = 0;
+  for (let level = 1; level < shape.levels; level++) {
+    const size = shape.side >> level;
+    // Two columns: the first level of the strip is half the field and starts a
+    // column of its own; the rest stack under it until they would run past the
+    // bottom, then step right by the width of the level that just filled up.
+    if (y + size > shape.side) {
+      x += shape.side >> (level - 1);
+      y = 0;
+    }
+    origins.push({ x, y });
+    y += size;
+  }
+  const width = origins.reduce((w, o, level) => Math.max(w, o.x + (shape.side >> level)), 0);
+  return { width, height: shape.side, origins };
+}
+
+/** Where each level of ONE TILE stands inside the tile's own image. */
+function campoTileLayout(shape) {
+  const origins = [{ x: 0, y: 0 }];
+  let x = 0;
+  const y = shape.tile;
+  for (let level = 1; level < shape.levels; level++) {
+    origins.push({ x, y });
+    x += shape.tile >> level;
+  }
+  return { width: shape.tile, height: shape.tile + (shape.tile >> 1), origins };
+}
+
+/**
+ * The shape of one picture, and every number in it is a power of two on
  * purpose.
  *
  * THE SIDE AND THE TILE ARE THE WHOLE OF WHY THE TOROIDAL UPDATE IS TRIVIAL. A
- * chunk is 64 columns, so 128 texels; the field is 1024, so exactly eight
- * chunks a side. A chunk's square therefore lands on a multiple of its own size
- * at EVERY level of the pyramid and can never straddle the wrap -- which turns
- * "update a moving window" into seven sub-rectangle writes with no clipping and
- * no split. A side that was not a whole number of chunks would need four writes
- * a level and a case analysis for each.
+ * tile is 128 texels and the picture is 1024, so exactly eight tiles a side. A
+ * tile's square therefore lands on a multiple of its own size at EVERY level of
+ * the pyramid and can never straddle the wrap -- which turns "update a moving
+ * window" into seven sub-rectangle writes with no clipping and no split. A side
+ * that was not a whole number of tiles would need four writes a level and a
+ * case analysis for each.
+ *
+ * @param {object} options
+ * @param {number} options.cell   metres a texel of the finest level covers
+ * @param {number} options.side   texels a side of the finest level
+ * @param {number} options.levels how many levels the pyramid has, finest first
+ * @param {number} options.tile   texels a side of one tile
+ * @param {boolean} options.still whether the window stands over the world
+ *                                instead of following the walker
  */
-export const CAMPO = {
-  /** Texels a side of the finest level: 1024 at 5 cm is 51.2 m of world. */
-  side: 1024,
-  /** Metres a texel of the finest level covers. */
-  cell: BLADE,
-  /** Metres one level of a height byte is worth. */
-  unit: BLADE / SUB,
-  /** Texels a side of one chunk's square. */
-  tile: CHUNK * BLADES_PER_VOXEL,
-  /**
-   * How many levels the pyramid has, finest first.
-   *
-   * SEVEN, AND THE BOUND IS THE CHUNK AND NOT A TASTE. Level 6 is a cell of 64
-   * texels, so a chunk's square is 2 x 2 of them and its reduction is entirely
-   * inside the chunk that produced it. Level 7 would be a cell of 128 -- still
-   * inside -- but level 8 spans four chunks, and a level whose cell straddles
-   * two producers cannot be written by either of them alone. The measurement
-   * says nothing above four is reached anyway (the prototype's own default top
-   * was level 4, a cell of 80 cm).
-   */
-  levels: 7,
-};
+export function campoShape({
+  cell, side = 1024, levels = 7, tile = CHUNK * BLADES_PER_VOXEL, still = false, name = '',
+}) {
+  const shape = {
+    name,
+    /** Metres a texel of the finest level covers. */
+    cell,
+    /** Texels a side of the finest level. */
+    side,
+    /** Texels a side of one tile. */
+    tile,
+    /** Metres one tile covers a side. */
+    span: tile * cell,
+    /** Metres one level of a GROUND byte is worth. */
+    unitGround: VOXEL,
+    /** Metres one level of a BLADE byte is worth. */
+    unitBlade: BLADE / SUB,
+    /**
+     * How many levels the pyramid has, finest first.
+     *
+     * SEVEN, AND THE BOUND IS THE TILE AND NOT A TASTE. Level 6 is a cell of 64
+     * texels, so a tile's square is 2 x 2 of them and its reduction is entirely
+     * inside the tile that produced it. Level 7 would be a cell of 128 -- still
+     * inside -- but level 8 spans four tiles, and a level whose cell straddles
+     * two producers cannot be written by either of them alone.
+     */
+    levels,
+    /** Whether this window stands over the world rather than over the walker. */
+    still,
+  };
+  shape.atlas = campoAtlas(shape);
+  shape.tiles = campoTileLayout(shape);
+  shape.tileBytes = shape.tiles.width * shape.tiles.height * 4;
+  shape.bytes = shape.atlas.width * shape.atlas.height * 4;
+  return shape;
+}
+
+/**
+ * THE NEAR WINDOW: five centimetres a texel, 51.2 m across, following the eye.
+ *
+ * The name is kept from phase one because two dozen readers -- the guard, the
+ * material, the window -- spell it, and because it is still the field the
+ * meadow is drawn from. What is new beside it is CAMPO_FAR.
+ */
+export const CAMPO = campoShape({ cell: BLADE, name: 'vicino' });
+
+/**
+ * How many near cells a far cell is worth.
+ *
+ * EIGHT, AND IT IS A POWER OF TWO BECAUSE THE TRAVERSAL IS ONE LOOP. A far
+ * texel is then exactly a cell of level three of the near pyramid: the ray
+ * keeps ONE level counter, in near units, and crossing out of the near window
+ * is a change of which texture answers and of nothing else. Any other ratio
+ * would need two counters and a conversion at the seam, which is where a seam
+ * would then be visible.
+ */
+export const CAMPO_FAR_RATIO = 8;
+
+/** The shift from a near level to the same span in the far pyramid. */
+export const CAMPO_FAR_SHIFT = Math.round(Math.log2(CAMPO_FAR_RATIO));
+
+/**
+ * THE FAR WINDOW: forty centimetres a texel, 409.6 m across, standing still.
+ *
+ * It covers 204.8 m in every direction from the middle of the world, which
+ * carries the whole of the boundary -- the terraces, the crown of the ridge at
+ * 96 m and its outer flank to 168 -- and every metre of ground the two arms of
+ * standing water are laid over. Past that is V5's frame, which is drawn by
+ * src/world/distant.js and has never been ground.
+ */
+export const CAMPO_FAR = campoShape({
+  cell: BLADE * CAMPO_FAR_RATIO, still: true, name: 'lontano',
+});
 
 /** What a texel's material code means, and it is not MATERIAL's numbering. */
 export const CAMPO_MATERIAL = {
@@ -102,59 +267,19 @@ export const CAMPO_MATERIAL = {
 export const CAMPO_PRESENT = 16;
 
 /**
- * Where each level of the pyramid stands in the one texture that carries them
- * all, and why they are in ONE texture rather than in a mip chain.
+ * Bit 5 of B: the WALL of this column is soil.
  *
- * A mip chain is the natural home for a pyramid and it is the wrong one here.
- * The window moves toroidally, so a chunk's write has to land at level L at a
- * position that is level L's own; three.js reaches a mip level of a data
- * texture only through a full re-upload of the image, and the raw path needs
- * the texture object out of the renderer's private properties. Laid side by
- * side in one level-nought image, every write is the SAME call at a different
- * rectangle, the sampler needs no mip filtering at all (every fetch is a
- * texelFetch at level nought, which is what the DDA wants anyway), and the
- * shader's own addressing is one offset it is handed.
- *
- * What it costs is the space between the levels: 1536 x 1024 against the
- * 1365 x 1024 the levels themselves come to, so 1.5 MB of the six is padding.
+ * WHY A BIT AND NOT A GUESS, and it closes a defect the affiancato of phase one
+ * found. The mesher lays a cut wall as TWO rectangles -- soil from the floor to
+ * one voxel under the top, meadow for that last cube (E-DECISIONI8.3, «due
+ * voxel di TERRA + un voxel di PRATO») -- and the field had no way to know it:
+ * it read the family off the column's TOP and painted the whole flank of every
+ * mound bank, of every halo round a boulder and of every terrace of the
+ * boundary in one material. On the frame that was «cime sabbia e fianchi
+ * grigio-azzurri attorno ai massi». The store has always said it, in `under`;
+ * one spare bit of B is the whole of what it cost to carry.
  */
-export const CAMPO_ATLAS = (() => {
-  const origins = [{ x: 0, y: 0 }];
-  let x = CAMPO.side;
-  let y = 0;
-  for (let level = 1; level < CAMPO.levels; level++) {
-    const size = CAMPO.side >> level;
-    // Two columns: the first level of the strip is half the field and starts a
-    // column of its own; the rest stack under it until they would run past the
-    // bottom, then step right by the width of the level that just filled up.
-    if (y + size > CAMPO.side) {
-      x += CAMPO.side >> (level - 1);
-      y = 0;
-    }
-    origins.push({ x, y });
-    y += size;
-  }
-  const width = origins.reduce((w, o, level) => Math.max(w, o.x + (CAMPO.side >> level)), 0);
-  return { width, height: CAMPO.side, origins };
-})();
-
-/** Where each level of ONE CHUNK'S tile stands inside the tile's own image. */
-export const CAMPO_TILE = (() => {
-  const origins = [{ x: 0, y: 0 }];
-  let x = 0;
-  const y = CAMPO.tile;
-  for (let level = 1; level < CAMPO.levels; level++) {
-    origins.push({ x, y });
-    x += CAMPO.tile >> level;
-  }
-  return { width: CAMPO.tile, height: CAMPO.tile + (CAMPO.tile >> 1), origins };
-})();
-
-/** The bytes one chunk's tile costs on the wire, padding included. */
-export const CAMPO_TILE_BYTES = CAMPO_TILE.width * CAMPO_TILE.height * 4;
-
-/** The bytes the whole picture costs on the card, padding included. */
-export const CAMPO_BYTES = CAMPO_ATLAS.width * CAMPO_ATLAS.height * 4;
+export const CAMPO_SOIL_WALL = 32;
 
 /**
  * The material of a column as the field spells it, or -1 where the field draws
@@ -162,9 +287,9 @@ export const CAMPO_BYTES = CAMPO_ATLAS.width * CAMPO_ATLAS.height * 4;
  *
  * The corridor's own stone is a material the field CARRIES and does not DRAW:
  * the paving is three baked maps and a law of slabs (src/world/path.js), and
- * E-SENT4 keeps it where it is for this step. The texel still says PATH, so the
- * ray stops on the stone's own top at the right height and the fragment stands
- * aside for the family that owns it, instead of drawing grass over it.
+ * E-SENT4 keeps it where it is. The texel still says PATH, so the ray stops on
+ * the stone's own top at the right height and the fragment stands aside for the
+ * family that owns it, instead of drawing grass over it.
  */
 export function campoMaterialCode(mat) {
   if (mat === MATERIAL.GRASS) return CAMPO_MATERIAL.GRASS;
@@ -200,12 +325,24 @@ export function campoTintOf(byte) {
   return PIGMENT.tintFloor + (byte / 255) * (PIGMENT.tintCeil - PIGMENT.tintFloor);
 }
 
+/** The ground byte for a column whose top voxel is `top`. */
+export function campoGroundByte(top) {
+  const v = top + 1 + CAMPO_BIAS;
+  return v < 0 ? 0 : v > 255 ? 255 : v;
+}
+
+/** The voxel step a ground byte stands for: the inverse of campoGroundByte. */
+export function campoTopStep(texel) {
+  return texel.ground - CAMPO_BIAS - 1;
+}
+
 /** What a texel says, as numbers, for a guard and for a bench. */
 export function campoDecode(data, offset) {
   const b = data[offset + 2];
   return {
     present: (b & CAMPO_PRESENT) !== 0,
-    top: data[offset],
+    soilWall: (b & CAMPO_SOIL_WALL) !== 0,
+    blade: data[offset],
     ground: data[offset + 1],
     mat: b & 3,
     slim: campoSlimEighths((b >> 2) & 3),
@@ -213,31 +350,49 @@ export function campoDecode(data, offset) {
   };
 }
 
+/** What one texel means as METRES, for a guard that has to compare the two. */
+export function campoHeights(texel) {
+  const ground = (texel.ground - CAMPO_BIAS) * VOXEL;
+  const blade = texel.blade * (BLADE / SUB);
+  return { ground, blade, top: ground + blade };
+}
+
 const cap = (v) => (v < 0 ? 0 : v > 255 ? 255 : v);
 
 /**
- * One chunk's square of the picture, levels and all, out of the block store.
+ * Whether the wall of a column is soil, out of the store's own two fields.
  *
- * THE STORE AND NOT THE LAW, WHICH IS THE WHOLE POINT OF THIS FILE. Every
+ * The mesher's rule and not a second one: `under` is what a wall is cut in and
+ * `depth` is how far down it runs, and a wall is soil when the two say so.
+ */
+function soilWall(under, depth) {
+  return under === MATERIAL.EARTH && depth > 0;
+}
+
+/**
+ * ONE TILE OF THE NEAR PICTURE, LEVELS AND ALL, OUT OF THE BLOCK STORE.
+ *
+ * THE STORE AND NOT THE LAW, WHICH IS THE WHOLE POINT OF THIS FUNCTION. Every
  * number below is read off the arrays chunkColumns() filled: the top the four
  * passes of ./worldgen.js left, the material they wrote, the blade layMat laid
  * and the width it gave it. There is no second sampling of the field here and
- * there must never be one -- the moment this file asked columnSpec() a question
- * of its own, the picture and the cubes would be two answers about the floor.
+ * there must never be one -- the moment this asked columnSpec() a question of
+ * its own, the picture and the cubes would be two answers about the floor.
  *
  * AND THE MAT IS ASKED FOR AT THE BLADE AND NOT IN BLOCKS. layMat draws the mat
  * one blade at a time inside a ring round the walker and in blocks of N beyond
  * it, because the greedy mesher has to be given something to merge. The field
  * merges nothing, so it takes the law everywhere -- `detail: Infinity` -- and
- * the level of detail it draws is chosen per PIXEL from the distance instead.
- * That difference is exactly what the seam between the two representations is
- * measured on, and it is declared here rather than hidden by matching the
- * blocks.
+ * the level of detail it draws is chosen per PIXEL from the footprint instead.
  *
- * @param {number} cx  chunk index along x
- * @param {number} cz  chunk index along z
- * @param {number} radius  how far the disc reaches, the layer's own
- * @returns {{data: Uint8Array, bx: number, bz: number, ms: number, top: number}}
+ * AND THE WORLD DOES NOT STOP AT THE PLATEAU ANY MORE (E-DECISIONI13): the
+ * store is cut with `beyond` set, so a tile that reaches past the rim carries
+ * the terraces rather than a hole.
+ *
+ * @param {number} cx  tile index along x, in tiles of CHUNK columns
+ * @param {number} cz  tile index along z
+ * @param {number} radius  how far the plateau reaches, the layer's own
+ * @returns {{data: Uint8Array, bx: number, bz: number, ms: number}}
  */
 export function campoTile(cx, cz, radius) {
   const started = performance.now();
@@ -247,8 +402,9 @@ export function campoTile(cx, cz, radius) {
     // The law everywhere: see the note above.
     detail: Infinity,
     block: MANTO.block,
-  });
-  const data = new Uint8Array(CAMPO_TILE.width * CAMPO_TILE.height * 4);
+  }, true);
+  const shape = CAMPO;
+  const data = new Uint8Array(shape.tiles.width * shape.tiles.height * 4);
   const b = BLADES_PER_VOXEL;
   const storeW = store.w * b;
   // Where the tile's first blade stands in the store's own blade rectangle: the
@@ -256,127 +412,231 @@ export function campoTile(cx, cz, radius) {
   const skirt = (cx * CHUNK - store.ox) * b;
   const bx0 = cx * CHUNK * b;
   const bz0 = cz * CHUNK * b;
+  let lowest = 255;
   let tallest = 0;
-  for (let j = 0; j < CAMPO.tile; j++) {
-    for (let i = 0; i < CAMPO.tile; i++) {
-      const o = (j * CAMPO.tile + i) * 4;
+  for (let j = 0; j < shape.tile; j++) {
+    for (let i = 0; i < shape.tile; i++) {
+      const o = (j * shape.tile + i) * 4;
       const k = (j + skirt) * storeW + (i + skirt);
       const ck = ((j + skirt) >> 1) * store.w + ((i + skirt) >> 1);
       const top = store.top[ck];
       if (top === NO_COLUMN) continue;
       const code = campoMaterialCode(store.mat[ck]);
       if (code < 0) continue;
-      const ground = cap((top + 1) * CAMPO_RUNG);
-      const blade = code === CAMPO_MATERIAL.PATH ? 0 : store.blade[k];
-      const height = cap(ground + blade);
-      data[o] = height;
+      const ground = campoGroundByte(top);
+      const blade = code === CAMPO_MATERIAL.PATH ? 0 : cap(store.blade[k]);
+      data[o] = blade;
       data[o + 1] = ground;
-      data[o + 2] = CAMPO_PRESENT | (campoSlimCode(store.slim[k]) << 2) | code;
+      data[o + 2] = CAMPO_PRESENT | (campoSlimCode(store.slim[k]) << 2) | code
+        | (soilWall(store.under[ck], store.depth[ck]) ? CAMPO_SOIL_WALL : 0);
       // The pigment's own column, which is the WORLD's ten centimetre column and
       // not the blade: a zone of the world is one zone whichever family stands
       // in it, and the fragment of ./material.js reads it at exactly this index.
       data[o + 3] = campoTintByte((bx0 + i) >> 1, (bz0 + j) >> 1);
-      if (height > tallest) tallest = height;
+      if (ground > tallest) tallest = ground;
+      if (ground < lowest) lowest = ground;
     }
   }
-  campoReduce(data);
+  campoReduce(data, shape);
   return {
     data,
     bx: bx0,
     bz: bz0,
     tallest,
+    lowest,
     ms: performance.now() - started,
     columns: store.w * store.d,
   };
 }
 
 /**
- * The pyramid of maxima over a tile that already holds its finest level.
+ * The mean height of the mat, in SUB-steps, from the law that draws it.
  *
- * MAXIMA ON THE TWO HEIGHTS AND THE TALLEST CHILD'S OWN WORD ON THE REST.
- * Tevs 2008's hierarchical ray-stepping needs one thing from a coarse cell: a
- * bound it can trust -- nothing under it reaches higher than this -- so R and G
- * are maxima and the skip is conservative by construction. B and A are not
- * bounds and cannot be maxima of anything; they come from whichever child is
- * TALLEST, because a coarse cell is only ever SHADED where the level of detail
- * has decided a pixel is smaller than the cell, and what such a pixel is
- * looking at is the thing that sticks up.
+ * WHAT THE FAR WINDOW PUTS ON A COLUMN INSTEAD OF A BLADE. A far texel is forty
+ * centimetres across and a blade is five: sixty four of them stand under one
+ * texel, and no picture at that resolution can say which. So it carries the
+ * mat's own EXPECTATION -- the height the law would draw on average -- which is
+ * the honest prefilter and is exactly what E-DECISIONI13 asks for out there
+ * («oltre il disco e' a blocchi sotto la foschia»).
+ *
+ * It is derived from MANTO.law and not written down, so a sweep that moves the
+ * ladder moves the far meadow with it.
  */
-export function campoReduce(data) {
-  for (let level = 1; level < CAMPO.levels; level++) {
-    const size = CAMPO.tile >> level;
-    const src = CAMPO_TILE.origins[level - 1];
-    const dst = CAMPO_TILE.origins[level];
-    const srcSize = size << 1;
+export const CAMPO_FAR_BLADE = (() => {
+  let mean = 0;
+  for (let h = 0; h < MANTO.law.length; h++) mean += h * MANTO.law[h];
+  return Math.round(mean * SUB);
+})();
+
+/**
+ * ONE TILE OF THE FAR PICTURE, OUT OF THE LAW ITSELF, AND THE DIFFERENCE IS
+ * DECLARED RATHER THAN HIDDEN.
+ *
+ * The near tile is read off a STORE, because a store is what the greedy meshes
+ * and the two have to be one answer. Out here there is no greedy and there
+ * never will be: the boundary is drawn by the ray and by nothing else. So the
+ * far tile reads `columnSpec` -- THE LAW, the same single statement the store
+ * is filled from, through the same door and with the same arguments -- at its
+ * own stride of four columns. What it does NOT do is invent a second law, and
+ * the guard proves that texel by texel against columnSpec rather than against
+ * this file.
+ *
+ * WHY IT CANNOT GO THROUGH A STORE. A far tile is 51.2 m of world; a store of
+ * it at the world's own ten centimetre step is 512 x 512 columns, a quarter of
+ * a million calls of a law whose answer this picture then throws fifteen
+ * sixteenths of away. Sampled at the stride it is sixteen thousand, and the
+ * tile costs six milliseconds instead of ninety.
+ *
+ * AND THE MAT IS THE LAW'S OWN MEAN, not a sample of it: see CAMPO_FAR_BLADE.
+ *
+ * @param {number} cx  tile index along x, in tiles of the far picture
+ * @param {number} cz  tile index along z
+ * @param {number} radius  how far the plateau reaches, the layer's own
+ */
+export function campoFarTile(cx, cz, radius) {
+  const started = performance.now();
+  const shape = CAMPO_FAR;
+  const data = new Uint8Array(shape.tiles.width * shape.tiles.height * 4);
+  // How many world columns one far texel spans, and the column it is read at:
+  // the MIDDLE of its own footprint, so a texel is a sample of the ground it
+  // stands for and not of its corner.
+  const stride = Math.round(shape.cell / VOXEL);
+  const half = stride >> 1;
+  const tx0 = cx * shape.tile;
+  const tz0 = cz * shape.tile;
+  let lowest = 255;
+  let tallest = 0;
+  for (let j = 0; j < shape.tile; j++) {
+    for (let i = 0; i < shape.tile; i++) {
+      const o = (j * shape.tile + i) * 4;
+      const ix = (tx0 + i) * stride + half;
+      const iz = (tz0 + j) * stride + half;
+      const spec = columnSpec(ix, iz, false, radius, true);
+      if (spec.top === NO_COLUMN) continue;
+      const code = campoMaterialCode(spec.mat);
+      if (code < 0) continue;
+      const ground = campoGroundByte(spec.top);
+      data[o] = code === CAMPO_MATERIAL.PATH ? 0 : CAMPO_FAR_BLADE;
+      data[o + 1] = ground;
+      data[o + 2] = CAMPO_PRESENT | code
+        | (soilWall(spec.under, spec.depth) ? CAMPO_SOIL_WALL : 0);
+      data[o + 3] = campoTintByte(ix, iz);
+      if (ground > tallest) tallest = ground;
+      if (ground < lowest) lowest = ground;
+    }
+  }
+  campoReduce(data, shape);
+  return {
+    data,
+    bx: tx0,
+    bz: tz0,
+    tallest,
+    lowest,
+    ms: performance.now() - started,
+    columns: shape.tile * shape.tile,
+  };
+}
+
+/**
+ * The pyramid over a tile that already holds its finest level.
+ *
+ * THE TALLEST CHILD'S WHOLE WORD, AND NOT A MAXIMUM PER CHANNEL.
+ *
+ * Tevs 2008's hierarchical ray-stepping needs one thing from a coarse cell: a
+ * bound it can trust -- nothing under it reaches higher than this. A maximum
+ * taken channel by channel gives one, but a LOOSE one, and worse: the pair it
+ * hands back belongs to no column at all, so a pixel that stops at a coarse
+ * cell is shaded with a ground from one child and a blade from another. With
+ * the ground and the blade now held in two different units, that pair would not
+ * even be a height anybody could name.
+ *
+ * The child with the tallest TOP hands back a bound that is EXACT -- its top is
+ * by definition the maximum of the four -- and a texel that is a real column of
+ * the world: ground, blade, material, wall and tint together. That is both the
+ * tighter skip and the honest thing to shade with, and it is the same rule the
+ * material and the tint already followed in phase one.
+ */
+export function campoReduce(data, shape = CAMPO) {
+  const width = shape.tiles.width;
+  for (let level = 1; level < shape.levels; level++) {
+    const size = shape.tile >> level;
+    const src = shape.tiles.origins[level - 1];
+    const dst = shape.tiles.origins[level];
     for (let j = 0; j < size; j++) {
       for (let i = 0; i < size; i++) {
-        let r = 0;
-        let g = 0;
-        let best = -1;
-        let bestB = 0;
-        let bestA = 0;
+        let best = -Infinity;
+        let bo = -1;
         for (let dj = 0; dj < 2; dj++) {
           for (let di = 0; di < 2; di++) {
-            const s = ((src.y + j * 2 + dj) * CAMPO_TILE.width + (src.x + i * 2 + di)) * 4;
-            const sr = data[s];
-            const sg = data[s + 1];
-            const sb = data[s + 2];
-            if (sr > r) r = sr;
-            if (sg > g) g = sg;
-            // The tallest child, and a column that is THERE beats one that is
-            // not at the same height: an absent texel reads nought on both
-            // heights and would otherwise win every tie on the bare plane.
-            const rank = sb ? sr * 2 + 1 : -1;
-            if (rank > best) {
-              best = rank;
-              bestB = sb;
-              bestA = data[s + 3];
-            }
+            const s = ((src.y + j * 2 + dj) * width + (src.x + i * 2 + di)) * 4;
+            // The top of this child in SUB-steps, and a column that is THERE
+            // beats one that is not: an absent texel reads nought on both
+            // heights and would otherwise win every tie on bare ground.
+            const rank = data[s + 2]
+              ? (data[s + 1] - CAMPO_BIAS) * CAMPO_RUNG + data[s] : -Infinity;
+            if (rank > best) { best = rank; bo = s; }
           }
         }
-        const o = ((dst.y + j) * CAMPO_TILE.width + (dst.x + i)) * 4;
-        data[o] = r;
-        data[o + 1] = g;
-        data[o + 2] = bestB;
-        data[o + 3] = bestA;
-        if (srcSize === 0) break;
+        const o = ((dst.y + j) * width + (dst.x + i)) * 4;
+        if (bo < 0) continue;
+        data[o] = data[bo];
+        data[o + 1] = data[bo + 1];
+        data[o + 2] = data[bo + 2];
+        data[o + 3] = data[bo + 3];
       }
     }
   }
 }
 
 /**
- * Where a chunk's tile lands in the picture, at one level, and the address is
- * TOROIDAL: a chunk owns the same square for ever, and walking out of the field
- * on one side walks back into it on the other. This is Losasso-Hoppe's own
- * update and the whole of why the window has no border and no re-mesh.
+ * Where a tile lands in the picture, at one level, and the address is TOROIDAL:
+ * a tile owns the same square for ever, and walking out of the field on one
+ * side walks back into it on the other. This is Losasso-Hoppe's own update and
+ * the whole of why the window has no border and no re-mesh.
  */
-export function campoSlot(bx, bz, level) {
-  const size = CAMPO.side >> level;
-  const tile = CAMPO.tile >> level;
+export function campoSlot(bx, bz, level, shape = CAMPO) {
+  const size = shape.side >> level;
+  const tile = shape.tile >> level;
   const wrap = (v) => (((v >> level) % size) + size) % size;
   return { x: wrap(bx), y: wrap(bz), size: tile };
 }
 
-/** The blade column a metre coordinate falls in, as the whole world counts it. */
-export function campoColumnOf(metres) {
-  return Math.floor(metres / BLADE);
+/** The texel a metre coordinate falls in, as the window counts it. */
+export function campoColumnOf(metres, shape = CAMPO) {
+  return Math.floor(metres / shape.cell);
+}
+
+/**
+ * The corner tile of the FAR window, which stands over the middle of the world.
+ *
+ * The far picture does not follow anybody: it is centred once, on the world, so
+ * that the boundary is in it from whichever corner of the plateau the walker
+ * looks out.
+ */
+export function campoFarOrigin(shape = CAMPO_FAR) {
+  const tiles = shape.side / shape.tile;
+  return {
+    cx: Math.floor(Math.floor(CENTRE.x / shape.cell) / shape.tile) - tiles / 2,
+    cz: Math.floor(Math.floor(CENTRE.z / shape.cell) / shape.tile) - tiles / 2,
+  };
 }
 
 /**
  * WHERE THE LINE BETWEEN THE TWO REPRESENTATIONS RUNS, as one plane in the
  * world's own XZ, compiled into BOTH programs out of this one seat.
  *
- * The field and the greedy have to be judged in one frame, side by side, at one
- * pose: that is the whole of what this step is for. A frame that showed them
- * one after the other would be two frames of two machines' weather. So the mat
- * is cut in half by a plane and each half is drawn by one of them -- and the
- * plane is written ONCE, here, because a boundary spelled out in two programs
- * is two boundaries the moment one of them is edited.
+ * PHASE TWO KEPT IT, AND IT CHANGED JOB. In phase one it was how the field and
+ * the cubes were put side by side in ONE frame for the committente. The field
+ * is the ground now, so the line is no longer a comparison anybody looks at --
+ * it is the only way the two can still be MEASURED against each other inside a
+ * single opening of the page, which is the one condition under which a
+ * before-and-after is a reading about a change and not about the machine
+ * (E-V7k). `uCut.w` at nought is the world that ships: the cubes draw nothing
+ * and the field draws everything.
  *
  * uCut is (nx, nz, d, on): the field draws where the half-space is positive and
- * the cubes draw where it is not. At `on` nought neither cuts anything, which
- * is the world that ships.
+ * the cubes draw where it is not. At `on` nought the cubes discard nothing,
+ * which is the world the field owns whole.
  */
 export const CAMPO_CUT_GLSL = /* glsl */`
   uniform vec4 uCut;
@@ -387,23 +647,35 @@ export const CAMPO_CUT_GLSL = /* glsl */`
     return dot(uCut.xy, xz) + uCut.z;
   }
 
-  // TRUE WHERE THE FIELD OWNS THIS PIXEL, AND THE SECOND TEST IS NOT A
-  // FLOURISH. The field is a window over the DISC in this step -- outside it
-  // there is no column and no texel -- while the cubes' own material is shared
-  // by reference with the sheet that runs from the rim of the disc out to a
-  // hundred metres, deliberately, so that the two cannot drift apart under a
-  // sweep. A half-space alone would therefore cut the sheet as well as the
-  // cubes and leave the far ground as sky. So what the field claims is the
-  // half-space INSIDE the disc, and one voxel of margin past the rim, because
-  // the rim is decided on a column's centre and this is asked at a pixel.
-  //
-  // The cubes discard where this is true and the field draws exactly there:
-  // the line itself goes to the field, so the two can never both claim a pixel
-  // and never both leave one empty.
-  bool campoOwns(vec2 xz) {
-    if (uCut.w < 0.5 || campoSide(xz) < 0.0) return false;
+  // Inside the disc of cubes, one voxel of margin past its rim, because the rim
+  // is decided on a column's centre and this is asked at a pixel.
+  bool campoInDisc(vec2 xz) {
     vec2 r = xz - uCutDisc.xy;
     return dot(r, r) <= uCutDisc.z * uCutDisc.z;
+  }
+
+  // TRUE WHERE THE FIELD OWNS THIS PIXEL, which is what the CUBES read: they
+  // discard where it is true and the field draws exactly there, so the two can
+  // never both claim a pixel and never both leave one empty. The line itself
+  // goes to the field.
+  bool campoOwns(vec2 xz) {
+    return uCut.w >= 0.5 && campoSide(xz) >= 0.0 && campoInDisc(xz);
+  }
+
+  // AND TRUE WHERE THE FIELD MUST STAND ASIDE, which is what the FIELD reads:
+  // the complement of the above INSIDE the disc, because outside it there are
+  // no cubes to stand aside for and the ground would simply be missing.
+  //
+  // IT IS ASKED AT EVERY STEP OF THE MARCH AND NOT SOLVED AS AN INTERVAL, and
+  // that is the change phase two forced. In phase one the field was a window
+  // over the disc and the line was a PLANE, so a ray crossed it once and the
+  // crossing could be solved for. The field is the world now, so a ray that
+  // stands aside for the cubes over the disc has to come BACK -- the terraces
+  // and the ridge behind them are still the field's -- and an interval cannot
+  // say that. A test on the cell the ray is in can, exactly, for two ALU on a
+  // branch that is uniformly false in the world that ships.
+  bool campoYields(vec2 xz) {
+    return uCut.w >= 0.5 && campoSide(xz) < 0.0 && campoInDisc(xz);
   }
 `;
 
@@ -412,18 +684,4 @@ export function campoCutUniform() {
   return { uCut: { value: [0, 0, 0, 0] }, uCutDisc: { value: [0, 0, 0, 0] } };
 }
 
-/** What one texel means as METRES, for a guard that has to compare the two. */
-export function campoHeights(texel) {
-  return {
-    ground: texel.ground * CAMPO.unit,
-    top: texel.top * CAMPO.unit,
-    blade: (texel.top - texel.ground) * CAMPO.unit,
-  };
-}
-
-/** The voxel the field says a column's ground stands at, back in whole steps. */
-export function campoTopStep(texel) {
-  return texel.ground / CAMPO_RUNG - 1;
-}
-
-export { VOXEL, BLADE, SUB };
+export { VOXEL, BLADE, SUB, CHUNK };

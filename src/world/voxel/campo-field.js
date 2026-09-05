@@ -2,12 +2,12 @@ import {
   Box2, DataTexture, Group, LinearSRGBColorSpace, NearestFilter, RGBAFormat,
   UnsignedByteType, Vector2,
 } from 'three';
-import { BLADE, BLADES_PER_VOXEL, CHUNK, VOXEL } from './columns.js';
+import { VOXEL } from './columns.js';
 import { CENTRE, DISC_RADIUS } from './worldgen.js';
-import { CAMPO, CAMPO_ATLAS, CAMPO_BYTES, CAMPO_TILE, CAMPO_TILE_BYTES } from './campo.js';
+import { CAMPO, CAMPO_BIAS, CAMPO_FAR, campoFarOrigin } from './campo.js';
 import { campoBox, campoMaterial } from './campo-material.js';
 
-// THE WINDOW THAT FOLLOWS THE WALKER, AND THE ONE CALL THAT MOVES IT.
+// THE TWO WINDOWS THE GROUND IS KEPT IN, AND THE ONE CALL THAT MOVES THEM.
 //
 // ===========================================================================
 // THE SHAPE OF THE THING, AND WHY IT HAS NO EDGE.
@@ -18,72 +18,72 @@ import { campoBox, campoMaterial } from './campo-material.js';
 // only work a step costs is regenerating the strip that just fell off the back.
 // That is the whole of why this replaces a disc rather than enlarging one.
 //
-//   * there is no rim, so there is nothing for the shell to overlap and no
+//   * there is no rim, so there is nothing for a shell to overlap and no
 //     flicker where two surfaces claim one plane (§1.4 of the performance
 //     dossier: OVERLAP = 0.6 m of coplanar z-fighting, which is the thing the
 //     committente saw);
 //   * there is no ring of detail anchored to the spawn, so «i fili restano a un
 //     raggio di tot metri dalla posa iniziale» stops being true by construction
 //     rather than by a bigger radius;
-//   * and nothing is re-meshed. A chunk that comes into the window is one
+//   * and nothing is re-meshed. A tile that comes into the window is one
 //     texSubImage2D of its own square. There is no geometry to cut, no seam to
 //     stitch and no upload to dose.
 //
-// THE WINDOW IS A WHOLE NUMBER OF CHUNKS AND THAT IS LOAD-BEARING. Eight chunks
-// a side, a chunk 128 texels, the picture 1024: a chunk therefore lands on a
+// THE WINDOW IS A WHOLE NUMBER OF TILES AND THAT IS LOAD-BEARING. Eight tiles a
+// side, a tile 128 texels, the picture 1024: a tile therefore lands on a
 // multiple of its own size at every level of the pyramid and can never straddle
-// the wrap. Seven writes a chunk, no clipping, no case analysis. A window that
-// was not a whole number of chunks would need four writes a level and the
-// arithmetic to decide them.
+// the wrap. Seven writes a tile, no clipping, no case analysis.
+//
+// ===========================================================================
+// AND THERE ARE TWO OF THEM NOW (phase two, E-DECISIONI13).
+//
+//   THE NEAR WINDOW  5 cm a texel, 51.2 m across, FOLLOWING THE EYE. It is the
+//                    meadow blade by blade and it is the one that streams.
+//   THE FAR WINDOW   40 cm a texel, 409.6 m across, STANDING STILL over the
+//                    middle of the world. It is the boundary: the terraces down
+//                    to the water, the ridge that closes the horizon, and the
+//                    same meadow read eight times coarser.
+//
+// THE FAR ONE IS BUILT ONCE AND NEVER MOVED, and that is a measurement and not
+// a convenience: the walker cannot leave the plateau, which is thirty five
+// metres of a four hundred metre picture, so a window centred on the WORLD is
+// in front of them from every pose there is. Sixty four tiles at boot, and then
+// nothing at all for the rest of the run -- against a moving far window, which
+// would pay a toroidal update for a view that has not changed.
 //
 // ===========================================================================
 // WHAT THE MAIN THREAD DOES, AND THE GATE IT IS UNDER.
 //
 // Nothing but the copy. Every byte is generated in the worker out of the same
-// chunkColumns()/layMat() the greedy mesher reads (see ./campo.js), and what
-// arrives here is a typed array that is MOVED and not copied. The gate is the
-// one src/world/ground-voxel.js has carried since the disc: nothing over eight
-// milliseconds on the thread the walker is on. A chunk costs seven
+// chunkColumns()/layMat()/columnSpec the greedy mesher reads (see ./campo.js),
+// and what arrives here is a typed array that is MOVED and not copied. The gate
+// is the one src/world/ground-voxel.js has carried since the disc: nothing over
+// eight milliseconds on the thread the walker is on. A tile costs seven
 // sub-rectangle writes of 87 kB in total, and the run of them is timed here
 // rather than asserted -- `stats.worstUploadMs` is what a report quotes.
 //
 // AND THE WORKER STAYS ALIVE, which is the one habit of the disc that could not
 // survive. The disc's worker is a one-shot: it cuts, it posts, it is terminated
-// at `done`. A window that follows a walker asks for a chunk every few seconds
-// for as long as the walker walks, and a thread started per chunk would pay its
+// at `done`. A window that follows a walker asks for a tile every few seconds
+// for as long as the walker walks, and a thread started per tile would pay its
 // own module graph -- measured at 159 to 284 ms -- every time.
 // ===========================================================================
-
-/** How many chunks the window is across. */
-const CHUNKS = CAMPO.side / CAMPO.tile;
-
-/** Blade columns to a chunk. */
-const TILE = CHUNK * BLADES_PER_VOXEL;
 
 const wrap = (v, n) => ((v % n) + n) % n;
 
 /**
- * The clipmap, its box and the worker that fills it.
+ * One picture: its texture, the source rectangle every copy is made from, and
+ * the book-keeping of which tile is in which slot.
  *
- * @param {object} options
- * @param {number} options.radius  how far the ground reaches, the layer's own
- * @param {object} options.sheets  the delivered strip of grey squares
- * @param {boolean} options.depth  write gl_FragDepth; false prices the early
- *                                 depth test this draw gives up
- * @param {Function} options.worker  a factory for the engine's worker, handed
- *                                 in so this file imports no page machinery
+ * The two windows differ in three numbers -- how big a texel is, whether the
+ * window follows the eye, and which job the worker is asked for -- and in
+ * nothing else, so they are one function called twice rather than two files
+ * that would drift.
  */
-export function createCampo({
-  radius = DISC_RADIUS, sheets = null, depth = true, worker: makeWorker = null,
-} = {}) {
-  const group = new Group();
-  group.name = 'campo';
-
-  // THE PICTURE. One RGBA8 image carrying every level of the pyramid side by
-  // side; see CAMPO_ATLAS in ./campo.js for why they are not a mip chain.
-  const data = new Uint8Array(CAMPO_ATLAS.width * CAMPO_ATLAS.height * 4);
+function makeWindow(shape, job) {
+  const data = new Uint8Array(shape.atlas.width * shape.atlas.height * 4);
   const texture = new DataTexture(
-    data, CAMPO_ATLAS.width, CAMPO_ATLAS.height, RGBAFormat, UnsignedByteType,
+    data, shape.atlas.width, shape.atlas.height, RGBAFormat, UnsignedByteType,
   );
   // NEAREST IN BOTH DIRECTIONS AND NO MIPS, and that is the faithful answer as
   // well as the cheap one. Every read is a texelFetch at a whole texel the
@@ -99,19 +99,68 @@ export function createCampo({
   texture.colorSpace = LinearSRGBColorSpace;
   texture.needsUpdate = true;
 
-  // The one source rectangle every copy is made from, reused so that a chunk
+  // The one source rectangle every copy is made from, reused so that a tile
   // costs no allocation. It is deliberately never given to a material: three
-  // takes the direct texSubImage2D path only while the source has no GL
-  // texture of its own, and a source that had been bound once would fall back
-  // to a framebuffer blit for ever after.
-  const tileData = new Uint8Array(CAMPO_TILE_BYTES);
+  // takes the direct texSubImage2D path only while the source has no GL texture
+  // of its own, and a source that had been bound once would fall back to a
+  // framebuffer blit for ever after.
+  const tileData = new Uint8Array(shape.tileBytes);
   const tile = new DataTexture(
-    tileData, CAMPO_TILE.width, CAMPO_TILE.height, RGBAFormat, UnsignedByteType,
+    tileData, shape.tiles.width, shape.tiles.height, RGBAFormat, UnsignedByteType,
   );
   tile.flipY = false;
   tile.colorSpace = LinearSRGBColorSpace;
 
-  const material = campoMaterial({ texture, sheets, depth });
+  return {
+    shape,
+    job,
+    data,
+    texture,
+    tile,
+    tileData,
+    /** Which tile each slot of the window holds, so a walk that comes back asks
+     * for nothing. */
+    held: new Map(),
+    asked: new Set(),
+    pending: [],
+    arrived: [],
+    centre: null,
+    tiles: 0,
+    tilesAsked: 0,
+    workerMs: 0,
+    worstWorkerMs: 0,
+    uploadMs: 0,
+    worstUploadMs: 0,
+    tallest: 0,
+    lowest: 255,
+  };
+}
+
+/**
+ * The two clipmaps, the box they are drawn on, and the worker that fills them.
+ *
+ * @param {object} options
+ * @param {number} options.radius  how far the PLATEAU reaches, the layer's own
+ * @param {object} options.sheets  the delivered strip of grey squares
+ * @param {boolean} options.depth  write gl_FragDepth; false prices the early
+ *                                 depth test this draw gives up
+ * @param {number} options.rays    sub-pixel samples a fragment marches
+ * @param {Function} options.worker  a factory for the engine's worker, handed
+ *                                 in so this file imports no page machinery
+ */
+export function createCampo({
+  radius = DISC_RADIUS, sheets = null, depth = true, rays = 1, worker: makeWorker = null,
+} = {}) {
+  const group = new Group();
+  group.name = 'campo';
+
+  const near = makeWindow(CAMPO, 'campo');
+  const far = makeWindow(CAMPO_FAR, 'campo-far');
+  const windows = [near, far];
+
+  const material = campoMaterial({
+    texture: near.texture, far: far.texture, sheets, depth, rays,
+  });
   // THE RENDERER ARRIVES WITH THE FIRST DRAW AND NOT FROM A LAYER. Nothing in
   // src/world/layers is handed one, and reaching for the page's own would put a
   // piece of the engine somewhere it could not run. The copy still may NOT
@@ -121,66 +170,98 @@ export function createCampo({
   const mesh = campoBox(material, (webgl) => {
     if (renderer) return;
     renderer = webgl;
-    renderer.initTexture(texture);
+    for (const w of windows) renderer.initTexture(w.texture);
   });
   group.add(mesh);
 
   const stats = {
     tiles: 0,
     tilesAsked: 0,
+    farTiles: 0,
     workerMs: 0,
     worstWorkerMs: 0,
     uploadMs: 0,
     worstUploadMs: 0,
-    bytes: CAMPO_BYTES,
-    tileBytes: CAMPO_TILE_BYTES,
+    bytes: CAMPO.bytes + CAMPO_FAR.bytes,
+    tileBytes: CAMPO.tileBytes,
+    farTileBytes: CAMPO_FAR.tileBytes,
     levels: CAMPO.levels,
     side: CAMPO.side,
     cell: CAMPO.cell,
+    farCell: CAMPO_FAR.cell,
+    farSpan: CAMPO_FAR.side * CAMPO_FAR.cell,
     moves: 0,
+    lowest: 255,
     tallest: 0,
     radius,
   };
 
-  // Which chunk each slot of the window is holding, so that a walk that comes
-  // back to where it started asks for nothing.
-  const held = new Map();
-  const asked = new Set();
-  const pending = [];
-  const arrived = [];
   let renderer = null;
-  let centre = null;
 
   const srcRegion = new Box2(new Vector2(), new Vector2());
   const dstPosition = new Vector2();
 
-  /** Lays one chunk's tile into the picture: seven writes, no clipping. */
-  function place(bx, bz) {
+  /** Lays one tile into its picture: seven writes, no clipping. */
+  function place(w, bx, bz) {
     if (!renderer) return 0;
     const started = performance.now();
-    for (let level = 0; level < CAMPO.levels; level += 1) {
-      const size = TILE >> level;
-      const src = CAMPO_TILE.origins[level];
-      const atlas = CAMPO_ATLAS.origins[level];
+    for (let level = 0; level < w.shape.levels; level += 1) {
+      const size = w.shape.tile >> level;
+      const src = w.shape.tiles.origins[level];
+      const atlas = w.shape.atlas.origins[level];
       srcRegion.min.set(src.x, src.y);
       srcRegion.max.set(src.x + size, src.y + size);
       dstPosition.set(
-        atlas.x + wrap(bx >> level, CAMPO.side >> level),
-        atlas.y + wrap(bz >> level, CAMPO.side >> level),
+        atlas.x + wrap(bx >> level, w.shape.side >> level),
+        atlas.y + wrap(bz >> level, w.shape.side >> level),
       );
-      renderer.copyTextureToTexture(tile, texture, srcRegion, dstPosition);
+      renderer.copyTextureToTexture(w.tile, w.texture, srcRegion, dstPosition);
     }
     const ms = performance.now() - started;
+    w.uploadMs += ms;
     stats.uploadMs += ms;
+    if (ms > w.worstUploadMs) w.worstUploadMs = ms;
     if (ms > stats.worstUploadMs) stats.worstUploadMs = ms;
     return ms;
   }
 
   function receive(message) {
-    if (message.kind !== 'campo') return;
-    arrived.push(message);
+    const w = message.kind === 'campo' ? near : message.kind === 'campo-far' ? far : null;
+    if (!w) return;
+    w.arrived.push(message);
+    w.workerMs += message.ms;
     stats.workerMs += message.ms;
+    if (message.ms > w.worstWorkerMs) w.worstWorkerMs = message.ms;
     if (message.ms > stats.worstWorkerMs) stats.worstWorkerMs = message.ms;
+  }
+
+  /**
+   * How tall and how deep the box has to be, out of what the tiles have said.
+   *
+   * THE BOX HAS TO CONTAIN EVERY HEIGHT THE TWO PICTURES HOLD AND NOT A METRE
+   * MORE: every metre of box is depth the ray crosses before it reaches
+   * anything, and every metre missing is ground with no fragment over it. The
+   * two ends come from the tiles themselves -- the lowest and the tallest
+   * GROUND byte either window has seen -- so the boundary can be re-dialled
+   * without anybody remembering to widen a box.
+   */
+  function fitBox() {
+    let lowest = 255;
+    let tallest = 0;
+    for (const w of windows) {
+      if (w.tiles === 0) continue;
+      lowest = Math.min(lowest, w.lowest);
+      tallest = Math.max(tallest, w.tallest);
+    }
+    if (tallest === 0) return;
+    stats.lowest = lowest;
+    stats.tallest = tallest;
+    const height = material.uniforms.uHeight.value;
+    // One cell of margin either way, and the blade over the tallest ground.
+    height.x = (lowest - CAMPO_BIAS - 1) * VOXEL - CAMPO.cell;
+    height.y = (tallest - CAMPO_BIAS) * VOXEL + 1.0;
+    mesh.scale.y = height.y - height.x;
+    mesh.position.y = (height.y + height.x) / 2;
   }
 
   /**
@@ -189,96 +270,99 @@ export function createCampo({
    * The lesson is voxel-tools' and it is about the thread and not the card --
    * «typically only one mesh» a frame, because what a walker feels is a long
    * task and not a byte. A window that has just been opened has sixty four
-   * chunks to lay; a walker who takes a step has one. Two a frame is what makes
+   * tiles to lay; a walker who takes a step has one. Two a frame is what makes
    * the first case invisible without making the second late.
    */
   function flush(budget) {
     if (!renderer) return;
     let laid = 0;
-    while (arrived.length && laid < budget) {
-      const message = arrived.shift();
-      tileData.set(message.data);
-      place(message.bx, message.bz);
-      held.set(`${message.cx},${message.cz}`, true);
-      asked.delete(`${message.cx},${message.cz}`);
-      stats.tiles += 1;
-      laid += 1;
-      if (message.tallest > stats.tallest) {
-        stats.tallest = message.tallest;
-        // The box has to contain the tallest thing the window holds and not a
-        // metre more: every metre of box is depth the ray crosses before it
-        // reaches anything.
-          const height = material.uniforms.uHeight.value;
-        height.y = Math.max(0.5, message.tallest * CAMPO.unit + CAMPO.cell);
-        // AND THE BOX ITSELF FOLLOWS IT. The traversal solves its own entry
-        // against these two heights, but a fragment has to EXIST before it can
-        // solve anything: a box shorter than the field would have no pixel
-        // over the tallest blade, and one taller would be depth the ray
-        // crosses to reach nothing.
-        mesh.scale.y = height.y - height.x;
-        mesh.position.y = (height.y + height.x) / 2;
+    let moved = false;
+    for (const w of windows) {
+      while (w.arrived.length && laid < budget) {
+        const message = w.arrived.shift();
+        w.tileData.set(message.data);
+        place(w, message.bx, message.bz);
+        w.held.set(`${message.cx},${message.cz}`, true);
+        w.asked.delete(`${message.cx},${message.cz}`);
+        w.tiles += 1;
+        stats.tiles += 1;
+        if (w === far) stats.farTiles += 1;
+        laid += 1;
+        if (message.tallest > w.tallest) { w.tallest = message.tallest; moved = true; }
+        if (message.lowest < w.lowest) { w.lowest = message.lowest; moved = true; }
       }
     }
+    if (moved) fitBox();
   }
 
   let thread = null;
 
-  function ask(list) {
+  function ask(w, list) {
     if (!list.length) return;
-    for (const c of list) asked.add(`${c.cx},${c.cz}`);
+    for (const c of list) w.asked.add(`${c.cx},${c.cz}`);
+    w.tilesAsked += list.length;
     stats.tilesAsked += list.length;
-    if (thread) thread.postMessage({ job: 'campo', radius, chunks: list });
-    else pending.push(...list);
+    if (thread) thread.postMessage({ job: w.job, radius, chunks: list });
+    else w.pending.push(...list);
   }
 
   /**
-   * Where the window stands, in chunks, for a walker at this point.
+   * Where a window stands, in tiles, for a walker at this point.
    *
-   * Half a chunk either side of the middle: the window is eight chunks and the
-   * walker is in one of them, so it reaches between 22.4 and 28.8 metres in
-   * every direction depending where in their own chunk they stand. Snapping to
-   * the chunk is what keeps every write aligned.
+   * Half a tile either side of the middle: the window is eight tiles and the
+   * walker is in one of them, so it reaches between three eighths and half of
+   * its own span in every direction depending where in their own tile they
+   * stand. Snapping to the tile is what keeps every write aligned.
+   *
+   * A STILL WINDOW ANSWERS THE WORLD AND NOT THE WALKER: see campoFarOrigin.
    */
-  function windowAt(x, z) {
+  function windowAt(w, x, z) {
+    if (w.shape.still) return campoFarOrigin(w.shape);
+    const tiles = w.shape.side / w.shape.tile;
     return {
-      cx: Math.floor(Math.floor(x / BLADE) / TILE) - CHUNKS / 2 + 1,
-      cz: Math.floor(Math.floor(z / BLADE) / TILE) - CHUNKS / 2 + 1,
+      cx: Math.floor(Math.floor(x / w.shape.cell) / w.shape.tile) - tiles / 2 + 1,
+      cz: Math.floor(Math.floor(z / w.shape.cell) / w.shape.tile) - tiles / 2 + 1,
     };
   }
 
-  function moveTo(x, z) {
-    const w = windowAt(x, z);
-    if (centre && centre.cx === w.cx && centre.cz === w.cz) return;
-    centre = w;
-    stats.moves += 1;
+  function moveTo(w, x, z) {
+    const p = windowAt(w, x, z);
+    if (w.centre && w.centre.cx === p.cx && w.centre.cz === p.cz) return;
+    w.centre = p;
+    if (!w.shape.still) stats.moves += 1;
+    const tiles = w.shape.side / w.shape.tile;
     const wanted = [];
     const keep = new Set();
-    for (let j = 0; j < CHUNKS; j += 1) {
-      for (let i = 0; i < CHUNKS; i += 1) {
-        const cx = w.cx + i;
-        const cz = w.cz + j;
+    for (let j = 0; j < tiles; j += 1) {
+      for (let i = 0; i < tiles; i += 1) {
+        const cx = p.cx + i;
+        const cz = p.cz + j;
         const key = `${cx},${cz}`;
         keep.add(key);
-        if (!held.has(key) && !asked.has(key)) wanted.push({ cx, cz });
+        if (!w.held.has(key) && !w.asked.has(key)) wanted.push({ cx, cz });
       }
     }
     // A slot's old tenant is forgotten the moment its own square is claimed by
-    // somebody else: there is nothing to unload, because the new chunk writes
+    // somebody else: there is nothing to unload, because the new tile writes
     // over exactly the texels the old one owned.
-    for (const key of [...held.keys()]) if (!keep.has(key)) held.delete(key);
-    const lo = { x: w.cx * TILE * BLADE, z: w.cz * TILE * BLADE };
-    const hi = { x: (w.cx + CHUNKS) * TILE * BLADE, z: (w.cz + CHUNKS) * TILE * BLADE };
-    material.uniforms.uBounds.value.set(lo.x, lo.z, hi.x, hi.z);
-    const height = material.uniforms.uHeight.value;
-    mesh.position.set((lo.x + hi.x) / 2, (height.y + height.x) / 2, (lo.z + hi.z) / 2);
-    ask(wanted);
+    for (const key of [...w.held.keys()]) if (!keep.has(key)) w.held.delete(key);
+    const lo = { x: p.cx * w.shape.span, z: p.cz * w.shape.span };
+    const hi = { x: (p.cx + tiles) * w.shape.span, z: (p.cz + tiles) * w.shape.span };
+    const uniform = w === near ? material.uniforms.uBounds : material.uniforms.uFarBounds;
+    uniform.value.set(lo.x, lo.z, hi.x, hi.z);
+    if (w === far) mesh.position.set((lo.x + hi.x) / 2, mesh.position.y, (lo.z + hi.z) / 2);
+    // THE NEAR TILES FIRST, ALWAYS. A walker who has just been put down is
+    // looking at their own feet before they are looking at the ridge, and the
+    // worker answers in the order it was asked.
+    ask(w, wanted);
   }
 
   return {
     group,
     mesh,
     material,
-    texture,
+    texture: near.texture,
+    farTexture: far.texture,
     stats,
 
     /**
@@ -292,29 +376,32 @@ export function createCampo({
       renderer = webglRenderer;
       // Allocated before the first copy: copyTextureToTexture writes INTO a
       // texture and cannot create one.
-      renderer.initTexture(texture);
+      for (const w of windows) renderer.initTexture(w.texture);
     },
 
-    /** Starts the worker and asks for the first window. */
+    /** Starts the worker and asks for the first of both windows. */
     start(x, z) {
       if (makeWorker && !thread) {
         thread = makeWorker({ job: 'campo', radius }, receive);
       }
-      moveTo(x, z);
-      if (thread && pending.length) {
-        thread.postMessage({ job: 'campo', radius, chunks: pending.splice(0) });
+      for (const w of windows) moveTo(w, x, z);
+      if (!thread) return;
+      for (const w of windows) {
+        if (w.pending.length) {
+          thread.postMessage({ job: w.job, radius, chunks: w.pending.splice(0) });
+        }
       }
     },
 
-    /** One frame: where the walker stands decides where the window stands. */
+    /** One frame: where the walker stands decides where the near window is. */
     update(eye, budget = 2) {
-      // The picture is laid FIRST, so that a chunk that arrived while the last
+      // The pictures are laid FIRST, so that a tile that arrived while the last
       // frame was drawn is on the card before the window is asked to move
-      // again: the other order leaves a slot claimed by a chunk whose bytes are
+      // again: the other order leaves a slot claimed by a tile whose bytes are
       // still in a queue, and the ray reads whatever the last tenant left.
-      flush(centre === null ? Infinity : budget);
+      flush(near.centre === null ? Infinity : budget);
       if (!eye) return;
-      moveTo(eye.x, eye.z);
+      moveTo(near, eye.x, eye.z);
     },
 
     /** Lays everything that has arrived, whatever it costs: for a bench. */
@@ -322,9 +409,14 @@ export function createCampo({
       flush(Infinity);
     },
 
-    /** Every chunk of the window is in the picture. */
+    /** Every tile of both windows is in its picture. */
     ready() {
-      return centre !== null && asked.size === 0 && arrived.length === 0 && stats.tiles > 0;
+      for (const w of windows) {
+        if (w.centre === null || w.asked.size > 0 || w.arrived.length > 0 || w.tiles === 0) {
+          return false;
+        }
+      }
+      return true;
     },
 
     /**
@@ -332,7 +424,8 @@ export function createCampo({
      *
      * One seat, handed to both programs: see CAMPO_CUT_GLSL in ./campo.js. The
      * plane is (nx, nz, d) and the field owns the half-space where
-     * nx*x + nz*z + d is not negative.
+     * nx*x + nz*z + d is not negative. It is a MEASURING handle in phase two:
+     * the world that ships is the field, whole, at `on` nought.
      */
     setCut(nx, nz, d, on = 1) {
       material.uniforms.uCut.value = [nx, nz, d, on];
@@ -346,8 +439,10 @@ export function createCampo({
     dispose() {
       if (thread) thread.terminate();
       thread = null;
-      texture.dispose();
-      tile.dispose();
+      for (const w of windows) {
+        w.texture.dispose();
+        w.tile.dispose();
+      }
       material.dispose();
       mesh.geometry.dispose();
     },

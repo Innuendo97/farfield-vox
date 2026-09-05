@@ -5,12 +5,13 @@ import { SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS } from '../../core/sky.js';
 import { FACE_LIGHT_GLSL, faceLightUniforms } from '../face-light.js';
 import { FOG_GLSL, GROUND_EXPOSURE, fogUniforms } from '../air.js';
 import TERRAIN from '../../../assets-src/terrain/terrain.json' with { type: 'json' };
-import { MANTO, SUN_STEPS } from './worldgen.js';
+import { EARTH, MANTO, SUN_STEPS } from './worldgen.js';
 import { PIGMENT_GLSL, pigmentUniforms, refreshPigment } from './pigment.js';
 import { SHEET_GLSL, sheetArray, sheetUniforms } from './sheet.js';
 import { bladeSettings, earthSettings, voxelSettings } from './material.js';
 import {
-  CAMPO, CAMPO_ATLAS, CAMPO_CUT_GLSL, campoCutUniform,
+  CAMPO, CAMPO_BIAS, CAMPO_CUT_GLSL, CAMPO_FAR, CAMPO_FAR_SHIFT, CAMPO_RUNG,
+  campoCutUniform,
 } from './campo.js';
 
 // THE FIELD'S OWN MATERIAL: ONE BOX, ONE FRAGMENT A PIXEL, AND THE WORLD
@@ -32,6 +33,18 @@ import {
 // the pixels of meadow are the same pixels.
 //
 // ===========================================================================
+// PHASE TWO: ONE PROGRAM, TWO WINDOWS, AND NO EDGE ANYWHERE.
+//
+// The ray now walks TWO pictures (see ./campo.js): the near one, five
+// centimetres a texel and following the walker, and the far one, forty
+// centimetres a texel and standing still over the whole world. It walks them
+// with ONE level counter, because the two are exactly eight cells apart -- a
+// far texel is a cell of level three of the near pyramid -- so at every level
+// the two lattices are the SAME lattice and crossing between them is a change
+// of which sampler answers and of nothing else. There is no blend band, no
+// second draw and nothing to sort: the seam is arithmetic.
+//
+// ===========================================================================
 // WHAT IS FAITHFULLY THE SAME AS THE CUBES, AND IT IS EVERY TERM.
 //
 // The one risk this technique carries is that the field stops reading as VOXEL.
@@ -45,29 +58,39 @@ import {
 // voxelSettings()) rather than written again, so a sweep that moves the cubes
 // moves the field with them and neither can drift.
 //
-// THE ONE THING THAT IS NOT READ BUT RE-DERIVED IS THE SHADOW, AND IT IS THE
-// SAME MARCH. ./worldgen.js bakes where the sun stops reaching each blade
-// column by walking SUN_STEPS along the seal's own bearing and taking the
-// highest neighbour dropped by how far the beam has climbed. The field walks
-// the identical eight steps over the identical heights in the identical unit at
-// the moment it shades. It is not a copy of the bake: it is the bake's own loop
-// over a picture that already holds every height it reads. What it buys is that
-// the line follows the sun instead of being cooked at one hour, and what it
-// costs was measured at nought in the prototype.
+// AND THE WALL OF A COLUMN IS NOW THE MESHER'S OWN WALL, which phase one could
+// not draw. The greedy lays a cut wall as two rectangles -- soil up to one
+// voxel under the top, meadow for that last cube -- under three conditions:
+// the flank is soil, the wall is at least EARTH.minStep voxels tall, and the
+// face is one of the ones the target shows earth on. All three are answered
+// here out of the texel and its neighbour, so a mound bank, the halo round a
+// boulder and a terrace of the boundary are cut in the field exactly as the
+// cubes cut them. Phase one read the family off the column's TOP and painted
+// whole flanks with it, which is what the affiancato showed as «cime sabbia e
+// fianchi grigio-azzurri attorno ai massi».
 //
 // ===========================================================================
-// THE THREE THINGS TO KNOW BEFORE READING THE LOOP.
+// THE FOUR THINGS TO KNOW BEFORE READING THE LOOP.
 //
 // 1. THE TRAVERSAL IS AMANATIDES & WOO OVER A PYRAMID OF MAXIMA (Tevs 2008):
 //    the ray steps cell to cell exactly, and where a coarse cell's maximum is
 //    under it the whole cell is skipped and the ray climbs a level; where it is
 //    not, it descends. That is what makes the far field cost what the near does.
-// 2. THE LEVEL OF DETAIL IS PER PIXEL AND NOT PER CHUNK. The finest level a ray
-//    may stop at is chosen from how far it has travelled -- five centimetres
-//    inside eight metres (D-P3), then ten, then twenty. There is no seam
-//    because there is no mesh to cut, and the threshold itself is dithered per
-//    pixel so that even it has no line on it.
-// 3. THE DEPTH IS WRITTEN, so the flowers, the avatar and the feet of the
+// 2. THE LEVEL OF DETAIL IS THE PIXEL'S OWN FOOTPRINT AND IT IS DITHERED. The
+//    finest cell a ray may stop at is the one that covers about uLodGain pixels
+//    on the screen, which is a continuous number; the pixel's own hash decides
+//    which side of it this pixel takes, so two levels INTERLEAVE over a band
+//    instead of meeting at a line. That is a stochastic mip and it is the
+//    cheapest half of the answer to the scintillation of phase one: geometry
+//    finer than a pixel is not drawn at all rather than sampled once.
+// 3. AND THE OTHER HALF IS MORE THAN ONE RAY. `uRays` sub-pixel samples are
+//    marched through the same fragment on a rotated grid and averaged -- which
+//    is the only thing that antialiases a silhouette the RAY finds, since
+//    multisampling only ever antialiased the borders of the box. It is a
+//    uniform because its price is the whole point: E-DECISIONI14 spends the
+//    1.4 ms that dropping to two multisamples frees, and what that buys is
+//    measured on the bench rather than assumed here.
+// 4. THE DEPTH IS WRITTEN, so the flowers, the avatar and the feet of the
 //    monoliths cut into the blades per pixel. It costs this draw its early
 //    depth test, so it is a DEFINE and not a uniform: a program that writes
 //    gl_FragDepth anywhere has lost the early test whatever the branch decides,
@@ -96,25 +119,31 @@ const FRAGMENT = /* glsl */`
   out vec4 fragColour;
 
   uniform sampler2D tField;
-  // Where each level of the pyramid stands in the one picture that carries them
-  // all. Whole numbers, held as floats because that is the array a renderer
-  // uploads without a second thought about integer uniforms.
+  uniform sampler2D tFar;
+  // Where each level of each pyramid stands in the one picture that carries
+  // them all. Whole numbers, held as floats because that is the array a
+  // renderer uploads without a second thought about integer uniforms.
   uniform vec2 uLevelOrigin[${CAMPO.levels}];
-  // The window's own bounds in the world, which is where the ray must stop: the
-  // address of a texel is toroidal, so a step past the edge comes back in on
-  // the other side and would draw a copy of somewhere else.
+  uniform vec2 uFarOrigin[${CAMPO_FAR.levels}];
+  // The near window's own bounds in the world, which is where the ray has to
+  // change picture: the address of a texel is toroidal, so a step past the edge
+  // comes back in on the other side and would draw a copy of somewhere else.
   uniform vec4 uBounds;
+  uniform vec4 uFarBounds;
   uniform vec2 uHeight;
   uniform float uCell;
-  uniform float uUnit;
+  uniform float uGroundUnit;
+  uniform float uBladeUnit;
+  uniform float uBias;
   uniform int uSteps;
   uniform int uTopLevel;
-  uniform vec2 uLod;
+  uniform float uLodGain;
+  uniform int uRays;
   uniform float uHorizon;
   uniform vec3 uSunMarch[${SUN_MARCH.length}];
   uniform float uDebug;
   // How much ground one screen pixel covers at one metre, head on. See the note
-  // over the footprint in main() for why it is a uniform and not an fwidth.
+  // over the footprint in shade() for why it is a uniform and not an fwidth.
   uniform float uPixelScale;
   uniform mat4 uViewProjection;
 
@@ -132,6 +161,9 @@ const FRAGMENT = /* glsl */`
   uniform float uBounce;
   uniform vec2 uBase;
   uniform float uShadeSun;
+  // The mesher's own rule for when a wall shows what it is cut into.
+  uniform float uEarthMinStep;
+  uniform float uEarthToEye;
 
   ${SCENE_LIGHT_GLSL}
   ${FACE_LIGHT_GLSL}
@@ -141,6 +173,11 @@ const FRAGMENT = /* glsl */`
   ${CAMPO_CUT_GLSL}
 
   const int SIDE = ${CAMPO.side};
+  const int FAR_SIDE = ${CAMPO_FAR.side};
+  const int FAR_SHIFT = ${CAMPO_FAR_SHIFT};
+  const int NEAR_TOP = ${CAMPO.levels - 1};
+  const int FAR_TOP = ${CAMPO_FAR.levels - 1 + CAMPO_FAR_SHIFT};
+  const float RUNG = ${CAMPO_RUNG.toFixed(1)};
   // A whole number of every level's own wrap, added before the mask so that a
   // negative cell index -- the blade lattice is the world's, and the world has
   // plenty of them -- never reaches a bitwise operator as a negative number.
@@ -149,10 +186,35 @@ const FRAGMENT = /* glsl */`
   // decides it rather than from a number written twice.
   const float SLIM_LOW = ${MANTO.slim.low.toFixed(1)};
 
-  vec4 cellAt(ivec2 cell, int level) {
-    int mask = (SIDE >> level) - 1;
+  // ---------------------------------------------------------------- the pair
+  // What a texel says about height, in the two units it holds it in: the ground
+  // in whole voxels off a biased byte, the blade in quarter-blades over it. See
+  // the head of ./campo.js for why the two are not one unit any more.
+  float groundYOf(vec4 t) { return (t.g * 255.0 - uBias) * uGroundUnit; }
+  float topYOf(vec4 t) { return groundYOf(t) + t.r * 255.0 * uBladeUnit; }
+  // And the same top in the SUB-steps the sun's own march counts in.
+  float topSubOf(vec4 t) { return (t.g * 255.0 - uBias) * RUNG + t.r * 255.0; }
+  float floorSubOf(vec4 t) { return (t.g * 255.0 - uBias) * RUNG; }
+
+  // ONE FETCH, TWO PICTURES, AND THE SAME CELL INDEX FOR BOTH. At level L both
+  // lattices have a cell of uCell * 2^L -- the far one because it starts eight
+  // cells coarser and is asked at level L - 3 -- so the index the traversal
+  // computed is the index both of them want, and the only thing that changes is
+  // which sampler and which origin answer it.
+  vec4 cellAt(ivec2 cell, int level, bool near) {
+    if (near) {
+      int mask = (SIDE >> level) - 1;
+      ivec2 t = ivec2((cell.x + WRAP_BIAS) & mask, (cell.y + WRAP_BIAS) & mask);
+      return texelFetch(tField, ivec2(uLevelOrigin[level]) + t, 0);
+    }
+    int fl = level - FAR_SHIFT;
+    int mask = (FAR_SIDE >> fl) - 1;
     ivec2 t = ivec2((cell.x + WRAP_BIAS) & mask, (cell.y + WRAP_BIAS) & mask);
-    return texelFetch(tField, ivec2(uLevelOrigin[level]) + t, 0);
+    return texelFetch(tFar, ivec2(uFarOrigin[fl]) + t, 0);
+  }
+
+  bool insideNear(vec2 xz) {
+    return xz.x >= uBounds.x && xz.y >= uBounds.y && xz.x < uBounds.z && xz.y < uBounds.w;
   }
 
   // WHERE THE SUN STOPS REACHING A COLUMN, in the store's own unit, walked at
@@ -164,13 +226,20 @@ const FRAGMENT = /* glsl */`
   // quarter-blade high is a line the quarter-blade below it is still lit at,
   // and rounding up would darken a cube the sun does reach. A column that is
   // not there casts nothing and its step passes.
+  //
+  // IT IS ASKED OF THE NEAR PICTURE ONLY, and that is declared rather than
+  // hidden: the march's eight steps are in BLADES, and a far texel is eight
+  // blades wide, so out there the neighbours it wants are not separate columns
+  // at all. What the far field loses is the mat's own shadow on itself -- which
+  // the greedy also loses beyond its detail ring, where a block of four blades
+  // stands at one height and can shade nothing.
   float sunLineAt(ivec2 column, float floorUnits) {
     float line = floorUnits;
     for (int k = 0; k < ${SUN_MARCH.length}; k++) {
       vec3 s = uSunMarch[k];
-      vec4 t = cellAt(column + ivec2(s.xy), 0);
+      vec4 t = cellAt(column + ivec2(s.xy), 0, true);
       if (t.b == 0.0) continue;
-      float h = t.r * 255.0 - s.z;
+      float h = topSubOf(t) - s.z;
       if (h > line) line = h;
     }
     return floor(line);
@@ -179,13 +248,17 @@ const FRAGMENT = /* glsl */`
   // The grain inside a face, with the family's own slice and gain handed in:
   // sheetGrain() of ./sheet.js reads them off uniforms because a greedy
   // material is one family and this program is three. The arithmetic, the lay
-  // and the footprint are that file's, unchanged.
-  float grainOf(vec3 p, vec3 n, float pixel, vec2 draw, vec2 layers, vec2 gains) {
+  // and the footprint are that file's, unchanged. The SPAN is the cell that is
+  // actually being drawn and not the finest one: a grain laid at five
+  // centimetres on a cube drawn at forty is a picture of a face that is not
+  // there.
+  float grainOf(vec3 p, vec3 n, float pixel, float span, vec2 draw,
+                vec2 layers, vec2 gains) {
     float top = step(0.5, abs(n.y));
     float layer = mix(layers.y, layers.x, top);
     float gain = mix(gains.y, gains.x, top) * uSheetOn;
-    vec2 uv = sheetLay(sheetFaceUv(p, n, uCell), draw);
-    return max(0.0, 1.0 + gain * (sheetGrey(uv, layer, pixel / uCell) - 0.5));
+    vec2 uv = sheetLay(sheetFaceUv(p, n, span), draw);
+    return max(0.0, 1.0 + gain * (sheetGrey(uv, layer, pixel / span) - 0.5));
   }
 
   // The mat's own pair, bent exactly as matTerms() of ./material.js bends it:
@@ -197,100 +270,102 @@ const FRAGMENT = /* glsl */`
     return vec2(pair.x * sun, pair.y * sky);
   }
 
-  void main() {
-    vec3 eye = cameraPosition;
-    vec3 dir = normalize(vWorld - eye);
-    // No axis exactly nought, so that every reciprocal below is a number: a
-    // ray straight down the y axis would otherwise never leave its own column.
-    dir.x = abs(dir.x) < 1e-6 ? 1e-6 : dir.x;
-    dir.z = abs(dir.z) < 1e-6 ? 1e-6 : dir.z;
-    dir.y = abs(dir.y) < 1e-6 ? 1e-6 : dir.y;
-    vec3 inv = 1.0 / dir;
+  // --------------------------------------------------------------- one ray
+  // What a march comes back with. It is a struct rather than a pile of out
+  // parameters because the fragment now runs it more than once.
+  struct Hit {
+    bool found;
+    bool blade;
+    bool near;
+    int level;
+    float t;
+    vec3 p;
+    vec3 n;
+    ivec2 cell;
+    vec4 tex;
+  };
 
-    // WHERE THE RAY ENTERS THE WINDOW. The box draws its BACK faces so that the
-    // walker may stand inside it -- which they do the moment they climb a mound
-    // -- and a front face would then be culled and the ground would vanish from
-    // under their feet. So the entry is solved and not interpolated.
-    vec3 lo = vec3(uBounds.x, uHeight.x, uBounds.y);
-    vec3 hi = vec3(uBounds.z, uHeight.y, uBounds.w);
-    vec3 a = (lo - eye) * inv;
-    vec3 b = (hi - eye) * inv;
-    vec3 nearT = min(a, b);
-    vec3 farT = max(a, b);
-    float tEnter = max(max(nearT.x, nearT.y), max(nearT.z, 0.0));
-    float tLeave = min(farT.x, min(farT.y, farT.z));
-
-    // AND WHERE THE FIELD OWNS THE RAY AT ALL, CLIPPED AS AN INTERVAL AND NOT
-    // TESTED AT THE HIT. The line between the two representations is a vertical
-    // plane, so a ray crosses it at most once: solving for that crossing keeps
-    // the field from marching pixels the cubes are going to draw, which is what
-    // makes the two halves of the frame a comparison of COSTS and not of one
-    // cost plus the other's shadow.
-    if (uCut.w > 0.5) {
-      float s0 = campoSide(eye.xz);
-      float sd = dot(uCut.xy, dir.xz);
-      if (abs(sd) < 1e-9) {
-        if (s0 < 0.0) discard;
-      } else if (sd > 0.0) tEnter = max(tEnter, -s0 / sd);
-      else tLeave = min(tLeave, -s0 / sd);
-    }
-    if (tLeave <= tEnter) discard;
+  Hit march(vec3 eye, vec3 dir, vec3 inv, float tEnter, float tLeave, float dither) {
+    Hit hit;
+    hit.found = false;
+    hit.blade = false;
+    hit.near = true;
+    hit.level = 0;
+    hit.t = tLeave;
+    hit.p = eye;
+    hit.n = vec3(0.0, 1.0, 0.0);
+    hit.cell = ivec2(0);
+    hit.tex = vec4(0.0);
 
     vec3 p = eye + dir * (tEnter + 1e-4);
-
-    // THE LEVEL OF DETAIL, PER PIXEL AND DITHERED. The threshold is jittered by
-    // a tenth of its own distance out of the pixel's own hash, so the place
-    // where five centimetre cells give way to ten has no line on it: the two
-    // levels interleave over a band instead of meeting at an edge. It is the
-    // cheap half of Cesium's screen space cross fade -- one hash, no second
-    // draw, nothing to sort.
-    float dither = 0.9 + 0.2 * pigHash(gl_FragCoord.x, gl_FragCoord.y);
-    vec2 lod = uLod * dither;
-
     vec2 sgn = sign(dir.xz);
     int level = uTopLevel;
     vec3 n = vec3(0.0, 1.0, 0.0);
-    vec3 hit = vec3(0.0);
-    ivec2 hitCell = ivec2(0);
-    vec4 tex = vec4(0.0);
-    bool found = false;
-    bool blade = false;
-    int used = 0;
 
     for (int i = 0; i < 512; i++) {
       if (i >= uSteps) break;
-      used = i;
+      bool near = insideNear(p.xz) && level <= NEAR_TOP;
+      // THE FLOOR OF THE DETAIL, AS THE PIXEL'S OWN FOOTPRINT AND DITHERED.
+      // The cell the ray is allowed to stop at is the one that covers about
+      // uLodGain pixels; the pixel's own hash pushes the threshold up or down
+      // by up to a whole level, so the place where one level gives way to the
+      // next has no line on it -- the two interleave over a band. It is the
+      // cheap half of Cesium's screen space cross fade: one hash, no second
+      // draw, nothing to sort.
       float travelled = distance(p, eye);
-      int floorLevel = travelled < lod.x ? 0 : (travelled < lod.y ? 1
-        : (travelled < 2.0 * lod.y ? 2 : (travelled < 4.0 * lod.y ? 3 : 4)));
+      float want = travelled * uPixelScale * uLodGain / uCell;
+      int floorLevel = int(max(0.0, floor(log2(max(want, 1.0)) + dither)));
       floorLevel = min(floorLevel, uTopLevel);
+      if (!near) floorLevel = max(floorLevel, FAR_SHIFT);
+      if (level < floorLevel) level = floorLevel;
       float span = uCell * exp2(float(level));
       ivec2 cell = ivec2(floor(p.xz / span));
       vec2 edge = (vec2(cell) + max(sgn, 0.0)) * span;
       vec2 crossing = (edge - p.xz) * inv.xz;
       float tExit = max(min(crossing.x, crossing.y), 0.0);
-      vec4 t = cellAt(cell, level);
-      float topY = t.r * 255.0 * uUnit;
+      vec4 t = cellAt(cell, level, near);
+      float topY = topYOf(t);
       float yExit = p.y + dir.y * tExit;
-      bool maybe = t.b > 0.0 && (p.y <= topY + 1e-5 || yExit <= topY);
+      // AND WHERE THE CUBES OWN THE GROUND THE RAY PASSES STRAIGHT THROUGH.
+      // See campoYields in ./campo.js: in the world that ships this is a
+      // uniform branch that is false everywhere, and on a bench arm it is what
+      // lets the greedy disc and the field be priced in ONE opening of the page
+      // without either of them drawing the other's pixels.
+      bool maybe = !campoYields(p.xz) && t.b > 0.0
+        && (p.y <= topY + 1e-5 || yExit <= topY);
       if (maybe && level > floorLevel) { level--; continue; }
       if (maybe) {
         // ------------------------------------------------- the finest level
-        float groundY = t.g * 255.0 * uUnit;
+        float groundY = groundYOf(t);
         int packed = int(t.b * 255.0 + 0.5);
         // INSIDE THE GROUND: the ray came in through a wall of the column, so
         // the face it stands on is the one it crossed to get here.
         if (p.y <= groundY + 1e-5) {
-          hit = p; hitCell = cell; tex = t; found = true; blade = false; break;
+          hit.found = true; hit.blade = false; hit.near = near; hit.level = level;
+          hit.p = p; hit.n = n; hit.cell = cell; hit.tex = t;
+          hit.t = distance(p, eye);
+          return hit;
         }
         // THE BLADE, WHICH IS A BOX AND NOT A HEIGHTFIELD WHERE IT IS NARROW.
         // «larghezza da 3/4 a 1 voxel completo» (E-DECISIONI10 G3): a blade
         // narrower than its cell shows all four flanks for their whole height,
         // and the greedy cuts it out of the merge for exactly that reason. So
         // the ray has to miss it laterally where the cubes have air.
+        //
+        // AND THE INSET FADES WITH THE PIXEL, WHICH IS A PREFILTER AND NOT A
+        // TASTE. A blade three quarters of a cell wide standing at twenty
+        // metres has four flanks that are each a third of a pixel across: one
+        // ray a pixel cannot resolve them and what it reports instead is noise
+        // at the frequency of the pixel, which is the scintillation of phase
+        // one at its source. Where the cell is no bigger than a couple of
+        // pixels the blade is therefore widened back to its whole cell -- the
+        // detail is not drawn rather than sampled once -- and the LOD above
+        // has by then merged it into a bigger cell anyway.
         int slim = (packed >> 2) & 3;
-        float inset = (level == 0 && slim > 0)
-          ? uCell * (1.0 - (float(slim) + SLIM_LOW - 1.0) / 8.0) * 0.5 : 0.0;
+        float thin = span / max(distance(p, eye) * uPixelScale, 1e-6);
+        float inset = (level == 0 && near && slim > 0)
+          ? span * (1.0 - (float(slim) + SLIM_LOW - 1.0) / 8.0) * 0.5
+            * smoothstep(2.0, 5.0, thin) : 0.0;
         if (topY > groundY) {
           if (inset > 0.0) {
             vec3 blo = vec3(float(cell.x) * span + inset, groundY,
@@ -311,23 +386,33 @@ const FRAGMENT = /* glsl */`
                 else if (bn.y >= bn.z) nb = vec3(0.0, -sign(dir.y), 0.0);
                 else nb = vec3(0.0, 0.0, -sgn.y);
               }
-              n = nb;
-              hit = p + dir * t0; hitCell = cell; tex = t;
-              found = true; blade = true; break;
+              hit.found = true; hit.blade = true; hit.near = near; hit.level = level;
+              hit.p = p + dir * t0; hit.n = nb; hit.cell = cell; hit.tex = t;
+              hit.t = distance(hit.p, eye);
+              return hit;
             }
           } else if (p.y <= topY + 1e-5) {
-            hit = p; hitCell = cell; tex = t; found = true; blade = true; break;
+            hit.found = true; hit.blade = true; hit.near = near; hit.level = level;
+            hit.p = p; hit.n = n; hit.cell = cell; hit.tex = t;
+            hit.t = distance(p, eye);
+            return hit;
           } else if (yExit <= topY) {
-            hit = p + dir * ((topY - p.y) * inv.y);
-            n = vec3(0.0, 1.0, 0.0);
-            hitCell = cell; tex = t; found = true; blade = true; break;
+            hit.found = true; hit.blade = true; hit.near = near; hit.level = level;
+            hit.p = p + dir * ((topY - p.y) * inv.y);
+            hit.n = vec3(0.0, 1.0, 0.0);
+            hit.cell = cell; hit.tex = t;
+            hit.t = distance(hit.p, eye);
+            return hit;
           }
         }
         // AND THE GROUND'S OWN TOP, under the blade or where none stands.
         if (yExit <= groundY) {
-          hit = p + dir * ((groundY - p.y) * inv.y);
-          n = vec3(0.0, 1.0, 0.0);
-          hitCell = cell; tex = t; found = true; blade = false; break;
+          hit.found = true; hit.blade = false; hit.near = near; hit.level = level;
+          hit.p = p + dir * ((groundY - p.y) * inv.y);
+          hit.n = vec3(0.0, 1.0, 0.0);
+          hit.cell = cell; hit.tex = t;
+          hit.t = distance(hit.p, eye);
+          return hit;
         }
       }
       // The cell is empty as far as the ray goes: cross it and climb.
@@ -338,36 +423,64 @@ const FRAGMENT = /* glsl */`
       // tLeave is measured from the EYE, so a window entered fourteen metres
       // out would otherwise be abandoned after the six metres it is deep.
       if (distance(p, eye) > tLeave) break;
-      if (p.x < uBounds.x || p.z < uBounds.y || p.x > uBounds.z || p.z > uBounds.w
+      if (p.x < uFarBounds.x || p.z < uFarBounds.y
+        || p.x > uFarBounds.z || p.z > uFarBounds.w
         || p.y < uHeight.x || p.y > uHeight.y) break;
-      level = min(level + 1, uTopLevel);
+      level = min(level + 1, min(uTopLevel, FAR_TOP));
     }
+    return hit;
+  }
 
-    if (!found) {
-      if (uDebug > 1.5) { fragColour = vec4(1.0, 0.0, 1.0, 1.0); return; }
-      discard;
-    }
-    int packed = int(tex.b * 255.0 + 0.5);
+  // ------------------------------------------------------------ one shading
+  // Everything a pixel is, from a hit: the families, the pigment, the grain,
+  // the joint, the light, the arris and the air. Nought alpha where the ray
+  // found nothing, so a fragment that only partly covers the ground can hand
+  // back the fraction it covered instead of a hard edge against the sky.
+  vec4 shade(vec3 dir, Hit hit) {
+    if (!hit.found) return vec4(0.0);
+    int packed = int(hit.tex.b * 255.0 + 0.5);
     int family = packed & 3;
     // THE CORRIDOR IS CARRIED AND NOT DRAWN (E-SENT4). Its stone is three baked
     // maps and a law of slabs that belong to src/world/path.js; the field stops
     // on it at exactly the right height and stands aside, so the family that
     // owns it draws it and nothing is painted over it.
-    if (family == 2) discard;
-    // AND A BLADE IS THE MAT'S FAMILY WHATEVER IT STANDS ON, which is the one
-    // thing the material of a column does NOT decide.
+    if (family == 2) return vec4(0.0);
+
+    float span = uCell * exp2(float(hit.level));
+    float groundY = groundYOf(hit.tex);
+    bool onTop = abs(hit.n.y) > 0.5;
+
+    // ------------------------------------------------- WHICH FAMILY A FACE IS
+    // A BLADE IS THE MAT'S FAMILY WHATEVER IT STANDS ON, which is the one thing
+    // the material of a column does NOT decide: the mat lays on grass AND on
+    // the bare earth of a verge (MANTO.onVerge), and the greedy draws every one
+    // of them through ONE material with the meadow's own albedo.
     //
-    // The mat lays on grass AND on the bare earth of a verge (MANTO.onVerge:
-    // «blades thinning and shortening INTO the corridor» is what takes the netto
-    // confine verde out of the picture), and the greedy draws every one of them
-    // through ONE material with the meadow's own albedo -- bladeSettings() is
-    // voxelSettings() with three light terms moved and the pigment untouched. A
-    // field that read the family off the column would paint the blades on a
-    // verge, on a mound's bank and in the halo round a boulder with the EARTH's
-    // albedo and the EARTH's sheet: measured on the frame, a whole meadow of
-    // tan tops and grey-blue flanks where the cubes draw grass. So the family is
-    // the GROUND's question, and a blade never asks it.
-    bool earth = !blade && family == 1;
+    // A TOP FACE is the column's own material.
+    //
+    // A WALL IS THE MESHER'S WALL, and the three conditions are its three: the
+    // flank is soil (bit five of B, written by the store's own flank), the wall
+    // climbs at least EARTH.minStep voxels over the ground it stands against,
+    // and this face is one the target shows earth on -- south always, and east
+    // or west according to which side of the corridor the column stands, which
+    // is baked into bits six and seven because it is a question about the PATH
+    // and not about this column's height. The top cube of such a wall keeps the
+    // meadow's own flank, which is E-DECISIONI8.3 read as geometry.
+    bool earth = false;
+    if (!hit.blade) {
+      if (onTop) {
+        earth = family == 1;
+      } else if ((packed & 32) != 0) {
+        vec4 across = cellAt(hit.cell + ivec2(int(hit.n.x), int(hit.n.z)),
+                             hit.level, hit.near);
+        float rise = (hit.tex.g - across.g) * 255.0;
+        bool facing = (uEarthToEye > 0.5 && hit.n.z > 0.5)
+          || (hit.n.x < -0.5 && (packed & 64) != 0)
+          || (hit.n.x > 0.5 && (packed & 128) != 0);
+        earth = facing && across.b > 0.0 && rise >= uEarthMinStep
+          && hit.p.y < groundY - uGroundUnit;
+      }
+    }
 
     // ---------------------------------------------- how big a pixel is here
     // AN ANALYTIC FOOTPRINT AND NOT AN fwidth, AND THE REASON IS THE
@@ -379,19 +492,19 @@ const FRAGMENT = /* glsl */`
     // erase the joint along exactly the edges the eye reads a cube by. So it is
     // solved from the distance and the face's own lean, which is what the
     // derivative would have measured had the surface been continuous.
-    float travelled = distance(hit, eye);
-    float lean = max(0.15, abs(dot(n, dir)));
+    float travelled = hit.t;
+    float lean = max(0.15, abs(dot(hit.n, dir)));
     float pixel = max(travelled * uPixelScale / lean, 1e-6);
-    float onScreen = uCell / pixel;
+    float onScreen = span / pixel;
 
     // A nudge inside the solid, so the wrapped coordinates below land in the
     // cube that was hit and not in the one across the face from it.
-    vec3 p3 = hit - n * (uCell * 1e-3);
-    vec3 cell3 = vec3(float(hitCell.x), floor(p3.y / uCell), float(hitCell.y));
+    vec3 p3 = hit.p - hit.n * (span * 1e-3);
+    vec3 cell3 = vec3(float(hit.cell.x), floor(p3.y / span), float(hit.cell.y));
     // The pigment's own column, which is the world's ten centimetre column and
     // not the blade: a zone of the world is one zone whichever family stands in
     // it. This is uCellRatio of ./material.js, written for one family.
-    vec2 column = floor(cell3.xz * 0.5);
+    vec2 column = floor(p3.xz / (uCell * 2.0));
 
     // ------------------------------------------------------------ the pigment
     // THE TINT COMES OUT OF THE TEXEL AND THE HUE OUT OF THE FIELD. The worker
@@ -399,24 +512,23 @@ const FRAGMENT = /* glsl */`
     // carried the height (§2.4 of the performance dossier: one producer for a
     // texel), so the LEVEL of the colour is the store's own answer, to a byte.
     // What is left in the fragment is the hue, which rides the slow octave and
-    // is a second field rather than a second sampling of this one -- and it is
-    // called out of ./pigment.js rather than spelled again here.
-    float tint = uTintFloor + tex.a * (uTintCeil - uTintFloor);
+    // is a second field rather than a second sampling of this one.
+    float tint = uTintFloor + hit.tex.a * (uTintCeil - uTintFloor);
     vec3 albedo = (earth ? uAlbedoEarth : uAlbedo) * tint
       * pigHueOf(column.x, column.y, earth ? uHueEarth : uHue);
 
     // ------------------------------------------------------------- the grain
-    albedo *= grainOf(p3, n, pixel, vec2(
+    albedo *= grainOf(p3, hit.n, pixel, span, vec2(
       pigHash(cell3.x + 131.0, cell3.z + cell3.y * 17.0 + 57.0),
       pigHash(cell3.z + 401.0, cell3.x + cell3.y * 29.0 + 233.0)),
       earth ? uSheetLayerEarth : uSheetLayer,
       earth ? uSheetGainEarth : uSheetGain);
 
     // ------------------------------------------------------------- the joint
-    vec3 middle = abs(fract(p3 / uCell) - 0.5);
-    vec3 across = mix(middle, vec3(0.5), abs(n));
-    float border = (0.5 - max(across.x, max(across.y, across.z))) * uCell;
-    float width = min(uJointPixels * pixel, uCell * 0.14);
+    vec3 middle = abs(fract(p3 / span) - 0.5);
+    vec3 across = mix(middle, vec3(0.5), abs(hit.n));
+    float border = (0.5 - max(across.x, max(across.y, across.z))) * span;
+    float width = min(uJointPixels * pixel, span * 0.14);
     albedo *= 1.0 - uJoint * (1.0 - smoothstep(0.0, width, border))
       * smoothstep(2.5, 5.0, onScreen);
 
@@ -424,33 +536,105 @@ const FRAGMENT = /* glsl */`
     // The two lines the mat is lit between, and BOTH come out of the picture
     // rather than out of a second store: the canopy is the top of this column,
     // and the sun's line is the march above over the same heights.
-    vec4 here = cellAt(hitCell, 0);
-    float canopy = here.r * 255.0 * uUnit;
-    float sunLine = uHorizon > 0.5 ? sunLineAt(hitCell, here.g * 255.0) * uUnit : 0.0;
-    float lightY = min(hit.y, canopy);
-    float shadeSun = blade ? uShadeSun : 1.0;
+    float canopy = topYOf(hit.tex);
+    float sunLine = (uHorizon > 0.5 && hit.near && hit.level == 0)
+      ? sunLineAt(hit.cell, floorSubOf(hit.tex)) * uBladeUnit : -1e4;
+    float lightY = min(hit.p.y, canopy);
+    float shadeSun = hit.blade ? uShadeSun : 1.0;
     float lit = 1.0 - smoothstep(0.0, uCell * 0.25, sunLine - lightY);
     float sun = shadeSun + (1.0 - shadeSun) * lit;
-    vec2 base = blade ? uBase : vec2(0.0, 1.0);
-    float rung = floor(max(0.0, canopy - hit.y) / uCell);
+    vec2 base = hit.blade ? uBase : vec2(0.0, 1.0);
+    float rung = floor(max(0.0, canopy - hit.p.y) / uCell);
     float sky = 1.0 - base.x * (1.0 - pow(base.y, rung));
-    float bounce = blade ? uBounce : 0.0;
-    vec3 light = faceLightOf(matTerms(n, sun, sky, bounce));
+    float bounce = hit.blade ? uBounce : 0.0;
+    vec3 light = faceLightOf(matTerms(hit.n, sun, sky, bounce));
 
     // ---------------------------------------------------- the lightened arris
-    float up = fract(p3.y / uCell);
-    float band = min(uArrisPixels * pixel, uCell * 0.30) / uCell;
+    float up = fract(p3.y / span);
+    float band = min(uArrisPixels * pixel, span * 0.30) / span;
     float arris = smoothstep(1.0 - band, 1.0, up)
-      * (1.0 - abs(n.y)) * uArris * smoothstep(2.5, 5.0, onScreen);
+      * (1.0 - abs(hit.n.y)) * uArris * smoothstep(2.5, 5.0, onScreen);
     if (arris > 0.0) {
-      vec3 leaning = normalize(mix(n, normalize(n + vec3(0.0, 1.0, 0.0)), uArrisLean));
+      vec3 leaning = normalize(mix(hit.n, normalize(hit.n + vec3(0.0, 1.0, 0.0)), uArrisLean));
       light = mix(light, faceLightOf(matTerms(leaning, sun, sky, bounce)), arris);
     }
 
     vec3 colour = albedo * light;
-    colour = mix(colour, uFogColour, fogAmount(travelled, hit.y));
-    if (uDebug > 0.5 && uDebug < 1.5) colour = vec3(float(used) / float(uSteps));
-    fragColour = vec4(colour, 1.0);
+    colour = mix(colour, uFogColour, fogAmount(travelled, hit.p.y));
+    return vec4(colour, 1.0);
+  }
+
+  void main() {
+    vec3 eye = cameraPosition;
+    vec3 dir0 = normalize(vWorld - eye);
+    // THE TWO SCREEN DERIVATIVES OF THE RAY, which is how a sub-pixel sample is
+    // aimed without any knowledge of the projection: one pixel to the right is
+    // this direction plus its own derivative, whatever lens produced it.
+    vec3 ddx = dFdx(dir0);
+    vec3 ddy = dFdy(dir0);
+
+    // The pixel's own hash, used for the dither of the detail. It is a function
+    // of the PIXEL and not of the frame, so a still camera draws a still
+    // picture: the interleaving is spatial and never temporal.
+    float dither = pigHash(gl_FragCoord.x, gl_FragCoord.y);
+
+    vec4 sum = vec4(0.0);
+    float nearest = 1e9;
+    int used = 0;
+    int rays = max(1, min(uRays, 4));
+    for (int k = 0; k < 4; k++) {
+      if (k >= rays) break;
+      // A ROTATED GRID, which is the pattern that puts the most distinct sample
+      // positions on a nearly horizontal or nearly vertical edge -- and a
+      // meadow of blades is made of nothing else. With one ray the offset is
+      // nought and this is exactly the fragment phase one drew.
+      vec2 off = vec2(0.0);
+      if (rays == 2) off = (k == 0) ? vec2(-0.25, -0.125) : vec2(0.25, 0.125);
+      else if (rays == 3) off = (k == 0) ? vec2(-0.30, -0.15)
+        : (k == 1) ? vec2(0.0, 0.30) : vec2(0.30, -0.15);
+      else if (rays == 4) off = (k == 0) ? vec2(-0.375, -0.125)
+        : (k == 1) ? vec2(-0.125, 0.375)
+        : (k == 2) ? vec2(0.125, -0.375) : vec2(0.375, 0.125);
+      vec3 dir = normalize(dir0 + ddx * off.x + ddy * off.y);
+      // No axis exactly nought, so that every reciprocal below is a number: a
+      // ray straight down the y axis would otherwise never leave its own column.
+      dir.x = abs(dir.x) < 1e-6 ? 1e-6 : dir.x;
+      dir.z = abs(dir.z) < 1e-6 ? 1e-6 : dir.z;
+      dir.y = abs(dir.y) < 1e-6 ? 1e-6 : dir.y;
+      vec3 inv = 1.0 / dir;
+
+      // WHERE THE RAY ENTERS THE WINDOW. The box draws its BACK faces so that
+      // the walker may stand inside it -- which they always do -- and a front
+      // face would then be culled and the ground would vanish from under their
+      // feet. So the entry is solved and not interpolated.
+      vec3 lo = vec3(uFarBounds.x, uHeight.x, uFarBounds.y);
+      vec3 hi = vec3(uFarBounds.z, uHeight.y, uFarBounds.w);
+      vec3 a = (lo - eye) * inv;
+      vec3 b = (hi - eye) * inv;
+      vec3 nearT = min(a, b);
+      vec3 farT = max(a, b);
+      float tEnter = max(max(nearT.x, nearT.y), max(nearT.z, 0.0));
+      float tLeave = min(farT.x, min(farT.y, farT.z));
+
+      used++;
+      if (tLeave <= tEnter) continue;
+
+      Hit hit = march(eye, dir, inv, tEnter, tLeave, dither);
+      vec4 c = shade(dir, hit);
+      sum += c;
+      if (c.a > 0.0 && hit.t < nearest) nearest = hit.t;
+    }
+
+    if (sum.a <= 0.0) {
+      if (uDebug > 1.5) { fragColour = vec4(1.0, 0.0, 1.0, 1.0); return; }
+      discard;
+    }
+    // THE COLOUR IS THE MEAN OF THE RAYS THAT FOUND GROUND AND THE ALPHA IS THE
+    // SHARE OF THEM THAT DID, which is the whole of what more than one ray
+    // buys: a pixel on the silhouette of the ridge carries the fraction of
+    // itself the ridge covers, and what is behind it is the sky that was drawn
+    // before this pass. With one ray the alpha is one and nothing is blended.
+    fragColour = vec4(sum.rgb / sum.a, sum.a / float(max(used, 1)));
 
 #ifdef CAMPO_DEPTH
     // THE DEPTH, so everything else in the world cuts into the blades per pixel:
@@ -458,18 +642,23 @@ const FRAGMENT = /* glsl */`
     // this draw its early depth test, which is why it is a define -- a program
     // that writes gl_FragDepth at all has lost the early test whatever a branch
     // decides, so a cost that could not be compiled away could not be measured.
-    vec4 clip = uViewProjection * vec4(hit, 1.0);
+    //
+    // THE NEAREST OF THE RAYS AND NOT THEIR MEAN: a depth is a place and not a
+    // quantity, and the mean of two places on either side of a silhouette is a
+    // point in the air between them.
+    vec4 clip = uViewProjection * vec4(eye + dir0 * nearest, 1.0);
     gl_FragDepth = (clip.z / clip.w) * 0.5 + 0.5;
 #endif
   }
 `;
 
 /**
- * The field's material: one program, three families, every literal read from
- * the seat that measured it.
+ * The field's material: one program, two windows, three families, every literal
+ * read from the seat that measured it.
  *
  * @param {object} options
- * @param {object} options.texture  the live clipmap's own texture
+ * @param {object} options.texture  the near clipmap's own texture
+ * @param {object} options.far      the far clipmap's own texture
  * @param {object} options.sheets   THE ARRAY TEXTURE the cubes are already
  *                                  reading, shared by reference and not the
  *                                  delivered strip: sheetArray() is what cuts
@@ -480,8 +669,11 @@ const FRAGMENT = /* glsl */`
  *                                  world that shipped before the grain existed.
  * @param {boolean} options.depth   write gl_FragDepth. False prices what the
  *                                  early depth test on this draw is worth.
+ * @param {number} options.rays     sub-pixel samples a fragment marches.
  */
-export function campoMaterial({ texture, sheets = null, depth = true } = {}) {
+export function campoMaterial({
+  texture, far = null, sheets = null, depth = true, rays = 1,
+} = {}) {
   const blade = bladeSettings();
   const earth = earthSettings();
   const ground = voxelSettings();
@@ -491,16 +683,33 @@ export function campoMaterial({ texture, sheets = null, depth = true } = {}) {
     defines: depth ? { CAMPO_DEPTH: '1' } : {},
     uniforms: {
       tField: { value: texture },
-      uLevelOrigin: { value: CAMPO_ATLAS.origins.map((o) => new Vector2(o.x, o.y)) },
+      tFar: { value: far ?? texture },
+      uLevelOrigin: { value: CAMPO.atlas.origins.map((o) => new Vector2(o.x, o.y)) },
+      uFarOrigin: { value: CAMPO_FAR.atlas.origins.map((o) => new Vector2(o.x, o.y)) },
       uBounds: { value: new Vector4(0, 0, 0, 0) },
+      uFarBounds: { value: new Vector4(0, 0, 0, 0) },
       uHeight: { value: new Vector2(-0.05, 1.6) },
       uCell: { value: CAMPO.cell },
-      uUnit: { value: CAMPO.unit },
-      uSteps: { value: 64 },
-      uTopLevel: { value: 4 },
-      // D-P3, the coordinator's own answer: eight metres of five centimetre
-      // cells round the walker, then ten, then twenty.
-      uLod: { value: new Vector2(8, 16) },
+      uGroundUnit: { value: CAMPO.unitGround },
+      uBladeUnit: { value: CAMPO.unitBlade },
+      uBias: { value: CAMPO_BIAS },
+      uSteps: { value: 96 },
+      uTopLevel: { value: 6 },
+      /**
+       * How many pixels a cell has to cover before the ray may stop at it.
+       *
+       * SIX AND A HALF, AND IT IS PHASE ONE'S OWN LADDER RE-READ AS WHAT IT WAS
+       * MEASURING. D-P3 put the finest cells inside eight metres and the next
+       * inside sixteen; at the high tier's own pixel a five centimetre cell at
+       * eight metres covers 6.7 pixels, so the two thresholds were a footprint
+       * rule with the footprint left implicit. Written as the footprint it is
+       * one number instead of two, it follows the viewport and the field of
+       * view instead of standing still while they move, and it is the dial the
+       * scintillation is fought on -- geometry finer than this is not drawn at
+       * all rather than sampled once a pixel.
+       */
+      uLodGain: { value: 6.5 },
+      uRays: { value: rays },
       uHorizon: { value: 1 },
       uSunMarch: { value: SUN_MARCH },
       uDebug: { value: 0 },
@@ -523,6 +732,8 @@ export function campoMaterial({ texture, sheets = null, depth = true } = {}) {
       uBounce: { value: blade.bounce },
       uBase: { value: blade.base },
       uShadeSun: { value: blade.shadeSun },
+      uEarthMinStep: { value: EARTH.minStep },
+      uEarthToEye: { value: EARTH.toEye ? 1 : 0 },
       ...faceLightUniforms(TERRAIN.lightScale * GROUND_EXPOSURE),
       ...SCENE_LIGHT_UNIFORMS,
       ...fogUniforms(),
@@ -531,11 +742,17 @@ export function campoMaterial({ texture, sheets = null, depth = true } = {}) {
     vertexShader: VERTEX,
     fragmentShader: FRAGMENT,
     // BACK FACES, so the box still draws when the walker is inside it: the eye
-    // stands 1.6 m up and a mound with a blade on it reaches past that.
+    // stands 1.6 m up and the box is the whole world.
     side: BackSide,
     fog: false,
     depthWrite: true,
     depthTest: true,
+    // AND IT STAYS IN THE OPAQUE PASS. `transparent` false keeps it there, in
+    // renderOrder, after everything else that writes depth and after the sky:
+    // so the only thing a partly covered pixel can blend against is what is
+    // already behind it, which is exactly what a coverage is supposed to
+    // reveal. At one ray every alpha is one and the blend is a copy.
+    transparent: false,
   });
   material.userData.refresh = () => {
     const now = bladeSettings();
@@ -554,12 +771,12 @@ export function campoMaterial({ texture, sheets = null, depth = true } = {}) {
 /**
  * The one box the field is drawn on.
  *
- * A unit of the world scaled by its model matrix and moved with the window,
- * never rebuilt: the geometry is four hundred bytes and where it stands is a
- * matrix, so following the walker costs no upload at all.
+ * A unit of the world scaled by its model matrix, and it is the FAR window's
+ * own extent now: four hundred metres of ground, one draw, four hundred bytes
+ * of geometry. Where it stands is a matrix, so it costs no upload at all.
  */
 export function campoBox(material, onRenderer = null) {
-  const side = CAMPO.side * CAMPO.cell;
+  const side = CAMPO_FAR.side * CAMPO_FAR.cell;
   const mesh = new Mesh(new BoxGeometry(side, 1, side), material);
   mesh.name = 'ground-campo';
   // THE CAMERA AND THE RENDERER ARRIVE HERE AND NOWHERE ELSE, which is what
@@ -586,7 +803,8 @@ export function campoBox(material, onRenderer = null) {
   // AFTER EVERY OTHER OPAQUE. The field writes gl_FragDepth, so it has no early
   // depth test of its own; what it can still have is everybody else's depth
   // already written, which kills its fragments behind the monoliths at the late
-  // test instead of shading them.
+  // test instead of shading them -- and it is also what lets a partly covered
+  // pixel blend against a sky and a skyline that are already there.
   mesh.renderOrder = 10;
   return mesh;
 }

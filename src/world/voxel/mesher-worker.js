@@ -3,7 +3,7 @@ import {
 } from './mesher.js';
 import { buildMasonry, stoneTileData } from './courses.js';
 import { MONOLITHS } from '../layout.js';
-import { campoTile } from './campo.js';
+import { campoFarTile, campoTile } from './campo.js';
 
 // Everything this demo builds by arithmetic, built off the thread the walker is
 // on. Three jobs, in the order the picture wants them.
@@ -63,17 +63,24 @@ import { campoTile } from './campo.js';
 // same arithmetic in one page.
 self.onmessage = (event) => {
   const message = event.data || {};
-  if (message.job === 'campo') {
+  if (message.job === 'campo' || message.job === 'campo-far') {
+    // TWO WINDOWS AND ONE BRANCH. The near tile is cut out of a STORE and the
+    // far one out of the law at its own stride (see ./campo.js): what arrives
+    // here is the same shape of message either way -- a square of bytes, where
+    // it goes, and what it cost -- so the window on the other side does not
+    // have to know which picture it is filling.
+    const far = message.job === 'campo-far';
     const { chunks = [], radius: reach = DISC_RADIUS } = message;
     for (const { cx, cz } of chunks) {
-      const built = campoTile(cx, cz, reach);
+      const built = far ? campoFarTile(cx, cz, reach) : campoTile(cx, cz, reach);
       self.postMessage({
-        kind: 'campo',
+        kind: message.job,
         cx,
         cz,
         bx: built.bx,
         bz: built.bz,
         tallest: built.tallest,
+        lowest: built.lowest,
         ms: built.ms,
         data: built.data,
       }, [built.data.buffer]);

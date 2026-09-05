@@ -129,18 +129,24 @@ export {
 // the door (./index.js); this is the arithmetic.
 export {
   CAMPO,
-  CAMPO_ATLAS,
-  CAMPO_BYTES,
+  CAMPO_BIAS,
+  CAMPO_FAR,
+  CAMPO_FAR_BLADE,
+  CAMPO_FAR_RATIO,
+  CAMPO_FAR_SHIFT,
   CAMPO_MATERIAL,
   CAMPO_PRESENT,
   CAMPO_RUNG,
-  CAMPO_TILE,
-  CAMPO_TILE_BYTES,
+  CAMPO_SOIL_WALL,
   campoColumnOf,
   campoDecode,
+  campoFarOrigin,
+  campoFarTile,
+  campoGroundByte,
   campoHeights,
   campoMaterialCode,
   campoReduce,
+  campoShape,
   campoSlimCode,
   campoSlimEighths,
   campoSlot,
@@ -149,3 +155,19 @@ export {
   campoTintOf,
   campoTopStep,
 } from './campo.js';
+
+// AND THE EDGE OF THE WORLD (E-DECISIONI13), which is ground and therefore
+// arithmetic: the plateau, the fall cut into terraces, the ridge that closes the
+// horizon, and the fitted basin all four sessions read. A guard has to be able
+// to sweep it -- how tall the ridge gets, how steep a riser a body meets, and
+// whether the two of them still fit in the byte the picture holds them in --
+// without opening a browser.
+export {
+  CONFINE,
+  PLATEAU,
+  basinProfile,
+  confineRisers,
+  confineSteps,
+  confineSurface,
+  crestRise,
+} from './confine.js';
