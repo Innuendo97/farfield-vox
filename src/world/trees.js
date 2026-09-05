@@ -313,8 +313,12 @@ function mergeFaces(faces) {
   for (const [x, y, z, d] of faces) {
     const axis = d >> 1;
     const slab = axis === 0 ? x : axis === 1 ? y : z;
-    const u = axis === 0 ? y : x;
-    const v = axis === 0 ? z : axis === 1 ? z : y;
+    // (u, v) is the cyclic pair after the axis -- (y, z), (z, x), (x, y) -- so
+    // a rectangle grown in (u, v) winds the way its normal says. Reading (x, z)
+    // for the Y planes handed every top and bottom face to the back-face cull:
+    // a third of every crown and trunk was never drawn.
+    const u = axis === 0 ? y : axis === 1 ? z : x;
+    const v = axis === 0 ? z : axis === 1 ? x : y;
     const key = `${d}|${slab}`;
     if (!planes.has(key)) planes.set(key, { d, slab, axis, cells: new Set() });
     planes.get(key).cells.add(`${u},${v}`);
@@ -353,7 +357,7 @@ function geometryOf(quads) {
       const u = u0 + du;
       const v = v0 + dv;
       if (axis === 0) return [plane, u, v];
-      if (axis === 1) return [u, plane, v];
+      if (axis === 1) return [v, plane, u];
       return [u, v, plane];
     };
     const b = pos.length / 3;
