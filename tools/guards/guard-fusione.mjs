@@ -127,7 +127,27 @@ const ALLOCATION_RADIUS = 35;
 // the row is proposed at 190 000, the measured number with a third of a per cent
 // of headroom, exactly as the row above it was. THE GATE THAT DECIDED IT IS
 // STILL THE FRAME and it is in the verbale of U-ERBA-2.
-const ALLOCATION = 190000;
+//
+// AND A THIRD TIME, FOR THE CURVE OF THE PATH. E-DECISIONI14, the committente's
+// own words: the corridor «è troppo DRITTO ... nel target il sentiero è morbido,
+// CURVA». U-SENT-5 measured the reference's own axis with no shape assumed and
+// replaced the ramp with it (PATH_CENTRE in src/world/terrain-field.js), and the
+// disc went from 187 964 to 191 058 triangles at r = 14 m. The rise is the
+// CURVE and nothing else: measuring the offset along the local normal, which the
+// curve also brought, gives 468 triangles BACK -- with the normal taken out and
+// the curve left in, the same disc measures 191 526.
+//
+// A corridor that meanders covers more ground than one ruled straight between
+// the same two ends, and the ground it covers is the near field, where the mat
+// is laid blade by blade. What the world costs for it is a paving that is a
+// third longer at the near end and a mat that has to give way along a longer
+// kerb. There is no term here to tune it down with: the shape is a reading of
+// the reference and the width it is drawn at is another unit's.
+//
+// The row is proposed at 191 700, the measured number with a third of a per cent
+// of headroom, by the same rule and with the same authority as the two above it.
+// THE GATE THAT DECIDED IT IS THE FRAME and it is in the verbale of U-SENT-5.
+const ALLOCATION = 191700;
 
 /** What §2.9 allocated before D-E2 amended it, kept so the move stays readable. */
 const ALLOCATION_BEFORE = 60000;
@@ -150,7 +170,13 @@ const FOCUS = { x: SPAWN.x, z: SPAWN.z };
 // verges. Writing a yardstick is the coordinator's act (E-V1j, E-V1k) so the row
 // stands where it stood and the run below says out loud how far the world has
 // moved from it; the proposal is in the verbale of U-ERBA-1.
-const AT_TODAY = 187964;
+//
+// AND RE-TAKEN WITH THE CURVE OF THE PATH: 191 058 at r = 14 m, of which the
+// paving's own walls are 182 quads against 76 -- a corridor that crosses the
+// lattice at an angle shows more of its own flanks -- and the bare earth 1 649
+// against 1 604. The other 1 396 quads are the mat, giving way along a kerb that
+// is longer than it was. U-SENT-5, E-DECISIONI14.
+const AT_TODAY = 191058;
 
 const OWNER = 'V1';
 
