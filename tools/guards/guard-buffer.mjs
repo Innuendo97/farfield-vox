@@ -175,11 +175,15 @@ if (process.argv.includes('--self')) {
         .every((t) => (formats.find((f) => f.name === t.sceneFormat) || {}).highDynamicRange),
     },
     {
-      what: 'a tier whose multisampling was quietly dropped to two is caught',
+      // THE INJECTION TURNED ROUND WITH THE ANSWER. It used to drop a tier from
+      // four samples to two; two is what ships, so what has to be caught now is
+      // a tier quietly RAISED -- which is the same lever spent in the other
+      // direction, and the same 1.4 ms.
+      what: 'a tier whose multisampling was quietly raised to four is caught',
       caught: tiersOf(qualityText.replace(
-        "    scale: 1,\n    samples: 4,\n    sceneFormat: 'R11F_G11F_B10F',\n    bloom: 'half',",
-        "    scale: 1,\n    samples: 2,\n    sceneFormat: 'R11F_G11F_B10F',\n    bloom: 'half',",
-      )).some((t) => t.samples !== ({ oltre: 4, alto: 4, medio: 4, basso: 2 })[t.id]),
+        '    samples: 2,\n    sceneFormat:',
+        '    samples: 4,\n    sceneFormat:',
+      )).some((t) => t.samples !== 2),
     },
     {
       what: "RGBA8 is caught losing the sun's disc",
@@ -229,14 +233,24 @@ for (const format of formats.filter((f) => f.shipped)) {
 report.line(`  ${formats.filter((f) => !f.shipped).map((f) => f.name).join(', ') || 'none'} `
   + 'in the table and out of the ladder: allocatable by name for a measurement, never by fallback');
 
-// WHAT THE TIERS ARE HELD TO, LITERALLY. The multisampling is four everywhere but
-// the lowest tier, and that is a question standing with the committente and not a
-// lever anybody may spend quietly; the pixel is the same on every tier because
-// the range of the light is not a tier's to change.
+// WHAT THE TIERS ARE HELD TO, LITERALLY.
+//
+// THE MULTISAMPLING IS TWO EVERYWHERE NOW, AND THE QUESTION THIS GUARD WAS
+// HOLDING OPEN IS ANSWERED. It said: «four everywhere but the lowest tier, and
+// that is a question standing with the committente and not a lever anybody may
+// spend quietly». He spent it -- E-DECISIONI14 (2), «anti-aliasing: la
+// raccomandazione», which is two samples on the borders of the cubes and the
+// milliseconds that frees put on the sampling of the ray. What made it cheap to
+// answer is that the ground stopped being triangles: multisampling is charged
+// per triangle EDGE, and four samples were buying 3.75 ms of softness on
+// 172 608 of them where they now buy 1.39 on the borders of one box.
+//
+// The pixel is still the same on every tier, because the range of the light is
+// not a tier's to change, and THAT half of this table has not moved.
 const WRITTEN = {
-  oltre: { samples: 4, sceneFormat: 'R11F_G11F_B10F' },
-  alto: { samples: 4, sceneFormat: 'R11F_G11F_B10F' },
-  medio: { samples: 4, sceneFormat: 'R11F_G11F_B10F' },
+  oltre: { samples: 2, sceneFormat: 'R11F_G11F_B10F' },
+  alto: { samples: 2, sceneFormat: 'R11F_G11F_B10F' },
+  medio: { samples: 2, sceneFormat: 'R11F_G11F_B10F' },
   basso: { samples: 2, sceneFormat: 'R11F_G11F_B10F' },
 };
 report.check(tiers.length === Object.keys(WRITTEN).length,

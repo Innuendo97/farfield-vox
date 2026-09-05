@@ -1,6 +1,7 @@
 import {
   BLADE, BLADES_PER_VOXEL, CHUNK, MANTO, MATERIAL, NO_COLUMN, PIGMENT, PLATEAU, SUB, VOXEL,
-  CAMPO, CAMPO_BIAS, CAMPO_FAR, CAMPO_FAR_BLADE, CAMPO_FAR_RATIO, CAMPO_FAR_SHIFT,
+  CAMPO, CAMPO_BIAS, CAMPO_BLADE_CEIL, CAMPO_FAR, CAMPO_FAR_BLADE, CAMPO_FAR_RATIO,
+  CAMPO_FAR_SHIFT,
   CAMPO_MATERIAL, CAMPO_PRESENT, CAMPO_RUNG, CAMPO_SOIL_WALL,
   campoDecode, campoFarTile, campoGroundByte, campoHeights, campoSlimCode, campoSlimEighths,
   campoSlot, campoTile, campoTintByte, campoTintOf, campoTopStep, chunkColumns, columnSpec,
@@ -27,12 +28,12 @@ import { reporter, selfTest } from './lib.mjs';
 //      shader computes, through campoSlot's own toroidal wrap. A guard that
 //      only walked the texels would pass a picture that was right where it was
 //      written and wrote it in the wrong place.
-//   3. THE PYRAMID IS THE TALLEST CHILD, WHOLE. The traversal skips a cell when
-//      its top is under the ray, so a level that under-reported by one unit
-//      would cut the tops off blades at a distance -- and nobody would see that
-//      as a DEFECT, it would read as level of detail. And what it hands back
-//      has to be ONE COLUMN's four bytes and not four maxima, because a pixel
-//      that stops at a coarse cell is shaded with them.
+//   3. THE PYRAMID CARRIES ONE COLUMN, AND THE BOUND IT GIVES IS SAFE. A coarse
+//      cell is the child with the highest GROUND, whole -- a sample of the mat
+//      and not a maximum of it, because a maximum draws a flat meadow -- and
+//      what the traversal trusts is that ground plus the ladder's own ceiling.
+//      A cell that under-reported would cut the tops off blades at a distance,
+//      and nobody would see that as a DEFECT: it would read as level of detail.
 //   4. THE TINT IS THE PIGMENT'S OWN PURE TWIN, at the integer column the
 //      fragment of material.js samples it at, to the byte it is stored in.
 //   5. THE PACKING HOLDS THE LAW. Two bits for a width the law draws in
@@ -258,7 +259,16 @@ report.check(farWrong === 0 && farPresent > 0 && farBeyond > 0,
   + `${farWrong} disagree`);
 
 // --------------------------------------------------------------------------
-// 3. THE PYRAMID IS THE TALLEST CHILD, WHOLE.
+// 3. THE PYRAMID IS THE CHILD WITH THE HIGHEST GROUND, WHOLE -- AND THE BOUND
+//    IT GIVES THE TRAVERSAL IS STILL CONSERVATIVE.
+//
+// Two assertions and they are not the same one. The first is that the reduction
+// copies ONE column's four bytes and the right one; the second is that
+// `ground + CAMPO_BLADE_CEIL`, which is what the ray trusts at a coarse cell,
+// is not under the true top of anything inside that cell. A sampled blade over
+// a maximum ground is only safe because of the second, and a ladder that grew a
+// rung would break it here rather than by cutting the tops off blades at a
+// distance.
 // --------------------------------------------------------------------------
 let pyramidBad = 0;
 {
@@ -279,7 +289,6 @@ let pyramidBad = 0;
       if (done) break;
     }
   }
-  const topSub = (o) => (tile.data[o + 1] - CAMPO_BIAS) * CAMPO_RUNG + tile.data[o];
   for (let level = 1; level < CAMPO.levels; level += 1) {
     const size = CAMPO.tile >> level;
     const src = CAMPO.tiles.origins[level - 1];
@@ -291,7 +300,7 @@ let pyramidBad = 0;
         for (let dj = 0; dj < 2; dj += 1) {
           for (let di = 0; di < 2; di += 1) {
             const s = ((src.y + j * 2 + dj) * CAMPO.tiles.width + (src.x + i * 2 + di)) * 4;
-            const rank = tile.data[s + 2] ? topSub(s) : -Infinity;
+            const rank = tile.data[s + 2] ? tile.data[s + 1] : -Infinity;
             if (rank > best) { best = rank; bo = s; }
           }
         }
@@ -305,8 +314,46 @@ let pyramidBad = 0;
   }
 }
 report.check(pyramidBad === 0,
-  'every coarse cell is the WHOLE word of the tallest column under it',
+  'every coarse cell is the WHOLE word of the column with the highest ground',
   pyramidBad ? `${pyramidBad} are not` : '');
+
+// AND THE BOUND IS NEVER UNDER WHAT IS INSIDE THE CELL.
+let bound = 0;
+let boundCells = 0;
+let slack = 0;
+{
+  const tile = campoTile(0, 1, RADIUS);
+  const CEIL = Math.round(CAMPO_BLADE_CEIL / CAMPO.unitBlade);
+  for (let level = 1; level < CAMPO.levels; level += 1) {
+    const size = CAMPO.tile >> level;
+    const dst = CAMPO.tiles.origins[level];
+    const step = 1 << level;
+    for (let j = 0; j < size; j += 1) {
+      for (let i = 0; i < size; i += 1) {
+        const o = ((dst.y + j) * CAMPO.tiles.width + (dst.x + i)) * 4;
+        if (!tile.data[o + 2]) continue;
+        boundCells += 1;
+        const said = (tile.data[o + 1] - CAMPO_BIAS) * CAMPO_RUNG + CEIL;
+        let worst = -Infinity;
+        for (let dj = 0; dj < step; dj += 1) {
+          for (let di = 0; di < step; di += 1) {
+            const s = ((j * step + dj) * CAMPO.tile + (i * step + di)) * 4;
+            if (!tile.data[s + 2]) continue;
+            const top = (tile.data[s + 1] - CAMPO_BIAS) * CAMPO_RUNG + tile.data[s];
+            if (top > worst) worst = top;
+          }
+        }
+        if (worst > said) bound += 1;
+        else slack = Math.max(slack, said - worst);
+      }
+    }
+  }
+}
+report.check(bound === 0,
+  'and the ground plus the ladder ceiling is over every top inside that cell',
+  bound ? `${bound} of ${boundCells} are not`
+    : `${boundCells} coarse cells, the loosest by `
+      + `${(slack * CAMPO.unitBlade * 100).toFixed(1)} cm`);
 
 // --------------------------------------------------------------------------
 // 4 to 8. THE PACKING, THE UNITS, THE ATLAS, THE WRAP AND THE TWO WINDOWS.

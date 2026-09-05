@@ -99,6 +99,7 @@ function asked() {
     campoSteps: Number(query.get('campopassi')) > 0 ? Number(query.get('campopassi')) : null,
     campoTop: query.get('campotop') === null ? null : Number(query.get('campotop')),
     campoLod: Number(query.get('campolod')) > 0 ? Number(query.get('campolod')) : null,
+    campoDither: query.get('campodither') === null ? null : Number(query.get('campodither')),
     campoShadow: query.get('campoombra') !== '0',
     campoDepth: query.get('campodepth') !== '0',
     campoDebug: Number(query.get('campodebug')) || 0,
@@ -180,7 +181,17 @@ const layer = {
         radius: PLATEAU,
         sheets: layer.voxel.settings.sheet,
         depth: wanted.campoDepth,
-        rays: wanted.campoRays ?? 2,
+        // ONE RAY, AND IT IS A MEASUREMENT AND NOT A RETREAT. E-DECISIONI14
+        // spends the 1.4 ms that two multisamples free on «il campionamento
+        // del raggio», and the first thing this unit built was the second ray:
+        // a rotated grid of sub-pixel samples through the same fragment. It
+        // was measured, on the walk, against the cubes -- and a second ray
+        // moves the scintillation by ONE AND A HALF PER CENT while costing
+        // fifteen milliseconds. What actually samples the ray properly is not
+        // taking two of them: it is not putting geometry under the ray that is
+        // finer than the pixel, which is uLodGain above, and which is free.
+        // The handle stays so the number can be taken again.
+        rays: wanted.campoRays ?? 1,
         // The engine's own worker seat, handed in rather than imported, so that
         // the window holds no opinion about how a thread is started.
         worker: runInWorker,
@@ -195,6 +206,7 @@ const layer = {
       if (wanted.campoSteps) u.uSteps.value = wanted.campoSteps;
       if (wanted.campoTop !== null) u.uTopLevel.value = wanted.campoTop;
       if (wanted.campoLod) u.uLodGain.value = wanted.campoLod;
+      if (wanted.campoDither !== null) u.uDither.value = wanted.campoDither;
       u.uHorizon.value = wanted.campoShadow ? 1 : 0;
       u.uDebug.value = wanted.campoDebug;
       layer.campo.start(SPAWN.x, SPAWN.z);

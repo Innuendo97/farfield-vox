@@ -14,7 +14,7 @@
 //   2  grass           the only thing here drawn in real time, and the only
 //                      thing whose cost grows with where the eye is pointed
 //   3  bloom           a coarser halo, never no halo
-//   4  multisampling   four samples down to two
+//   4  multisampling   two samples on every tier (E-DECISIONI14)
 //
 // Two more were named and are not taken, for the same reason: they are worth
 // nothing here. Anisotropy in this world is set on exactly two surfaces, the
@@ -101,7 +101,15 @@ export const TIERS = [
     // more of the one thing that was rationed for the machines that cannot:
     // never a feature the other tiers do not have.
     scale: 1,
-    samples: 4,
+    // TWO SAMPLES ON EVERY TIER, AND IT IS THE COMMITTENTE'S OWN DECISION
+    // (E-DECISIONI14: «anti-aliasing: la raccomandazione», which is two samples
+    // on the borders of the cubes). Multisampling is charged per TRIANGLE EDGE,
+    // and the ground stopped being made of edges: the meadow is a ray-marched
+    // field now, so four samples bought 1.39 ms of softness on the box's own
+    // borders where they used to buy 3.75 ms of it on 172 608 triangles of
+    // blade. What is left for them to antialias is the masonry and the
+    // flowers, and two is what the low tier has always shipped.
+    samples: 2,
     sceneFormat: 'R11F_G11F_B10F',
     bloom: 'half',
     grass: { density: 1.3, radius: 16 },
@@ -115,7 +123,15 @@ export const TIERS = [
     id: 'alto',
     label: 'Alta',
     scale: 1,
-    samples: 4,
+    // TWO SAMPLES ON EVERY TIER, AND IT IS THE COMMITTENTE'S OWN DECISION
+    // (E-DECISIONI14: «anti-aliasing: la raccomandazione», which is two samples
+    // on the borders of the cubes). Multisampling is charged per TRIANGLE EDGE,
+    // and the ground stopped being made of edges: the meadow is a ray-marched
+    // field now, so four samples bought 1.39 ms of softness on the box's own
+    // borders where they used to buy 3.75 ms of it on 172 608 triangles of
+    // blade. What is left for them to antialias is the masonry and the
+    // flowers, and two is what the low tier has always shipped.
+    samples: 2,
     sceneFormat: 'R11F_G11F_B10F',
     bloom: 'half',
     grass: { density: 1, radius: 12 },
@@ -129,7 +145,15 @@ export const TIERS = [
     id: 'medio',
     label: 'Media',
     scale: 0.85,
-    samples: 4,
+    // TWO SAMPLES ON EVERY TIER, AND IT IS THE COMMITTENTE'S OWN DECISION
+    // (E-DECISIONI14: «anti-aliasing: la raccomandazione», which is two samples
+    // on the borders of the cubes). Multisampling is charged per TRIANGLE EDGE,
+    // and the ground stopped being made of edges: the meadow is a ray-marched
+    // field now, so four samples bought 1.39 ms of softness on the box's own
+    // borders where they used to buy 3.75 ms of it on 172 608 triangles of
+    // blade. What is left for them to antialias is the masonry and the
+    // flowers, and two is what the low tier has always shipped.
+    samples: 2,
     sceneFormat: 'R11F_G11F_B10F',
     bloom: 'quarter',
     grass: { density: 0.7, radius: 12 },
