@@ -1,6 +1,7 @@
 import { AREA_CENTER, MONOLITHS, PLATFORM, STAIRS } from '../layout.js';
 import {
-  BASE_LEVEL, pathCentreX, pathCoord, pathEdge, pathHalfWidth, pathRun,
+  BASE_LEVEL, pathCentreSlope, pathCentreX, pathCoord, pathEdge, pathHalfWidth,
+  pathOffset, pathRun,
 } from '../terrain-field.js';
 import {
   BLADE, BLADES_PER_VOXEL, MATERIAL, NO_COLUMN, SUB, VOXEL,
@@ -828,7 +829,7 @@ function moundSeat(cx, cz) {
   // standing beside the paving -- which is what the reference shows, and what
   // EARTH.toPath exists to paint -- and no mass there at all.
   if (pathRun(z) > 0
-    && Math.abs(x - pathCentreX(z))
+    && Math.abs(pathOffset(x, z))
       < pathHalfWidth(z) + PATH.wander + reach * (1 + MOUND.lean)) return null;
 
   const c = Math.cos(ang);
@@ -884,7 +885,7 @@ export function bladeHeightAt(bx, bz) {
 /** How far a point stands from the edge of the paving, in metres. Negative on it. */
 function pathEdgeGap(x, z) {
   if (pathRun(z) <= 0) return Infinity;
-  const s = x - pathCentreX(z);
+  const s = pathOffset(x, z);
   return Math.abs(s) - pathEdge(z, s >= 0 ? 1 : -1);
 }
 
@@ -1401,8 +1402,16 @@ export function pathVerge(z) {
 function corridorAt(x, z) {
   if (pathRun(z) <= 0) return -1;
   const centre = pathCentreX(z);
-  const left = centre - pathEdge(z, -1);
-  const right = centre + pathEdge(z, 1);
+  // THE ROW'S TWO ENDS ARE IN EASTING AND THE HALF WIDTHS ARE ACROSS, so the
+  // two are not the same number once the axis turns: a corridor of one width
+  // crossing a row at an angle covers sec(slope) times as much of that row.
+  // Without this the verges would still be counted in whole columns -- the
+  // point of solving the ends -- but the corridor they are counted off would
+  // pinch at every turn.
+  const slope = pathCentreSlope(z);
+  const sec = Math.sqrt(1 + slope * slope);
+  const left = centre - pathEdge(z, -1) * sec;
+  const right = centre + pathEdge(z, 1) * sec;
   if (x < left || x > right) return -1;
   // AND THE VERGE IS COUNTED IN COLUMNS AND NOT IN METRES, which is the whole
   // reason this row's two ends are solved rather than a distance being
@@ -1514,10 +1523,9 @@ function buildFramed() {
     // What it costs is measured rather than assumed and it is in the verbale of
     // U-ERBA-2: the overlap is counted here, and the worst riser the corridor
     // cuts into that mass is read on the disc that ships.
-    const centre = pathCentreX(z);
     const clear = pathHalfWidth(z) + PATH.wander + along;
     const x = f.x;
-    if (pathRun(z) > 0 && Math.abs(x - centre) < clear) framedTally.overlapping++;
+    if (pathRun(z) > 0 && Math.abs(pathOffset(x, z)) < clear) framedTally.overlapping++;
     // AND NOTHING GROWS ON THE WAY IN OR THROUGH THE MASONRY. The way in is the
     // committente's own reading named twice -- the seven steps are all in view
     // in the reference and none in ours -- and a mound rising through a block is
