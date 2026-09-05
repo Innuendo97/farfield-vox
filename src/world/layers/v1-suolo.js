@@ -1,5 +1,5 @@
 import { createGroundVoxel } from '../ground-voxel.js';
-import { CENTRE, PLATEAU, createCampo, runInWorker } from '../voxel/index.js';
+import { PLATEAU, createCampo, runInWorker } from '../voxel/index.js';
 import { SPAWN } from '../layout.js';
 
 // THE SOIL. Owned by V1.

@@ -206,16 +206,19 @@ const FRAGMENT = /* glsl */`
   // cells coarser and is asked at level L - 3 -- so the index the traversal
   // computed is the index both of them want, and the only thing that changes is
   // which sampler and which origin answer it.
+  //
+  // ONE RETURN AND NOT TWO, which is not a taste: the translator that turns
+  // this into HLSL cannot prove that a function whose branches both return has
+  // initialised its result, and warns about it on every compile. One value,
+  // written on both paths, and the warning goes with the ambiguity.
   vec4 cellAt(ivec2 cell, int level, bool near) {
-    if (near) {
-      int mask = (SIDE >> level) - 1;
-      ivec2 t = ivec2((cell.x + WRAP_BIAS) & mask, (cell.y + WRAP_BIAS) & mask);
-      return texelFetch(tField, ivec2(uLevelOrigin[level]) + t, 0);
-    }
-    int fl = level - FAR_SHIFT;
-    int mask = (FAR_SIDE >> fl) - 1;
+    int fl = near ? level : level - FAR_SHIFT;
+    int mask = (near ? (SIDE >> level) : (FAR_SIDE >> fl)) - 1;
     ivec2 t = ivec2((cell.x + WRAP_BIAS) & mask, (cell.y + WRAP_BIAS) & mask);
-    return texelFetch(tFar, ivec2(uFarOrigin[fl]) + t, 0);
+    vec4 got = vec4(0.0);
+    if (near) got = texelFetch(tField, ivec2(uLevelOrigin[level]) + t, 0);
+    else got = texelFetch(tFar, ivec2(uFarOrigin[fl]) + t, 0);
+    return got;
   }
 
   bool insideNear(vec2 xz) {
