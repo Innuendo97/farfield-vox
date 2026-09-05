@@ -81,67 +81,267 @@ export function smoothstep(edge0, edge1, x) {
 
 // ------------------------------------------------------------------ the path
 
-// Where the path runs, in metres: a ramp between two northings, the far end at
-// the foot of the stair and the near one at the front of the frame.
+// WHERE THE PATH RUNS, AS A CURVE READ OFF THE REFERENCE AND NOT AS A SHAPE.
 //
-// THE NEAR END IS MEASURED ON THE DAY REFERENCE NOW, AND IT USED TO BE READ.
-// What stood here said the centreline "passes under the walker a little west of
-// the axis" -- nearX at -0.74 -- and that sentence was taken off the picture by
-// eye, without a projector. Held up against the reference through the fitted
-// frame it is wrong by more than a metre: the corridor the day reference draws
-// stands 1.0 to 1.3 m EAST of ours over the whole stretch the frame resolves.
+// THE RAMP HAS FALLEN, AND IT WAS SEEN TO FALL BEFORE THE RULER SAID SO. What
+// stood here was a smoothstep between two northings, fitted by HOLDING that
+// shape and moving one of its two ends; the 0.20 m rms it could not account for
+// was written off as the wander of a hand-drawn verge. It was not wander.
+// Measured row by row with no shape assumed, the reference's corridor MEANDERS:
+// four turns over the thirteen metres the frame resolves, 1.33 m of lateral
+// travel end to end, and one single stretch 0.75 m long that a ruler would call
+// straight. Against that reading the old ramp is 0.45 m rms out and 1.12 m out
+// at its worst -- and its worst is at the NEAR end, under the walker's feet,
+// where the reference puts the corridor 1.14 m west of where the ramp put it,
+// on the other side of the eye. That end had never been measured: the rows that
+// would measure it are the rows the walker stands in, and the ramp reached them
+// by extrapolation.
 //
-// THE RULER, AND WHY IT IS NOT THIS FILE'S OWN NUMBERS. For every row of the
-// picture, the two crossings of 50 % greenness either side of the corridor,
-// smoothed over 15 cm along the row and taken to the plane y = 0 through
-// POSE_VOX_DAY; the centre is the midpoint of the pair. It is defined on the
-// image being measured, it is the same test on the reference and on a render,
-// and it is the point the corridor is looked at. A band counted off OUR
-// centreline measures, on the reference, half meadow -- which is what every
-// lateral reading of this campaign did until it was caught.
+// THE RULER IS U-SENT-3's, WITH TWO MORE LEGS. Per row of the picture, the two
+// crossings of half a share of greenness either side of the corridor -- smoothed
+// over 15 cm along the row, found on the image being measured and on no number
+// of this world -- taken to the plane y = 0 through POSE_VOX_DAY; and inside
+// that pair, the spatial centroid of the pale stone and the spatial centroid of
+// stone and earth together. Three estimates of one axis that fail in different
+// ways, and their disagreement is the reading's own error bar.
+// fondazione/lav/s5-asse.py.
 //
-// THE READING, over 42 rows from z = -12.25 to z = +6.08. Fitted in the form
-// this line already has, with the stair end held where the stair is:
+// WHAT THE PICTURE CAN AND CANNOT SEE. North of z = -3.6 the reference's own
+// staircase is in the way: projected on the ground plane its lowest riser meets
+// the earth at z = -4.0, eight metres south of where layout.js puts ours, so
+// every row past that reads worked stone and not corridor. Nine of the 42 rows
+// the old fit stood on were those rows, which is why its far end landed where it
+// did. South of z = +9.35 there is no more picture. Inside that window the
+// walker hides the west verge over two short stretches and the panel hides the
+// east verge under itself; those rows are read past or skipped, and which is
+// which is written in the bench.
 //
-//     nearX  = +0.617 +/- 0.043 m       residual 0.20 m rms
-//     today's pair, unfitted                      1.00 m rms
+// THE ERROR BAR IS MEASURED AND NOT POSTULATED. The same ruler turned on a
+// render of THIS world, where the axis is arithmetic and not a reading, comes
+// back 0.092 m rms per row -- the 0.101 U-SENT-3 measured, reproduced -- and no
+// better than 0.04 m on a band however many rows go into it, because the verge
+// wanders over a whole block of grass at a time and that does not average away.
+// Those two numbers weight the reading below, and they are why the curve is the
+// STIFFEST one that stays within two sigma of every measured point rather than
+// the one that runs through them: at chi squared per degree of freedom of one
+// the curve chases seven-centimetre humps, which is one sigma of the reading,
+// and a law that carries those writes noise into a source file.
 //
-// and with BOTH ends free the far one comes back at +0.265 +/- 0.083 against
-// the 0.25 the stair actually stands at (layout.js STAIRS.x). So the far end is
-// NOT refitted: the reference's corridor points at the staircase, and that
-// agreement -- 1.5 cm, a fifth of the reading's own error, on a measurement
-// that knows nothing of layout.js -- is evidence for the anchor rather than a
-// reason to move it.
+// THE FOUR TURNS, with where they sit and how tight they are:
 //
-// THE RESIDUAL IS THE REFERENCE'S OWN EDGE AND NOT THE INSTRUMENT'S. Run on a
-// render of this world, the same ruler recovers this file's own law to 3 cm
-// (nearX -0.708 read against -0.740 written, 0.10 m rms). Twice that on the
-// reference is the wander of a hand-drawn verge, and it is why the third
-// decimal is not written down here: 0.62 is what a 4 cm error bar can say.
+//     z = -2.00   x = +0.665   R 1.90 m   round to the east
+//     z = +0.75   x = +0.102   R 1.35 m   round to the west
+//     z = +4.00   x = +0.757   R 1.79 m   round to the east
+//     z = +8.25   x = -0.556   R 2.30 m   round to the west
 //
-// AND THE RAMP RUNS THE OTHER WAY NOW. It used to drift west by a metre as it
-// came toward the eye; it drifts east by four tenths. The shape of the ramp is
-// untouched -- a straight line through the same 42 rows fits no better than the
-// smoothstep (0.198 against 0.202 m rms), so there is nothing in the reading to
-// buy a new form with, and the fragment that mirrors this function would have
-// had to be rewritten to spend it.
-const PATH_STAIR_Z = -14.3;
-const PATH_NEAR_Z = 8.8;
-const PATH_STAIR_X = 0.25;
-const PATH_NEAR_X = 0.62;
+// and the arcs between them are 0.56, 0.66 and 1.14 m of travel over 2.75, 3.25
+// and 2.75 m of northing. The steepest the axis ever runs is 0.84 m of easting
+// per metre of northing, at z = +6.9; the tightest radius anywhere is 0.91 m.
+//
+// THE TABLE IS THE MEASUREMENT AND THE TWO TAILS ARE NOT, and which is which is
+// marked. Between z = -3.75 and +9.25 the entries are the measured curve sampled
+// at the metre, and a natural cubic through them repeats that curve to 0.054 m
+// -- half a voxel, and inside the reading's own error, so the sampling costs
+// nothing the reading could have told apart.
+const PATH_CENTRE = [
+  // NOT MEASURED. The staircase covers these rows. The far end is held at
+  // STAIRS.x -- E-SENT3's anchor, and the one number here this unit did not
+  // read -- and what runs between it and the first measured row is a straight
+  // line between the two, which the spline rounds off at both ends.
+  [-14.30, 0.250],
+  [-12.14, 0.250],
+  [-8.00, 0.375],
+  // MEASURED, off farfield-day-voxel-target.png through the fitted camera:
+  // 217 rows gathered into 32 bins of 0.4 m of northing. fondazione/lav has the
+  // bench: s5-asse.py reads a row, s5-curva.py makes the curve, s5-tavola.py
+  // samples it here.
+  [-3.75, 0.504],
+  [-2.75, 0.529],
+  [-1.75, 0.678],
+  [-0.75, 0.415],
+  [0.25, 0.211],
+  [1.25, 0.168],
+  [2.25, 0.454],
+  [3.25, 0.589],
+  [4.25, 0.771],
+  [5.25, 0.570],
+  [6.25, 0.475],
+  [7.25, -0.259],
+  [8.25, -0.556],
+  [9.25, -0.427],
+  // NOT MEASURED. Past the bottom of the frame, and it is the arc the last
+  // measured rows are in, continued and let go: the slope at the last knot,
+  // +0.203 m per metre, relaxed over the 3.5 m of northing the reference's own
+  // arcs run for. The corridor finishes the turn it is in and settles at +0.33
+  // rather than ruling off in a straight line or stopping dead at a kink. The
+  // spawn in layout.js stands on it.
+  [11.00, -0.129],
+  [13.00, 0.072],
+  [16.00, 0.222],
+  [22.00, 0.313],
+];
 
 /**
- * The centreline's four numbers, published.
+ * The second derivatives of the natural cubic through PATH_CENTRE, solved once
+ * at load and never again.
  *
- * THE FRAGMENT THAT PAINTS THE PAVING HAS TO SOLVE THIS LINE, and GLSL cannot
- * call JavaScript. So the four travel as uniforms and the shader mirrors
- * pathCentreX below rather than carrying an attribute: the paving is the top of
- * a column of the meadow's own store now, and a strip coordinate baked into a
- * vertex would be a second opinion about where the centreline is, on a mesh that
- * is rebuilt every time the disc is laid.
+ * A NATURAL CUBIC AND NOT A CATMULL-ROM. Three readers care about this line's
+ * CURVATURE and not only its position -- how far off the axis a point stands,
+ * which is a foreshortening by the local normal; how wide the strip's frame has
+ * to reach; and the eye, at a turn -- and a Catmull-Rom's second derivative
+ * jumps at every knot it passes. This one is continuous everywhere, has no cusp
+ * anywhere, and passes THROUGH the measured values rather than near them.
+ *
+ * AND THE NATURAL END CONDITION IS WHAT MAKES THE OUTSIDE BEHAVE. The second
+ * derivative is nought at both ends of the table, so the curve is already
+ * straight when it arrives there and the linear continuation below joins it with
+ * the same value, the same slope AND the same curvature. Nothing built from this
+ * line meets a kink at either end.
+ */
+const PATH_CENTRE_D2 = (() => {
+  const n = PATH_CENTRE.length;
+  const h = new Float64Array(n - 1);
+  for (let i = 0; i < n - 1; i++) h[i] = PATH_CENTRE[i + 1][0] - PATH_CENTRE[i][0];
+  const m = new Float64Array(n);
+  const c = new Float64Array(n);
+  const d = new Float64Array(n);
+  for (let i = 1; i < n - 1; i++) {
+    const a = h[i - 1];
+    const b = 2 * (h[i - 1] + h[i]);
+    const rhs = 6 * ((PATH_CENTRE[i + 1][1] - PATH_CENTRE[i][1]) / h[i]
+      - (PATH_CENTRE[i][1] - PATH_CENTRE[i - 1][1]) / h[i - 1]);
+    const den = b - a * c[i - 1];
+    c[i] = h[i] / den;
+    d[i] = (rhs - a * d[i - 1]) / den;
+  }
+  for (let i = n - 2; i >= 1; i--) m[i] = d[i] - c[i] * m[i + 1];
+  return m;
+})();
+
+/** Which span of PATH_CENTRE a northing falls in, clamped to the two ends. */
+function pathSpan(z) {
+  let lo = 0;
+  let hi = PATH_CENTRE.length - 2;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (z >= PATH_CENTRE[mid][0]) lo = mid; else hi = mid - 1;
+  }
+  return lo;
+}
+
+/** How fast the axis moves east per metre of northing. */
+export function pathCentreSlope(z) {
+  const i = pathSpan(z);
+  const z0 = PATH_CENTRE[i][0];
+  const z1 = PATH_CENTRE[i + 1][0];
+  const h = z1 - z0;
+  const zc = z < z0 ? z0 : z > z1 ? z1 : z;
+  const a = (z1 - zc) / h;
+  const b = (zc - z0) / h;
+  return (PATH_CENTRE[i + 1][1] - PATH_CENTRE[i][1]) / h
+    + ((1 - 3 * a * a) * PATH_CENTRE_D2[i] + (3 * b * b - 1) * PATH_CENTRE_D2[i + 1]) * h / 6;
+}
+
+/**
+ * Where the corridor's axis stands at a northing, in metres of easting.
+ *
+ * Beyond the table it continues in a straight line with the slope it arrives
+ * at, which is the curve's own continuation and not a second law: the natural
+ * end condition has already brought its curvature to nought there.
+ */
+export function pathCentreX(z) {
+  const last = PATH_CENTRE.length - 1;
+  if (z < PATH_CENTRE[0][0] || z > PATH_CENTRE[last][0]) {
+    const end = z < PATH_CENTRE[0][0] ? 0 : last;
+    const ze = PATH_CENTRE[end][0];
+    return PATH_CENTRE[end][1] + pathCentreSlope(ze) * (z - ze);
+  }
+  const i = pathSpan(z);
+  const z0 = PATH_CENTRE[i][0];
+  const z1 = PATH_CENTRE[i + 1][0];
+  const h = z1 - z0;
+  const a = (z1 - z) / h;
+  const b = (z - z0) / h;
+  return a * PATH_CENTRE[i][1] + b * PATH_CENTRE[i + 1][1]
+    + ((a * a * a - a) * PATH_CENTRE_D2[i] + (b * b * b - b) * PATH_CENTRE_D2[i + 1])
+    * h * h / 6;
+}
+
+/**
+ * How far a point stands from the axis, in metres, measured ALONG THE LOCAL
+ * NORMAL and not along a row of the world. Signed: east of the axis is positive.
+ *
+ * WHY IT IS NOT (x - centre), WHICH IS WHAT EVERY READER USED TO ASK FOR. On a
+ * straight axis the two are the same number. On a curved one they are not: at
+ * the steepest turn the axis runs 0.84 m of easting per metre of northing, and a
+ * corridor whose EASTING extent is held constant there has a perpendicular width
+ * of 0.77 of it -- so a path of one width would draw itself a quarter narrower
+ * at exactly the four places the eye is watching it turn. Dividing by the secant
+ * of the local slope holds the width across the whole run and lets the easting
+ * extent open where the corridor runs diagonally, which is what a path of
+ * constant width does.
+ *
+ * It is the first-order perpendicular distance and not the exact one, and what
+ * the difference costs is set by the radius of curvature: at the tightest turn,
+ * R = 0.91 m, a point one half width out lands 3 cm from where the exact foot of
+ * the normal would put it -- a third of a voxel, on a corridor whose own edge is
+ * allowed to wander fourteen centimetres.
+ */
+export function pathOffset(x, z) {
+  const s = pathCentreSlope(z);
+  return (x - pathCentreX(z)) / Math.sqrt(1 + s * s);
+}
+
+// THE STRIP'S FRAME, WHICH IS NOT THE AXIS AND NO LONGER PRETENDS TO BE.
+//
+// The paving is drawn out of two maps carried in a ribbon along the run, and the
+// fragment that reads them has to solve where a point falls ACROSS that ribbon.
+// It cannot call this file, so it mirrors a smoothstep between two northings out
+// of four uniforms -- which is exactly the shape that has just fallen, and a
+// meander is not in its reach. Rewriting that mirror to carry a twenty-one knot
+// spline puts a spline in a fragment shader; the other way is to stop asking the
+// ribbon to BE the axis and ask it only to CONTAIN the corridor, which costs
+// texels and no arithmetic at all.
+//
+// AND THE TEXELS ARE CHEAPER HERE THAN THEY LOOK, BECAUSE THE RIBBON HAD TO
+// GROW ANYWAY. Measuring the offset along the normal opens the corridor's
+// EASTING extent by the secant of the slope -- 1.31 at z = +6.9 -- so a ribbon
+// that followed the axis exactly would already need a half of 1.32 m against the
+// 1.25 it has, and 1.25 was short even before this unit: pathHalfWidth reaches
+// 1.20 in the flare at the stair, pathEdge 1.32 with its wobble, and the strip
+// has been clipping the outer three centimetres of the flare since the width was
+// refitted. What the straight frame costs on top of that is 18 cm.
+//
+// The four numbers are fitted to the curve above by minimising the worst case of
+// |curve - frame| plus the paving's own reach in easting, over the whole
+// northing the paving lives on (fondazione/lav/s5-telaio.mjs, s5-tel3.mjs): the
+// frame runs 0.51 m from the axis at its worst and the ribbon needs a half of
+// 1.506 m. See PATH_SKIN in src/world/path.js.
+//
+// The field names in PATH_LINE below are the ones the uniform is built out of
+// and they are historical: they were the two ends of the centreline back when
+// the centreline was a ramp between them.
+const PATH_FRAME_Z0 = 0.5;
+const PATH_FRAME_Z1 = 8.5;
+const PATH_FRAME_X0 = 0.55;
+const PATH_FRAME_X1 = -0.05;
+
+/** Where the strip's frame stands. The painter's line, and the fragment's. */
+export function pathFrameX(z) {
+  const t = smoothstep(PATH_FRAME_Z0, PATH_FRAME_Z1, z);
+  return PATH_FRAME_X0 + (PATH_FRAME_X1 - PATH_FRAME_X0) * t;
+}
+
+/**
+ * The frame's four numbers, published for the fragment that mirrors it.
+ *
+ * GLSL cannot call JavaScript, so the four travel as a uniform and the shader
+ * solves the same smoothstep rather than carrying a strip coordinate on a
+ * vertex: a coordinate baked into a vertex would be a second opinion about where
+ * the frame is, on a mesh that is rebuilt every time the disc is laid.
  */
 export const PATH_LINE = {
-  stairZ: PATH_STAIR_Z, nearZ: PATH_NEAR_Z, stairX: PATH_STAIR_X, nearX: PATH_NEAR_X,
+  stairZ: PATH_FRAME_Z0, nearZ: PATH_FRAME_Z1, stairX: PATH_FRAME_X0, nearX: PATH_FRAME_X1,
 };
 
 // Where the STONE stops, and it is now the bottom of the run.
@@ -160,14 +360,15 @@ export const PATH_LINE = {
 // deep. A literal here would be that sum copied, and a copy is what goes stale
 // the day the run is refitted.
 //
-// THE OTHER NORTHING STAYS WHERE IT IS, AND THERE IS A BASE FOR IT NOW.
-// pathCentreX reads PATH_STAIR_Z as one end of its ramp -- a fact about where
-// the path POINTS -- and it used to be held there for want of any measurement.
-// The ruler above supplies one and it holds the line: fitted free, the ramp's
-// far end lands 1.5 cm from where the stair stands. What it still cannot say is
-// the NORTHING, because the last rows it can read stop around z = -12 and past
-// them a metre of ground is two pixels of picture. So the two stay separated:
-// one is measured and confirmed, the other is out of the instrument's reach.
+// AND THIS NORTHING IS NOW THE ONE THE AXIS IS ANCHORED AT. The paragraph that
+// stood here said the axis POINTED at the stair through the far end of a ramp,
+// and that the free fit of that ramp landed 1.5 cm from where the stair stands.
+// The ramp is gone and so is that agreement: the nine rows that carried the far
+// end of the fit were reading the reference's own staircase, which is eight
+// metres nearer the eye than ours (see PATH_CENTRE above). What survives is the
+// ANCHOR and not the corroboration -- the axis is held at STAIRS.x from here
+// north because a corridor has to arrive at the steps, and the picture cannot
+// see that stretch to say otherwise.
 //
 // AND IT IS PUBLISHED NOW, because the generator needs this same northing and
 // must not sum it again: the paving stands at the meadow's own floor over the
@@ -184,11 +385,6 @@ export const PATH_STONE_END_Z = STAIRS.z + STAIRS.tread * STAIRS.steps;
 // It is not nought only because pathRun is a smoothstep and a smoothstep of zero
 // width has no value at its own edge.
 const PATH_STONE_FADE = 0.10;
-
-export function pathCentreX(z) {
-  const t = smoothstep(PATH_STAIR_Z, PATH_NEAR_Z, z);
-  return PATH_STAIR_X + (PATH_NEAR_X - PATH_STAIR_X) * t;
-}
 
 // THE CORRIDOR HAS NO RELIEF OF ITS OWN, and the four centimetre-sized numbers
 // that gave it one are gone rather than tuned to nought.
@@ -269,8 +465,11 @@ export const VERGE_OFFSET = 0.34;
 // as the irregularity it was measured as rather than as a curve fitted through
 // noise. Nothing was added to buy it.
 //
-// AND IT IS HALF WIDTHS IN METRES, so pathCoord and pathEdge below are unchanged
-// in shape and in every reader: what moved is the number they scale.
+// AND IT IS HALF WIDTHS IN METRES, MEASURED ACROSS THE CORRIDOR. They were the
+// same thing as half widths in easting while the axis ran north; they are not
+// any more, and pathCoord below divides an offset taken along the local normal
+// by these, so the corridor keeps this width through a turn instead of drawing
+// itself narrower there.
 //
 // AND THE WAIST IS GONE, WHICH IS THE COMMITTENTE'S OWN READING AND A
 // MEASUREMENT (E-DECISIONI11.4: «ancora troppo stretto: misurando in lontananza
@@ -314,7 +513,10 @@ const PATH_WIDTH = [
   [6.0, 0.83],
   [-3.0, 0.92],
   [-5.5, 1.20],
-  [PATH_STAIR_Z, 1.20],
+  // The far end is the stair's own northing, read from layout.js rather than
+  // typed: PATH_STAIR_Z used to hold this number as one end of a ramp, and the
+  // ramp is gone.
+  [STAIRS.z, 1.20],
 ];
 
 export function pathHalfWidth(z) {
@@ -350,9 +552,17 @@ export function pathEdge(z, side) {
   return pathHalfWidth(z) + 0.105 * wobble + 0.0434 * snoise(z * 0.91 + side * 13.0, 8.4);
 }
 
-/** Signed distance from the path centreline, normalised so 1 is the edge. */
+/**
+ * Signed distance from the corridor's axis, normalised so 1 is the edge.
+ *
+ * IT ASKS pathOffset AND NOT (x - centre), and the difference is the whole of
+ * what a curved axis costs its readers: the numerator is now a distance along
+ * the local normal, so what this returns is a fraction of the corridor's
+ * PERPENDICULAR half width at every northing and not only where the axis
+ * happens to run north.
+ */
 export function pathCoord(x, z) {
-  const s = x - pathCentreX(z);
+  const s = pathOffset(x, z);
   return s / pathEdge(z, s);
 }
 
