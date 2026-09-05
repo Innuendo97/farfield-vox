@@ -6,7 +6,7 @@ import {
   GRAIN, JOINT_LIP, PATH_SKIN, PEB_EDGE, RELIEF, SKIN_REACH,
   grainAt, grainTone, paveAt, skinPitch, skinToWorld,
 } from '../../src/world/path.js';
-import { smoothstep } from '../../src/world/terrain-field.js';
+import { pathCoord, pathRun, smoothstep } from '../../src/world/terrain-field.js';
 
 // Paints the three maps the corridor is drawn from.
 //
@@ -211,7 +211,19 @@ function paintTone() {
   let liftHi = 0;
   // The mean of `inSlot * lift`, which is the number the fragment writes its
   // wall term about so the term cannot move the level: RELIEF.mean in ../path.js.
+  //
+  // AND IT IS TAKEN OVER THE PAVING AND NOT OVER THE STRIP. The fragment runs on
+  // the tops of paving columns and nowhere else, so the mean it has to be
+  // written about is the mean over those. It used to be taken over the whole
+  // strip, which was near enough while the ribbon was a little wider than the
+  // corridor and stopped being so the day the ribbon stopped tracking the axis
+  // (PATH_SKIN.half in ../../src/world/path.js): meadow carries no slots, so a
+  // wider ribbon reports a smaller mean for a paving that has not changed, and
+  // the term would come back a dimmer. Taken this way the literal does not know
+  // how wide the ribbon is.
   let slotLift = 0;
+  let onPaving = 0;
+  let slotLiftAll = 0;
   for (let j = 0; j < TONE_H; j++) {
     const v = (j + 0.5) / TONE_H;
     for (let i = 0; i < TONE_W; i++) {
@@ -232,7 +244,12 @@ function paintTone() {
       // distance doubled because everything on this ruler is `second minus best`
       // (see crackDistance in ../../src/world/path.js).
       const depth = Math.max(0, (seat.gape - seat.jm) / 2);
-      slotLift += smoothstep(0, JOINT_LIP[1], depth) * (seat.lift / RELIEF.high);
+      const term = smoothstep(0, JOINT_LIP[1], depth) * (seat.lift / RELIEF.high);
+      slotLiftAll += term;
+      if (pathRun(z) > 0 && Math.abs(pathCoord(x, z)) <= 1) {
+        slotLift += term;
+        onPaving++;
+      }
       const code = Math.round(seat.tone * 255);
       const lift = Math.round(seat.lift / RELIEF.high * 255);
       out[(j * TONE_W + i) * 3] = code;
@@ -248,15 +265,18 @@ function paintTone() {
     + `${(px * 1000).toFixed(2)} x ${(pz * 1000).toFixed(2)} mm; runs ${lo}..${hi}, `
     + `relief ${liftLo}..${liftHi} of 255 `
     + `(${(liftHi / 255 * RELIEF.high * 1000).toFixed(1)} mm at the tallest)\n`);
-  const mean = slotLift / (TONE_W * TONE_H);
-  process.stdout.write(`  the wall term's own mean over the strip is ${mean.toFixed(4)}; `
+  const mean = onPaving ? slotLift / onPaving : 0;
+  process.stdout.write(`  the wall term's own mean over the PAVING is ${mean.toFixed(4)} `
+    + `(the paving is ${(onPaving / (TONE_W * TONE_H) * 100).toFixed(1)}% of the strip; `
+    + `over the whole strip the term would read `
+    + `${(slotLiftAll / (TONE_W * TONE_H)).toFixed(4)}); `
     + `RELIEF.mean carries ${RELIEF.mean.toFixed(4)}\n`);
   // AND IT IS REFUSED HERE AND NOT FOUND IN A FRAME. The wall term is written
   // about this mean so that it is contrast and not a dimmer; a literal that has
   // drifted from the map it describes moves the LEVEL of the paving, which is a
   // number two gates are ratios of.
   if (Math.abs(mean - RELIEF.mean) > 0.004) {
-    throw new Error(`RELIEF.mean is ${RELIEF.mean} and the strip's own mean is `
+    throw new Error(`RELIEF.mean is ${RELIEF.mean} and the paving's own mean is `
       + `${mean.toFixed(4)}: the wall term would move the level of the paving`);
   }
   // THE SECOND THING THAT MUST BE TRUE: the paving is pieces and not one stone.
