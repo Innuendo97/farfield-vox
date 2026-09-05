@@ -173,4 +173,5 @@ export {
   confineSteps,
   confineSurface,
   crestRise,
+  waterLevel,
 } from './confine.js';

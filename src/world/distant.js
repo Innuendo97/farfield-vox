@@ -7,6 +7,9 @@ import {
 } from '../core/sky.js';
 import { smoothstep } from './terrain-field.js';
 import { fogUniforms, FOG_GLSL, FOG_RADIANCE } from './air.js';
+// The edge of the world states where the ground is, and the water is a level in
+// it: see LAKES below for why the height is asked for rather than written.
+import { waterLevel } from './voxel/confine.js';
 
 // Everything past the meadow: the standing water, the ring of hills, and the
 // giants that are not in the reference framing.
@@ -326,9 +329,43 @@ const LAKE_FRAGMENT = /* glsl */`
 // The far half of each sheet is almost entirely fog by the time it is drawn,
 // which is where the very low contrast of the reference comes from. It is not
 // applied as a separate effect.
+//
+// ===========================================================================
+// AND THE HEIGHT IS NO LONGER ONE OF THOSE READINGS (E-DECISIONI19).
+//
+// The paragraph above is still true of WHERE each sheet lies on the plane, and
+// it is the reason those four numbers are untouched. It stopped being true of
+// how HIGH it lies the day the world grew a basin. Thirty centimetres over the
+// meadow was fitted when everything past the disc was a flat shell, and against
+// E-DECISIONI13's ground it is a lake floating four and a half metres over its
+// own bed -- and worse than floating, because a sheet ABOVE the meadow's own
+// floor covers the whole fall: at the rim of the plateau the terraces from
+// thirty five metres to the shore were not merely wrong, they were not visible
+// at all, and the world read as a meadow that stopped at a line.
+//
+// «Abbassare l'acqua alla conca» is the committente's answer, and the height is
+// now READ from the boundary rather than written here: waterLevel() is
+// basinProfile's own answer at the radius the two arms of water were fitted
+// through. There is no literal to drift. Two consequences worth saying out
+// loud, because both are improvements this file did not have to make:
+//
+//   -- THE NEAR EDGE OF THE WATER IS NO LONGER A RECTANGLE'S. It is wherever
+//      the terraces rise through the level, found by the depth buffer. The
+//      rectangles are now bigger than the lake in every direction that matters,
+//      which is what they should always have been: their job is to say where
+//      water is ALLOWED, and the ground says where it ends.
+//   -- THE SHEET IS DEEPER THE FURTHER OUT IT GOES, which is what a flat lake
+//      in a cone is. The old sheet was a constant thirty centimetres of nothing
+//      over a floor that never moved.
+//
+// WHAT MOVED WITH IT. Everything anchored to the old height, which is one
+// thing: the fog. LAKE_FRAGMENT hands fogAmount the fragment's own world y, so
+// the haze on the water follows the surface down by construction and there is
+// no second number to change. The reflection is a direction and knows no
+// height; the shore was never drawn.
 const LAKES = [
-  { x: -37, z: -104, width: 74, depth: 108, y: 0.30 },
-  { x: 14, z: -108, width: 58, depth: 116, y: 0.30 },
+  { x: -37, z: -104, width: 74, depth: 108, y: waterLevel() },
+  { x: 14, z: -108, width: 58, depth: 116, y: waterLevel() },
 ];
 
 function hexToLinear(hex) {

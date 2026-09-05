@@ -182,6 +182,32 @@ export const CONFINE = {
    */
   riser: 1,
 
+  /**
+   * WHERE THE STANDING WATER LIES, as the radius of the basin its surface is
+   * level with -- in metres, and NOT as a height.
+   *
+   * E-DECISIONI19, on the bivio E-PERF3 left open: «LAGO: abbassare l'acqua
+   * alla conca (distant.js +0,30 -> quota della conca a 110 m, -4,74)».
+   *
+   * A RADIUS AND NOT A HEIGHT, WHICH IS THE WHOLE POINT OF THE DIAL. The water
+   * was a literal in src/world/distant.js -- +0.30 m, read off the framing by
+   * V5 at a time when the ground beyond the disc was a SHEET and there was no
+   * fall for a lake to lie in. The day E-DECISIONI13 gave the world a basin,
+   * that literal became a lake floating four and a half metres over its own
+   * bed, and it went on floating because nothing tied the two numbers together.
+   * Written as a radius the tie cannot come undone: the surface IS basinProfile
+   * at this distance, so a refit of the basin carries the water with it and can
+   * never leave it hanging again.
+   *
+   * ONE HUNDRED AND TEN, WHICH IS WHERE THE WATER WAS READ. basinProfile is
+   * fitted THROUGH the two arms of standing water the reference shows, at 110.4
+   * and 108.9 m (see the fit above); the committente named the round number
+   * between them and it is the one carried here. The two sheets take ONE level
+   * between them and not one each: a basin holds one lake, and two sheets each
+   * at its own radius would stand 7.6 cm apart with a step in the water.
+   */
+  waterAt: 110,
+
   /** The ridge that closes the horizon. */
   crest: {
     /** Where the ground stops falling and starts climbing, in metres. */
@@ -272,6 +298,36 @@ export const CONFINE = {
  * the guard rather than by a circular import.
  */
 export const PLATEAU = CONFINE.plateau;
+
+/**
+ * THE HEIGHT OF THE STANDING WATER, in metres over the plateau's own floor.
+ *
+ * The one number src/world/distant.js is allowed to lay its two sheets at, and
+ * the reason it is a FUNCTION and not a constant anybody could copy: a lake is
+ * a level in a basin, so the only honest way to write it is to ask the basin.
+ *
+ * IT IS DELIBERATELY NOT QUANTISED, and the guard asserts that it is not. The
+ * fall is cut into terraces of one voxel; a surface put ON a tread would share
+ * a plane with it over a whole annulus of ground and the two would fight for
+ * every pixel of it. Left where the fitted cone actually passes, it falls
+ * INSIDE a riser -- 4.1 cm under the last dry tread and 5.9 cm over the first
+ * drowned one, as it stands -- so the water laps against the face of a step,
+ * which is what a shore is. Nothing is cantilevered over it and nothing gapes
+ * under it, because the ground it meets is continuous and this is a level
+ * through it, not a second surface fitted beside it.
+ *
+ * AND THE SHORE IS NO LONGER DRAWN, IT IS FOUND. Where the water's edge appears
+ * used to be the near edge of a rectangle V5 read off the framing; it is now
+ * wherever the terraces come up through this level, decided by the depth buffer
+ * from two pieces of arithmetic that both answer basinProfile. On the open
+ * bearings that is 110.16 m, and it moves with the ridge where the ridge wades
+ * in, which no rectangle could have done.
+ *
+ * @returns {number} metres, negative: the basin's own depth at CONFINE.waterAt
+ */
+export function waterLevel() {
+  return basinProfile(CONFINE.waterAt);
+}
 
 /**
  * The sum of the three waves at one bearing, in [-1, 1].

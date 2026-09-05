@@ -1,10 +1,10 @@
 import {
   CAMPO_BIAS, CAMPO_FAR, CENTRE, CONFINE, NO_COLUMN, PLATEAU, VOXEL,
-  basinProfile, campoGroundByte, columnSpec, confineSteps, crestRise,
+  basinProfile, campoGroundByte, columnSpec, confineSteps, crestRise, waterLevel,
 } from '../../src/world/voxel/pure.js';
 import { POSE_VOX_DAY } from '../../src/core/poses.js';
 import { TUNING } from '../../src/core/presence.js';
-import { reporter, selfTest } from './lib.mjs';
+import { read, reporter, selfTest } from './lib.mjs';
 
 // GUARD-CONFINE -- THE EDGE OF THE WORLD IS GROUND, AND IT IS THE RIGHT GROUND.
 //
@@ -47,6 +47,15 @@ import { reporter, selfTest } from './lib.mjs';
 //   8. AND THE BASIN IS STILL THE FITTED ONE. It moved seat into confine.js;
 //      the numbers it answers are pinned here against the readings E-V5f took,
 //      so a move of seat can never have been a change of shape.
+//   9. AND THE WATER LIES IN IT (E-DECISIONI19). «Il camminatore si ferma dove
+//      comincia l'ACQUA» is only a boundary if the water is where the ground
+//      says it is: a lake fitted against a framing, in a file that knows
+//      nothing about the fall, floated four and a half metres over its own bed
+//      for as long as nobody asked it. So this asks twice -- of the SOURCE,
+//      that src/world/distant.js reads its level off the boundary instead of
+//      carrying a number of its own, and of the GROUND, that the terraces come
+//      down and meet that level with neither a void under the last dry tread
+//      nor a step over it that a body could not take.
 // ===========================================================================
 
 const report = reporter('guard-confine -- the edge of the world is ground');
@@ -264,6 +273,131 @@ report.check(basinOff === 0 && basinProfile(20) === 0,
   pinned.map(([r]) => `${r} m: ${basinProfile(r).toFixed(3)}`).join('  '));
 
 // --------------------------------------------------------------------------
+// 9. AND THE WATER LIES IN THE BASIN, AND THE TERRACES REACH IT.
+//
+// TWO QUESTIONS, AND THE FIRST IS ABOUT THE SOURCE ON PURPOSE. The defect
+// E-DECISIONI19 named was not a wrong height, it was an UNTIED one:
+// src/world/distant.js carried `y: 0.30`, read off the framing by V5 when the
+// world past the disc was a flat shell, and no measurement anywhere could
+// notice that the ground had since dropped out from under it. A guard that only
+// checked the NUMBER would go green again the day somebody typed -4.74 into
+// that file by hand -- and drift the day the basin was refit. So the first leg
+// reads the file and asks that both sheets take their height from waterLevel(),
+// which is the boundary's own answer and cannot be typed wrong.
+//
+// AND THE OTHER TWO ASK THE GROUND.
+//
+// Every height out there is a whole number of voxels (leg 7), so a level laid
+// through the world lands in one of two places. INSIDE a riser: the water laps
+// the face of a step, that face is the shore, and the clearance to the tread
+// above and to the tread below add up to one riser. Or ON a tread: a whole
+// annulus of ground and a plane share a single height and fight for every pixel
+// of it, on every bearing at once. The first of the two legs asks that it is
+// the former, and it asks it of the number alone, which is why it holds
+// everywhere and not only where somebody looked.
+//
+// The second walks it out, on THE BEARINGS THE RIDGE STANDS ASIDE FOR. Those
+// are `gateFrom` and inwards, where the gate is shut on the crest and the
+// ground does nothing but fall -- the bearings the lake is on, and the ones
+// E-DECISIONI13's «si ferma dove comincia l'acqua» is about. Further out the
+// crest wades in, the ground climbs back over the level and meets it a second
+// time on a riser of FOUR voxels, and that is not a shore and not a defect: it
+// is leg 3, where the walker is stopped by a hillside on purpose.
+// --------------------------------------------------------------------------
+const WATER = waterLevel();
+const RISER = CONFINE.riser * VOXEL;
+
+/** Every `y:` the sheets of standing water are laid at, as written in source. */
+function sheetHeights(text) {
+  const open = text.indexOf('const LAKES = [');
+  if (open < 0) return [];
+  const body = text.slice(open, text.indexOf('];', open));
+  return [...body.matchAll(/\by:\s*([^,}\n]+)/g)].map((m) => m[1].trim());
+}
+const heightsAsWritten = sheetHeights(read('src/world/distant.js'));
+const readsTheBoundary = (hs) => hs.length > 0 && hs.every((h) => h === 'waterLevel()');
+report.check(readsTheBoundary(heightsAsWritten),
+  'the standing water takes its level from the boundary and carries no number of its own',
+  `${heightsAsWritten.length} sheets, laid at `
+  + `${[...new Set(heightsAsWritten)].join(' and ')} = ${WATER.toFixed(4)} m`);
+
+// AND THE LEVEL ITSELF LIES INSIDE A RISER, which is a fact about one number
+// and therefore true on every bearing there is.
+const clearAbove = (Math.ceil(WATER / VOXEL) * VOXEL) - WATER;
+const clearBelow = WATER - (Math.floor(WATER / VOXEL) * VOXEL);
+const insideARiser = (level) => {
+  const above = (Math.ceil(level / VOXEL) * VOXEL) - level;
+  const below = level - (Math.floor(level / VOXEL) * VOXEL);
+  return above > 0.001 && below > 0.001;
+};
+report.check(insideARiser(WATER),
+  'and it lies inside a riser and not on a tread, so no annulus of ground shares its plane',
+  `${(clearAbove * 100).toFixed(2)} cm under the tread above it and `
+  + `${(clearBelow * 100).toFixed(2)} cm over the one below, of a `
+  + `${(RISER * 100).toFixed(0)} cm riser`);
+
+/**
+ * Where the fall meets a level, on one bearing.
+ *
+ * @param {number} deg    bearing from north
+ * @param {number} level  metres, the surface of the water
+ * @returns {?object} the last dry tread, the first drowned one, and how far
+ *                    each stands from the surface; null if the fall never
+ *                    reaches it at all
+ */
+function shore(deg, level) {
+  const a = deg * DEG;
+  const ux = Math.sin(a);
+  const uz = -Math.cos(a);
+  let dry = null;
+  for (let r = PLATEAU; r < REACH; r += VOXEL) {
+    const h = confineSteps(CENTRE.x + ux * r, CENTRE.z + uz * r, CENTRE) * VOXEL;
+    if (h > level) { dry = h; continue; }
+    return { r, dry, wet: h, over: dry === null ? 0 : dry - level, under: level - h };
+  }
+  return null;
+}
+
+// The bearings the ridge stands aside for -- `gate()` is nought at gateFrom and
+// inwards, so crestRise is exactly zero there and the fall is the whole of the
+// ground. Read from the dial rather than written, so that moving the gate moves
+// the sweep with it.
+const OPEN = [];
+for (let d = -CONFINE.crest.gateFrom; d <= CONFINE.crest.gateFrom; d += 1) OPEN.push(d);
+
+function shoreFaults(level) {
+  const bad = [];
+  for (const deg of OPEN) {
+    const s = shore(deg, level);
+    if (s === null) { bad.push({ deg, why: 'the fall never reaches the water' }); continue; }
+    if (s.dry === null) { bad.push({ deg, why: 'the water stands over the plateau itself' }); continue; }
+    if (!(s.over > 0 && s.over < RISER)) {
+      bad.push({ deg, why: `${(s.over * 100).toFixed(1)} cm of dry tread over the surface` });
+      continue;
+    }
+    if (!(s.under > 0 && s.under < RISER)) {
+      bad.push({ deg, why: `${(s.under * 100).toFixed(1)} cm of drowned tread under it` });
+      continue;
+    }
+    if (Math.abs(s.over + s.under - RISER) > 1e-9) {
+      bad.push({ deg, why: 'the step at the shore is not one riser' });
+    }
+  }
+  return bad;
+}
+
+const faults = shoreFaults(WATER);
+const north = shore(0, WATER);
+report.check(faults.length === 0,
+  'and the terraces come down and meet it: no void under the last dry tread, no step over it',
+  faults.length
+    ? `${faults.length} of ${OPEN.length} bearings, first at ${faults[0].deg} deg: ${faults[0].why}`
+    : `${OPEN.length} bearings open on the water; due north the shore is at `
+      + `${north.r.toFixed(2)} m, with the last dry tread ${(north.over * 100).toFixed(1)} cm `
+      + `over the surface and the first drowned one ${(north.under * 100).toFixed(1)} cm under `
+      + `it -- one riser of ${(RISER * 100).toFixed(0)} cm between them`);
+
+// --------------------------------------------------------------------------
 // AND THE LAW LAYS IT AS COLUMNS, which is the one thing that turns all of the
 // above into ground somebody can stand on.
 // --------------------------------------------------------------------------
@@ -279,9 +413,38 @@ if (process.argv.includes('--self')) {
       what: 'a ridge raised past what the picture byte can hold',
       caught: injected ? clipped > 0 : true,
     },
+    {
+      what: 'a sheet of water given a height of its own again',
+      caught: !readsTheBoundary(['waterLevel()', '0.30']),
+    },
+    {
+      what: 'and two that read the boundary are not called a defect',
+      caught: readsTheBoundary(['waterLevel()', 'waterLevel()']),
+    },
+    {
+      what: 'the level V5 fitted before the world had a basin (+0.30 m)',
+      caught: shoreFaults(0.30).length > 0,
+    },
+    {
+      what: 'a level quantised onto a tread, which would fight it for every pixel',
+      caught: !insideARiser(Math.round(WATER / VOXEL) * VOXEL),
+    },
+    {
+      what: 'and the level that ships is not itself called one',
+      caught: insideARiser(WATER),
+    },
+    {
+      what: 'and a lake sunk under the bed of the world, which the terraces never reach',
+      caught: shoreFaults(-12).length > 0,
+    },
+    {
+      what: 'while the level that ships is met on every one of those bearings',
+      caught: shoreFaults(WATER).length === 0,
+    },
   ]);
 }
 
 report.end(`the plateau is ${PLATEAU} m; the fall reaches `
   + `${(deepest * VOXEL).toFixed(1)} m and the ridge ${(highest * VOXEL).toFixed(1)} m over it, `
-  + `both inside ${REACH} m of far window`);
+  + `both inside ${REACH} m of far window, and the water lies at `
+  + `${WATER.toFixed(4)} m in it`);
