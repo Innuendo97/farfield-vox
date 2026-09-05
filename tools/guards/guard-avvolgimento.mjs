@@ -55,17 +55,10 @@ const SELF = flags.includes('--self');
 const REGISTER = [
   {
     what: 'alberi chiome e tronchi', owner: 'V4',
-    where: 'src/world/trees.js:315-316',
-    why: 'l\'accoppiata (u,v) per asse non e\' una permutazione ciclica: per '
-      + 'axis 1 vale (x,z) dove la terna destrorsa vuole (z,x), e ogni faccia '
-      + '+Y e -Y esce avvolta contro la normale che dichiara',
-    reversed: 1206, inconsistent: 1473,
-  },
-  {
-    what: 'alberi secondo pigmento', owner: 'V4',
-    where: 'src/world/trees.js:315-316',
-    why: 'la stessa riga, sul secondo pigmento',
-    reversed: 24, inconsistent: 48,
+    where: 'src/world/trees.js: mergeFaces/geometryOf, il giunto fra due piani',
+    why: 'dopo la cura del coordinatore delle facce Y (E-GUARDIA1) resta UNO spigolo '
+      + 'fra due facce discordi: registrato per il proprietario, non un buco disegnato',
+    reversed: 0, inconsistent: 1,
   },
   {
     what: 'nuvole 0', owner: 'V6',
@@ -132,8 +125,8 @@ if (SELF) {
     { what: '... anche quando il side gli e\' stato assegnato dopo (buco E-V7g)',
       caught: drawsFromEitherSide(Object.assign({ blending: 2 }, { side: 2 })) },
     { what: 'il registro morde nei due versi: un conto diverso e\' rosso',
-      caught: registered('alberi chiome e tronchi').reversed !== 0
-        && registered('alberi chiome e tronchi').reversed !== 1205 },
+      caught: registered('alberi chiome e tronchi').inconsistent !== 0
+        && registered('alberi chiome e tronchi').inconsistent !== 2 },
   ]);
 }
 
