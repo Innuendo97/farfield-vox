@@ -4,7 +4,9 @@ import {
 } from 'three';
 import { VOXEL } from './columns.js';
 import { CENTRE, DISC_RADIUS } from './worldgen.js';
-import { CAMPO, CAMPO_BIAS, CAMPO_FAR, campoFarOrigin } from './campo.js';
+import {
+  CAMPO, CAMPO_BIAS, CAMPO_BLADE_CEIL, CAMPO_FAR, campoCoarseSpan, campoFarOrigin,
+} from './campo.js';
 import { campoBox, campoMaterial } from './campo-material.js';
 
 // THE TWO WINDOWS THE GROUND IS KEPT IN, AND THE ONE CALL THAT MOVES THEM.
@@ -133,6 +135,9 @@ function makeWindow(shape, job) {
     worstUploadMs: 0,
     tallest: 0,
     lowest: 255,
+    /** The tallest ground each SIX METRE piece of each tile holds, by the
+     * tile's key: the sky's own bound. See skySlope. */
+    coarse: new Map(),
   };
 }
 
@@ -197,6 +202,9 @@ export function createCampo({
   };
 
   let renderer = null;
+  // Where the sky's bound was last taken, and whether a tile has landed since.
+  let slopeAt = null;
+  let dirty = true;
 
   const srcRegion = new Box2(new Vector2(), new Vector2());
   const dstPosition = new Vector2();
@@ -223,6 +231,62 @@ export function createCampo({
     if (ms > w.worstUploadMs) w.worstUploadMs = ms;
     if (ms > stats.worstUploadMs) stats.worstUploadMs = ms;
     return ms;
+  }
+
+  /**
+   * THE STEEPEST ANYTHING IN THE WORLD STANDS OVER THE EYE, as a slope.
+   *
+   * A ray that leaves the eye steeper than this cannot reach ground, whichever
+   * way it is pointing, so the fragment that carries it discards before it has
+   * marched a cell -- and that is most of the sky, which the box of phase two
+   * put back into the frame when it grew to the size of the world.
+   *
+   * WHY IT IS ASKED OF SIX METRE PIECES AND NOT OF TILES. It is a MAXIMUM over
+   * the world of (how tall a thing is over the eye) / (how far away it is), and
+   * a far tile is 51.2 m across: one of them holds both the level plateau the
+   * walker stands on and the crown of the ridge, so its single maximum answers
+   * "fourteen metres, right here" and the bound comes out at sixty degrees --
+   * true, and useless. Level four of each tile's own pyramid is a cell of 6.4 m
+   * and the reduction has already taken the highest ground in each, so the
+   * crown is measured at the distance the crown actually stands at. Measured at
+   * the judging pose that is the difference between 63 degrees and 12.
+   *
+   * It is a BOUND and not a guess: the ground is a maximum, the mat over it is
+   * the ladder's own ceiling, and the distance is to the NEAREST corner of the
+   * cell, floored at a metre so a cell the walker is standing in cannot make it
+   * infinite. Four thousand cells, a few operations each, and only when the eye
+   * has moved a quarter of a metre.
+   */
+  function skySlope(eye) {
+    let worst = -1e9;
+    for (const w of windows) {
+      const span = w.shape.span;
+      const cell = campoCoarseSpan(w.shape);
+      const n = Math.round(span / cell);
+      for (const [key, coarse] of w.coarse) {
+        const [cx, cz] = key.split(',').map(Number);
+        const x0 = cx * span;
+        const z0 = cz * span;
+        for (let j = 0; j < n; j += 1) {
+          const az = z0 + j * cell;
+          const dz = Math.max(az - eye.z, 0, eye.z - (az + cell));
+          for (let i = 0; i < n; i += 1) {
+            const top = coarse[j * n + i];
+            if (!top) continue;
+            const ax = x0 + i * cell;
+            const dx = Math.max(ax - eye.x, 0, eye.x - (ax + cell));
+            const y = (top - CAMPO_BIAS) * VOXEL + CAMPO_BLADE_CEIL;
+            if (y <= eye.y) continue;
+            const d = Math.max(1, Math.hypot(dx, dz));
+            const slope = (y - eye.y) / d;
+            if (slope > worst) worst = slope;
+          }
+        }
+      }
+    }
+    // A hand of margin, and a floor of nought: a walker who is above every
+    // scrap of ground in the world still sees the ground under their feet.
+    return Math.max(0, worst) + 0.02;
   }
 
   function receive(message) {
@@ -283,11 +347,13 @@ export function createCampo({
         w.tileData.set(message.data);
         place(w, message.bx, message.bz);
         w.held.set(`${message.cx},${message.cz}`, true);
+        if (message.coarse) w.coarse.set(`${message.cx},${message.cz}`, message.coarse);
         w.asked.delete(`${message.cx},${message.cz}`);
         w.tiles += 1;
         stats.tiles += 1;
         if (w === far) stats.farTiles += 1;
         laid += 1;
+        dirty = true;
         if (message.tallest > w.tallest) { w.tallest = message.tallest; moved = true; }
         if (message.lowest < w.lowest) { w.lowest = message.lowest; moved = true; }
       }
@@ -402,6 +468,17 @@ export function createCampo({
       flush(near.centre === null ? Infinity : budget);
       if (!eye) return;
       moveTo(near, eye.x, eye.z);
+      // AND THE SKY'S OWN BOUND, WHEN THE EYE HAS MOVED ENOUGH TO CHANGE IT.
+      // It is four thousand cells of arithmetic; at a quarter of a metre it is
+      // asked about four times a second at walking pace, and what it can be
+      // wrong by in between is a quarter of a metre of parallax on a ridge
+      // sixty metres away, which the margin above covers many times over.
+      if (!slopeAt || Math.hypot(eye.x - slopeAt.x, eye.z - slopeAt.z) > 0.25
+        || Math.abs(eye.y - slopeAt.y) > 0.25 || dirty) {
+        slopeAt = { x: eye.x, y: eye.y, z: eye.z };
+        dirty = false;
+        material.uniforms.uSkySlope.value = skySlope(eye);
+      }
     },
 
     /** Lays everything that has arrived, whatever it costs: for a bench. */

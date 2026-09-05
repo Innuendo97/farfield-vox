@@ -440,6 +440,7 @@ export function campoTile(cx, cz, radius) {
   campoReduce(data, shape);
   return {
     data,
+    coarse: campoCoarse(data, shape),
     bx: bx0,
     bz: bz0,
     tallest,
@@ -462,6 +463,16 @@ export function campoTile(cx, cz, radius) {
  * It is derived from MANTO.law and not written down, so a sweep that moves the
  * ladder moves the far meadow with it.
  */
+/**
+ * The tallest blade the mat's own law can draw, in metres.
+ *
+ * IT IS THE PYRAMID'S BOUND AND NOT A DECORATION: see campoReduce for why a
+ * coarse cell carries a SAMPLED blade over a MAXIMUM ground, and why that is
+ * conservative only because this number exists. It is derived from MANTO.law
+ * rather than written down, so a ladder with a sixth rung moves it.
+ */
+export const CAMPO_BLADE_CEIL = (MANTO.law.length - 1) * BLADE;
+
 export const CAMPO_FAR_BLADE = (() => {
   let mean = 0;
   for (let h = 0; h < MANTO.law.length; h++) mean += h * MANTO.law[h];
@@ -528,6 +539,7 @@ export function campoFarTile(cx, cz, radius) {
   campoReduce(data, shape);
   return {
     data,
+    coarse: campoCoarse(data, shape),
     bx: tx0,
     bz: tz0,
     tallest,
@@ -540,21 +552,31 @@ export function campoFarTile(cx, cz, radius) {
 /**
  * The pyramid over a tile that already holds its finest level.
  *
- * THE TALLEST CHILD'S WHOLE WORD, AND NOT A MAXIMUM PER CHANNEL.
+ * THE CHILD WITH THE HIGHEST GROUND, WHOLE -- AND NOT THE HIGHEST TOP.
  *
  * Tevs 2008's hierarchical ray-stepping needs one thing from a coarse cell: a
- * bound it can trust -- nothing under it reaches higher than this. A maximum
- * taken channel by channel gives one, but a LOOSE one, and worse: the pair it
- * hands back belongs to no column at all, so a pixel that stops at a coarse
- * cell is shaded with a ground from one child and a blade from another. With
- * the ground and the blade now held in two different units, that pair would not
- * even be a height anybody could name.
+ * bound it can trust. Taking the child with the highest TOP gives one, and it
+ * is what phase two was first written with -- and it draws a FLAT MEADOW. The
+ * mat's ladder tops out at five blades with a probability of a twentieth, so
+ * the tallest of the sixteen children of a level-two cell is at the top of the
+ * ladder more than half the time: coarsen a meadow by taking maxima and every
+ * cell of it stands at the same height. On the frame that is the difference
+ * between the chunky voxel grass of the target and a sheet of flat plates.
  *
- * The child with the tallest TOP hands back a bound that is EXACT -- its top is
- * by definition the maximum of the four -- and a texel that is a real column of
- * the world: ground, blade, material, wall and tint together. That is both the
- * tighter skip and the honest thing to shade with, and it is the same rule the
- * material and the tint already followed in phase one.
+ * THE GREEDY NEVER DID THAT. Beyond its detail ring layMat draws a block of N
+ * by N blades at the height of the block's OWN first blade -- a SAMPLE of the
+ * law, not a maximum of it -- which is exactly why the cubes read as cubes at
+ * distance. So this takes a sample too, and the sample is the child with the
+ * highest GROUND, first one wins: over the plateau, where every child stands on
+ * the same ground, that is a fixed corner and the blade heights stay as varied
+ * as the law drew them; over a mound or a terrace, it is the child that sticks
+ * up, which is what a pixel looking at a bank is looking at.
+ *
+ * AND THE SKIP STAYS CONSERVATIVE BECAUSE THE BLADE IS BOUNDED. The ground is a
+ * true maximum, and no blade the law draws is taller than CAMPO_BLADE_CEIL, so
+ * `ground + ceiling` is a bound nothing under the cell reaches past -- looser
+ * than the exact top by at most a quarter of a metre, which costs a few cells
+ * entered and left again and buys the whole look back.
  */
 export function campoReduce(data, shape = CAMPO) {
   const width = shape.tiles.width;
@@ -572,8 +594,7 @@ export function campoReduce(data, shape = CAMPO) {
             // The top of this child in SUB-steps, and a column that is THERE
             // beats one that is not: an absent texel reads nought on both
             // heights and would otherwise win every tie on bare ground.
-            const rank = data[s + 2]
-              ? (data[s + 1] - CAMPO_BIAS) * CAMPO_RUNG + data[s] : -Infinity;
+            const rank = data[s + 2] ? data[s + 1] : -Infinity;
             if (rank > best) { best = rank; bo = s; }
           }
         }
@@ -586,6 +607,40 @@ export function campoReduce(data, shape = CAMPO) {
       }
     }
   }
+}
+
+/**
+ * ONE LEVEL OF A TILE, AS GROUND BYTES, FOR THE THREAD THE WALKER IS ON.
+ *
+ * The picture lives on the card and the main thread never reads it back. But
+ * one question about it has to be answered on the CPU every frame -- how steep
+ * a ray has to leave the eye before it can no longer reach any ground at all,
+ * which is what takes the whole sky out of the march (see skySlope in
+ * ./campo-field.js) -- and answering it needs the tallest ground in each PIECE
+ * of a tile rather than in the tile as a whole: a far tile is 51.2 m across and
+ * mixes the level plateau with the crown of the ridge, so its single maximum
+ * says the ridge is right here.
+ *
+ * Level four of the pyramid is that piece: a cell of sixteen texels, 6.4 m of
+ * far window, and the reduction has already taken the highest ground in each.
+ * Eight by eight numbers a tile, which travel with it and cost nothing.
+ */
+export function campoCoarse(data, shape, level = 4) {
+  const size = shape.tile >> level;
+  const src = shape.tiles.origins[level];
+  const out = new Uint8Array(size * size);
+  for (let j = 0; j < size; j++) {
+    for (let i = 0; i < size; i++) {
+      const o = ((src.y + j) * shape.tiles.width + (src.x + i)) * 4;
+      out[j * size + i] = data[o + 2] ? data[o + 1] : 0;
+    }
+  }
+  return out;
+}
+
+/** How many metres a side one cell of campoCoarse covers. */
+export function campoCoarseSpan(shape, level = 4) {
+  return shape.cell * (1 << level);
 }
 
 /**

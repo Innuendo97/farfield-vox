@@ -83,7 +83,8 @@ self.onmessage = (event) => {
         lowest: built.lowest,
         ms: built.ms,
         data: built.data,
-      }, [built.data.buffer]);
+        coarse: built.coarse,
+      }, [built.data.buffer, built.coarse.buffer]);
     }
     return;
   }

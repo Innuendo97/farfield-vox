@@ -10,8 +10,8 @@ import { PIGMENT_GLSL, pigmentUniforms, refreshPigment } from './pigment.js';
 import { SHEET_GLSL, sheetArray, sheetUniforms } from './sheet.js';
 import { bladeSettings, earthSettings, voxelSettings } from './material.js';
 import {
-  CAMPO, CAMPO_BIAS, CAMPO_CUT_GLSL, CAMPO_FAR, CAMPO_FAR_SHIFT, CAMPO_RUNG,
-  campoCutUniform,
+  CAMPO, CAMPO_BIAS, CAMPO_BLADE_CEIL, CAMPO_CUT_GLSL, CAMPO_FAR, CAMPO_FAR_SHIFT,
+  CAMPO_RUNG, campoCutUniform,
 } from './campo.js';
 
 // THE FIELD'S OWN MATERIAL: ONE BOX, ONE FRAGMENT A PIXEL, AND THE WORLD
@@ -135,16 +135,21 @@ const FRAGMENT = /* glsl */`
   uniform float uGroundUnit;
   uniform float uBladeUnit;
   uniform float uBias;
+  uniform float uBladeCeil;
   uniform int uSteps;
   uniform int uTopLevel;
+  uniform int uStartLevel;
   uniform float uLodGain;
+  uniform float uDither;
   uniform int uRays;
+  uniform float uRayNear;
   uniform float uHorizon;
   uniform vec3 uSunMarch[${SUN_MARCH.length}];
   uniform float uDebug;
   // How much ground one screen pixel covers at one metre, head on. See the note
   // over the footprint in shade() for why it is a uniform and not an fwidth.
   uniform float uPixelScale;
+  uniform float uSkySlope;
   uniform mat4 uViewProjection;
 
   // The families' own numbers, read out of the settings objects of
@@ -285,6 +290,10 @@ const FRAGMENT = /* glsl */`
     vec4 tex;
   };
 
+  // HOW MANY CELLS THE MARCH CROSSED, for uDebug: a picture of where the
+  // traversal is expensive is the only thing that says WHICH ray is slow.
+  int gSteps = 0;
+
   Hit march(vec3 eye, vec3 dir, vec3 inv, float tEnter, float tLeave, float dither) {
     Hit hit;
     hit.found = false;
@@ -299,12 +308,33 @@ const FRAGMENT = /* glsl */`
 
     vec3 p = eye + dir * (tEnter + 1e-4);
     vec2 sgn = sign(dir.xz);
-    int level = uTopLevel;
+    // WHERE THE RAY STARTS ITS PYRAMID, AND IT IS NOT THE TOP OF IT.
+    //
+    // Tevs starts a ray at the coarsest level and descends. That is right when
+    // the pyramid is four levels deep, which is what phase one had; with the
+    // far window under it the pyramid is TEN, and a ray whose first solid is
+    // three metres away would pay nine descents before it could look at
+    // anything. Measured on the frame that is 8 ms at the pose the campaign
+    // judges on. So the ray starts LOW and CLIMBS -- one level for every empty
+    // cell it crosses, which takes it from four to nine over twenty five metres
+    // of open air, exactly where the coarse levels start being worth having.
+    // AND A RAY THAT IS RISING STARTS AT THE TOP OF THE PYRAMID INSTEAD.
+    //
+    // The box is the whole world now: four hundred metres across and fifteen
+    // tall, so the eye stands INSIDE it and every pixel of the sky gets a
+    // fragment -- where in phase one the box was 1.65 m tall and the upper half
+    // of the frame missed it entirely. A ray leaving upwards from eye height
+    // cannot meet anything until the ridge, ninety metres out, because nothing
+    // between here and there is taller than the eye; so it has no use for a
+    // cell of eighty centimetres and every use for one of twenty five metres.
+    // Started low it pays ten crossings just to climb, over half the frame.
+    int level = dir.y > 0.0 ? uTopLevel : min(uStartLevel, uTopLevel);
     vec3 n = vec3(0.0, 1.0, 0.0);
 
     for (int i = 0; i < 512; i++) {
       if (i >= uSteps) break;
-      bool near = insideNear(p.xz) && level <= NEAR_TOP;
+      gSteps = i;
+      float travelled = distance(p, eye);
       // THE FLOOR OF THE DETAIL, AS THE PIXEL'S OWN FOOTPRINT AND DITHERED.
       // The cell the ray is allowed to stop at is the one that covers about
       // uLodGain pixels; the pixel's own hash pushes the threshold up or down
@@ -312,12 +342,25 @@ const FRAGMENT = /* glsl */`
       // next has no line on it -- the two interleave over a band. It is the
       // cheap half of Cesium's screen space cross fade: one hash, no second
       // draw, nothing to sort.
-      float travelled = distance(p, eye);
       float want = travelled * uPixelScale * uLodGain / uCell;
       int floorLevel = int(max(0.0, floor(log2(max(want, 1.0)) + dither)));
       floorLevel = min(floorLevel, uTopLevel);
-      if (!near) floorLevel = max(floorLevel, FAR_SHIFT);
       if (level < floorLevel) level = floorLevel;
+      // AND IT IS NOT CAPPED OVER THAT FLOOR, WHICH WAS TRIED AND MEASURED. A
+      // descending ray pays one iteration for every level it has to come back
+      // down, so holding it within three or four levels of the detail it is
+      // going to stop at looks like a saving; it is not. Measured on the step
+      // counter at the pose the campaign judges on, the ground went from 45.9
+      // steps a pixel to 52.0 at three levels and 47.5 at four: the cells it is
+      // then forced to cross are so much smaller that the crossings cost more
+      // than the descents saved. The climb is worth what it costs.
+      // AND WHICH PICTURE ANSWERS: the near one where the ray stands inside the
+      // window it covers and the level is one it holds, the far one otherwise.
+      bool near = insideNear(p.xz) && level <= NEAR_TOP;
+      if (!near && level < FAR_SHIFT) {
+        level = FAR_SHIFT;
+        if (floorLevel < FAR_SHIFT) floorLevel = FAR_SHIFT;
+      }
       float span = uCell * exp2(float(level));
       ivec2 cell = ivec2(floor(p.xz / span));
       vec2 edge = (vec2(cell) + max(sgn, 0.0)) * span;
@@ -325,6 +368,13 @@ const FRAGMENT = /* glsl */`
       float tExit = max(min(crossing.x, crossing.y), 0.0);
       vec4 t = cellAt(cell, level, near);
       float topY = topYOf(t);
+      // THE BOUND THE SKIP IS DECIDED ON, WHICH IS NOT THE SAME AS THE SURFACE.
+      // A coarse cell carries the MAXIMUM ground of what is under it and a
+      // SAMPLED blade over it (see campoReduce in ./campo.js: a maximum blade
+      // draws a flat meadow). So what the ray may trust as "nothing under here
+      // reaches past this" is the ground plus the tallest blade the law can
+      // draw, and the exact tests below still use the surface itself.
+      float boundY = level == 0 ? topY : groundYOf(t) + uBladeCeil;
       float yExit = p.y + dir.y * tExit;
       // AND WHERE THE CUBES OWN THE GROUND THE RAY PASSES STRAIGHT THROUGH.
       // See campoYields in ./campo.js: in the world that ships this is a
@@ -332,7 +382,7 @@ const FRAGMENT = /* glsl */`
       // lets the greedy disc and the field be priced in ONE opening of the page
       // without either of them drawing the other's pixels.
       bool maybe = !campoYields(p.xz) && t.b > 0.0
-        && (p.y <= topY + 1e-5 || yExit <= topY);
+        && (p.y <= boundY + 1e-5 || yExit <= boundY);
       if (maybe && level > floorLevel) { level--; continue; }
       if (maybe) {
         // ------------------------------------------------- the finest level
@@ -415,7 +465,9 @@ const FRAGMENT = /* glsl */`
           return hit;
         }
       }
-      // The cell is empty as far as the ray goes: cross it and climb.
+      // The ray leaves this cell without stopping in it: cross it. Which parent
+      // cell it was standing in is remembered first -- see the ascent rule below.
+      ivec2 parentBefore = ivec2(floor(p.xz / (span * 2.0)));
       n = crossing.x < crossing.y ? vec3(-sgn.x, 0.0, 0.0) : vec3(0.0, 0.0, -sgn.y);
       p += dir * (tExit + 1e-4);
       // PAST THE FAR WALL OF THE WINDOW, and the comparison is against the
@@ -426,7 +478,24 @@ const FRAGMENT = /* glsl */`
       if (p.x < uFarBounds.x || p.z < uFarBounds.y
         || p.x > uFarBounds.z || p.z > uFarBounds.w
         || p.y < uHeight.x || p.y > uHeight.y) break;
-      level = min(level + 1, min(uTopLevel, FAR_TOP));
+      // AND IT CLIMBS ONLY WHEN IT HAS LEFT THE PARENT CELL AS WELL.
+      //
+      // THIS IS THE ONE LINE THE WHOLE COST OF THE FRAME WAS IN, and it is the
+      // ascent rule every hierarchical traversal needs. Climbing on every
+      // crossing puts the ray in a PING-PONG: at level L the cell's maximum is
+      // under it, so it crosses and climbs; at L + 1 the cell is twice as long
+      // and reaches far enough ahead that its maximum is NOT under it, so the
+      // ray descends again without having moved. Two iterations for every cell
+      // of ground, over the whole lower half of the frame. Measured on the step
+      // counter, the meadow was costing fifty to seventy steps a pixel and the
+      // air over it more.
+      //
+      // A ray may only stand at level L + 1 where it has not already looked at
+      // half of that cell -- and it has not, exactly when the crossing took it
+      // out of the parent. Asked that way the ascent is exact, it costs one
+      // floor, and no cell is ever tested twice.
+      ivec2 parentAfter = ivec2(floor(p.xz / (span * 2.0)));
+      if (parentAfter != parentBefore) level = min(level + 1, min(uTopLevel, FAR_TOP));
     }
     return hit;
   }
@@ -537,8 +606,20 @@ const FRAGMENT = /* glsl */`
     // rather than out of a second store: the canopy is the top of this column,
     // and the sun's line is the march above over the same heights.
     float canopy = topYOf(hit.tex);
-    float sunLine = (uHorizon > 0.5 && hit.near && hit.level == 0)
-      ? sunLineAt(hit.cell, floorSubOf(hit.tex)) * uBladeUnit : -1e4;
+    // AND THE SUN'S LINE IS MARCHED AT THE BLADE WHATEVER THE LEVEL OF DETAIL
+    // IS, which is the same thing layMat does and for the same reason. Beyond
+    // its detail ring the greedy draws a block of four blades at one height --
+    // which can shade nothing, because nothing on it is taller than itself --
+    // and hands the shadow back as a TEXTURE marched over the mat the LAW
+    // draws. The field has that mat in the picture already, at five
+    // centimetres, so it marches there: the column asked is the blade column
+    // under the hit and not the coarse cell the ray stopped in. What the eye
+    // gets on a plateau of blocks is the light and shade of the blades that
+    // would have been there, which is exactly what the cubes give it.
+    ivec2 fine = ivec2(floor(hit.p.xz / uCell));
+    vec4 under = hit.level == 0 ? hit.tex : cellAt(fine, 0, true);
+    float sunLine = (uHorizon > 0.5 && insideNear(hit.p.xz) && under.b > 0.0)
+      ? sunLineAt(fine, floorSubOf(under)) * uBladeUnit : -1e4;
     float lightY = min(hit.p.y, canopy);
     float shadeSun = hit.blade ? uShadeSun : 1.0;
     float lit = 1.0 - smoothstep(0.0, uCell * 0.25, sunLine - lightY);
@@ -567,6 +648,22 @@ const FRAGMENT = /* glsl */`
   void main() {
     vec3 eye = cameraPosition;
     vec3 dir0 = normalize(vWorld - eye);
+    // A RAY THAT CANNOT REACH ANYTHING IS NOT MARCHED AT ALL.
+    //
+    // The box is the whole world -- four hundred metres across and fifteen
+    // tall -- so the eye stands inside it and EVERY pixel of the sky gets a
+    // fragment, where in phase one the box was 1.65 m tall and the upper half
+    // of the frame missed it entirely. Most of those fragments cannot hit
+    // anything: the plateau is level, the ridge crowns fifteen metres up and
+    // sixty out, and a ray leaving the eye steeper than the steepest thing in
+    // the picture is looking at sky by arithmetic.
+    //
+    // uSkySlope is exactly that steepness, taken every frame on the thread the
+    // walker is on out of the tiles' own maxima -- sixty four numbers and the
+    // distance from the eye to each tile, which is a bound and not a guess (see
+    // skySlope() in ./campo-field.js). One compare, and the sky stops being
+    // marched.
+    if (dir0.y > uSkySlope * length(dir0.xz)) discard;
     // THE TWO SCREEN DERIVATIVES OF THE RAY, which is how a sub-pixel sample is
     // aimed without any knowledge of the projection: one pixel to the right is
     // this direction plus its own derivative, whatever lens produced it.
@@ -576,11 +673,24 @@ const FRAGMENT = /* glsl */`
     // The pixel's own hash, used for the dither of the detail. It is a function
     // of the PIXEL and not of the frame, so a still camera draws a still
     // picture: the interleaving is spatial and never temporal.
-    float dither = pigHash(gl_FragCoord.x, gl_FragCoord.y);
+    float dither = uDither * (pigHash(gl_FragCoord.x, gl_FragCoord.y) - 0.5) + 0.5;
 
     vec4 sum = vec4(0.0);
     float nearest = 1e9;
     int used = 0;
+    // HOW MANY RAYS THIS PIXEL GETS, AND IT IS NOT THE SAME EVERYWHERE.
+    //
+    // A second ray is worth having exactly where the ray finds detail smaller
+    // than the pixel, and that is the NEAR meadow: past ten metres the level of
+    // detail has already merged the blades into cells bigger than a pixel and a
+    // second sample of them lands on the same cell. It is also cheapest exactly
+    // there -- a near hit is found in a few steps where a grazing far one is
+    // found in forty -- so the rule buys the aliasing that is left at the price
+    // of the marches that are short. How far "near" reaches is uRayNear, and
+    // nought turns the whole thing off.
+    //
+    // The first ray decides for the rest, which is one branch a whole warp of
+    // neighbouring pixels takes the same way.
     int rays = max(1, min(uRays, 4));
     for (int k = 0; k < 4; k++) {
       if (k >= rays) break;
@@ -623,8 +733,14 @@ const FRAGMENT = /* glsl */`
       vec4 c = shade(dir, hit);
       sum += c;
       if (c.a > 0.0 && hit.t < nearest) nearest = hit.t;
+      // AND THE FIRST RAY DECIDES WHETHER THERE ARE ANY MORE.
+      if (k == 0 && (!hit.found || hit.t > uRayNear)) rays = 1;
     }
 
+    if (uDebug > 0.5 && uDebug < 1.5) {
+      fragColour = vec4(vec3(float(gSteps) / float(uSteps)), 1.0);
+      return;
+    }
     if (sum.a <= 0.0) {
       if (uDebug > 1.5) { fragColour = vec4(1.0, 0.0, 1.0, 1.0); return; }
       discard;
@@ -693,27 +809,93 @@ export function campoMaterial({
       uGroundUnit: { value: CAMPO.unitGround },
       uBladeUnit: { value: CAMPO.unitBlade },
       uBias: { value: CAMPO_BIAS },
+      uBladeCeil: { value: CAMPO_BLADE_CEIL },
       uSteps: { value: 96 },
-      uTopLevel: { value: 6 },
+      /**
+       * The level the traversal starts at, IN NEAR CELLS.
+       *
+       * NINE, WHICH IS THE TOP OF THE FAR PYRAMID AND NOT OF THE NEAR ONE. A
+       * near level of nine is a cell of 25.6 m, which is exactly level six of
+       * the far picture -- the coarsest thing either window holds -- and it is
+       * what a ray crossing four hundred metres of boundary has to be allowed
+       * to skip in. Started at six (a cell of 3.2 m) the same ray would need a
+       * hundred and twenty five steps to cross the window and would run out:
+       * measured, the frame went from 12 ms to 33.
+       */
+      uTopLevel: { value: 9 },
+      /**
+       * The level a ray STARTS at, which is not the level it may reach.
+       *
+       * FOUR, which is phase one's own top: a cell of 80 cm, and the first
+       * thing a ray meets near the eye is nearly always inside one. From there
+       * it climbs one level per empty cell, so it is at the top of the far
+       * pyramid after twenty five metres of air and pays no descent it does not
+       * use. See the note in march() for the eight milliseconds this is worth.
+       */
+      uStartLevel: { value: 4 },
       /**
        * How many pixels a cell has to cover before the ray may stop at it.
        *
-       * SIX AND A HALF, AND IT IS PHASE ONE'S OWN LADDER RE-READ AS WHAT IT WAS
-       * MEASURING. D-P3 put the finest cells inside eight metres and the next
-       * inside sixteen; at the high tier's own pixel a five centimetre cell at
-       * eight metres covers 6.7 pixels, so the two thresholds were a footprint
-       * rule with the footprint left implicit. Written as the footprint it is
-       * one number instead of two, it follows the viewport and the field of
-       * view instead of standing still while they move, and it is the dial the
-       * scintillation is fought on -- geometry finer than this is not drawn at
-       * all rather than sampled once a pixel.
+       * TWENTY FOUR, AND IT IS THE ONE NUMBER THE SCINTILLATION WAS WON ON.
+       *
+       * Phase one's ladder -- the finest cells inside eight metres, the next
+       * inside sixteen (D-P3) -- is a footprint rule with the footprint left
+       * implicit: at the high tier's own pixel a five centimetre cell at eight
+       * metres covers 6.7 of them. Written as the footprint it is one number
+       * instead of two and it follows the viewport and the field of view
+       * instead of standing still while they move.
+       *
+       * AND THEN IT WAS SWEPT, because it is the dial the scintillation is
+       * fought on: geometry finer than this is not drawn at all rather than
+       * sampled once a pixel. Measured on the walk, as the mean change of a
+       * pixel between two consecutive frames, against the CUBES the committente
+       * has already accepted (levels of 255, four windows of the frame):
+       *
+       *     cubi        12.16  12.37  11.33  6.84
+       *     gain  6.5   17.89  18.11  14.57  7.78     worse everywhere
+       *     gain 12     15.17  14.99  10.63  5.88
+       *     gain 18     13.22  11.28  10.22  5.24
+       *     gain 24     10.88  11.07   8.27  5.07     under the cubes everywhere
+       *     gain 32      9.00   6.71   4.56  3.96     and the meadow goes flat
+       *
+       * Twenty four is the coarsest the meadow can be drawn at while still
+       * reading as blades in the near field, and the finest at which nothing
+       * scintillates more than the cubes did. What it costs is that the narrow
+       * blade of E-DECISIONI10 G3 is only resolved inside 2.2 m; that is
+       * declared in the verbale and it is a dial the committente may move.
        */
-      uLodGain: { value: 6.5 },
+      uLodGain: { value: 24 },
+      /**
+       * How wide the band is where one level of detail gives way to the next,
+       * in levels, spread by the pixel's own hash.
+       *
+       * NOUGHT, AND IT IS A CHANGE OF MIND WITH A PICTURE BEHIND IT. Phase two
+       * started at ONE -- a whole octave, which is the textbook stochastic mip
+       * -- and it is right for a photograph and wrong for a voxel: two
+       * neighbouring pixels were drawing cells of twenty and of forty
+       * centimetres, so a meadow read as a MUSH of two block sizes instead of
+       * as blocks. Measured, the octave also cost half again as much energy at
+       * the frequency of the pixel (laplacian 33.7 against 23.4 in the near
+       * window). At nought the levels meet on a ring -- and the ring is not
+       * found, because what changes across it is the size of a cube in a world
+       * made of cubes, which is a thing this world does everywhere anyway.
+       */
+      uDither: { value: 0 },
       uRays: { value: rays },
+      /**
+       * How far a hit may be and still be worth a second ray, in metres.
+       *
+       * TEN, and it is where the level of detail has merged the blades into
+       * cells a pixel cannot see inside of anyway: past it a second sample
+       * lands on the same cell as the first and buys nothing, while costing the
+       * longest marches in the frame. Nought is one ray everywhere.
+       */
+      uRayNear: { value: 10 },
       uHorizon: { value: 1 },
       uSunMarch: { value: SUN_MARCH },
       uDebug: { value: 0 },
       uPixelScale: { value: 0.002 },
+      uSkySlope: { value: 10 },
       uViewProjection: { value: new Matrix4() },
       // The meadow's own pigment, shared with the cubes by construction: these
       // are voxelSettings()' numbers and not a second table.

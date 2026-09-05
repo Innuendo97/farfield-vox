@@ -130,6 +130,7 @@ export {
 export {
   CAMPO,
   CAMPO_BIAS,
+  CAMPO_BLADE_CEIL,
   CAMPO_FAR,
   CAMPO_FAR_BLADE,
   CAMPO_FAR_RATIO,
@@ -138,6 +139,8 @@ export {
   CAMPO_PRESENT,
   CAMPO_RUNG,
   CAMPO_SOIL_WALL,
+  campoCoarse,
+  campoCoarseSpan,
   campoColumnOf,
   campoDecode,
   campoFarOrigin,
