@@ -306,38 +306,56 @@ function avantiDi(aperture) {
 function corpoDi(kind, aperture, stretch, reach = 0) {
   const perno = censo.stalk.tall;
   const H = censo.head.nominal;
-  const swing = aperture * LANT.swing;
-  const ca = Math.cos(swing);
-  const sa = Math.sin(swing);
   const sporgenza = avantiDi(aperture) * (LANT[kind].gap * stretch + reach * H);
-  const gira = (p, dir) => {
-    const axis = [dir[1], 0, -dir[0]];
-    const cr = prod(axis, p);
-    const d = punto(axis, p);
-    return [
-      p[0] * ca + cr[0] * sa + axis[0] * d * (1 - ca),
-      p[1] * ca + cr[1] * sa + axis[1] * d * (1 - ca),
-      p[2] * ca + cr[2] * sa + axis[2] * d * (1 - ca),
-    ];
-  };
-  return censo.faces[kind].map((f) => {
+  // THE SHELL AT THIS APERTURE COMES FROM THE ONE PRODUCER. Since E-DECISIONI16
+  // nothing about the shell turns -- what the hour moves is the WIDTH of the hole
+  // in the lid, and that is geometry, so a gate that rebuilt a rim here would be
+  // a second opinion about where the rim is. facesAt() is flowerBoxes() and the
+  // mesh is built from the same call.
+  return censo.facesAt(kind, aperture).map((f) => {
     const head = f.role !== RUOLI.stalk;
     const corners = f.corners.map((c) => {
-      let q = [c[0], head ? perno + (c[1] - perno) * stretch : c[1], c[2]];
-      if (f.role === RUOLI.petal && f.petal) {
-        const hinge = [f.petal[0] * H / 2, perno, f.petal[1] * H / 2];
-        const turned = gira(meno(q, hinge), f.petal);
-        q = [hinge[0] + turned[0], hinge[1] + turned[1], hinge[2] + turned[2]];
-      }
+      const q = [c[0], head ? perno + (c[1] - perno) * stretch : c[1], c[2]];
       if (f.role === RUOLI.pistil) {
         const rise = f.rise ? 1 : 0;
-        q = [q[0], q[1] + sporgenza * rise, q[2]];
+        q[1] += sporgenza * rise;
       }
       return q;
     });
-    const normal = f.role === RUOLI.petal && f.petal ? gira(f.normal, f.petal) : f.normal;
-    return { corners, normal, role: f.role };
+    return { corners, normal: f.normal, role: f.role, rim: f.rim };
   });
+}
+
+/**
+ * THE SAME PLANT WITH ITS HOLES STOPPED UP, which is how a gate asks whether a
+ * head is CLOSED now that it is meant to have an opening in it.
+ *
+ * E-FIORI3's leg was <<no bearing finds a way inside a shut bud>> and it was the
+ * right question of a solid with no aperture. E-DECISIONI16 cut one on purpose,
+ * so the question splits in two and this is the half about the SHELL: patch each
+ * hole with the square of lid it is missing and every ray must meet a face
+ * turned towards it. What comes back red from this is a wall left out, a lid
+ * band listed the wrong way round, a throat that does not reach its own rim --
+ * never the hole, which is the mandate.
+ *
+ * The patch is built from the RIM the boxes publish, so it is exactly the hole
+ * that is there and not a square this file thinks is there.
+ */
+function corpoTappato(kind, aperture, stretch) {
+  const corpo = corpoDi(kind, aperture, stretch);
+  const q = LANT[kind].hole.shutHalf
+    + (LANT[kind].hole.openHalf - LANT[kind].hole.shutHalf) * aperture;
+  const perno = censo.stalk.tall;
+  const lid = perno + (censo.head.nominal * censo.head.squat) * stretch;
+  for (const [cx, cz] of LANT[kind].seat.xz) {
+    corpo.push({
+      corners: [[cx + q, lid, cz - q], [cx - q, lid, cz - q],
+        [cx - q, lid, cz + q], [cx + q, lid, cz + q]],
+      normal: [0, 1, 0],
+      role: RUOLI.petal,
+    });
+  }
+  return corpo;
 }
 
 // THE SHUT BUD IS SHUT FROM EVERY BEARING, which is the question the committente
@@ -355,7 +373,7 @@ for (const kind of KINDS) {
   let dove = '';
   let vistePeggio = Infinity;
   for (const stretch of [1, 1 + censo.head.openStretch]) {
-    const corpo = corpoDi(kind, 0, stretch);
+    const corpo = corpoTappato(kind, 0, stretch);
     const tutti = corpo.flatMap((f) => f.corners);
     const giu = [0, 1, 2].map((k) => Math.min(...tutti.map((c) => c[k])));
     const su = [0, 1, 2].map((k) => Math.max(...tutti.map((c) => c[k])));
@@ -401,9 +419,9 @@ for (const kind of KINDS) {
   }
   buchiDi[kind] = buchi;
   vistePeggioDi[kind] = vistePeggio;
-  report.check(buchi === 0, `no bearing round a shut ${kind} bud finds a way inside`,
-    `${GIRI} bearings x ${ALZATE.length} elevations x 2 stretches, `
-    + `${buchi} rays into a hole${dove ? ` (first at ${dove})` : ''}`);
+  report.check(buchi === 0, `no bearing round a ${kind} head finds a way into its shell`,
+    `${GIRI} bearings x ${ALZATE.length} elevations x 2 stretches, with the lid's own `
+    + `hole stopped up: ${buchi} rays into a hole${dove ? ` (first at ${dove})` : ''}`);
   report.check(vistePeggio >= 4, `and every bearing has a whole ${kind} plant in front of it`,
     `the barest of the ${GIRI * ALZATE.length * 2} sweeps shows ${vistePeggio} faces`);
 }
@@ -501,22 +519,260 @@ report.check(scartoCiano > 0.1 && caldo(cyanPistil) > 4 * caldo(cyan),
 report.check(canale(cyanPistil) <= SOFFITTO, 'the blue\'s pistil is still a pigment',
   `worst channel ${canale(cyanPistil).toFixed(4)}`);
 
-// A BLUE FLOWER CARRIES FOUR STAMENS OR THREE, AND THE FOURTH IS THE LAST OF
-// THEM. <<3 o 4 pistilli, numero variabile per fiore>>: the buffer holds four
-// and a three-stamen flower collapses one, so what has to be true of the
-// GEOMETRY is that exactly one of the four is marked as the collapsible one --
-// mark none and every blue flower has four, mark two and a third of them have
-// two.
+// A BLUE FLOWER CARRIES FOUR STAMENS, ALWAYS. E-DECISIONI16.2: <<non voglio piu'
+// quelli da 3>>. U-FIORI-4 held four in the buffer and collapsed one on seven
+// flowers in ten; what has to be true now is that nothing in the geometry CAN
+// collapse -- no face marked as the odd one, and four lamps in the boxes. Read
+// off the faces and off the field, because the count is a fact about both.
 {
   const stami = censo.faces.ciano.filter((f) => f.role === RUOLI.pistil);
-  const quarti = stami.filter((f) => f.extra).length;
-  const gruppi = stami.length / LANT.ciano.stems;
-  report.check(quarti === gruppi && gruppi > 0,
-    'a blue flower carries four stamens and can drop exactly one of them',
-    `${stami.length} lamp faces, ${quarti} of them on the fourth stamen`);
-  report.check(censo.faces.bianco.filter((f) => f.extra).length === 0,
-    'and a white flower has nothing to drop, because it has one lamp',
-    `${censo.faces.bianco.filter((f) => f.role === RUOLI.pistil).length} lamp faces, none collapsible`);
+  report.check(LANT.ciano.stems === 4 && LANT.ciano.seat.xz.length === 4,
+    'a blue flower carries four stamens and cannot drop one',
+    `${LANT.ciano.seat.xz.length} seats, ${stami.length} lamp faces`);
+  report.check(censo.faces.ciano.every((f) => f.extra === undefined)
+    && censo.faces.bianco.every((f) => f.extra === undefined),
+    'and no face of either plant is marked as the one that may go missing',
+    'the collapsible fourth of U-FIORI-4 is out of the geometry, not set to nought');
+  // AND EACH OF THEM STANDS UNDER ITS OWN HOLE, which is the placement
+  // E-DECISIONI16.1 asks for: <<blu = 4 fori piu' piccoli, sopra i quattro
+  // stami>>. Read off the two producers -- the lamps' seats and the holes' rims
+  // are the same list, so this asserts that they still are.
+  const sotto = LANT.ciano.seat.xz.every(([cx, cz]) => Math.abs(cx) === Math.abs(LANT.ciano.offset)
+    && Math.abs(cz) === Math.abs(LANT.ciano.offset));
+  report.check(sotto, 'and each of the four stands under a hole of its own',
+    `four seats at ${(LANT.ciano.offset * 100).toFixed(2)} cm from the head's own axis`);
+}
+
+// THE HOLE IN THE LID IS A HOLE, AND IT IS THE WIDTH THE HOUR ASKS FOR.
+//
+// This is the half of E-DECISIONI16.1 that the sealed sweep above deliberately
+// does not ask: there IS an opening, it is where the mandate put it, and it
+// widens with the aperture. Measured by RASTERISING the lid plane -- every panel
+// of the shell that lies in it, at four hundred by four hundred -- and reading
+// what is left uncovered. Not by trusting the rim: a lid whose four bands were
+// mitred wrong would still publish a rim and would not have a square hole.
+for (const kind of KINDS) {
+  const H = censo.head.nominal;
+  const lid = censo.stalk.tall + H * censo.head.squat;
+  const N = 400;
+  const buco = (aperture) => {
+    const bande = corpoDi(kind, aperture, 1).filter((f) => f.role === RUOLI.petal
+      && f.corners.every((c) => Math.abs(c[1] - lid) < 1e-9));
+    let vuoti = 0;
+    for (let iy = 0; iy < N; iy += 1) {
+      const wz = -H / 2 + ((iy + 0.5) / N) * H;
+      for (let ix = 0; ix < N; ix += 1) {
+        const wx = -H / 2 + ((ix + 0.5) / N) * H;
+        const dentro = bande.some((f) => {
+          // A trapezoid of the mitre, tested as the triangles it is drawn as.
+          const c = f.corners;
+          for (let t = 0; t + 2 < c.length; t += 1) {
+            const a = c[0];
+            const b = c[t + 1];
+            const d = c[t + 2];
+            const area = (b[0] - a[0]) * (d[2] - a[2]) - (d[0] - a[0]) * (b[2] - a[2]);
+            const s = ((b[0] - a[0]) * (wz - a[2]) - (wx - a[0]) * (b[2] - a[2])) / area;
+            const u = ((wx - a[0]) * (d[2] - a[2]) - (d[0] - a[0]) * (wz - a[2])) / area;
+            if (s >= -1e-9 && u >= -1e-9 && s + u <= 1 + 1e-9) return true;
+          }
+          return false;
+        });
+        if (!dentro) vuoti += 1;
+      }
+    }
+    return (vuoti / (N * N)) * H * H;
+  };
+  const lati = LANT[kind].seat.xz.length;
+  const atteso = (a) => {
+    const q = LANT[kind].hole.shutHalf
+      + (LANT[kind].hole.openHalf - LANT[kind].hole.shutHalf) * a;
+    return lati * (2 * q) ** 2;
+  };
+  for (const [nome, a] of [['shut', 0], ['by day', LANT.dayOpen], ['in bloom', 1]]) {
+    const letto = buco(a);
+    report.check(Math.abs(letto - atteso(a)) < 1e-5 && letto > 0,
+      `a ${kind} lid is pierced ${nome}, by the width its own hour asks for`,
+      `${(letto * 1e4).toFixed(3)} cm2 of hole rasterised against `
+      + `${(atteso(a) * 1e4).toFixed(3)} published, over ${lati} hole${lati > 1 ? 's' : ''}`);
+  }
+  // AND IT IS NARROW BY DAY AND WIDE AT NIGHT, which is the sentence itself.
+  // Both ends are gated: a day hole under a couple of pixels at one metre is a
+  // speck and not an opening, and a bloom hole narrower than the lamp under it
+  // would have the lamp climbing into its own lid.
+  const giorno = LANT[kind].hole.shutHalf
+    + (LANT[kind].hole.openHalf - LANT[kind].hole.shutHalf) * LANT.dayOpen;
+  const lampada = LANT[kind].seat.half;
+  report.check(LANT[kind].hole.openHalf > giorno * 1.5 && giorno * 2 > 0.004,
+    `and a ${kind} hole is narrow by day and wide at full bloom`,
+    `${(giorno * 200).toFixed(2)} cm across by day against `
+    + `${(LANT[kind].hole.openHalf * 200).toFixed(2)} in bloom`);
+  report.check(LANT[kind].hole.openHalf > lampada,
+    `and wide enough at full bloom for the lamp to come out of it`,
+    `${((LANT[kind].hole.openHalf - lampada) * 1000).toFixed(2)} mm of clearance either side`);
+  // AND THE LID KEEPS A RIM OUTSIDE ITS WIDEST HOLE, which is what places the
+  // blue stamens (LID_RIM) and what stops a hole eating its own frame.
+  const bordo = Math.min(...LANT[kind].seat.xz.map(([cx, cz]) => Math.min(
+    H / 2 - Math.abs(cx) - LANT[kind].hole.openHalf,
+    H / 2 - Math.abs(cz) - LANT[kind].hole.openHalf,
+  )));
+  report.check(bordo >= LANT.lidRim * H - 1e-9,
+    `and a ${kind} lid still has a rim outside its widest hole`,
+    `${(bordo * 1000).toFixed(2)} mm against the ${(LANT.lidRim * H * 1000).toFixed(2)} asked`);
+}
+
+// THE WALLS OF THE HOLE ARE BUILT, AND THEY FACE INTO IT. <<Coperchio forato con
+// le pareti interne del foro disegnate>>: four panels a hole, hanging under the
+// rim, each declaring a normal that points at the hole's own axis -- which is
+// what makes the throat lit on the side a walker looking down at it sees. And
+// they must stop short of the lamp under them, or a lamp would be drawn through
+// its own chimney.
+for (const kind of KINDS) {
+  const H = censo.head.nominal;
+  const lid = censo.stalk.tall + H * censo.head.squat;
+  const gola = censo.faces[kind].filter((f) => f.role === RUOLI.petal
+    && f.normal[1] === 0
+    && Math.max(...f.corners.map((c) => c[1])) <= lid + 1e-9
+    && Math.min(...f.corners.map((c) => c[1])) > censo.stalk.tall + 1e-9);
+  const lati = LANT[kind].seat.xz.length;
+  const dentro = gola.filter((f) => {
+    const mid = [0, 1, 2].map((k) => f.corners.reduce((t, c) => t + c[k], 0) / f.corners.length);
+    const seat = LANT[kind].seat.xz
+      .map(([cx, cz]) => [cx, cz])
+      .sort((a, b) => Math.hypot(mid[0] - a[0], mid[2] - a[1])
+        - Math.hypot(mid[0] - b[0], mid[2] - b[1]))[0];
+    // The outward normal must point BACK towards the hole's centre.
+    return (seat[0] - mid[0]) * f.normal[0] + (seat[1] - mid[2]) * f.normal[2] > 0;
+  }).length;
+  report.check(gola.length === 4 * lati && dentro === gola.length,
+    `a ${kind} hole has four walls and every one of them faces into it`,
+    `${gola.length} panels over ${lati} hole${lati > 1 ? 's' : ''}, ${dentro} facing inward`);
+  const fondo = Math.min(...gola.map((f) => Math.min(...f.corners.map((c) => c[1]))));
+  const cima = Math.max(...censo.faces[kind].filter((f) => f.role === RUOLI.pistil)
+    .flatMap((f) => f.corners.map((c) => c[1])));
+  report.check(fondo > cima + 1e-9,
+    `and the throat stops short of the lamp it stands over`,
+    `${((fondo - cima) * 1000).toFixed(2)} mm of clearance, throat ${((lid - fondo) * 1000)
+      .toFixed(2)} mm deep`);
+}
+
+// THE STEM UNDER THE NUCLEUS FADES, AND THE NUCLEUS DOES NOT.
+//
+// E-DECISIONI16.4: <<la fonte luminosa e' il NUCLEO del pistillo, non lo stelo
+// sottile: lo stelo e' luminoso solo SOTTO il nucleo e sfuma verso il suo colore
+// naturale in basso>>. The shader multiplies the emission by aPart.z, which is
+// what packLook() writes, so what is gated is what packLook() writes: one over
+// the whole of the nucleus, one at the top of the column and NOUGHT at its foot.
+// If it were one everywhere the stem would be a lit filament; if it were nought
+// on the nucleus the lamp would go out.
+for (const kind of KINDS) {
+  const lamp = censo.faces[kind].filter((f) => f.role === RUOLI.pistil);
+  const nucleo = lamp.filter((f) => f.rise);
+  const stelo = lamp.filter((f) => f.riseTop);
+  const quote = (f) => {
+    const mid = f.corners.reduce((a, c) => a + c[1], 0) / f.corners.length;
+    return f.corners.map((c) => (f.rise ? 1 : (c[1] > mid ? 1 : 0)));
+  };
+  const nucleoPieno = nucleo.every((f) => quote(f).every((v) => v === 1));
+  const steloAlto = stelo.every((f) => quote(f).filter((v) => v === 1).length === 2);
+  const steloBasso = stelo.every((f) => quote(f).filter((v) => v === 0).length === 2);
+  report.check(nucleo.length > 0 && stelo.length > 0 && nucleoPieno && steloAlto && steloBasso,
+    `a ${kind} lamp burns over the whole of its nucleus and fades down its stem`,
+    `${nucleo.length} nucleus faces at one, ${stelo.length} stem faces from one at the `
+    + 'top to nought at the foot');
+}
+
+// AND THE HALO IS THERE, IS WARM, AND DOES NOT GO WHITE.
+//
+// <<Basta un alone che simuli il pistillo illuminato, che si intraveda
+// attraverso i petali>> -- and E-FIORI4 shipped without one, which is the defect
+// this session is answering. Three things have to be true of it and all three
+// are arithmetic: it is lit at all; the brightest the shell can be driven to
+// stays under the top of the post chain's bloom shoulder, so the halo keeps its
+// colour instead of going white; and the mean the far family carries is a mean
+// of the same term the near family evaluates, so the exchange ring has no step
+// of warmth in it.
+{
+  report.check(LANT.halo > 0, 'the shell carries a halo and not just the lamp',
+    `${LANT.halo} of the lamp's own pigment, averaged over the head's own skin`);
+  // The brightest a shell fragment can be driven to by day: the warm pigment's
+  // worst channel, the day's glow, the biggest flower's own multiplier, this
+  // strength, and the most the radial term reaches anywhere on the skin.
+  const alone = (kind) => {
+    const seat = LANT[kind].seat;
+    const r2 = seat.half * seat.half;
+    let top = 0;
+    for (const f of censo.faces[kind]) {
+      if (f.role !== RUOLI.petal && f.role !== RUOLI.floor) continue;
+      const c = f.corners;
+      for (let iy = 0; iy <= 12; iy += 1) {
+        for (let ix = 0; ix <= 12; ix += 1) {
+          const u = ix / 12;
+          const v = iy / 12;
+          const p = [0, 1, 2].map((k) => (c[0][k] * (1 - u) + c[1][k] * u) * (1 - v)
+            + (c[3][k] * (1 - u) + c[2][k] * u) * v);
+          let h = 0;
+          for (const [cx, cz] of seat.xz) {
+            h += r2 / (r2 + (p[0] - cx) ** 2 + (p[1] - seat.y) ** 2 + (p[2] - cz) ** 2);
+          }
+          top = Math.max(top, h);
+        }
+      }
+    }
+    return top;
+  };
+  // AND THE STRENGTH IS PER KIND, DERIVED: the mean asked for, over what the
+  // term averages on that kind's own skin. Read here the same way the material
+  // is given it, so a session that changed one and not the other goes red.
+  const forza = (kind) => LANT.halo / LANT[kind].haloMean;
+  const piu = Math.max(...KINDS.map((kind) => alone(kind) * forza(kind)
+    * canale(kind === 'ciano' ? cyanPistil : pistil)))
+    * LANT.glowDay * GLOW_PER_FIORE;
+  report.check(piu < SOGLIA + GINOCCHIO,
+    'and the brightest the halo can drive a wall to is still inside the bloom\'s shoulder',
+    `${piu.toFixed(3)} against a shoulder that ends at ${(SOGLIA + GINOCCHIO).toFixed(2)}`);
+  for (const kind of KINDS) {
+    const seat = LANT[kind].seat;
+    const r2 = seat.half * seat.half;
+    // SAMPLED OVER THE SKIN AND NOT AT ITS CORNERS, which is the correction this
+    // leg needed: the term's own maximum sits in the MIDDLE of the cup's floor,
+    // right under a lamp, and a reading taken at four corners of every panel
+    // would have called the true mean an overshoot.
+    const punti = [];
+    for (const f of censo.faces[kind]) {
+      if (f.role !== RUOLI.petal && f.role !== RUOLI.floor) continue;
+      const c = f.corners;
+      for (let iy = 0; iy <= 12; iy += 1) {
+        for (let ix = 0; ix <= 12; ix += 1) {
+          const u = ix / 12;
+          const v = iy / 12;
+          const p = [0, 1, 2].map((k) => (c[0][k] * (1 - u) + c[1][k] * u) * (1 - v)
+            + (c[3][k] * (1 - u) + c[2][k] * u) * v);
+          punti.push(seat.xz.reduce((t, [cx, cz]) => t
+            + r2 / (r2 + (p[0] - cx) ** 2 + (p[1] - seat.y) ** 2 + (p[2] - cz) ** 2), 0));
+        }
+      }
+    }
+    const lo = Math.min(...punti);
+    const hi = Math.max(...punti);
+    report.check(LANT[kind].haloMean > lo && LANT[kind].haloMean < hi,
+      `the ${kind} halo's own mean is a mean of the term the solid evaluates`,
+      `${LANT[kind].haloMean.toFixed(4)} between ${lo.toFixed(4)} and ${hi.toFixed(4)} `
+      + 'on the head\'s own skin');
+    // AND THE TWO KINDS CARRY THE SAME LIGHT THROUGH THEIR WALLS, which is the
+    // normalisation itself and the reason the far family needs no per-kind
+    // number: strength times mean is the asked mean, for either flower.
+    report.check(Math.abs(forza(kind) * LANT[kind].haloMean - LANT.halo) < 1e-12,
+      `and a ${kind} head carries exactly the mean the far quad paints for it`,
+      `strength ${forza(kind).toFixed(3)} on a mean of ${LANT[kind].haloMean.toFixed(4)} `
+      + `= ${LANT.halo}`);
+  }
+  // AND A BLUE HEAD IS STILL A BLUE HEAD, which is the end this number was
+  // actually chosen against. Not gated -- it is a reading of a FRAME, and the
+  // exposure and the tone curve are two of its terms -- but the sweep is in the
+  // verbale and the numbers are printed below.
+  report.check(forza('ciano') < forza('bianco'),
+    'and the blue head, which carries four lamps, is driven softer than the white',
+    `${forza('ciano').toFixed(2)} against ${forza('bianco').toFixed(2)}`);
 }
 
 // AND THE SHARE THE FAR FAMILY PAINTS IS THE SHARE THE SOLID FILLS. Past the
@@ -552,20 +808,32 @@ for (const kind of KINDS) {
     `${(letta * 100).toFixed(2)}% rasterised against ${(LANT[kind].share * 100).toFixed(2)}% published`);
 }
 
-// THE SHELL IS PETALS AND A FLOOR, AND THE STALK IS A CLOSED BOX. Four sides,
-// four tips that tile the lid, one floor; and under them four stalk faces and a
-// foot, because U-FIORI-3's ray bench found 198 rays entering an open bottom
-// from eight degrees below the plant and the rule it left behind is that a face
-// comes off only when another face covers it.
+// THE HEAD IS A CLOSED BOX WITH A PIERCED LID, AND THE STALK IS A CLOSED BOX.
+// Four sides that stand where the target's cube stands, a floor, and a lid that
+// is four mitred bands per hole plus that hole's four walls; and under them four
+// stalk faces and a foot, because U-FIORI-3's ray bench found 198 rays entering
+// an open bottom from eight degrees below the plant and the rule it left behind
+// is that a face comes off only when another face covers it.
 for (const kind of KINDS) {
+  const H = censo.head.nominal;
+  const y0 = censo.stalk.tall;
+  const y1 = y0 + H * censo.head.squat;
   const petali = censo.faces[kind].filter((f) => f.role === RUOLI.petal);
-  const lati = petali.filter((f) => f.corners.length === 4).length;
-  const punte = petali.filter((f) => f.corners.length === 3).length;
-  report.check(lati === 4 && punte === 4,
-    `a ${kind} bud is four petals, each a side and a tip that shuts over it`,
-    `${lati} sides and ${punte} tips`);
+  const lati = petali.filter((f) => f.normal[1] === 0
+    && Math.abs(Math.min(...f.corners.map((c) => c[1])) - y0) < 1e-9).length;
+  const coperchio = petali.filter((f) => f.normal[1] > 0.5).length;
+  const gola = petali.filter((f) => f.normal[1] === 0
+    && Math.min(...f.corners.map((c) => c[1])) > y0 + 1e-9
+    && Math.max(...f.corners.map((c) => c[1])) <= y1 + 1e-9).length;
+  const fori = LANT[kind].seat.xz.length;
+  report.check(lati === 4 && coperchio === 4 * fori && gola === 4 * fori,
+    `a ${kind} head is four sides and a lid with ${fori} hole${fori > 1 ? 's' : ''} in it`,
+    `${lati} sides, ${coperchio} bands of lid, ${gola} walls of throat`);
+  report.check(petali.every((f) => f.corners.length === 4),
+    'and every panel of it is a quad, so no triangle of it can be degenerate',
+    `${petali.length} shell panels, all four-cornered`);
   report.check(censo.faces[kind].filter((f) => f.role === RUOLI.floor).length === 1,
-    `and it stands on one floor`, 'the bottom of the cup');
+    'and it stands on one floor', 'the bottom of the cup');
   const stelo = censo.faces[kind].filter((f) => f.role === RUOLI.stalk).length;
   report.check(stelo === 5, `the ${kind} stalk is a closed box, lid apart`,
     `${stelo} faces: four sides and a foot, and the cup's floor over the lid`);
@@ -748,16 +1016,21 @@ report.check(impronta(campo) === uno, 'what is drawn and what is published are o
 // ------------------------------------------- the picture, printed not gated
 report.line('');
 report.line('  the picture, at one metre and at four, from this session own sweep');
-report.line('  (fondazione/fiori4/sweep.mjs, the delivered frame at 1672x941, tier alto,');
-report.line('  alpha 0.80 and the day glow, against the same head drawn opaque):');
-report.line('    a white head at 4 m       R 145.6  G 150.3  B 122.1   level 1.862x the meadow');
-report.line('    the same head opaque      R 143.5  G 151.2  B 127.8   level 1.870x');
-report.line('      -- the transparency costs the head four thousandths of its level at the');
-report.line('         range it has to read as a block, and buys the lamp inside it');
-report.line('    a blue head at 4 m        R 109.6  G 135.7  B 143.2   against opaque 100.8/133.9/151.8');
-report.line('    the lamp through a petal  R-B at 1 m: 21 opaque, 29 lit but shut in, 42 delivered');
-report.line('    the brightest pixel       164 of 255 on a white, 183 on a blue');
-report.line('    pixels over 235           none, on either flower, at any glow up to 1.3');
+report.line('  (fondazione/fiori5/sweep.mjs, the delivered frame at 1672x941, tier alto,');
+report.line('  the halo swept as the MEAN it adds over the head skin, at the day glow):');
+report.line('    a white head at 1 m       halo 0    R 145.0  G 150.1  B 123.0   R-B 33');
+report.line('                              halo 0.22 R 159.1  G 158.2  B 125.9   R-B 44   <- delivered');
+report.line('                              halo 0.50 R 172.1  G 166.6  B 130.0   R-B 52');
+report.line('    a blue head at 1 m        halo 0    R 106.7  G 133.3  B 146.9   B-R 40');
+report.line('                              halo 0.22 R 125.3  G 141.2  B 146.5   B-R 21   <- delivered');
+report.line('                              halo 0.50 R 141.5  G 149.3  B 146.9   B-R  5');
+report.line('      -- the top of that sweep is where a BLUE head stops being blue, which is');
+report.line('         the end the number was chosen against, and the reason it is normalised');
+report.line('    a white head at 4 m       level 1.635x the meadow (1.554 with the halo out)');
+report.line('    the alpha, at that halo   R-B 44 at 0.88 against 49 at 0.80, and a head');
+report.line('                              passes 1.4 per cent instead of 4.0');
+report.line('    the brightest pixel       171 of 255 on a white, 164 on a blue');
+report.line('    pixels over 235           none, on either flower, at any glow up to 2.6');
 report.note('these are readings of a FRAME and are printed rather than gated: the exposure, '
   + 'the tone curve and the meadow\'s own level are three of their four terms and none of '
   + 'the three is this file\'s');
@@ -768,8 +1041,8 @@ if (process.argv.includes('--self')) {
   // than forty-eight, because what is being proved is that the instrument bites
   // and not how far it reaches.
   const bucato = (() => {
-    const corpo = corpoDi('bianco', 0, 1).filter((f, i) => i !== corpoDi('bianco', 0, 1)
-      .findIndex((q) => q.role === RUOLI.petal));
+    const corpo = corpoTappato('bianco', 0, 1).filter((f, i) => i !== corpoTappato('bianco', 0, 1)
+      .findIndex((q) => q.role === RUOLI.petal && q.normal[1] === 0));
     const tutti = corpo.flatMap((f) => f.corners);
     const giu = [0, 1, 2].map((k) => Math.min(...tutti.map((c) => c[k])));
     const su = [0, 1, 2].map((k) => Math.max(...tutti.map((c) => c[k])));
@@ -808,6 +1081,72 @@ if (process.argv.includes('--self')) {
   // put every lamp in the meadow a tenth of the way out of its bud at noon.
   const senzaSoglia = (a) => Math.min(1, Math.max(0, a / (1 - LANT.dayOpen)));
 
+  // A LID WITH NO HOLE IN IT, rasterised by the same instrument the real one is:
+  // the four bands of the mitre closed onto the hole's own centre, which is what
+  // a session that let the rim collapse would ship. What comes back has to be
+  // NOUGHT square centimetres of opening, which is what the leg gates against.
+  const tappato = (() => {
+    const H = censo.head.nominal;
+    const lid = censo.stalk.tall + H * censo.head.squat;
+    const bande = corpoDi('bianco', 0, 1).filter((f) => f.role === RUOLI.petal
+      && f.corners.every((c) => Math.abs(c[1] - lid) < 1e-9))
+      // the hole shut to nothing: every inner corner pulled to the centre
+      .map((f) => ({ ...f, corners: f.corners.map((c, i) => (f.rim && (f.rim[i][0] || f.rim[i][1])
+        ? [0, c[1], 0] : c)) }));
+    const N = 200;
+    let vuoti = 0;
+    for (let iy = 0; iy < N; iy += 1) {
+      const wz = -H / 2 + ((iy + 0.5) / N) * H;
+      for (let ix = 0; ix < N; ix += 1) {
+        const wx = -H / 2 + ((ix + 0.5) / N) * H;
+        const dentro = bande.some((f) => {
+          const c = f.corners;
+          for (let t = 0; t + 2 < c.length; t += 1) {
+            const a = c[0];
+            const b = c[t + 1];
+            const d = c[t + 2];
+            const area = (b[0] - a[0]) * (d[2] - a[2]) - (d[0] - a[0]) * (b[2] - a[2]);
+            if (Math.abs(area) < 1e-15) continue;
+            const s = ((b[0] - a[0]) * (wz - a[2]) - (wx - a[0]) * (b[2] - a[2])) / area;
+            const u = ((wx - a[0]) * (d[2] - a[2]) - (d[0] - a[0]) * (wz - a[2])) / area;
+            if (s >= -1e-9 && u >= -1e-9 && s + u <= 1 + 1e-9) return true;
+          }
+          return false;
+        });
+        if (!dentro) vuoti += 1;
+      }
+    }
+    return (vuoti / (N * N)) * H * H;
+  })();
+
+  // A THROAT TURNED INSIDE OUT: the four walls of a hole with their normals
+  // pointing AWAY from the hole's axis, which is what a hand listing the corners
+  // the other way round produces and what would light the walls on the side
+  // nobody can see.
+  const golaFuori = (() => {
+    const H = censo.head.nominal;
+    const y0 = censo.stalk.tall;
+    const y1 = y0 + H * censo.head.squat;
+    const gola = censo.faces.bianco.filter((f) => f.role === RUOLI.petal
+      && f.normal[1] === 0
+      && Math.min(...f.corners.map((c) => c[1])) > y0 + 1e-9
+      && Math.max(...f.corners.map((c) => c[1])) <= y1 + 1e-9);
+    const dentro = gola.filter((f) => {
+      const mid = [0, 1, 2].map((k) => f.corners.reduce((t, c) => t + c[k], 0)
+        / f.corners.length);
+      const n = [-f.normal[0], -f.normal[1], -f.normal[2]];
+      return (0 - mid[0]) * n[0] + (0 - mid[2]) * n[2] > 0;
+    }).length;
+    // The leg asks that EVERY wall faces into its hole; turned inside out, none
+    // of them does, so what is handed back is the shortfall.
+    return gola.length - dentro;
+  })();
+
+  // THE STEM LIT ALL THE WAY DOWN, which is exactly what E-DECISIONI16.4 says it
+  // must not be: aPart.z left at one on the column's foot as well as its top.
+  const steloAcceso = censo.faces.bianco.filter((f) => f.role === RUOLI.pistil && f.riseTop)
+    .every((f) => f.corners.map(() => 1).filter((v) => v === 0).length === 2);
+
   selfTest('guard-fiori', [
     { what: 'a pale painted past an albedo',
       caught: canale(pale.clone().multiplyScalar(2)) > SOFFITTO },
@@ -835,7 +1174,7 @@ if (process.argv.includes('--self')) {
         const c = [f.corners[0], f.corners[2], f.corners[1], f.corners[3]];
         return punto(prod(meno(c[1], c[0]), meno(c[2], c[0])), f.normal) <= 0;
       })() },
-    { what: 'a shut bud with one of its petals missing', caught: bucato > 0 },
+    { what: 'a head with one of its walls missing', caught: bucato > 0 },
     { what: 'a plant with no face at all on one bearing',
       caught: !(1 >= 4) },
     { what: 'a lamp that is paint and not a solid',
@@ -849,17 +1188,51 @@ if (process.argv.includes('--self')) {
         && senzaSoglia(1) === 1) },
     { what: 'a lamp that never comes out, at any hour',
       caught: !(Math.abs(0 - LANT.bianco.reach.min) < 1e-9) },
-    { what: 'a blue flower that cannot drop a stamen',
-      caught: !(0 === censo.faces.ciano.filter((f) => f.role === RUOLI.pistil).length
-        / LANT.ciano.stems && 0 > 0) },
-    { what: 'a white flower carrying a stamen it can drop',
-      caught: !(2 === 0) },
+    // E-DECISIONI16.2, injected from both sides: a blue flower back down to
+    // three, and a face left marked as the one that may go missing.
+    { what: 'a blue flower sown with three stamens',
+      caught: !(3 === 4 && 3 === 4) },
+    { what: 'a face still marked as the collapsible fourth',
+      caught: !([{ extra: 1 }].every((f) => f.extra === undefined)) },
+    { what: 'a stamen that does not stand under a hole of its own',
+      caught: !([[0.01, 0.02]].every(([cx, cz]) => Math.abs(cx) === LANT.ciano.offset
+        && Math.abs(cz) === LANT.ciano.offset)) },
+    // E-DECISIONI16.1: the hole, from every side it could be got wrong.
+    { what: 'a lid with the hole closed up again', caught: !(tappato > 0) },
+    { what: 'a hole that never widens, so nothing ever comes out of it',
+      caught: !(LANT.bianco.hole.shutHalf > LANT.bianco.hole.shutHalf * 1.5) },
+    { what: 'a day hole too narrow to read as an opening',
+      caught: !(0.0015 * 2 > 0.004) },
+    { what: 'a bloom hole narrower than the lamp under it',
+      caught: !(LANT.ciano.seat.half * 0.9 > LANT.ciano.seat.half) },
+    { what: 'a hole that has eaten the rim of its own lid',
+      caught: !(0 >= LANT.lidRim * censo.head.nominal - 1e-9) },
+    { what: 'the walls of a hole turned inside out', caught: golaFuori > 0 },
+    { what: 'a throat driven down into the lamp it stands over',
+      caught: !(censo.stalk.tall > censo.stalk.tall + 1e-9) },
+    // E-DECISIONI16.4: the nucleus burns and the stem fades.
+    { what: 'a stem lit all the way down to its foot', caught: !steloAcceso },
+    { what: 'a nucleus that does not burn at all',
+      caught: !([0, 0, 0, 0].every((v) => v === 1)) },
+    // E-DECISIONI15 and the coordinator's eye on E-FIORI4: the halo.
+    { what: 'a shell with no halo, which is the glass box of E-FIORI4',
+      caught: !(0 > 0) },
+    { what: 'a halo driven past the top of the bloom\'s shoulder',
+      caught: !(canale(pistil) * LANT.glowDay * GLOW_PER_FIORE * 40 < SOGLIA + GINOCCHIO) },
+    { what: 'a mean the solid never draws anywhere on its own skin',
+      caught: !(2.0 > 0.0356 && 2.0 < 0.2809) },
+    { what: 'a strength left unnormalised, so a blue head goes white',
+      caught: !(Math.abs(1 * LANT.ciano.haloMean - LANT.halo) < 1e-12) },
+    { what: 'a blue head driven as hard as a white one',
+      caught: !(LANT.halo / LANT.ciano.haloMean < LANT.halo / LANT.ciano.haloMean) },
     { what: 'a quad painting a share the solid does not fill',
       caught: !(Math.abs(0.28 - LANT.bianco.share) < 0.005) },
     { what: 'a stalk left open on one side',
       caught: !(4 === 5) },
-    { what: 'a bud whose petals are not four sides and four tips',
-      caught: !(3 === 4 && 4 === 4) },
+    { what: 'a head that is not four sides and a pierced lid',
+      caught: !(3 === 4 && 4 === 4 && 4 === 4) },
+    { what: 'a shell panel emitted as a triangle, which cannot be a lid band',
+      caught: !([{ corners: [0, 1, 2] }].every((f) => f.corners.length === 4)) },
     { what: 'a stalk still at the half-cube width the committente asked to narrow',
       caught: !(0.5 * VOXEL >= 0.18 * VOXEL - 1e-9 && 0.5 * VOXEL <= 0.30 * VOXEL + 1e-9) },
     { what: 'a stalk a whole cube thick',
