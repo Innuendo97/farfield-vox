@@ -1,66 +1,80 @@
 import {
-  BLADE, BLADES_PER_VOXEL, CHUNK, MANTO, MATERIAL, NO_COLUMN, PIGMENT, SUB, VOXEL,
-  CAMPO, CAMPO_ATLAS, CAMPO_MATERIAL, CAMPO_PRESENT, CAMPO_RUNG, CAMPO_TILE,
-  campoDecode, campoSlimCode, campoSlimEighths, campoSlot, campoTile,
-  campoTintByte, campoTintOf, campoTopStep, chunkColumns, pigTint,
+  BLADE, BLADES_PER_VOXEL, CHUNK, MANTO, MATERIAL, NO_COLUMN, PIGMENT, PLATEAU, SUB, VOXEL,
+  CAMPO, CAMPO_BIAS, CAMPO_FAR, CAMPO_FAR_BLADE, CAMPO_FAR_RATIO, CAMPO_FAR_SHIFT,
+  CAMPO_MATERIAL, CAMPO_PRESENT, CAMPO_RUNG, CAMPO_SOIL_WALL,
+  campoDecode, campoFarTile, campoGroundByte, campoHeights, campoSlimCode, campoSlimEighths,
+  campoSlot, campoTile, campoTintByte, campoTintOf, campoTopStep, chunkColumns, columnSpec,
+  pigTint,
 } from '../../src/world/voxel/pure.js';
-import { TIERS } from '../../src/core/quality.js';
 import { reporter, selfTest } from './lib.mjs';
 
 // GUARD-CAMPO -- THE PICTURE REPRODUCES THE STORE, IN BOTH DIRECTIONS.
 //
 // ===========================================================================
-// WHAT THIS GUARD IS FOR, IN ONE SENTENCE: the ray-marched field is a SECOND
-// WAY TO DRAW THE SAME GROUND, and the whole of the campaign's case for it
-// rests on the word SAME. The moment a texel says something the block store
-// does not, the world has two answers about where the floor is -- which is
-// exactly the defect the pivot to a block store was made to remove, arriving by
-// the back door in a texture.
+// WHAT THIS GUARD IS FOR, IN ONE SENTENCE: the ray-marched field is THE ground
+// now, and the whole of the campaign's case for it rests on the word SAME. The
+// moment a texel says something the block store does not, the world has two
+// answers about where the floor is -- which is exactly the defect the pivot to
+// a block store was made to remove, arriving by the back door in a texture.
 //
 // So the assertions are not "does the picture look right". They are:
 //
-//   1. EVERY texel of a chunk equals the column under it. Not a sample: every
-//      one, over chunks chosen to carry every feature this world has -- the
-//      open meadow, the corridor and its verge of earth, the masses, and the
-//      rim of the disc where the columns stop.
+//   1. EVERY texel of a tile equals the column under it. Not a sample: every
+//      one, over tiles chosen to carry every feature this world has -- the open
+//      meadow, the corridor and its verge of earth, the masses, and the ground
+//      BEYOND THE PLATEAU, which is the boundary E-DECISIONI13 put there.
 //   2. AND BACK: every column is findable in the picture at the address the
 //      shader computes, through campoSlot's own toroidal wrap. A guard that
 //      only walked the texels would pass a picture that was right where it was
 //      written and wrote it in the wrong place.
-//   3. THE PYRAMID IS A PYRAMID OF MAXIMA. The traversal skips a cell when its
-//      maximum is under the ray, so a level that under-reported by one unit
+//   3. THE PYRAMID IS THE TALLEST CHILD, WHOLE. The traversal skips a cell when
+//      its top is under the ray, so a level that under-reported by one unit
 //      would cut the tops off blades at a distance -- and nobody would see that
-//      as a DEFECT, it would read as level of detail.
+//      as a DEFECT, it would read as level of detail. And what it hands back
+//      has to be ONE COLUMN's four bytes and not four maxima, because a pixel
+//      that stops at a coarse cell is shaded with them.
 //   4. THE TINT IS THE PIGMENT'S OWN PURE TWIN, at the integer column the
 //      fragment of material.js samples it at, to the byte it is stored in.
 //   5. THE PACKING HOLDS THE LAW. Two bits for a width the law draws in
-//      eighths, one for presence: the day MANTO.slim widens, this fails HERE
-//      rather than silently drawing every wide blade as a narrow one.
-//   6. THE UNIT DIVIDES THE WORLD. A voxel has to be a whole number of the
-//      height unit or every ground in the picture is quantised twice.
-//   7. THE ATLAS DOES NOT OVERLAP ITSELF, and a chunk's toroidal address never
+//      eighths, one for presence, one for the soil of a wall: the day
+//      MANTO.slim widens, this fails HERE rather than silently drawing every
+//      wide blade as a narrow one.
+//   6. THE TWO UNITS DIVIDE THE WORLD. The ground is counted in VOXELS and the
+//      blade in quarter-blades; a voxel has to be a whole number of the second
+//      or every height in the picture is quantised twice.
+//   7. THE ATLAS DOES NOT OVERLAP ITSELF, and a tile's toroidal address never
 //      straddles the wrap -- which is the property the seven writes of the
 //      update rest on, and the only reason the window has no case analysis.
+//   8. AND THE TWO WINDOWS ARE ONE LATTICE. The far picture is eight near cells
+//      to a texel, so a far texel is a cell of level three of the near pyramid
+//      and the traversal walks both with ONE level counter. If that ratio ever
+//      stopped being a power of two the seam between them would be a place the
+//      ray changes its mind about where it is.
 // ===========================================================================
 
 const report = reporter('guard-campo -- the picture reproduces the store');
 
-// The disc that ships, for the reason guard-fusione gives: the ground that
-// exists is the ground the tiers lay, and the field is a window over it.
-const RADIUS = Math.max(...TIERS.map((t) => t.voxelDiscRadius));
+// THE PLATEAU, and it is not a tier's number any more. The field is the world:
+// what it is cut at is where the meadow's own law gives way to the boundary,
+// and that is a property of the world (E-DECISIONI13).
+const RADIUS = PLATEAU;
 
-// FOUR CHUNKS, AND EACH IS CHOSEN FOR A FEATURE AND NOT FOR COVERAGE.
+// FIVE TILES, AND EACH IS CHOSEN FOR A FEATURE AND NOT FOR COVERAGE.
 //   0,0   the middle of the hub: the corridor, its stone, its verge of earth
 //   0,1   the open meadow north of the spawn -- the pose the campaign judges on
 //  -1,0   the meadow west, where the masses stand
-//   0,2   the RIM: half its columns are outside the disc and must read absent
-const CHUNKS = [{ cx: 0, cz: 0 }, { cx: 0, cz: 1 }, { cx: -1, cz: 0 }, { cx: 0, cz: 2 }];
+//   0,2   the rim of the PLATEAU is not here any more, but the mat is thinning
+//   6,0   BEYOND THE PLATEAU: the terraces of the boundary, which used to be a
+//         hole in the picture and are now ground like any other
+const CHUNKS = [
+  { cx: 0, cz: 0 }, { cx: 0, cz: 1 }, { cx: -1, cz: 0 }, { cx: 0, cz: 2 }, { cx: 6, cz: 0 },
+];
 
-/** The store a chunk's tile was cut from, cut again here so nothing is shared. */
+/** The store a tile was cut from, cut again here so nothing is shared. */
 function storeOf(cx, cz) {
   return chunkColumns(cx, cz, CHUNK, true, RADIUS, {
     x: 0, z: 0, detail: Infinity, block: MANTO.block,
-  });
+  }, true);
 }
 
 const MAT_OF = {
@@ -78,17 +92,19 @@ let walked = 0;
 let present = 0;
 let blades = 0;
 let narrow = 0;
+let walls = 0;
+let beyond = 0;
 const wrong = {
-  presence: 0, ground: 0, top: 0, mat: 0, slim: 0, tint: 0, address: 0,
+  presence: 0, ground: 0, blade: 0, mat: 0, slim: 0, wall: 0, tint: 0, address: 0,
 };
 let firstWrong = '';
 const note = (what) => { if (!firstWrong) firstWrong = what; };
 
 for (const { cx, cz } of CHUNKS) {
   const tile = campoTile(cx, cz, RADIUS);
-  // The self test's own hand on the answer: one texel raised by a single unit,
-  // which is 1.25 cm and is exactly the size of defect a picture can carry
-  // without looking wrong.
+  // The self test's own hand on the answer: one texel's blade raised by a
+  // single unit, which is 1.25 cm and is exactly the size of defect a picture
+  // can carry without looking wrong.
   if (injected) tile.data[(70 * CAMPO.tile + 70) * 4] += 1;
   const store = storeOf(cx, cz);
   const b = BLADES_PER_VOXEL;
@@ -113,9 +129,11 @@ for (const { cx, cz } of CHUNKS) {
       }
       if (!should) continue;
       present += 1;
+      if (top < -1) beyond += 1;
       // THE GROUND, ASKED BACK IN THE UNIT THE WORLD IS KEPT IN. The texel is
       // read back as a voxel top and compared with the store's own Int16, so a
-      // unit that did not divide would show here as a rounding rather than pass.
+      // bias that did not hold the world would show here as a clamp rather than
+      // pass.
       if (campoTopStep(texel) !== top) {
         wrong.ground += 1;
         note(`ground at ${cx},${cz} texel ${i},${j}: ${campoTopStep(texel)} against ${top}`);
@@ -124,20 +142,29 @@ for (const { cx, cz } of CHUNKS) {
         wrong.mat += 1;
         note(`material at ${cx},${cz} texel ${i},${j}`);
       }
-      // THE BLADE. The corridor's stone carries none -- the tiles are not this
-      // family's -- and everything else carries what layMat laid, to the unit.
+      // THE BLADE, MEASURED FROM THE GROUND IT STANDS ON. The corridor's stone
+      // carries none -- the tiles are not this family's -- and everything else
+      // carries what layMat laid, to the unit.
       const blade = family === CAMPO_MATERIAL.PATH ? 0 : store.blade[k];
-      const height = Math.min(255, (top + 1) * CAMPO_RUNG + blade);
-      if (texel.top !== height) {
-        wrong.top += 1;
-        note(`blade at ${cx},${cz} texel ${i},${j}: ${texel.top} against ${height}`);
+      if (texel.blade !== blade) {
+        wrong.blade += 1;
+        note(`blade at ${cx},${cz} texel ${i},${j}: ${texel.blade} against ${blade}`);
       }
-      if (texel.top > texel.ground) blades += 1;
+      if (texel.blade > 0) blades += 1;
       if (texel.slim !== store.slim[k]) {
         wrong.slim += 1;
         note(`width at ${cx},${cz} texel ${i},${j}: ${texel.slim} against ${store.slim[k]}`);
       }
       if (texel.slim) narrow += 1;
+      // AND WHETHER THE WALL OF THIS COLUMN IS SOIL, which is the store's own
+      // `under` and the bit the field needs to cut a bank, a terrace or the
+      // halo round a boulder the way the mesher cuts them.
+      const soil = store.under[ck] === MATERIAL.EARTH && store.depth[ck] > 0;
+      if (texel.soilWall !== soil) {
+        wrong.wall += 1;
+        note(`wall at ${cx},${cz} texel ${i},${j}`);
+      }
+      if (texel.soilWall) walls += 1;
       // THE TINT, AGAINST THE PIGMENT'S OWN PURE TWIN at the integer column --
       // which is the WORLD's ten centimetre column and not the blade, because a
       // zone of the world is one zone whichever family is standing in it.
@@ -161,20 +188,23 @@ for (const { cx, cz } of CHUNKS) {
 const clean = Object.values(wrong).every((v) => v === 0);
 
 report.check(walked === CHUNKS.length * CAMPO.tile * CAMPO.tile,
-  'every texel of four chunks was walked, not a sample of them', `${walked}`);
-report.check(present > 0 && blades > 0 && narrow > 0,
-  'and those four carry columns, blades and narrow blades',
-  `${present} columns, ${blades} with a blade, ${narrow} narrow`);
+  'every texel of five tiles was walked, not a sample of them', `${walked}`);
+report.check(present > 0 && blades > 0 && narrow > 0 && walls > 0 && beyond > 0,
+  'and those five carry columns, blades, narrow blades, soil walls and the boundary',
+  `${present} columns, ${blades} with a blade, ${narrow} narrow, ${walls} on soil, `
+  + `${beyond} under the plateau`);
 report.check(wrong.presence === 0, 'a texel is there exactly where a column is',
   wrong.presence ? `${wrong.presence} disagree` : '');
 report.check(wrong.ground === 0, 'the ground of a texel is the top of its column',
   wrong.ground ? `${wrong.ground} disagree` : '');
-report.check(wrong.top === 0, 'its top is that ground plus the blade layMat laid',
-  wrong.top ? `${wrong.top} disagree` : '');
+report.check(wrong.blade === 0, 'its blade is the one layMat laid, over that ground',
+  wrong.blade ? `${wrong.blade} disagree` : '');
 report.check(wrong.mat === 0, 'its material is the material of its column',
   wrong.mat ? `${wrong.mat} disagree` : '');
 report.check(wrong.slim === 0, 'its width is the width the mat gave that blade',
   wrong.slim ? `${wrong.slim} disagree` : '');
+report.check(wrong.wall === 0, 'and its wall is soil exactly where the store cut one',
+  wrong.wall ? `${wrong.wall} disagree` : '');
 report.check(wrong.tint === 0, 'its tint is pigTint at its own column of the world',
   wrong.tint ? `${wrong.tint} disagree` : '');
 report.check(wrong.address === 0,
@@ -183,10 +213,54 @@ report.check(wrong.address === 0,
 if (firstWrong) report.line(`        first disagreement: ${firstWrong}`);
 
 // --------------------------------------------------------------------------
-// 3. THE PYRAMID IS A PYRAMID OF MAXIMA.
+// 1b. THE FAR PICTURE, AGAINST THE LAW IT IS SAMPLED FROM.
+//
+// The near tile is read off a STORE because a store is what the greedy meshes.
+// The far tile is read off `columnSpec` at its own stride, and it is declared
+// as exactly that in ./campo.js -- so what this leg asks is whether the sample
+// it took is the sample the law gives at that very column, texel by texel over
+// a whole tile of the boundary. A far picture that had drifted from the law
+// would be a second opinion about a hillside.
+// --------------------------------------------------------------------------
+let farWalked = 0;
+let farWrong = 0;
+let farPresent = 0;
+let farBeyond = 0;
+{
+  // A tile of the far window that stands over the ridge: at 40 cm a texel and
+  // 128 texels a tile, tile 2 covers 102.4 to 153.6 m of x.
+  const tile = campoFarTile(2, 0, RADIUS);
+  const stride = Math.round(CAMPO_FAR.cell / VOXEL);
+  const half = stride >> 1;
+  for (let j = 0; j < CAMPO_FAR.tile; j += 1) {
+    for (let i = 0; i < CAMPO_FAR.tile; i += 1) {
+      farWalked += 1;
+      const texel = campoDecode(tile.data, (j * CAMPO_FAR.tile + i) * 4);
+      const ix = (2 * CAMPO_FAR.tile + i) * stride + half;
+      const iz = (0 * CAMPO_FAR.tile + j) * stride + half;
+      const spec = columnSpec(ix, iz, false, RADIUS, true);
+      const family = spec.top === NO_COLUMN ? -1 : (MAT_OF[spec.mat] ?? -1);
+      if (texel.present !== (family >= 0)) { farWrong += 1; continue; }
+      if (family < 0) continue;
+      farPresent += 1;
+      if (spec.top < -1) farBeyond += 1;
+      if (campoTopStep(texel) !== spec.top) farWrong += 1;
+      else if (texel.mat !== family) farWrong += 1;
+      else if (texel.blade !== (family === CAMPO_MATERIAL.PATH ? 0 : CAMPO_FAR_BLADE)) {
+        farWrong += 1;
+      } else if (texel.tint !== campoTintByte(ix, iz)) farWrong += 1;
+    }
+  }
+}
+report.check(farWrong === 0 && farPresent > 0 && farBeyond > 0,
+  'every texel of a far tile is the law at its own column, boundary included',
+  `${farWalked} texels, ${farPresent} standing, ${farBeyond} under the plateau, `
+  + `${farWrong} disagree`);
+
+// --------------------------------------------------------------------------
+// 3. THE PYRAMID IS THE TALLEST CHILD, WHOLE.
 // --------------------------------------------------------------------------
 let pyramidBad = 0;
-let pyramidCarried = 0;
 {
   const tile = campoTile(0, 1, RADIUS);
   if (injected) {
@@ -194,56 +268,48 @@ let pyramidCarried = 0;
     // A cell chosen by its coordinates would land on bare ground as often as
     // not, and lowering a maximum of nought is not a defect -- a self test that
     // injected one would pass while proving nothing.
-    const dst = CAMPO_TILE.origins[1];
+    const dst = CAMPO.tiles.origins[1];
     const size = CAMPO.tile >> 1;
     for (let j = 0; j < size; j += 1) {
       let done = false;
       for (let i = 0; i < size && !done; i += 1) {
-        const o = ((dst.y + j) * CAMPO_TILE.width + (dst.x + i)) * 4;
+        const o = ((dst.y + j) * CAMPO.tiles.width + (dst.x + i)) * 4;
         if (tile.data[o] > 0) { tile.data[o] -= 1; done = true; }
       }
       if (done) break;
     }
   }
+  const topSub = (o) => (tile.data[o + 1] - CAMPO_BIAS) * CAMPO_RUNG + tile.data[o];
   for (let level = 1; level < CAMPO.levels; level += 1) {
     const size = CAMPO.tile >> level;
-    const src = CAMPO_TILE.origins[level - 1];
-    const dst = CAMPO_TILE.origins[level];
+    const src = CAMPO.tiles.origins[level - 1];
+    const dst = CAMPO.tiles.origins[level];
     for (let j = 0; j < size; j += 1) {
       for (let i = 0; i < size; i += 1) {
-        let r = 0;
-        let g = 0;
-        let best = -1;
-        let childB = 0;
-        let childA = 0;
+        let best = -Infinity;
+        let bo = -1;
         for (let dj = 0; dj < 2; dj += 1) {
           for (let di = 0; di < 2; di += 1) {
-            const s = ((src.y + j * 2 + dj) * CAMPO_TILE.width + (src.x + i * 2 + di)) * 4;
-            if (tile.data[s] > r) r = tile.data[s];
-            if (tile.data[s + 1] > g) g = tile.data[s + 1];
-            const rank = tile.data[s + 2] ? tile.data[s] * 2 + 1 : -1;
-            if (rank > best) {
-              best = rank;
-              childB = tile.data[s + 2];
-              childA = tile.data[s + 3];
-            }
+            const s = ((src.y + j * 2 + dj) * CAMPO.tiles.width + (src.x + i * 2 + di)) * 4;
+            const rank = tile.data[s + 2] ? topSub(s) : -Infinity;
+            if (rank > best) { best = rank; bo = s; }
           }
         }
-        const o = ((dst.y + j) * CAMPO_TILE.width + (dst.x + i)) * 4;
-        if (tile.data[o] !== r || tile.data[o + 1] !== g) pyramidBad += 1;
-        else if (tile.data[o + 2] !== childB || tile.data[o + 3] !== childA) pyramidCarried += 1;
+        if (bo < 0) continue;
+        const o = ((dst.y + j) * CAMPO.tiles.width + (dst.x + i)) * 4;
+        for (let c = 0; c < 4; c += 1) {
+          if (tile.data[o + c] !== tile.data[bo + c]) { pyramidBad += 1; break; }
+        }
       }
     }
   }
 }
-report.check(pyramidBad === 0, 'every coarse cell is the maximum of the four under it',
+report.check(pyramidBad === 0,
+  'every coarse cell is the WHOLE word of the tallest column under it',
   pyramidBad ? `${pyramidBad} are not` : '');
-report.check(pyramidCarried === 0,
-  'and its material and its tint are the tallest of those four',
-  pyramidCarried ? `${pyramidCarried} are not` : '');
 
 // --------------------------------------------------------------------------
-// 4 to 7. THE PACKING, THE UNIT, THE ATLAS AND THE WRAP.
+// 4 to 8. THE PACKING, THE UNITS, THE ATLAS, THE WRAP AND THE TWO WINDOWS.
 // --------------------------------------------------------------------------
 const widths = [0];
 for (let w = MANTO.slim.low; w < MANTO.slim.high; w += 1) widths.push(w);
@@ -251,19 +317,77 @@ report.check(widths.map(campoSlimCode).every((c) => c >= 0 && c < 4),
   'two bits hold every width the law draws', `eighths ${widths.join(', ')}`);
 report.check(widths.every((w) => campoSlimEighths(campoSlimCode(w)) === w),
   'and every one of them comes back out unchanged');
-report.check(CAMPO_PRESENT > ((3 << 2) | 3),
-  'the bit of presence stands above the two fields packed under it', `${CAMPO_PRESENT}`);
+report.check(CAMPO_PRESENT > ((3 << 2) | 3) && CAMPO_SOIL_WALL === CAMPO_PRESENT * 2,
+  'the bits of presence and of the soil wall stand above the fields packed under',
+  `present ${CAMPO_PRESENT}, wall ${CAMPO_SOIL_WALL}`);
 
-report.check(Number.isInteger(VOXEL / CAMPO.unit) && CAMPO.unit === BLADE / SUB,
-  'a voxel is a whole number of height units, and the unit is the mat own',
-  `${VOXEL / CAMPO.unit} to a voxel, ${(CAMPO.unit * 100).toFixed(2)} cm each, `
-  + `one byte spans ${(255 * CAMPO.unit).toFixed(4)} m`);
-report.check(CAMPO.side % CAMPO.tile === 0 && CAMPO.tile === CHUNK * BLADES_PER_VOXEL,
-  'the window is a whole number of chunks, and a chunk is the engine own',
-  `${CAMPO.side / CAMPO.tile} chunks a side of ${CAMPO.tile} texels`);
-report.check((CAMPO.tile >> (CAMPO.levels - 1)) >= 1,
-  'no level of the pyramid has a cell wider than the chunk that writes it',
-  `level ${CAMPO.levels - 1} is ${CAMPO.tile >> (CAMPO.levels - 1)} texels of a tile`);
+report.check(Number.isInteger(VOXEL / CAMPO.unitBlade) && CAMPO.unitBlade === BLADE / SUB
+  && CAMPO.unitGround === VOXEL,
+'a voxel is a whole number of blade units, and the ground is counted in voxels',
+`${VOXEL / CAMPO.unitBlade} blade units to a voxel of ${(CAMPO.unitGround * 100).toFixed(0)} cm; `
++ `the ground byte spans ${(-CAMPO_BIAS * VOXEL).toFixed(1)} to `
++ `${((255 - CAMPO_BIAS) * VOXEL).toFixed(1)} m, the blade byte `
++ `${(255 * CAMPO.unitBlade).toFixed(2)} m`);
+report.check(campoTopStep(campoDecode(new Uint8Array([0, campoGroundByte(-1), 16, 0]), 0)) === -1,
+  'and a ground byte comes back as the voxel step it was written from');
+
+for (const shape of [CAMPO, CAMPO_FAR]) {
+  report.check(shape.side % shape.tile === 0 && shape.tile === CHUNK * BLADES_PER_VOXEL,
+    `the ${shape.name} window is a whole number of tiles, and a tile is the engine's own`,
+    `${shape.side / shape.tile} tiles a side of ${shape.tile} texels, `
+    + `${(shape.side * shape.cell).toFixed(1)} m across at ${(shape.cell * 100).toFixed(0)} cm`);
+  report.check((shape.tile >> (shape.levels - 1)) >= 1,
+    `no level of the ${shape.name} pyramid has a cell wider than the tile that writes it`,
+    `level ${shape.levels - 1} is ${shape.tile >> (shape.levels - 1)} texels of a tile`);
+
+  let overlap = 0;
+  for (let a = 0; a < shape.levels; a += 1) {
+    for (let b = a + 1; b < shape.levels; b += 1) {
+      const A = { ...shape.atlas.origins[a], s: shape.side >> a };
+      const B = { ...shape.atlas.origins[b], s: shape.side >> b };
+      if (A.x < B.x + B.s && B.x < A.x + A.s && A.y < B.y + B.s && B.y < A.y + A.s) overlap += 1;
+    }
+  }
+  report.check(overlap === 0, `no two levels of the ${shape.name} atlas claim one texel`,
+    `${shape.atlas.width} x ${shape.atlas.height}, `
+    + `${(shape.bytes / 1048576).toFixed(2)} MB on the card`);
+  report.check(shape.atlas.origins.every((o, l) => o.x + (shape.side >> l) <= shape.atlas.width
+    && o.y + (shape.side >> l) <= shape.atlas.height),
+  `and every level of the ${shape.name} atlas stands inside its picture`);
+
+  let straddle = 0;
+  for (let c = -9; c <= 9; c += 1) {
+    for (let level = 0; level < shape.levels; level += 1) {
+      const slot = campoSlot(c * shape.tile, c * shape.tile, level, shape);
+      if (slot.x % slot.size !== 0 || slot.y % slot.size !== 0
+        || slot.x + slot.size > (shape.side >> level)
+        || slot.y + slot.size > (shape.side >> level)) straddle += 1;
+    }
+  }
+  report.check(straddle === 0,
+    `a ${shape.name} tile is aligned at every level and never straddles the wrap`,
+    straddle ? `${straddle} do` : '');
+}
+
+// THE TWO WINDOWS ARE ONE LATTICE, which is what lets the traversal keep one
+// level counter: a far cell at level L must cover exactly the ground a near
+// cell at level L + CAMPO_FAR_SHIFT covers, and start at the same place.
+report.check(CAMPO_FAR.cell === CAMPO.cell * CAMPO_FAR_RATIO
+  && (1 << CAMPO_FAR_SHIFT) === CAMPO_FAR_RATIO,
+'a far texel is exactly a cell of level three of the near pyramid',
+`${CAMPO_FAR_RATIO} near cells to a far one, shift ${CAMPO_FAR_SHIFT}`);
+let lattice = 0;
+for (let level = CAMPO_FAR_SHIFT; level < CAMPO.levels; level += 1) {
+  const nearSpan = CAMPO.cell * (2 ** level);
+  const farSpan = CAMPO_FAR.cell * (2 ** (level - CAMPO_FAR_SHIFT));
+  if (Math.abs(nearSpan - farSpan) > 1e-12) lattice += 1;
+}
+report.check(lattice === 0,
+  'and at every level the two lattices are the same lattice',
+  lattice ? `${lattice} levels differ` : '');
+report.check(CAMPO_FAR_BLADE > 0 && CAMPO_FAR_BLADE <= 255,
+  'the far window carries the mat as the law own mean and not as a sample',
+  `${CAMPO_FAR_BLADE} quarter-blades = ${(CAMPO_FAR_BLADE * CAMPO.unitBlade * 100).toFixed(1)} cm`);
 
 let worstTint = 0;
 for (let ix = -60; ix < 60; ix += 1) {
@@ -277,32 +401,8 @@ report.check(worstTint <= step / 2 + 1e-9,
   'the tint survives the byte to within half a step of it',
   `worst ${worstTint.toFixed(5)} against half a step ${(step / 2).toFixed(5)}`);
 
-let overlap = 0;
-for (let a = 0; a < CAMPO.levels; a += 1) {
-  for (let b = a + 1; b < CAMPO.levels; b += 1) {
-    const A = { ...CAMPO_ATLAS.origins[a], s: CAMPO.side >> a };
-    const B = { ...CAMPO_ATLAS.origins[b], s: CAMPO.side >> b };
-    if (A.x < B.x + B.s && B.x < A.x + A.s && A.y < B.y + B.s && B.y < A.y + A.s) overlap += 1;
-  }
-}
-report.check(overlap === 0, 'no two levels of the atlas claim one texel',
-  `${CAMPO_ATLAS.width} x ${CAMPO_ATLAS.height}`);
-report.check(CAMPO_ATLAS.origins.every((o, l) => o.x + (CAMPO.side >> l) <= CAMPO_ATLAS.width
-  && o.y + (CAMPO.side >> l) <= CAMPO_ATLAS.height),
-'and every level of it stands inside the picture');
-
-let straddle = 0;
-for (let c = -9; c <= 9; c += 1) {
-  for (let level = 0; level < CAMPO.levels; level += 1) {
-    const slot = campoSlot(c * CAMPO.tile, c * CAMPO.tile, level);
-    if (slot.x % slot.size !== 0 || slot.y % slot.size !== 0
-      || slot.x + slot.size > (CAMPO.side >> level)
-      || slot.y + slot.size > (CAMPO.side >> level)) straddle += 1;
-  }
-}
-report.check(straddle === 0,
-  'a chunk square is aligned at every level and never straddles the wrap',
-  straddle ? `${straddle} do` : '');
+report.line(`        one texel in metres: ${JSON.stringify(campoHeights(
+  campoDecode(new Uint8Array([8, campoGroundByte(0), 16, 0]), 0)))}`);
 
 if (process.argv.includes('--self')) {
   // THE OTHER DIRECTION, which is the half a guard is usually missing: the run
@@ -314,12 +414,12 @@ if (process.argv.includes('--self')) {
       caught: injected ? !clean : true,
     },
     {
-      what: 'a coarse cell told a maximum its children do not reach',
+      what: 'a coarse cell told a top its children do not reach',
       caught: injected ? pyramidBad > 0 : true,
     },
   ]);
 }
 
-report.end(`${walked} texels over ${CHUNKS.length} chunks; the picture is `
-  + `${(CAMPO_ATLAS.width * CAMPO_ATLAS.height * 4 / 1048576).toFixed(2)} MB on the card `
-  + `and a chunk ${(CAMPO_TILE.width * CAMPO_TILE.height * 4 / 1024).toFixed(0)} kB on the wire`);
+report.end(`${walked} near texels over ${CHUNKS.length} tiles and ${farWalked} far ones; `
+  + `the two pictures are ${((CAMPO.bytes + CAMPO_FAR.bytes) / 1048576).toFixed(2)} MB on the card `
+  + `and a near tile ${(CAMPO.tileBytes / 1024).toFixed(0)} kB on the wire`);

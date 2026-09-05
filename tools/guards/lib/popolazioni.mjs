@@ -167,16 +167,14 @@ export function populations(root) {
         });
       },
     },
-    {
-      name: 'guscio', owner: 'FOND', grid: 56,
-      where: 'ground-shell.js: gli indici che E-FOND-PIANO10 ha scambiato',
-      async build() {
-        const shell = await load('src/world/ground-shell.js');
-        const built = shell.createGroundShell({ radius: 35, material: null });
-        const mesh = built.mesh || built.meshes[0];
-        return [{ mesh: fromMesh(mesh), side: 'FrontSide' }];
-      },
-    },
+    // IL GUSCIO NON E' PIU' UNA POPOLAZIONE. Era un disegno solo, 7.168
+    // triangoli dall'orlo del disco ai cento metri, e resta la storia migliore
+    // di questo censimento: i suoi due triangoli per quad erano avvolti in
+    // senso orario visti dall'alto, il materiale e' FrontSide, e per un'intera
+    // campagna non ne e' stato disegnato nemmeno uno. E-DECISIONI13 lo ha
+    // ritirato -- oltre l'altopiano il terreno e' COLONNE e lo disegna il campo
+    // ray-marchato -- e un raggio non ha un avvolgimento da sbagliare. Qui non
+    // resta niente da contare.
     {
       name: 'manto, cumuli, tasselli', owner: 'FOND', grid: 40, rays: 'sample',
       where: 'voxel/mesher.js QUAD_INDEX e le quaterne di spigoli per faccia',

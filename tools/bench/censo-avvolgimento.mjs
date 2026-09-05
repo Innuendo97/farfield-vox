@@ -242,17 +242,13 @@ await take('avatar', 'V8', async () => {
 
 // ------------------------------------------------------- the foundation, mine
 
-await take('guscio (oltre il disco)', 'FOND', async () => {
-  const shell = await load('src/world/ground-shell.js');
-  const built = shell.createGroundShell({ radius: 35, material: null });
-  const mesh = built.mesh || built.meshes[0];
-  return {
-    mesh: fromMesh(mesh),
-    side: 'FrontSide',
-    grid: 56,
-    where: 'ground-shell.js:179 index',
-  };
-});
+// THE SHEET BEYOND THE DISC IS NOT A POPULATION ANY MORE. It was one draw of
+// 7 168 triangles from the rim to a hundred metres, and it is the census's own
+// best story: its two triangles a quad were wound clockwise seen from above,
+// the material is FrontSide, and the whole of it was culled for a whole
+// campaign. E-DECISIONI13 retired it -- past the plateau the ground is COLUMNS
+// and the ray-marched field draws them -- and a ray has no winding to get
+// wrong. There is nothing left here to count.
 
 await take('manto, cumuli e tasselli', 'FOND', async () => {
   const pure = await load('src/world/voxel/pure.js');

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
-  BASE_STEP, BLADE, CENTRE, CHUNK, DISC_RADIUS, FRAMED, MANTO, MATERIAL, MOUND, NO_COLUMN, SUB,
-  VOXEL,
+  BASE_STEP, BLADE, CENTRE, CHUNK, DISC_RADIUS, FRAMED, MANTO, MATERIAL, MOUND, NO_COLUMN,
+  PLATEAU, SUB, VOXEL,
   cellMaterialAt,
   chunkColumns, clearColumn, columnCount, columnSpec, columnTop, createColumns, depthAt,
   framedTally, matAt, meadowMoundAt, moundAt, moundCutAt, onPaving, paintTop, PATH, pathDrop,
@@ -10,7 +10,7 @@ import {
 // AND THE CONTRACT, because from step 6 the walker's floor is not the law any
 // more: it is the store, read through a cache of tiles that only this file's
 // last leg can prove answers the same thing the frame is cut from.
-import { builtHeightAt, groundHeightAt, setGroundDiscRadius } from '../../src/world/contracts.js';
+import { builtHeightAt, groundHeightAt } from '../../src/world/contracts.js';
 import { PLATFORM, STAIRS } from '../../src/world/layout.js';
 import { TIERS } from '../../src/core/quality.js';
 import { TUNING } from '../../src/core/presence.js';
@@ -589,7 +589,6 @@ export function editsHold() {
  * back a stale tile would show up as a floor over a hole.
  */
 export function contractReadsTheStore(radius, injected = 0) {
-  setGroundDiscRadius(radius);
   const i0 = Math.round((CENTRE.x - radius) / VOXEL);
   const i1 = Math.round((CENTRE.x + radius) / VOXEL);
   const j0 = Math.round((CENTRE.z - radius) / VOXEL);
@@ -602,7 +601,12 @@ export function contractReadsTheStore(radius, injected = 0) {
       const x = (i + 0.5) * VOXEL;
       const z = (j + 0.5) * VOXEL;
       if (Math.hypot(x - CENTRE.x, z - CENTRE.z) > radius) continue;
-      const top = columnTop(i, j, true, radius);
+      // THE WORLD AND NOT THE DISC (E-DECISIONI13). The contract cuts its tiles
+      // at the PLATEAU with the boundary beyond it, because a walker may step
+      // off the plateau now and the ground out there is columns like any
+      // other; asking the law for a disc would compare the floor against a
+      // world that stopped where no tier's disc stops any more.
+      const top = columnTop(i, j, true, PLATEAU, true);
       // `injected` is the self test's own hand on the answer: nought in every
       // real run, one voxel when the file is asked to prove that it would catch
       // a floor that had drifted off the store by the smallest thing there is.
