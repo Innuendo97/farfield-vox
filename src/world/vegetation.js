@@ -1151,13 +1151,26 @@ const HEAD_SHADE = 0.34;
  *
  * AND THE SHUT WIDTH IS A READING. At one metre -- the range the committente
  * walks the meadow at -- a centimetre of flower is 15 pixels of the delivered
- * frame, so a hole of 0.14 of a 7.5 cm head is 16 px across and a blue one of
- * 0.09 is 10 px: a hole a walker can SEE is the whole point of putting one
+ * frame, so a hole of 0.161 of a 7.5 cm head is 18 px across and a blue one of
+ * 0.1035 is 12 px: a hole a walker can SEE is the whole point of putting one
  * there, and a hole a couple of pixels wide would be a dark speck rather than an
  * opening. Both are gated off the boxes and printed in the verbale's sweep.
+ *
+ * AND THE SHUT WIDTH IS THE ONE THE COMMITTENTE MOVED. E-DECISIONI17, on the
+ * tables of E-FIORI5: <<leggermente piu' largo di com'e'>> -- so +15% and not a
+ * doubling. 0.14 and 0.09 of a head become 0.161 and 0.1035, which is a white
+ * day hole of 1.05 -> 1.21 cm and each of the four blue ones 0.68 -> 0.78.
+ *
+ * THREE THINGS DELIBERATELY DO NOT MOVE WITH IT. The OPEN widths, because they
+ * are the clearance the lamp needs and a clearance is not a taste. The LAW
+ * between the two ends, because holeHalf() is the same line it was and this is
+ * a wider shut end fed into it. And the RIM the lid keeps outside its widest
+ * hole (LID_RIM), because that rim is measured against the OPEN hole: the blue
+ * lid already stands at the floor of it, and a shut end that widens cannot
+ * spend a rim it never touches -- 3.75 mm before and 3.75 mm after, gated.
  */
-const HOLE_WHITE = { shut: 0.14, open: 0.40 };
-const HOLE_CYAN = { shut: 0.09, open: 0.28 };
+const HOLE_WHITE = { shut: 0.161, open: 0.40 };
+const HOLE_CYAN = { shut: 0.1035, open: 0.28 };
 
 /**
  * THE RIM THE LID KEEPS OUTSIDE ITS WIDEST HOLE, as a share of the head.
@@ -1183,14 +1196,25 @@ const LID_RIM = 0.05;
  * OPENING is a throat: four inward-facing panels hanging under the rim, which
  * catch the light on their own normals and put a lip of shadow round the hole.
  *
- * A FIFTH OF THE HEAD'S HEIGHT, and the ceiling on it is arithmetic: the throat
- * must not reach the lamp under it, or the two would intersect and the lamp
- * would be drawn through its own chimney. The white lamp's top stands 2.51 cm
- * under the lid at the nominal size and the throat comes down 1.27, so it stops
- * 1.24 cm short; the blue stamens stand lower still. guard-fiori reads that
- * clearance off the boxes.
+ * ELEVEN HUNDREDTHS OF THE HEAD'S HEIGHT, and the ceiling on it is arithmetic:
+ * the throat must not reach the lamp under it, or the two would intersect and
+ * the lamp would be drawn through its own chimney. The white lamp's top stands
+ * 2.51 cm under the lid at the nominal size and the throat comes down 0.63, so
+ * it stops 1.88 cm short; the blue stamens stand lower still. guard-fiori reads
+ * that clearance off the boxes.
+ *
+ * IT WAS A FIFTH (0.22 = 1.27 cm) UNTIL E-DECISIONI17, WHICH HALVED IT. The
+ * committente was given the throat as a depth to keep, halve or drop and chose
+ * <<meta'>>: a lip of shadow round the hole, but a shallower one, so the walker
+ * looking down reads an opening in a lid rather than a chimney. HALF THE DEPTH
+ * IS NOT HALF THE PRICE, AND THAT IS THE POINT OF DOING IT THIS WAY: the throat
+ * is four panels a hole however deep it is, so this moves the y of one row of
+ * corners and NOT the face count -- 56 and 164 triangles a flower before and
+ * after, and the 4,928 triangles the throat costs the dense meadow stay spent.
+ * Dropping it was the option that would have bought them back; the committente
+ * did not take it.
  */
-const THROAT = 0.22;
+const THROAT = 0.11;
 
 /**
  * THE DAY'S OWN CEILING ON THE APERTURE, and it is a gate as much as a number.
