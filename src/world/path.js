@@ -1,5 +1,6 @@
 import {
-  clamp01, pathCentreX, pathCoord, pathEdge, pathHalfWidth, pathRun, smoothstep,
+  clamp01, pathCoord, pathEdge, pathFrameX, pathHalfWidth, pathOffset, pathRun,
+  smoothstep,
 } from './terrain-field.js';
 
 // THE CORRIDOR, AND IT IS A SURFACE OF ITS OWN FROM HERE ON.
@@ -62,14 +63,27 @@ import {
 // on meadow that has no joints in it. Laid along the run, every texel is on or
 // beside the paving.
 export const PATH_SKIN = {
-  // Half a metre wider than the stone ever gets, and the half metre is spent
-  // rather than rounded up to. pathHalfWidth() tops out at 0.7751 m, pathEdge()
-  // adds up to 19% of that plus 4.34 cm of wander, so the paving can reach
-  // 0.966 m from the centreline; the slabs that surface in the grass beyond the
-  // verge reach a quarter of a metre past that. At 1.25 the strip's own edge
-  // always stands in meadow, which is what lets the frame clamp at the border
-  // instead of carrying a window: nothing out there is drawn.
-  half: 1.25,
+  // Wide enough to hold the corridor wherever the axis takes it, and the number
+  // is solved rather than chosen.
+  //
+  // IT WAS SHORT BEFORE THIS, AND THE PARAGRAPH THAT STOOD HERE SAID WHY WITHOUT
+  // NOTICING. It read pathHalfWidth "tops out at 0.7751 m", which was true when
+  // the seed wrote it and stopped being true when U-SENT-4 refitted the width
+  // against the reference: the flare in front of the bottom step is a half width
+  // of 1.20 m now, pathEdge takes it to 1.32 with its wobble, and 1.25 has been
+  // clipping the outer three centimetres of that flare ever since.
+  //
+  // AND THE RIBBON IS NOT THE AXIS ANY MORE, which is what the other 18 cm buy.
+  // The axis is a measured meander (PATH_CENTRE in ../terrain-field.js) and the
+  // fragment that mirrors this mapping solves a smoothstep out of four uniforms,
+  // which cannot follow one. So the ribbon is a straight-ish band that CONTAINS
+  // the corridor instead of tracking it: it stands 0.51 m off the axis at its
+  // worst, the paving reaches 1.32 m of easting from the axis at its worst, and
+  // the two together want 1.506 m. Four centimetres of margin over that, so the
+  // strip's own edge always stands in meadow -- which is what lets the frame
+  // clamp at the border instead of carrying a window: nothing out there is
+  // drawn.
+  half: 1.55,
   // Both ends stand on ground with no paving drawn on it. The stone begins at
   // -9.1 and pathRun() has let go of it by 30, so a strip that stopped while the
   // paving was still live would draw a line ACROSS the run at a fixed northing
@@ -91,7 +105,14 @@ export const PATH_SKIN = {
   // pitch that matters is the same on both; the seed shipped 7.0 mm across and
   // 22.9 along because its strip had to cover fifty metres of a path twice this
   // wide. A narrower corridor buys the along axis back.
-  size: [320, 5120],
+  //
+  // THE COUNT ACROSS ROSE WITH THE HALF AND THE PITCH DID NOT. 320 texels over
+  // 2.50 m was 7.81 mm; 400 over 3.10 m is 7.75. The pitch is what decides which
+  // joints survive being sampled at all and it is the one thing here that is not
+  // allowed to move, so the ribbon growing by a quarter costs a quarter more
+  // texels and nothing else -- in particular the 2 cm window U-SENT-4 fitted the
+  // joint's softening on is still two and a half texels wide.
+  size: [400, 5120],
   // AND THE TONE TRAVELS SEPARATELY, AT A QUARTER OF THAT.
   //
   // The two fields on this strip do not want the same pitch and they do not
@@ -108,7 +129,9 @@ export const PATH_SKIN = {
   // half the width of the median joint drawn over it. Below that the ramp gets
   // wider than the joint and two pieces start borrowing each other's level,
   // which is the one thing the identity between slabs cannot survive.
-  toneSize: [128, 2048],
+  // 160 across and not 128, for the same reason and to the same effect: 19.38 mm
+  // against the 19.53 the eight-texel piece was measured at.
+  toneSize: [160, 2048],
 };
 
 /** How much ground one texel of a strip map covers, in metres: across, along. */
@@ -122,17 +145,24 @@ export function skinPitch(size = PATH_SKIN.size) {
 /**
  * Where a world point falls on the strip, both in 0..1.
  *
- * BUILT ON pathCentreX AND NOTHING ELSE, exactly as the seed is. pathCoord()
- * would have been the obvious thing to reach for and it is the wrong thing: it
- * divides by pathEdge(), which has a noise in it, so the frame would breathe in
- * and out with the wobble of the edge and the paving would swim along the run.
- * The centreline is fitted arithmetic with no noise anywhere in it, so this
- * mapping is smooth, and being smooth is what lets the frame interpolate it
- * across a quad and still get a defined mip.
+ * BUILT ON pathFrameX AND NOTHING ELSE. pathCoord() would have been the obvious
+ * thing to reach for and it is the wrong thing: it divides by pathEdge(), which
+ * has a noise in it, so the frame would breathe in and out with the wobble of
+ * the edge and the paving would swim along the run. What carries the frame has
+ * to be arithmetic with no noise anywhere in it, because being smooth is what
+ * lets a fragment interpolate this across a quad and still get a defined mip.
+ *
+ * AND IT IS THE FRAME AND NOT THE AXIS, WHICH IS NEW. The two were the same
+ * function while the axis was a ramp. The axis is a measured meander now and
+ * the fragment that mirrors this mapping cannot solve one, so the ribbon stopped
+ * being the axis and became a straight-ish band wide enough to hold the corridor
+ * wherever it goes. The maps below are painted through this same seat, so the
+ * painter and the fragment agree to the bit; what the corridor does inside the
+ * band is carried by the CONTENT of the maps, which is sampled off the world.
  */
 export function pathSkinUv(x, z) {
   return {
-    u: (x - pathCentreX(z)) / (2 * PATH_SKIN.half) + 0.5,
+    u: (x - pathFrameX(z)) / (2 * PATH_SKIN.half) + 0.5,
     v: (z - PATH_SKIN.z0) / (PATH_SKIN.z1 - PATH_SKIN.z0),
   };
 }
@@ -140,7 +170,7 @@ export function pathSkinUv(x, z) {
 /** The world point a strip coordinate looks at. The painter's way round. */
 export function skinToWorld(u, v) {
   const z = PATH_SKIN.z0 + v * (PATH_SKIN.z1 - PATH_SKIN.z0);
-  return { x: pathCentreX(z) + (u - 0.5) * 2 * PATH_SKIN.half, z };
+  return { x: pathFrameX(z) + (u - 0.5) * 2 * PATH_SKIN.half, z };
 }
 
 // How far the field is allowed to say, in metres, and what one code is worth.
@@ -610,7 +640,7 @@ function bareShare(base, x, z) {
 function lateral(x, z) {
   const half = pathHalfWidth(z);
   if (!(half > 0)) return null;
-  return Math.abs(x - pathCentreX(z)) / half;
+  return Math.abs(pathOffset(x, z)) / half;
 }
 
 /**
