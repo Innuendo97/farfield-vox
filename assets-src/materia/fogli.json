@@ -31,12 +31,6 @@
       "seed": 409,
       "cut": [717, 847, 738, 857],
       "note": "The inside of one slab of the near paving, twenty two by eleven, clear of the black crack that runs under it at row 858. The reference's slabs are 20 to 40 px across at six metres -- BIGGER THAN A VOXEL -- so what a sheet can carry is the grain inside a slab and not the lattice of slabs. That lattice is src/world/path.js's law, baked into the two maps the corridor already reads, and it stays exactly where it is: this unit does not own that file."
-    },
-    {
-      "id": "flower-band",
-      "kind": "banda",
-      "band": { "spine": 0.20, "top": 0.18 },
-      "note": "NOT A CUT, AND THE REASON IS THAT THERE IS NOTHING TO CUT: a flower head in the reference is 13 to 21 px across, which is one voxel, and the pistil inside it is a band about five pixels wide. Photographed at that size there is no texel structure to lift. So this sheet is the band U-PIG-2 FITTED, rasterised at sixteen: the spine down the middle of each side and the lid under its top, at the two widths that unit settled between the dossier's two readings of where the yellow sits. It carries a MASK and not a grain -- nought is the pale pigment of a petal, one is the pistil -- so its mean is not a half but the share of a side the band covers, and the far family reads exactly that number to paint a head it draws as a single quad. Cutting it as a sheet moves nothing anybody can see and buys two things: the shape becomes data, so the next reading of the reference can enter without a shader edit, and the softening at range becomes the mip chain's instead of a fwidth, which cannot crawl."
     }
   ]
 }

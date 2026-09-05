@@ -1,6 +1,6 @@
 {
   "owner": "V4",
-  "note": "The green asks for ONE sheet of blades and one mask of a pistil. The accent's cards need a sheet because a blade is a picture; the flower head does not, because a flower here is a cube and no cube in this world carries a picture of itself. What the flower DOES carry is a mask of where its second pigment goes -- the band C 1.6 measured at 22 to 40 per cent of a head, on the four samples under one and a half voxels -- and that used to be two smoothsteps in the fragment. As a sixteen texel sheet it is the same shape at the same share and it is DATA: the next reading of the reference enters as a rectangle in assets-src/materia/fogli.json rather than as an edit to a shader, and the softening at range becomes the mip chain's, which cannot crawl. props-atlas went with the crossed cards and the two bushes E-V4d gave to V1.",
+  "note": "The green asks for ONE sheet of blades and nothing else. The accent's cards need a sheet because a blade is a picture; the flower head does not, because a flower here is a bud of petals and no cube in this world carries a picture of itself. THE PISTIL'S MASK WENT WITH E-DECISIONI15: it said WHERE on a face the warm pigment stood, which was the right shape for a pistil painted on the outside of a head, and the committente's flower carries its pistil INSIDE the bud where the petals pass light over it. Nothing samples it, so it is not declared -- the rule of E-RICERCA-C 10, which counted 807,579 bytes of texture in this world that nobody reads. props-atlas went earlier, with the crossed cards and the two bushes E-V4d gave to V1.",
   "assets": [
     {
       "id": "grass-atlas",
@@ -8,15 +8,6 @@
       "role": "albedo",
       "source": "vegetation/grass-atlas.png",
       "priority": "high"
-    },
-    {
-      "id": "flower-band",
-      "type": "texture",
-      "role": "coverage",
-      "channels": 1,
-      "source": "materia/flower-band.png",
-      "priority": "high",
-      "note": "The pistil of a white flower, as a mask: nought is the pale pigment of a petal and one is the warm. Rasterised by tools/materia/foglio.mjs out of the two widths U-PIG-2 fitted -- the spine down the middle of each side and the lid under its top -- so its mean IS the share the far family paints its single quad with, and the two halves of the meadow cannot come to hold two different numbers for it. R8 raw with zstd and no transfer, like every other fraction this delivery carries: a mask is not a picture, and a texture with a transfer comes back from the sampler decoded. It KEEPS its mip chain, unlike the soil's strip beside it, because it is drawn as it arrives rather than cut into layers -- and the chain is the point: a head shrinking towards the exchange ring climbs it until the last level returns exactly that mean. High and not critical: a head with no pistil is the flower the campaign shipped a day ago, which is a poorer picture and not a wrong one."
     }
   ]
 }

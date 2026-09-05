@@ -50,12 +50,15 @@ import sharp from 'sharp';
 //      so that the sum over the sheet is exactly 127.5 * 256 -- the byte grid
 //      has no 0.5, so the mean is bought texel by texel and not by luck.
 //
-// AND ONE SHEET IS NOT A GRAIN AT ALL. The flower's is a MASK: nought is the
-// pale pigment of a petal and one is the pistil, and its mean is therefore not
-// a half but the share of a side face the pistil covers -- the number the far
-// family reads to paint a head that has become one quad. It is rasterised from
-// the two widths U-PIG-2 fitted rather than cut, because a head in the
-// reference is one voxel across and there is nothing in it to cut.
+// AND THERE WAS A FIFTH SHEET HERE THAT IS NOT ONE ANY MORE. The flower's band
+// was a MASK rather than a grain -- nought the pale pigment of a petal and one
+// the pistil -- rasterised from the two widths U-PIG-2 fitted instead of cut out
+// of the reference, because a head in the reference is one voxel across and
+// there is nothing in it to cut. E-DECISIONI15 moved the pistil INSIDE the bud,
+// where petals that pass light stand over it: there is no band on a face left to
+// mask, nothing samples the sheet, and the whole of it -- the recipe entry, the
+// rasteriser, the picture and its declaration in assets.d -- comes out rather
+// than staying on the disk as bytes no fragment reads.
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..', '..');
@@ -394,32 +397,6 @@ function fromCut(target, entry, side, sd, sigma) {
   };
 }
 
-/** The flower's band, rasterised out of the two widths U-PIG-2 fitted. */
-function fromBand(entry, side) {
-  const { spine, top } = entry.band;
-  const field = new Float64Array(side * side);
-  // Softened over exactly one texel, which is what the fragment's fwidth() was
-  // doing over exactly one pixel: the sheet is read with a linear filter, so
-  // the softening a mip level gives it at range is the right one for free.
-  const soft = (t) => Math.min(1, Math.max(0, t));
-  const reach = spine * 0.5;
-  for (let j = 0; j < side; j++) {
-    // The face's own v runs up: row 0 of a sheet is the TOP of the picture, and
-    // vFace.y is nought at the foot of the face.
-    const v = (side - 0.5 - j) / side;
-    for (let i = 0; i < side; i++) {
-      const u = (i + 0.5) / side;
-      const sp = soft((reach + 0.5 / side - Math.abs(u - 0.5)) * side);
-      const lid = soft((v - (1.0 - top) + 0.5 / side) * side);
-      field[j * side + i] = Math.max(sp, lid);
-    }
-  }
-  let share = 0;
-  for (const v of field) share += v;
-  share /= field.length;
-  return { field, reading: { spine, top, share: +share.toFixed(4) } };
-}
-
 /**
  * The four chunks a delivered picture is allowed to have, and nothing else.
  *
@@ -452,13 +429,9 @@ async function main() {
 
   const soil = [];
   const report = { side, sd: recipe.sd, sheets: [] };
-  let flower = null;
   for (const entry of recipe.sheets) {
-    const built = entry.kind === 'banda'
-      ? fromBand(entry, side)
-      : fromCut(target, entry, side, recipe.sd, recipe.sigma);
-    const wantMean = entry.kind === 'banda' ? built.reading.share : 0.5;
-    const { bytes, sum, want } = quantise(built.field, wantMean);
+    const built = fromCut(target, entry, side, recipe.sd, recipe.sigma);
+    const { bytes, sum, want } = quantise(built.field, 0.5);
     const levels = mipChain(bytes, side);
     const one = levels[levels.length - 1][0];
     report.sheets.push({
@@ -469,8 +442,7 @@ async function main() {
       mip1x1: one,
       mip1x1Frazione: +(one / 255).toFixed(4),
     });
-    if (entry.kind === 'banda') flower = bytes;
-    else soil.push({ id: entry.id, bytes });
+    soil.push({ id: entry.id, bytes });
   }
 
   // THE ARRAY TRAVELS AS A STRIP AND IS SLICED WHERE IT LANDS. One layer under
@@ -489,7 +461,6 @@ async function main() {
 
   const files = [
     ['soil-sheets.png', sheet, side, side * soil.length],
-    ['flower-band.png', Buffer.from(flower), side, side],
   ];
   for (const [name, buf, w, h] of files) {
     const png = strip(await sharp(buf, { raw: { width: w, height: h, channels: 1 } })
@@ -516,11 +487,9 @@ async function main() {
   for (const s of report.sheets) {
     process.stdout.write(`  ${s.id.padEnd(12)} media ${String(s.mediaByte).padStart(7)}`
       + `  mip 1x1 ${String(s.mip1x1).padStart(3)}`
-      + (s.deviazioneInterna !== undefined
-        ? `  faccia ${s.px[0]}x${s.px[1]} L ${s.L} deviazione interna ${s.deviazioneInterna}%`
-          + ` quota dopo il ricampionamento ${s.quotaDopoIlRicampionamento}`
-        : `  quota della banda ${s.share}`)
-      + '\n');
+      + `  faccia ${s.px[0]}x${s.px[1]} L ${s.L} deviazione interna ${s.deviazioneInterna}%`
+      + ` quota dopo il ricampionamento ${s.quotaDopoIlRicampionamento}
+`);
   }
 }
 

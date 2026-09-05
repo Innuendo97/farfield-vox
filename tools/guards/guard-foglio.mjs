@@ -18,20 +18,20 @@ import { REPO_ROOT, read, readJson, reporter, selfTest } from './lib.mjs';
 // not at level zero only, but at EVERY level of the chain, because the level a
 // fragment lands on is decided by how far away it is standing.
 //
-// AND ONE SHEET IS NOT A GRAIN, so it is not asked for a half. The flower's is a
-// MASK -- nought is the petal's pale pigment and one is the pistil -- and its
-// mean is the SHARE of a side the band covers. That number is not free either:
-// the far half of the meadow paints a head it draws as a single quad with
-// exactly that share, so if the sheet and the uniform ever part company the two
-// halves of one meadow become two different flowers at the ring between them.
-// This guard reads the share off the SHEET and off src/world/vegetation.js and
-// asserts they are the same number.
+// AND THERE WAS A FIFTH SHEET HERE THAT WAS NOT A GRAIN. The flower's band was a
+// MASK -- nought the petal's pale pigment and one the pistil -- and this guard
+// held its mean against the share src/world/vegetation.js painted its far quad
+// with, so the two halves of one meadow could not come to hold two different
+// flowers. E-DECISIONI15 put the pistil INSIDE the bud: there is no band on a
+// face to mask, the sheet is gone from the recipe and from the delivery, and the
+// two legs that read it are gone with it rather than being pointed at a file
+// that is no longer written. What replaced the leg is in guard-fiori, which
+// reads the lamp's share off the BOXES and off the far family's own uniform.
 //
 // THE OTHER DIRECTION, which is the half a guard is usually missing: --self
-// injects the four ways a sheet can go wrong -- a mean a level too pale, a mean
-// a level too dark, a layer declared in the recipe that the picture does not
-// carry, and a mask whose share has left the fragment behind -- and asserts that
-// each one is caught.
+// injects the three ways a sheet can go wrong -- a mean a level too pale, a mean
+// a level too dark, and a layer declared in the recipe that the picture does not
+// carry -- and asserts that each one is caught.
 //
 // AND IT READS THE DELIVERED PICTURE AND NOT THE RECIPE. The recipe is checked
 // too, by tools/materia/foglio.mjs --check, and that answers a different
@@ -40,7 +40,6 @@ import { REPO_ROOT, read, readJson, reporter, selfTest } from './lib.mjs';
 
 const SRC = 'assets-src/materia';
 const STRIP = `${SRC}/soil-sheets.png`;
-const BAND = `${SRC}/flower-band.png`;
 
 /** The tolerance, in levels of 255, on the mean of any level of the chain. */
 //
@@ -156,14 +155,6 @@ function slices(strip, side) {
   return out;
 }
 
-/** What the shader says the band's share is, read out of its two constants. */
-function shaderShare() {
-  const text = read('src/world/vegetation.js');
-  const spine = Number(/const BAND_SPINE = ([\d.]+);/.exec(text)[1]);
-  const top = Number(/const BAND_TOP = ([\d.]+);/.exec(text)[1]);
-  return spine + top * (1 - spine);
-}
-
 function main() {
   const r = reporter('guard-foglio -- the mean of a sheet is the colour of the far world');
   if (!existsSync(join(REPO_ROOT, STRIP))) {
@@ -175,7 +166,7 @@ function main() {
   r.check(strip.width === side, 'the strip is as wide as one sheet',
     `${strip.width} of ${side}`);
   const layers = slices(strip, side);
-  const names = recipe.sheets.filter((s) => s.kind !== 'banda').map((s) => s.id);
+  const names = recipe.sheets.map((s) => s.id);
   r.check(layers.length === names.length, 'the strip holds the layers the recipe names',
     `${layers.length} of ${names.length}`);
 
@@ -191,25 +182,12 @@ function main() {
       `worst ${worst.toFixed(2)} of ${EPS} levels, last ${last}`);
   }
 
-  // THE MASK IS A DIFFERENT CONTRACT AND IS ASKED FOR IT.
-  const band = pngGrey(BAND);
-  const share = mean(band.data) / 255;
-  const want = shaderShare();
-  const levels = chain(band.data, side);
-  const lastShare = levels[levels.length - 1][0] / 255;
-  r.check(Math.abs(share - want) * 255 <= EPS,
-    'the pistil sheet covers the share the fragment says it does',
-    `${share.toFixed(4)} against ${want.toFixed(4)}`);
-  r.check(Math.abs(lastShare - want) * 255 <= EPS,
-    'and its last level is that share, which is what the far family paints with',
-    `${lastShare.toFixed(4)}`);
-
   // AND THE SHEETS ARE WHAT THE CUTS PRODUCE, which is the recipe's own leg:
   // this states where that check lives rather than repeating it, because a
   // second implementation of the derivation is a second thing to drift.
   r.line('  ----  the derivation itself: node tools/materia/foglio.mjs --check');
-  r.end(`${layers.length} grain sheets and one mask, ${strip.width}x${strip.height} `
-    + `and ${band.width}x${band.height}, from ${SRC}/fogli.json`);
+  r.end(`${layers.length} grain sheets, ${strip.width}x${strip.height}, `
+    + `from ${SRC}/fogli.json`);
 }
 
 function self() {
@@ -236,21 +214,13 @@ function self() {
   // layer added to the recipe and not to the picture, which would leave the
   // array reading a slice of nothing.
   const missing = { ...readJson(`${SRC}/fogli.json`) };
-  const declared = missing.sheets.filter((x) => x.kind !== 'banda').length + 1;
-  const band = pngGrey(BAND);
-  const shifted = Uint8Array.from(band.data);
-  for (let i = 0; i < shifted.length; i += 3) shifted[i] = 255;
-  const share = mean(shifted) / 255;
+  const declared = missing.sheets.length + 1;
   selfTest('guard-foglio', [
     { what: 'a sheet two levels too pale', caught: worstOf(bump(4)) > EPS },
     { what: 'a sheet two levels too dark', caught: worstOf(bump(-4)) > EPS },
     {
       what: 'a layer declared in the recipe that the strip does not carry',
       caught: slices(strip, side).length !== declared,
-    },
-    {
-      what: 'a pistil mask whose share has left the fragment behind',
-      caught: Math.abs(share - shaderShare()) * 255 > EPS,
     },
   ]);
 }

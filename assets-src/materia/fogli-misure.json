@@ -105,16 +105,6 @@
    "mediaVoluta": 127.5,
    "mip1x1": 128,
    "mip1x1Frazione": 0.502
-  },
-  {
-   "id": "flower-band",
-   "spine": 0.2,
-   "top": 0.18,
-   "share": 0.3434,
-   "mediaByte": 87.566,
-   "mediaVoluta": 87.566,
-   "mip1x1": 88,
-   "mip1x1Frazione": 0.3451
   }
  ],
  "strip": {

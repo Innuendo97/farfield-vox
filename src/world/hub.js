@@ -181,6 +181,17 @@ export function buildHub() {
     /** The level the weather is read at, for the sweep that settles the gain. */
     setCloudLevel(scale) { return weather.setLevel(scale); },
 
+    /**
+     * WHAT HOUR THE FLOWERS ARE AT: shut with a faint lamp, or bloomed.
+     *
+     * The night is not built here (E-DECISIONI2) and the flower is parametric in
+     * its own hour instead (E-DECISIONI15.3), so this is the whole of what V7
+     * has to reach for. It is on the hub rather than inside the layer for the
+     * reason every other cross-session handle is: a session that needs it asks
+     * the WORLD, not another session's file.
+     */
+    setFlowerHour(hour) { green.setFlowerHour(hour); },
+
     /** What the vegetation is currently costing, for the development panel. */
     vegetationStats() {
       const stats = green.stats();

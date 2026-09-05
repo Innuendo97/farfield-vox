@@ -55,11 +55,20 @@ export function populations(root) {
 
   return [
     {
+      // DUE ORA, E SONO DUE GEOMETRIE. E-DECISIONI15 da' ai due fiori due lampade
+      // diverse -- una al centro del bianco, quattro agli angoli del blu -- e il
+      // ramo le disegna con due mesh invece di far pagare a ogni pianta tutte e
+      // due. Il guscio e' a PANNELLI su due facce: l'avvolgimento non decide piu'
+      // se una faccia si disegna, decide come e' illuminata, e la chiusura del
+      // bocciolo la misura guard-fiori con i propri raggi.
       name: 'fiori', owner: 'V4', closed: true,
       where: 'vegetation.js flowerCensus / il materiale del fiore vicino',
       async build() {
         const veg = await load('src/world/vegetation.js');
-        return [{ mesh: { faces: veg.flowerCensus().faces }, side: 'FrontSide' }];
+        const faces = veg.flowerCensus().faces;
+        return ['bianco', 'ciano'].map((kind) => ({
+          suffix: kind, mesh: { faces: faces[kind] }, side: 'DoubleSide',
+        }));
       },
     },
     {

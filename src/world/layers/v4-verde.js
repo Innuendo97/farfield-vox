@@ -45,20 +45,20 @@ const layer = {
     // fragment below no longer declares it and the tool that painted it is
     // gone, which is also how assets-src/vegetation/palette.json loses its last
     // consumer instead of being patched (E-V4f.3).
-    // AND ONE MORE, WHICH IS A HUNDRED AND FIFTY BYTES AND IS NOT A SHEET OF
-    // BLADES. The flower's pistil was two smoothsteps in the fragment; it is
-    // now the same shape delivered as a sixteen texel mask, so what the
-    // reference says about where the yellow sits can enter as a rectangle in
-    // assets-src/materia/fogli.json instead of as a shader edit. The head is
-    // still a cube with no picture ON it: this is a mask of WHERE the second
-    // pigment goes, which is a different thing and costs a hundred and fifty
-    // bytes to say exactly.
-    needs: ['grass-atlas', 'flower-band'],
+    // AND THE PISTIL'S OWN MASK GOES WITH THEM, WHICH IS THE SECOND SHEET THIS
+    // LAYER HAS RETIRED. It was a sixteen texel picture saying WHERE on a face
+    // the warm pigment stood, and it was the right shape for a pistil painted on
+    // the OUTSIDE of a head. E-DECISIONI15 put the pistil inside the bud -- a
+    // solid seen through petals that pass light -- so there is no band on a face
+    // to mask and nothing samples the sheet. It stops being declared, here and
+    // in assets-src/assets.d/v4-verde.json and in the recipe that cut it, rather
+    // than being kept as a texture nobody reads: E-RICERCA-C §10 counted 807,579
+    // such bytes in this world and was right to.
+    needs: ['grass-atlas'],
 
     build(assets) {
       layer.vegetation = createVegetation({
         grassAtlas: assets['grass-atlas'],
-        flowerBand: assets['flower-band'] || null,
         // Where the ground is, which the hub knows and no delivery carries.
         height: assets.height,
       });
@@ -90,6 +90,19 @@ const layer = {
   /** And the flowers on their own, for the same reason. */
   setFlowersVisible(visible) {
     if (layer.vegetation) layer.vegetation.setFlowersVisible(visible);
+  },
+
+  /**
+   * THE HOUR OF THE FLOWERS, AND IT IS THE DOOR V7 WILL COME THROUGH.
+   *
+   * E-DECISIONI15 puts the day at shut buds with a faint lamp inside and the
+   * night at open ones with the pistils out; E-DECISIONI2 says the night is not
+   * built on this branch. So the flower is parametric and this is the one handle
+   * that moves it -- a bloom from nought to one and how hard the lamps burn.
+   * Nothing on this branch calls it: the day is what the meadow is built at.
+   */
+  setFlowerHour(hour) {
+    if (layer.vegetation) layer.vegetation.setHour(hour);
   },
 
   /** What the layer is currently costing, for the development panel. */
