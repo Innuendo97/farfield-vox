@@ -2,8 +2,13 @@ import { stairHeightAt as stairRunHeight } from './stairs.js';
 import { flowerField } from './vegetation.js';
 import { PLATFORM } from './layout.js';
 import {
-  BASE_STEP, CENTRE, DISC_RADIUS, MATERIAL, NO_COLUMN, VOXEL, chunkColumns, matAt, topAt,
+  BASE_STEP, CENTRE, MATERIAL, NO_COLUMN, VOXEL, chunkColumns, matAt, topAt,
 } from './voxel/mesher.js';
+// THE PLATEAU, which is where the meadow's own law stops and the boundary's
+// begins. It is a property of the WORLD -- the committente's «l'area giocabile
+// e' il disco su un altopiano» -- and no longer of a tier, so the floor reads
+// it from the seat that states it instead of being told a radius by a layer.
+import { PLATEAU } from './voxel/confine.js';
 
 // THE CONTRACTS BETWEEN THE SESSIONS, AND THE ONLY DOOR BETWEEN THEM.
 //
@@ -68,33 +73,16 @@ import {
 // than hidden: it lands the first time the walker sets foot in a chunk of the
 // disc and never again while he is on it.
 
-// How far the ten centimetre ground reaches, in metres.
+// HOW FAR THE TEN CENTIMETRE GROUND REACHES, AND WHY NOBODY IS TOLD ANY MORE.
 //
-// THE TIER DECIDES IT AND THE GROUND DECLARES IT, because the disc that ships
-// is not the engine's own: quality.js carries 14 m on three tiers and 12 on the
-// fourth, and a contract that answered for 35 would be promising cubes over
-// twenty metres of ground the page draws as sheet. The engine's default sits
-// here only so that the honest answer to "nobody has said yet" is the engine's
-// and not a number invented in this file.
-let discRadius = DISC_RADIUS;
-
-/**
- * What the ground session laid, told to the seat that has to answer for it.
- *
- * Called by src/world/layers/v1-suolo.js at the one place the radius is
- * resolved, so the disc, the sheet and this contract are three readers of ONE
- * decision rather than three opinions about it.
- *
- * @param {number} radius  metres of ten centimetre ground from the centre
- */
-export function setGroundDiscRadius(radius) {
-  discRadius = radius > 0 ? radius : DISC_RADIUS;
-  // AND THE CACHED TILES GO WITH IT. A store is cut at a radius -- the rim of
-  // the disc is where it lays no column -- so a tile kept across a change of
-  // radius would answer for a disc nobody laid.
-  tiles.clear();
-  return discRadius;
-}
+// `setGroundDiscRadius` stood here: the layer resolved a tier's radius once and
+// handed it over, so that the disc of cubes, the sheet beyond it and this floor
+// were three readers of ONE decision instead of three opinions about it. The
+// decision itself is gone. E-DECISIONI13 put ground everywhere, the field draws
+// all of it, and a tier's `voxelDiscRadius` no longer says where the WORLD
+// stops -- only how much of it a bench draws as cubes, which is a question
+// about a measurement and not about a floor. So the store below is cut at the
+// PLATEAU, and there is nothing left to tell this file.
 
 // -------------------------------------------------------- the store, one tile at a time
 //
@@ -172,7 +160,17 @@ function storeAt(ix, iz) {
     // guard-piano walks 61 572 columns of this store against the mesher's and
     // guard-sentiero-cucitura reads the corridor's seam at 0.00 mm, both with
     // the mat off here and on there.
-    store = chunkColumns(cx, cz, TILE, false, discRadius);
+    // AND IT ASKS FOR THE WHOLE WORLD AND NOT FOR THE DISC (E-DECISIONI13).
+    //
+    // `discRadius` used to be the edge of the ground: outside it the store laid
+    // no column and the answer below fell through to a sheet. There is no sheet
+    // any more -- past the plateau the world falls in terraces to the water and
+    // climbs into the ridge, and a walker may stand on any of it -- so the tile
+    // is cut with `beyond` set and the radius it is cut at is the PLATEAU's,
+    // which is a property of the world and not of a tier. What a tier still
+    // decides is how much of it is drawn as CUBES, and that is a question for
+    // the layer and not for the floor.
+    store = chunkColumns(cx, cz, TILE, false, PLATEAU, CENTRE, true);
     if (tiles.size >= CACHED_TILES) tiles.delete(tiles.keys().next().value);
     tiles.set(key, store);
   }
@@ -204,21 +202,15 @@ function storeAt(ix, iz) {
  *   for the platform and the stair run, which are surfaces a foot really
  *   travels, and it answers -Infinity over all 595 of these.
  *
- * WHAT IS LEFT IS THE DISC AND THE SHEET. BEYOND THE DISC the sheet, SNAPPED
- * THE WAY THE SHEET SNAPS -- not a flourish: the walker's hard radius is 21 m
- * and the disc reaches 14, so seven metres of what he can walk on are sheet,
- * and an unsnapped answer there would have him riding a smooth field over
- * terraced ground for a third of his own range.
- *
- * AND THE ARITHMETIC OF THE SHEET IS NOW ONE STATEMENT, WHICH IS A DEBT PAID.
- * It was re-declared here, character for character against ground-shell.js,
- * with a note saying the two were pinned by a leg of guard-lift -- and there
- * was no such leg: the copy was held together by nothing at all, and it was a
- * voxel out from the day the meadow's floor stopped being the field. So the
- * height of the sheet is `shellHeightAt` below, in the same seat as the basin
- * it is made of, and ground-shell.js READS it. The direction is the one that
- * always worked: the layer already imports this file for basinProfile, and
- * nothing of three.js comes back the other way.
+ * AND WHAT IS LEFT IS ONE BRANCH AND NO SHEET AT ALL, WHICH IS E-DECISIONI13.
+ * Beyond the disc there used to be a SHEET -- a mesh from the rim to a hundred
+ * metres, whose height this file re-declared and then, at step 7, read from one
+ * seat. The sheet is retired: past the plateau the ground falls in terraces to
+ * the water and climbs into the ridge that closes the horizon, and every one of
+ * those is a COLUMN of the same store, laid by the same law, with the same
+ * `(top + 1) * VOXEL` under a foot as the meadow. So the walker who steps off
+ * the plateau is answered by the store the frame is drawn from, all the way
+ * out, and the two cannot part company because there is only one of them.
  */
 export function groundHeightAt(x, z) {
   const ix = Math.floor(x / VOXEL);
@@ -229,125 +221,48 @@ export function groundHeightAt(x, z) {
   // because it IS the same statement.
   const top = topAt(storeAt(ix, iz), ix, iz);
   if (top !== NO_COLUMN) return (top + 1) * VOXEL;
-  const r = Math.hypot(x - CENTRE.x, z - CENTRE.z);
-  // Inside the disc with no column: the masonry's own footprint. The floor
-  // there is the plane the meadow around it stands on -- see above.
-  if (r <= discRadius) return (BASE_STEP + 1) * VOXEL;
-  // And beyond it, the sheet.
-  return shellHeightAt(r);
+  // The one place the store lays no column at all is the masonry's own
+  // footprint, and the floor there is the plane the meadow around it stands on
+  // -- see above. There is no second branch any more: E-DECISIONI13 put ground
+  // everywhere else, so the sheet the last line used to read is gone with the
+  // mesh that drew it.
+  return (BASE_STEP + 1) * VOXEL;
 }
 
 // ----------------------------------------------------------- the basin
 //
-// HOW FAR THE GROUND HAS FALLEN, r METRES FROM THE MIDDLE OF THE WORLD.
+// HOW FAR THE GROUND HAS FALLEN, r METRES FROM THE MIDDLE OF THE WORLD --
+// STATED IN src/world/voxel/confine.js AND RE-EXPORTED HERE.
 //
-// WHY THERE IS ONE AT ALL. The two targets put standing water about three
-// degrees below the eye and the feet of three rings of ridge with it, and no
-// plane at height nought can be read that way from either pose: for the water
-// to be where it is drawn, the ground beyond the walkable disc has to DESCEND.
-// That is a fact about the shape of the world and not about anybody's
-// material, which is why it is a contract: V1 models the shell from 35 to
-// 100 m against it and V5 carries it out past that, and if the two answered
-// it separately the seam between them would be degrees of ground.
+// THE SEAT MOVED AND THE ADDRESS DID NOT, which is the whole of why this note
+// is here instead of the arithmetic. The basin used to be the ONLY thing this
+// world said about the ground beyond the playable disc: a fall, drawn by a
+// sheet, with nothing on it. E-DECISIONI13 made the ground out there a PLACE --
+// «il terreno scende a gradoni voxel verso il lago tutt'intorno, con le creste
+// terrazzate a chiudere l'orizzonte» -- and the fall became one term of a law
+// with two, the other being the ridge. A contract that carried one of the two
+// terms would be half a boundary, and the half that was quantised into terraces
+// somewhere else.
 //
-// IT IS A CONE, AND THAT IS A READING AND NOT A CHOICE OF CURVE -- READ TWICE.
-// The first fit (0.1239 m per metre) was taken through the camera the campaign
-// has since refit away from: at the poses the register carries today the two
-// arms of standing water sit at -2.92 and -3.66 degrees, and the old cone put
-// them at -8.00 -- eighty-seven pixels of world too low. Re-read against the
-// true radii of both arms (110.4 and 108.9 m), the left asks 0.0462 and the
-// right 0.0624, AND NO SINGLE CONE SATISFIES BOTH: the 0.74 degrees between
-// them is the floor of the model, not a defect of any session. The slope
-// carried here is the minimax between the two in pixels, with the apex held
-// where the first fit put it, and it leaves a BALANCED RESIDUAL OF +/-6.8 px
-// PER ARM. That residual is part of this contract: a gate that reads the water
-// a few pixels from either target is reading the model, not a mistake.
-//
-// WHAT IS NOT MEASURED IS THE SHOULDER, AND IT IS SAID HERE RATHER THAN HIDDEN
-// IN AN INTERPOLATION. The cone, run back inwards, crosses zero at r = 22.7 --
-// INSIDE the walkable disc -- so it cannot both pass through the readings and
-// meet the disc at its own level. Something has to roll over between the two,
-// the targets say nothing about its shape, and the only honest answer is the
-// tamest curve that leaves the disc flat and joins the cone at the first place
-// anybody measured: a Hermite from (35, nought, level) to (60, the cone, the
-// cone's slope). It stays monotone -- the form is unchanged by the refit and
-// scales linearly in the slope -- and its steepest point is now 10.9%, at
-// r = 49.6. If that stretch reads wrong in a picture, it is this stretch that
-// is wrong and not the cone, and it is twenty-five metres of ground wide.
-//
-// AND IT DOES NOT REACH THE WALKABLE FLOOR. This is stated here rather than in
-// the generator on purpose: the base of the disc is the walkable floor, and the
-// basin is the one shape in this world that must never be added to it -- a
-// walker who found it would walk off the edge of the disc into a slope. It is
-// added to the floor the disc DRAWS, once, in `shellHeightAt` below, and only
-// past thirty five metres, where nobody stands.
+// So the fall lives beside the ridge, in the seat that lays the columns out
+// there, and it is re-exported from here UNCHANGED and under its own name: the
+// guards, V5 and the walker's floor all still read `basinProfile` from the
+// contracts, and not one of them had to be told.
+export { basinProfile } from './voxel/confine.js';
 
-/** Where the walkable disc ends and the shell begins, in metres. */
-const BASIN_SHELL_R = 35;
-/** The innermost radius anybody measured, and where the shoulder lets go. */
-const BASIN_JOIN_R = 60;
-/**
- * Metres of fall per metre of radius: the minimax between the two arms of
- * water read at the register's poses (0.0462 left, 0.0624 right), residual
- * +/-6.8 px per arm declared above as the model's own floor.
- */
-const BASIN_SLOPE = 0.0543;
-/** Where the first fit's cone reached height nought; held through the refit. */
-const BASIN_APEX_R = 22.682;
-
-/**
- * How far the ground beyond the disc has fallen, in metres, always <= 0.
- *
- * Nought inside the shell's inner edge, and nought there with a level tangent,
- * so whatever the disc does at its rim this welds onto it without a crease.
- *
- * PAST 260 m THIS IS AN EXTRAPOLATION and the owner of that ground should know
- * it: nothing was measured further out, and a straight cone carried to 420 m
- * says -49 m. It is left straight because a floor put under it here would be a
- * number nobody measured, dressed as one that was.
- *
- * @param {number} r  metres from the middle of the world
- * @returns {number} metres of fall, nought or negative
- */
-export function basinProfile(r) {
-  if (r <= BASIN_SHELL_R) return 0;
-  const cone = -BASIN_SLOPE * (r - BASIN_APEX_R);
-  if (r >= BASIN_JOIN_R) return cone;
-  // Hermite with a level start: the two ends are the disc's rim and the cone,
-  // and both the height and the slope are continuous at each of them.
-  const span = BASIN_JOIN_R - BASIN_SHELL_R;
-  const t = (r - BASIN_SHELL_R) / span;
-  const end = -BASIN_SLOPE * (BASIN_JOIN_R - BASIN_APEX_R);
-  return end * (3 * t * t - 2 * t * t * t) - BASIN_SLOPE * span * (t * t * t - t * t);
-}
-
-/**
- * Where the sheet beyond the disc stands, in metres, r from the middle.
- *
- * THE ONE STATEMENT OF IT, read by the mesh that draws the sheet
- * (src/world/ground-shell.js) and by the floor above that answers for a walker
- * standing on it. Two copies of this is what the campaign had until step 7, and
- * they had already parted company by a voxel.
- *
- * IT STARTS AT THE FLOOR THE DISC DRAWS AND NOT AT THE WALKABLE FIELD. The
- * meadow's own field sits one voxel under nought so that the TOP FACE of a base
- * column lands on nought (BASE_LEVEL in ./terrain-field.js), and the eye is
- * given the face. A sheet laid on the field met the cubes ten centimetres low
- * all the way round the rim; laid on `(BASE_STEP + 1) * VOXEL` it meets them
- * exactly, at any radius a tier hands the disc.
- *
- * SNAPPED TO THE STEP, because an unsnapped sheet meeting a snapped disc reads
- * as two materials -- the cubes terrace and the ground beyond them does not --
- * and because the walker's hard radius is 21 m against a disc of 14: seven
- * metres of what he can walk on are sheet, and a smooth answer there would have
- * him riding a ramp over ground drawn in steps.
- *
- * @param {number} r  metres from the middle of the world
- * @returns {number} the height of the sheet, in metres
- */
-export function shellHeightAt(r) {
-  return Math.round(((BASE_STEP + 1) * VOXEL + basinProfile(r)) / VOXEL) * VOXEL;
-}
+// WHERE THE SHEET BEYOND THE DISC STOOD, AND WHY THERE IS NO SEAT FOR IT.
+//
+// `shellHeightAt` was the one statement of the height of the ground past the
+// rim, read by the mesh that drew a sheet out to a hundred metres and by the
+// floor above. E-DECISIONI13 retired the sheet: past the plateau the ground is
+// COLUMNS like everything else -- the fall cut into terraces, the ridge that
+// closes the horizon -- and both the picture and the walker read them out of
+// the same store as the meadow. A contract whose two readers are gone is not a
+// contract, so it is deleted rather than left as a function nobody calls, and
+// what took its place is `confineSteps` in src/world/voxel/confine.js, which is
+// the LAW and is therefore already inside the one statement of where the ground
+// is. `basinProfile` -- the fitted half of it, and the half V5 shares -- is
+// still exported above, under its own name.
 
 // ------------------------------------------------------- the worked stone
 
