@@ -477,6 +477,18 @@ let worldSeconds = 0;
  * what it named. An asset that has not landed comes back undefined, which is
  * what every layer already checks for.
  */
+/**
+ * Compiles what an arrival has just built, before any of it is hung.
+ *
+ * Handed to the hub rather than called here because only the hub knows what an
+ * arrival made; see raise() in src/world/hub.js for why the group is compiled
+ * against the scene instead of in it. Whatever happens it resolves: a stall in
+ * a driver may cost the world a few frames of lateness, never the world.
+ */
+function warm(group) {
+  return renderer.warm(group, camera, hub.scene);
+}
+
 function bagFor(arrival) {
   const bag = {};
   for (const id of needsAt(arrival)) bag[id] = assets.get(id);
@@ -510,7 +522,7 @@ assets.loadCritical(onCriticalByte)
     // world wants and what every layer means by them. Now every id the register
     // asks for is handed over under its own name, and the layer that eats it
     // does its own naming beside the code that does the eating.
-    hub.dress(bagFor('dress'));
+    hub.dress({ ...bagFor('dress'), warm });
     engraveAll();
     plantWhenReady();
     return assets.stream();
@@ -620,6 +632,7 @@ function plantWhenReady() {
       // follow it. See generated() above.
       relit,
       frozen: isClockFrozen(),
+      warm,
     }))
     .then(() => calibrate())
     .catch((error) => {

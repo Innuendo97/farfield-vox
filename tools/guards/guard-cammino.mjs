@@ -3,6 +3,7 @@ import {
 } from '../../src/world/voxel/pure.js';
 import { groundHeightAt, storeCost } from '../../src/world/contracts.js';
 import { flowerField } from '../../src/world/vegetation.js';
+import { readFileSync } from 'node:fs';
 import { reporter, selfTest } from './lib.mjs';
 
 // GUARD-CAMMINO -- QUELLO CHE UN PASSO COSTA AL FILO DEL CAMMINATORE.
@@ -51,6 +52,24 @@ import { reporter, selfTest } from './lib.mjs';
 //    a scansione, dove gli sfratti sono pochi; questa le chiede in ordine di
 //    RAGGIO, che e' l'ordine che sfratta, e confronta ogni risposta con la
 //    legge.
+//
+// 3. E L'ARRIVO NON SINGHIOZZA. Il passo e' meta' della domanda del
+//    committente; l'altra meta' e' il primo minuto, ed e' quella che ogni
+//    visitatore paga una volta sola e non dimentica. La gamba dell'arrivo legge
+//    una traccia presa dalla pagina (fondazione/lav/p4-arrivo.mjs) e chiede due
+//    cose di ogni fotogramma DOPO il primo quadro visibile: quanto e' costato
+//    al filo, e quanto tempo e' passato prima che arrivasse il successivo. Il
+//    primo quadro sta fuori dal conto per definizione -- prima di lui non c'e'
+//    un arrivo da rovinare, e quel costo e' l'apertura della pagina.
+//
+//    E SI LEGGE L'INTERVALLO E NON SOLO LA CPU, che e' la lezione di U-CONF-1.
+//    La misura di E-PERF4 contava solo il tempo DENTRO la callback di
+//    requestAnimationFrame e riporto' tre singhiozzi da 414, 977 e 488 ms. Il
+//    grosso non era li': erano otto secondi di getImageData su tele filtrate
+//    dentro engrave(), che gira nella continuazione di un
+//    `await requestAnimationFrame` e cade nel BUCO fra due fotogrammi invece
+//    che dentro uno. Sedici secondi di filo bloccato su ventuno, invisibili a
+//    chi guardava solo la CPU.
 //
 // 2. E IL COSTO E' UN CONTEGGIO E NON UN CRONOMETRO. Quante colonne di legge
 //    costa un fiore posato: e' il numero che e' regredito (59) ed e' il numero
@@ -201,6 +220,94 @@ report.check(Math.abs(outside - (beyond.top + 1) * VOXEL) < 1e-9,
   'e risponde del MONDO e non del disco: oltre l\'altopiano il pavimento e\' il confine',
   `a 90 m: ${outside.toFixed(2)} m`);
 
+// --------------------------------------------------------------------------
+// L'ARRIVO: QUANTO COSTA UN FOTOGRAMMA DOPO IL PRIMO QUADRO VISIBILE.
+//
+// I MILLISECONDI SI GATEANO QUI E ALTROVE NO, ed e' una differenza di natura e
+// non un'eccezione. Il costo di un fiore e' un CONTEGGIO e vale su qualunque
+// macchina a qualunque carico; l'arrivo e' fatto di cose che solo un orologio
+// vede -- un driver che compila, una tela che si rilegge -- e non esiste un
+// conteggio che le rappresenti. Quindi qui si gatea il millisecondo, ma di una
+// TRACCIA PRESA e consegnata sulla riga di comando, mai di una corsa fatta
+// dentro la guardia: la guardia e' lo strumento e la soglia, la macchina e' di
+// chi misura, e senza tracce questa gamba dichiara di non avere niente da
+// mordere invece di inventarsi un numero (E-V5j).
+//
+//   node tools/guards/guard-cammino.mjs fondazione/lav/c1-arr-warm-1.json
+//
+// AT_TODAY, tier alto, tre corse di questa scrivania (U-CONF-1):
+//
+//   prima  fotogramma peggiore 1627-2247 ms, buco peggiore 5119-5251 ms,
+//          filo bloccato 16,0-16,8 s su un arrivo di 21,0-21,5 s
+//   oggi   fotogramma peggiore   254-290 ms, buco peggiore   921-1193 ms,
+//          filo bloccato  7,8- 8,3 s su un arrivo di 14,1-14,6 s
+//
+// I TETTI STANNO UN TERZO SOPRA L'OGGI E MOLTO SOTTO IL DIFETTO, che e' l'unico
+// posto in cui un tetto significhi qualcosa. L'OBIETTIVO DEL MANDATO -- nessun
+// fotogramma sopra i 50 ms -- NON E' PRESO, e il tetto non finge che lo sia:
+// quel che resta e' scritto nel verbale (il residuo di engrave e i programmi
+// che il preriscaldamento non copre), e il giorno che qualcuno lo prende questi
+// due numeri scendono con lui.
+// --------------------------------------------------------------------------
+const ARRIVAL_FRAME_MS = 400;
+const ARRIVAL_GAP_MS = 1600;
+
+/**
+ * What an arrival trace says about the frames AFTER the first visible one.
+ *
+ * @param {object} trace   what fondazione/lav/p4-arrivo.mjs wrote
+ * @param {number} addMs   a defect added to the worst frame, for the self test
+ * @param {number} addGap  the same, for the worst interval
+ */
+export function arrivalCost(trace, addMs = 0, addGap = 0) {
+  const frames = trace.frames || [];
+  if (frames.length < 2) return null;
+  // The first frame is the page opening, and it is not a hiccup in anybody's
+  // arrival: what is gated is what happens to somebody already looking.
+  const after = frames.slice(1);
+  const worstFrame = Math.max(...after.map((f) => f.cpu)) + addMs;
+  const worstGap = Math.max(...after.map((f) => f.dt)) + addGap;
+  return {
+    frames: frames.length,
+    firstMs: frames[0].t,
+    worstFrame,
+    worstGap,
+    // How long the thread was handing out no frames at all, over the trace.
+    blockedS: after.reduce((sum, f) => sum + Math.max(0, f.dt - 17), 0) / 1000,
+    spanS: frames[frames.length - 1].t / 1000,
+    ok: worstFrame <= ARRIVAL_FRAME_MS && worstGap <= ARRIVAL_GAP_MS,
+  };
+}
+
+// La traccia sintetica del self test: il primo quadro caro come oggi, e poi il
+// peggior fotogramma e il peggior buco che le tre corse di oggi hanno reso.
+const TODAY = {
+  frames: [
+    { t: 1100, dt: 0, cpu: 880 },
+    { t: 4000, dt: 60, cpu: 290 },
+    { t: 5500, dt: 1193, cpu: 100 },
+    { t: 6000, dt: 17, cpu: 8 },
+  ],
+};
+
+const traces = process.argv.slice(2).filter((a) => a.endsWith('.json'));
+if (traces.length === 0) {
+  process.stdout.write("  NOTE  nessuna traccia dell'arrivo consegnata, quindi si e' chiesto solo lo "
+    + 'strumento. Prendine con fondazione/lav/p4-arrivo.mjs e passale qui.\n');
+} else {
+  for (const path of traces) {
+    const seen = arrivalCost(JSON.parse(readFileSync(path, 'utf8')));
+    const name = path.split(/[\\/]/).pop();
+    report.check(seen !== null && seen.ok,
+      `l'arrivo di ${name} non porta un fotogramma sopra ${ARRIVAL_FRAME_MS} ms `
+      + `ne' un buco sopra ${ARRIVAL_GAP_MS}`,
+      seen === null ? 'la traccia non ha fotogrammi'
+        : `peggiore ${seen.worstFrame.toFixed(0)} ms, buco ${seen.worstGap.toFixed(0)} ms, filo `
+          + `bloccato ${seen.blockedS.toFixed(1)} s su ${seen.spanS.toFixed(1)}, primo quadro a `
+          + `${(seen.firstMs / 1000).toFixed(2)} s, ${seen.frames} fotogrammi`);
+  }
+}
+
 if (process.argv.includes('--self')) {
   // Ogni difetto e' iniettato QUI e non da una maniglia della riga di comando:
   // una guardia che si prova solo quando qualcuno si ricorda il flag giusto e'
@@ -228,7 +335,27 @@ if (process.argv.includes('--self')) {
       what: 'e mezza colonna in piu\' a fiore, che e\' un centoventesimo del difetto',
       caught: inflated(legs[0], Math.ceil(0.5 * legs[0].flowers)) > CEILING,
     },
+    // L'ARRIVO, contro una traccia sintetica: i fotogrammi buoni sono quelli di
+    // oggi, i difetti sono quelli misurati prima della cura.
+    {
+      what: 'l\'arrivo di oggi, che NON deve essere chiamato difetto',
+      caught: arrivalCost(TODAY).ok,
+    },
+    {
+      what: 'il fotogramma da 2247 ms che pagava la compilazione dei programmi',
+      caught: !arrivalCost(TODAY, 2247 - 290).ok,
+    },
+    {
+      what: 'il buco da 5251 ms che pagava getImageData su una tela filtrata',
+      caught: !arrivalCost(TODAY, 0, 5251 - 1193).ok,
+    },
+    {
+      what: 'e un primo quadro caro, che e\' l\'apertura della pagina e non un singhiozzo',
+      caught: arrivalCost({ frames: [{ t: 1100, dt: 0, cpu: 1900 }, ...TODAY.frames.slice(1)] }).ok,
+    },
   ]);
 }
 
-report.end(legs.map((l) => `${l.radius} m: ${l.per.toFixed(2)} col/fiore in ${l.ms.toFixed(0)} ms`).join('   '));
+report.end(`${legs.map((l) => `${l.radius} m: ${l.per.toFixed(2)} col/fiore`).join('   ')}`
+  + `   |   arrivo: tetti ${ARRIVAL_FRAME_MS} ms per fotogramma e ${ARRIVAL_GAP_MS} per buco, `
+  + `su ${traces.length} tracce lette`);

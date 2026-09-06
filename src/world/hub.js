@@ -1,4 +1,4 @@
-import { Scene } from 'three';
+import { Group, Scene } from 'three';
 import { applySky } from '../core/sky.js';
 import { setAir } from './air.js';
 import { builtHeightAt, groundHeightAt as meadowHeightAt } from './contracts.js';
@@ -92,10 +92,37 @@ export function buildHub() {
       // is the tier's answer to a machine rather than anybody's taste.
       groundDetail: wanted.groundDetail,
     };
+    // BUILT FIRST, HUNG SECOND, AND THE GAP BETWEEN THE TWO IS THE POINT.
+    //
+    // ANGLE compiles a program the first time something is DRAWN with it, not
+    // when it is linked, and three asks the driver for the answer on that same
+    // first draw. So the frame after an arrival used to pay for every material
+    // the arrival had just made, all at once, on this thread: measured on the
+    // first load, the frame after dress cost 1.8 s and the one after plant
+    // 1.0 s, and both of them were renderer.render and neither was any of the
+    // work above.
+    //
+    // Whoever raised us can hand in a `warm`: it compiles what is in the group
+    // while the driver takes its own threads over it, and the world keeps
+    // handing out frames meanwhile because none of this is in the scene yet.
+    // The meshes go up when it answers.
+    //
+    // THREE THINGS ARE DELIBERATE. The group is not the scene, so nothing is
+    // drawn early and nothing half-lit is delivered. The hanging happens in
+    // `finally`, so a driver that never answers, or a build without a warm at
+    // all, still puts the world up -- late is a defect, missing is a disaster.
+    // And the meshes keep a parent throughout, so the `!mesh.parent` test above
+    // still means "this one has not been hung yet" on the next arrival.
+    const fresh = [];
     for (const l of layersAt(arrival)) {
       l[arrival].build(bag);
-      for (const mesh of l.meshes) if (!mesh.parent) scene.add(mesh);
+      for (const mesh of l.meshes) if (!mesh.parent) fresh.push(mesh);
     }
+    const hang = () => { for (const mesh of fresh) scene.add(mesh); };
+    if (typeof bag.warm !== 'function' || fresh.length === 0) { hang(); return; }
+    const holding = new Group();
+    for (const mesh of fresh) holding.add(mesh);
+    Promise.resolve(bag.warm(holding)).catch(() => {}).finally(hang);
   }
 
   const soil = layer('v1-suolo');

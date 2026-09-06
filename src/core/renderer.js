@@ -82,6 +82,18 @@ export class Renderer {
     this.#post.render(scene, camera);
   }
 
+  /**
+   * Compiles ahead of the frame that would otherwise pay for it.
+   *
+   * Forwarded rather than reached for, like everything else here: the caller
+   * says WHEN the world has changed shape and does not learn what a render
+   * target is. See warm() in src/core/post.js for why it cannot be done
+   * against the default framebuffer.
+   */
+  warm(scene, camera, targetScene = null) {
+    return this.#post.warm(scene, camera, targetScene);
+  }
+
   // The one seam the presentation layer deliberately exposes: the grading and
   // bloom parameters, so a development panel can move them without anyone else
   // learning what draws the frame.

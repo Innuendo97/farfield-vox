@@ -3333,6 +3333,43 @@ export function createPostPipeline(gl) {
   }
 
   return {
+    /**
+     * Compiles what the world is about to draw, WHILE THE DRIVER IS ALLOWED TO
+     * TAKE ITS TIME OVER IT.
+     *
+     * ANGLE does not compile a program when it is linked, it compiles it the
+     * first time something is DRAWN with it, and three.js asks for the result
+     * on that same first use -- so the whole cost of a new material lands
+     * inside one render(), on the main thread, at the worst possible moment:
+     * the frame right after the ground is dressed or the meadow is planted.
+     * Measured on the arrival, those four frames cost 0.6, 1.8, 1.0 and 0.16
+     * seconds, and every one of them was renderer.render and none of them was
+     * the world being built.
+     *
+     * compileAsync links the same programs and then POLLS
+     * KHR_parallel_shader_compile instead of waiting on them, so the driver
+     * compiles on its own threads and the main thread keeps handing out
+     * frames. What it must be given is the render target the world is actually
+     * drawn into: a program key carries the target it was made for, and one
+     * compiled against the default framebuffer would be thrown away and
+     * compiled again at first use, which is the stall this exists to remove.
+     *
+     * @param {Scene} scene
+     * @param {Camera} camera
+     * @returns {Promise} resolves when the driver says the programs are ready
+     */
+    warm(scene, camera, targetScene = null) {
+      if (typeof gl.compileAsync !== 'function') return Promise.resolve();
+      if (sceneTarget === null) allocateScene();
+      const previous = gl.getRenderTarget();
+      gl.setRenderTarget(sceneTarget);
+      try {
+        return gl.compileAsync(scene, camera, targetScene);
+      } finally {
+        gl.setRenderTarget(previous);
+      }
+    },
+
     setSize(nextWidth, nextHeight) {
       width = Math.max(1, Math.floor(nextWidth));
       height = Math.max(1, Math.floor(nextHeight));
