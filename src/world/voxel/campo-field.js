@@ -5,7 +5,8 @@ import {
 import { VOXEL } from './columns.js';
 import { CENTRE, DISC_RADIUS } from './worldgen.js';
 import {
-  CAMPO, CAMPO_BIAS, CAMPO_BLADE_CEIL, CAMPO_FAR, campoCoarseSpan, campoFarOrigin,
+  CAMPO, CAMPO_BEARINGS, CAMPO_BIAS, CAMPO_BLADE_CEIL, CAMPO_FAR, CAMPO_HORIZON_REACH,
+  campoCoarseSpan, campoFarOrigin, campoHorizon,
 } from './campo.js';
 import { campoBox, campoMaterial } from './campo-material.js';
 
@@ -205,6 +206,11 @@ export function createCampo({
   // Where the sky's bound was last taken, and whether a tile has landed since.
   let slopeAt = null;
   let dirty = true;
+  // The ring of bearings, and the vec4s the fragment reads it through: the
+  // uniform is allocated once and written in place, because this is rewritten
+  // four times a second on the thread the walker is on.
+  const horizon = new Float32Array(CAMPO_BEARINGS);
+  const horizonPacked = material.uniforms.uSkyRing.value;
 
   const srcRegion = new Box2(new Vector2(), new Vector2());
   const dstPosition = new Vector2();
@@ -287,6 +293,33 @@ export function createCampo({
     // A hand of margin, and a floor of nought: a walker who is above every
     // scrap of ground in the world still sees the ground under their feet.
     return Math.max(0, worst) + 0.02;
+  }
+
+  /**
+   * THE SAME QUESTION, ASKED PER DIRECTION -- and it is the same four thousand
+   * cells, walked once, at the same moments.
+   *
+   * What the single bound above gives away is measured in ./campo.js at the
+   * head of campoHorizon: at the pose the campaign judges on the world's
+   * steepest bearing presents 0.166 and the median 0.133, and the band between
+   * them is 15.0% of the whole frame -- a quarter of every pixel that marches.
+   * The ring is that band handed back, and the arithmetic that keeps it honest
+   * is campoHorizon's, in the file a guard can run offline.
+   *
+   * The tiles are handed over as a lazy walk rather than copied into an array:
+   * a tile's coarse square is already the shape campoHorizon wants, and this is
+   * called four times a second on the thread the walker is on.
+   */
+  function* coarsePatches() {
+    for (const w of windows) {
+      const span = w.shape.span;
+      const cell = campoCoarseSpan(w.shape);
+      const n = Math.round(span / cell);
+      for (const [key, coarse] of w.coarse) {
+        const [cx, cz] = key.split(',').map(Number);
+        yield { x0: cx * span, z0: cz * span, cell, n, top: coarse };
+      }
+    }
   }
 
   function receive(message) {
@@ -477,7 +510,16 @@ export function createCampo({
         || Math.abs(eye.y - slopeAt.y) > 0.25 || dirty) {
         slopeAt = { x: eye.x, y: eye.y, z: eye.z };
         dirty = false;
-        material.uniforms.uSkySlope.value = skySlope(eye);
+        const bound = skySlope(eye);
+        material.uniforms.uSkySlope.value = bound;
+        // AND THE RING, WHICH IS WHAT THE FRAGMENT ACTUALLY READS. The single
+        // bound above is kept and still uploaded: it is the ring's own ceiling,
+        // it is the cheap compare the fragment takes first, and it is the
+        // number the bench of U-PERF-3 was written on.
+        campoHorizon(horizon, coarsePatches(), eye, CAMPO_HORIZON_REACH, bound);
+        for (let b = 0; b < CAMPO_BEARINGS; b += 1) {
+          horizonPacked[b >> 2].setComponent(b & 3, horizon[b]);
+        }
       }
     },
 

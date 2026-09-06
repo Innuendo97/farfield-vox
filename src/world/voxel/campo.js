@@ -643,6 +643,237 @@ export function campoCoarseSpan(shape, level = 4) {
   return shape.cell * (1 << level);
 }
 
+// ---------------------------------------------------------------------------
+// THE HORIZON, AND WHY IT IS A RING OF NUMBERS AND NOT ONE NUMBER.
+//
+// A ray steeper than the steepest ground in the world cannot hit anything, so
+// it is not marched at all. That test -- skySlope() in ./campo-field.js -- took
+// the frame from 32.9 ms to 20.3 in U-PERF-3 and is the largest single lever
+// this field has. But it asks the question ONCE FOR THE WHOLE FRAME: the
+// steepest thing ANYWHERE, whichever way the eye happens to be looking.
+//
+// The ridge is not the same height in every direction. Measured on the law at
+// the pose the campaign judges on: the world's steepest bearing presents 0.166
+// (9.4 degrees), the MEDIAN bearing 0.133, the gentlest 0.02. The band between
+// the one bound and the true one is 15.0% OF THE WHOLE FRAME -- a quarter of
+// every pixel that marches today -- and every ray in it crosses the four
+// hundred metres of the far window, finds nothing, and draws nothing.
+//
+// So the bound becomes a RING: 256 bearings round the eye, each holding the
+// steepest ground that stands anywhere along it. It is the arithmetic skySlope
+// already walks -- four thousand coarse cells, four times a second -- with the
+// answer written into the bearings a cell can be SEEN FROM instead of into a
+// single maximum.
+//
+// AND IT IS CONSERVATIVE BY CONSTRUCTION, which is the whole of why a ray may
+// be thrown away on it. A cell is written into EVERY bearing its own angular
+// extent touches -- the arc of its four corners, not the direction of its
+// centre -- so no ray that could reach it is ever told it cannot. Three things
+// are given away on purpose, and each is paid for here:
+//
+//   THE EYE MOVES between two counts. The ring is rebuilt when the walker has
+//   gone a quarter of a metre, exactly as the single bound is, and in between a
+//   cell's bearing has swung. So the eye is not a point: it is a BOX of radius
+//   `reach`, a cell is measured from the nearest corner of that box and from
+//   its lowest point, and the arc is widened by the angle the box subtends at
+//   that distance. A near cell then owns a wide arc, which is right -- a mound
+//   a metre and a half away really can be in any direction after a step.
+//
+//   THE BEARING IS QUANTISED. The arc is written from the floor of its start to
+//   the ceiling of its end, in the numbering the fragment reads, and one
+//   bearing is added at each end.
+//
+//   A CELL IS A MAXIMUM over 6.4 m of ground, and it is the same maximum the
+//   single bound uses. Nothing is given away against today.
+//
+// The guard sweeps it against the law rather than trusting any of that.
+// ---------------------------------------------------------------------------
+
+/**
+ * How many bearings the ring holds.
+ *
+ * TWO HUNDRED AND FIFTY SIX, and it is the knee and not a round number. Swept
+ * on the law at the pose the campaign judges on, the share of the frame the
+ * ring takes out over what the single bound takes: 64 bearings 13.36%, 128
+ * 14.42%, 256 15.04%, 512 15.32%. Past 256 the arcs are already narrower than
+ * the cells that write them, the curve is flat, and the uniform doubles.
+ *
+ * It is a multiple of four because the fragment reads the ring as vec4s: an
+ * array of 256 floats asks a driver for 256 uniform vectors where 64 will do.
+ */
+export const CAMPO_BEARINGS = 256;
+
+/**
+ * How far the eye may wander before the ring is rebuilt, in metres.
+ *
+ * The quarter metre ./campo-field.js already refreshes the single bound at,
+ * plus a hand: the ring is built for an eye ANYWHERE in a box of this radius,
+ * so it stays true for every step the walker can take before the next count.
+ */
+export const CAMPO_HORIZON_REACH = 0.30;
+
+/** A margin on the slope itself, as the single bound has always carried. */
+export const CAMPO_HORIZON_MARGIN = 0.02;
+
+/**
+ * WHAT THE LAST RING COST, AS A COUNT.
+ *
+ * E-PERF4 is the reason this is here and the reason it is a COUNT. The spikes
+ * of that unit's walk were not on the card at all: they were one law turned
+ * hundreds of thousands of times on the thread the walker is on, and the guard
+ * that closed it gates a NUMBER OF COLUMNS and not a stopwatch, «because what
+ * you gate cannot be a clock». The ring has exactly that shape -- four thousand
+ * cells walked four times a second while somebody is walking -- so it carries
+ * the same kind of receipt:
+ *
+ *   cells   pieces of tile looked at
+ *   above   how many of them stand over the eye and are worth an arc at all
+ *   writes  bearings written, which is the work the scatter actually does
+ *   whole   cells that claimed the entire ring -- the eye standing in one, or
+ *           an arc so wide it was cheaper to fill than to walk. One of these is
+ *           two hundred and fifty six writes, so a law that starts producing
+ *           them shows up here before it shows up in a walk.
+ *
+ * Measured: 0.21 ms at the pose the campaign judges on (p50 over sixty counts,
+ * 0.41 at the p90), against a gate of eight on that thread and 1.1 ms of worst
+ * frame today.
+ */
+const HORIZON_COST = { cells: 0, above: 0, writes: 0, whole: 0 };
+
+/** The receipt of the last campoHorizon, for a guard and for a bench. */
+export function campoHorizonCost() { return { ...HORIZON_COST }; }
+
+/**
+ * THE RING, WRITTEN OUT OF THE COARSE PIECES OF THE TILES.
+ *
+ * @param {Float32Array} out  the bearings, overwritten
+ * @param {Iterable} patches  {x0, z0, cell, n, top} -- a tile's coarse square:
+ *                            its corner in metres, how many metres a cell is,
+ *                            how many cells a side, and the ground BYTES
+ *                            campoCoarse laid (nought where no column stands)
+ * @param {{x,y,z}} eye       where the walker stands
+ * @param {number} reach      how far they may go before the next count
+ * @param {number} ceiling    the single bound the ring may never stand above.
+ *                            THE RING MAY ONLY EVER CUT MORE. Its own slopes
+ *                            are taken from a padded eye -- lower by `reach`,
+ *                            nearer by `reach` -- so on the bearing of the
+ *                            steepest thing in the world it comes out a
+ *                            hundredth or two ABOVE skySlope's exact answer,
+ *                            which would be a regression wearing the clothes of
+ *                            a feature. Clamped here, in the one place both
+ *                            numbers are known, rather than at the seat.
+ * @returns {Float32Array} out
+ */
+export function campoHorizon(out, patches, eye, reach = CAMPO_HORIZON_REACH,
+  ceiling = Infinity) {
+  const bins = out.length;
+  const TAU = Math.PI * 2;
+  out.fill(0);
+  HORIZON_COST.cells = 0;
+  HORIZON_COST.above = 0;
+  HORIZON_COST.writes = 0;
+  HORIZON_COST.whole = 0;
+  // The lowest the eye can be while this ring stands: ground that clears THAT
+  // clears every eye the ring answers for.
+  const eyeLow = eye.y - reach;
+  const angles = [0, 0, 0, 0];
+  for (const patch of patches) {
+    const { x0, z0, cell, n, top } = patch;
+    for (let j = 0; j < n; j += 1) {
+      const az = z0 + j * cell;
+      for (let i = 0; i < n; i += 1) {
+        HORIZON_COST.cells += 1;
+        const byte = top[j * n + i];
+        // A piece with no column in it casts nothing. That is campoCoarse's own
+        // nought and not a height of zero: see its last line.
+        if (!byte) continue;
+        const y = (byte - CAMPO_BIAS) * VOXEL + CAMPO_BLADE_CEIL;
+        if (y <= eyeLow) continue;
+        HORIZON_COST.above += 1;
+        const ax = x0 + i * cell;
+        // The nearest the cell can be to any eye in the box.
+        const dx = Math.max(ax - eye.x, 0, eye.x - (ax + cell));
+        const dz = Math.max(az - eye.z, 0, eye.z - (az + cell));
+        const raw = Math.hypot(dx, dz);
+        const d = Math.max(1, raw - reach);
+        const slope = (y - eyeLow) / d + CAMPO_HORIZON_MARGIN;
+        // WHERE IT CAN BE SEEN FROM. Where the box of the eye reaches into the
+        // cell, the answer is every bearing there is.
+        if (raw <= reach) {
+          HORIZON_COST.whole += 1;
+          HORIZON_COST.writes += bins;
+          for (let b = 0; b < bins; b += 1) if (slope > out[b]) out[b] = slope;
+          continue;
+        }
+        const x1 = ax - eye.x;
+        const x2 = ax + cell - eye.x;
+        const z1 = az - eye.z;
+        const z2 = az + cell - eye.z;
+        angles[0] = Math.atan2(z1, x1);
+        angles[1] = Math.atan2(z1, x2);
+        angles[2] = Math.atan2(z2, x1);
+        angles[3] = Math.atan2(z2, x2);
+        // THE ARC, WITHOUT A SORT AND WITHOUT A SEARCH FOR THE WIDEST GAP.
+        //
+        // The cell is a rectangle and the eye is OUTSIDE it (the case where it
+        // is not left through the door above), so what it subtends is convex
+        // and narrower than half a turn. Measure the other three corners as
+        // OFFSETS from the first, each wrapped into (-pi, pi]: an arc under pi
+        // cannot straddle that wrap, so the smallest and largest offsets are
+        // its two ends, and the cut of atan2 behind the eye takes care of
+        // itself.
+        //
+        // It is written this way because it is the inner loop of something that
+        // runs on the thread the walker is on, four times a second, over four
+        // thousand cells. The sort it replaces -- four elements and a closure --
+        // was 0.75 ms of the 0.90 the whole ring cost, which is most of a
+        // millisecond taken off a walk to save four lines.
+        const a0 = angles[0];
+        let lowOff = 0;
+        let highOff = 0;
+        for (let k = 1; k < 4; k += 1) {
+          let d0 = angles[k] - a0;
+          if (d0 > Math.PI) d0 -= TAU;
+          else if (d0 < -Math.PI) d0 += TAU;
+          if (d0 < lowOff) lowOff = d0;
+          if (d0 > highOff) highOff = d0;
+        }
+        const swing = Math.atan2(reach, raw);
+        const lo = a0 + lowOff - swing;
+        const hi = a0 + highOff + swing;
+        // The same numbering the fragment reads and campoBearingOf writes.
+        const b0 = Math.floor((lo + Math.PI) / TAU * bins) - 1;
+        const b1 = Math.ceil((hi + Math.PI) / TAU * bins) + 1;
+        if (b1 - b0 >= bins) {
+          HORIZON_COST.whole += 1;
+          HORIZON_COST.writes += bins;
+          for (let b = 0; b < bins; b += 1) if (slope > out[b]) out[b] = slope;
+          continue;
+        }
+        HORIZON_COST.writes += b1 - b0 + 1;
+        for (let b = b0; b <= b1; b += 1) {
+          const k = ((b % bins) + bins) % bins;
+          if (slope > out[k]) out[k] = slope;
+        }
+      }
+    }
+  }
+  for (let b = 0; b < bins; b += 1) if (out[b] > ceiling) out[b] = ceiling;
+  return out;
+}
+
+/**
+ * WHICH BEARING A DIRECTION FALLS IN, written once so the fragment and the
+ * guard cannot drift. The fragment does this with atan(dz, dx) and a floor;
+ * this is the same two lines in the language a test can run.
+ */
+export function campoBearingOf(dx, dz, bins = CAMPO_BEARINGS) {
+  const TAU = Math.PI * 2;
+  const a = Math.atan2(dz, dx);
+  const k = Math.floor((a + Math.PI) / TAU * bins);
+  return Math.min(bins - 1, Math.max(0, k));
+}
+
 /**
  * Where a tile lands in the picture, at one level, and the address is TOROIDAL:
  * a tile owns the same square for ever, and walking out of the field on one
