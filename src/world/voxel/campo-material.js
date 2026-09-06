@@ -10,8 +10,8 @@ import { PIGMENT_GLSL, pigmentUniforms, refreshPigment } from './pigment.js';
 import { SHEET_GLSL, sheetArray, sheetUniforms } from './sheet.js';
 import { bladeSettings, earthSettings, voxelSettings } from './material.js';
 import {
-  CAMPO, CAMPO_BIAS, CAMPO_BLADE_CEIL, CAMPO_CUT_GLSL, CAMPO_FAR, CAMPO_FAR_SHIFT,
-  CAMPO_RUNG, campoCutUniform,
+  CAMPO, CAMPO_BEARINGS, CAMPO_BIAS, CAMPO_BLADE_CEIL, CAMPO_CUT_GLSL, CAMPO_FAR,
+  CAMPO_FAR_SHIFT, CAMPO_RUNG, campoCutUniform,
 } from './campo.js';
 
 // THE FIELD'S OWN MATERIAL: ONE BOX, ONE FRAGMENT A PIXEL, AND THE WORLD
@@ -150,6 +150,10 @@ const FRAGMENT = /* glsl */`
   // over the footprint in shade() for why it is a uniform and not an fwidth.
   uniform float uPixelScale;
   uniform float uSkySlope;
+  // THE HORIZON'S RING, four bearings to a vector. See campoHorizon in
+  // ./campo.js for what it holds and why it may be trusted with a discard.
+  // (uHorizon above is the SUN's march and has nothing to do with it.)
+  uniform vec4 uSkyRing[${CAMPO_BEARINGS / 4}];
   uniform mat4 uViewProjection;
 
   // The families' own numbers, read out of the settings objects of
@@ -334,20 +338,74 @@ const FRAGMENT = /* glsl */`
     int level = dir.y > 0.0 ? uTopLevel : min(uStartLevel, uTopLevel);
     vec3 n = vec3(0.0, 1.0, 0.0);
 
+    // THE FLOOR OF THE DETAIL, AS A LADDER AND NOT AS A LOGARITHM.
+    //
+    // The cell the ray is allowed to stop at is the one that covers about
+    // uLodGain pixels; the pixel's own hash pushes the threshold up or down by
+    // up to a whole level, so the place where one level gives way to the next
+    // has no line on it -- the two interleave over a band. It is the cheap half
+    // of Cesium's screen space cross fade: one hash, no second draw, nothing to
+    // sort.
+    //
+    // WHAT CHANGED, AND WHY IT IS THE SAME ANSWER. The floor used to be written
+    // the way the arithmetic says it -- floor(log2(want) + dither) -- and that
+    // put A LOGARITHM AND A SQUARE ROOT IN THE INNER LOOP, taken once for every
+    // cell every ray crossed. Thirty and a half of them a pixel over a million
+    // pixels is thirty million of each a frame, for a number that only ever
+    // goes UP: the floor is a non-decreasing function of how far the ray has
+    // travelled, and how far the ray has travelled is a non-decreasing function
+    // of the step it is on.
+    //
+    // So it is a LADDER. The distance at which level k becomes the floor is
+    //
+    //     want >= 2^(k - dither)  <=>  travelled >= 2^(k - dither) * uCell
+    //                                              / (uPixelScale * uLodGain)
+    //
+    // and each rung is the one below times two, so the whole march pays ONE
+    // doubling per level it actually climbs -- at most uTopLevel of them over
+    // the entire ray -- against a log2 at every step. The distance goes with
+    // it: dir is a unit vector, so the ray's own parameter IS the distance
+    // travelled, and the traversal already computes every crossing it is made
+    // of. It is also the unit tEnter and tLeave were always measured in.
+    //
+    // THE TWO ARE THE SAME PICTURE, AND IT IS MEASURED AND NOT ASSERTED. The
+    // ladder and the logarithm agree wherever the arithmetic is exact; where it
+    // is not -- a want within an ulp of a power of two, or a parameter that has
+    // accumulated a rounding the square root would not have -- they could
+    // differ by a level on a pixel. Shot at the pose the campaign judges on, at
+    // the back edge looking in, and at the worst pose of the sweep: IDENTICAL
+    // TO THE BYTE on all 1 668 480 pixels of each, both halves of the change
+    // separately and together. (The panels of the monoliths are put out for
+    // that comparison and only for it: their diamond and its swarm have a clock
+    // of their own that ?t0 does not stop, and they move 15 000 pixels between
+    // two shots of the SAME build.)
+    float lodRung = (uCell / max(uPixelScale * uLodGain, 1e-9)) * exp2(1.0 - dither);
+    int lodFloor = 0;
+    // THE RAY'S OWN PARAMETER, WHICH IS THE DISTANCE FROM THE EYE. dir is a
+    // unit vector, so the parameter and the distance are the same number; the
+    // traversal already computes every crossing it is made of, and tEnter and
+    // tLeave were always measured in it. Keeping it costs an add a step where
+    // asking distance() for it cost a square root a step.
+    float tRay = tEnter + 1e-4;
+
     for (int i = 0; i < 512; i++) {
       if (i >= uSteps) break;
       gSteps = i;
-      float travelled = distance(p, eye);
-      // THE FLOOR OF THE DETAIL, AS THE PIXEL'S OWN FOOTPRINT AND DITHERED.
-      // The cell the ray is allowed to stop at is the one that covers about
-      // uLodGain pixels; the pixel's own hash pushes the threshold up or down
-      // by up to a whole level, so the place where one level gives way to the
-      // next has no line on it -- the two interleave over a band. It is the
-      // cheap half of Cesium's screen space cross fade: one hash, no second
-      // draw, nothing to sort.
-      float want = travelled * uPixelScale * uLodGain / uCell;
-      int floorLevel = int(max(0.0, floor(log2(max(want, 1.0)) + dither)));
-      floorLevel = min(floorLevel, uTopLevel);
+      float travelled = tRay;
+      // WHICH RUNG THE RAY HAS REACHED. It only ever climbs, so this is one
+      // compare a step and one doubling a level, and never a level twice.
+      for (int k = 0; k < ${CAMPO.levels + CAMPO_FAR.levels}; k++) {
+        if (travelled < lodRung || lodFloor >= uTopLevel) break;
+        lodFloor++;
+        lodRung *= 2.0;
+      }
+      // AND THE LADDER IS NOT THE FLOOR ITSELF. The far window raises the floor
+      // for the step it is answering (below), and that raise belongs to the
+      // step and not to the ray: a ray that crosses the boundary and comes back
+      // inside the near window has to be allowed its own detail again. So the
+      // ladder is what the DISTANCE has earned, and the floor is a copy of it
+      // that this one step may push up.
+      int floorLevel = lodFloor;
       if (level < floorLevel) level = floorLevel;
       // AND IT IS NOT CAPPED OVER THAT FLOOR, WHICH WAS TRIED AND MEASURED. A
       // descending ray pays one iteration for every level it has to come back
@@ -473,11 +531,12 @@ const FRAGMENT = /* glsl */`
       ivec2 parentBefore = ivec2(floor(p.xz / (span * 2.0)));
       n = crossing.x < crossing.y ? vec3(-sgn.x, 0.0, 0.0) : vec3(0.0, 0.0, -sgn.y);
       p += dir * (tExit + 1e-4);
+      tRay += tExit + 1e-4;
       // PAST THE FAR WALL OF THE WINDOW, and the comparison is against the
       // parameter along the ray and not against the length of the interval:
       // tLeave is measured from the EYE, so a window entered fourteen metres
       // out would otherwise be abandoned after the six metres it is deep.
-      if (distance(p, eye) > tLeave) break;
+      if (tRay > tLeave) break;
       if (p.x < uFarBounds.x || p.z < uFarBounds.y
         || p.x > uFarBounds.z || p.z > uFarBounds.w
         || p.y < uHeight.x || p.y > uHeight.y) break;
@@ -666,7 +725,26 @@ const FRAGMENT = /* glsl */`
     // distance from the eye to each tile, which is a bound and not a guess (see
     // skySlope() in ./campo-field.js). One compare, and the sky stops being
     // marched.
-    if (dir0.y > uSkySlope * length(dir0.xz)) discard;
+    // The RUN of the ray, as in rise over run: both bounds are slopes.
+    float run = length(dir0.xz);
+    if (dir0.y > uSkySlope * run) discard;
+    // AND THEN THE RING, WHICH IS THE SAME TEST ASKED OF THIS BEARING.
+    //
+    // The one bound above is the steepest ground ANYWHERE; the ring holds the
+    // steepest ground along the way this pixel is looking, which at the pose
+    // the campaign judges on is 0.133 against 0.166 at the median bearing. The
+    // band between them is 15.0% of the frame, and every ray in it crossed four
+    // hundred metres to find nothing. See campoHorizon in ./campo.js: a cell is
+    // written into every bearing its own extent can be seen from, widened by
+    // the step the walker may take before the ring is counted again, so a ray
+    // this throws away is a ray that provably could not have hit anything.
+    //
+    // THE ORDER IS THE POINT. The cheap compare stands first and takes most of
+    // the sky out for one multiply; only what survives it pays the arc tangent.
+    int bearing = int(floor((atan(dir0.z, dir0.x) + ${Math.PI.toFixed(8)})
+      * ${(CAMPO_BEARINGS / (Math.PI * 2)).toFixed(8)}));
+    bearing = clamp(bearing, 0, ${CAMPO_BEARINGS - 1});
+    if (dir0.y > uSkyRing[bearing >> 2][bearing & 3] * run) discard;
     // THE TWO SCREEN DERIVATIVES OF THE RAY, which is how a sub-pixel sample is
     // aimed without any knowledge of the projection: one pixel to the right is
     // this direction plus its own derivative, whatever lens produced it.
@@ -899,6 +977,11 @@ export function campoMaterial({
       uDebug: { value: 0 },
       uPixelScale: { value: 0.002 },
       uSkySlope: { value: 10 },
+      // Ten everywhere until the first count, which is the same thing uSkySlope
+      // starts at: a bound nothing is steeper than cuts nothing.
+      uSkyRing: {
+        value: Array.from({ length: CAMPO_BEARINGS / 4 }, () => new Vector4(10, 10, 10, 10)),
+      },
       uViewProjection: { value: new Matrix4() },
       // The meadow's own pigment, shared with the cubes by construction: these
       // are voxelSettings()' numbers and not a second table.
