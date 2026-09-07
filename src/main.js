@@ -22,7 +22,6 @@ import { createQuality, forgetStored, needsBenchmark } from './core/quality.js';
 import { createBenchmark, tierOf } from './core/bench.js';
 import { buildHub } from './world/hub.js';
 import { needsAt } from './world/layers/registry.js';
-import { PLATE_FIELD } from './world/clouds.js';
 import { createStartOverlay } from './ui/overlay.js';
 import { createSkyVeil } from './ui/veil.js';
 import { createHud } from './ui/hud.js';
@@ -669,53 +668,15 @@ function plantWhenReady() {
   // walker has already paid for into the bar that measures what is left.
   const dressed = needsAt('dress');
   const wanted = needsAt('plant').filter((id) => !dressed.includes(id));
-  // The generated weather, asked for by name and allowed not to be there.
+  // WHAT WAS BETWEEN HERE AND THE LINE BELOW: the switch between two weathers.
   //
-  // THIS IS THE SWITCH. The pieces are a bake of hours and they arrive all at
-  // once: a build whose asset manifest carries the generated table is a build
-  // whose weather is generated, and one that does not is a build still drawing
-  // the pieces cut out of the reference's own photograph. There is no flag to
-  // set and none to forget — see the note over createClouds for why it is a
-  // migration and not a setting.
-  //
-  // AND THE TABLE SAYS HOW MANY TEXTURES TO FETCH. How many the atlas took is
-  // decided when the volumes are packed — seven maps fit in two, an eighth
-  // opens a third — so the table is read first and its own list of textures is
-  // what gets asked for. A list written here instead would be a second copy of
-  // that decision, and the day a bake shipped a third texture this would fetch
-  // two of it and light every cloud from a channel that is not there.
-  //
-  // AND A PLATE DELIVERY DOES NOT ASK FOR IT AT ALL. The generated table and
-  // its three textures are two megabytes of line the frame would throw away:
-  // src/world/clouds.js draws the plate field whatever comes back, so fetching
-  // them would be paying for a decision already taken. The predicate is that
-  // module's, imported rather than restated, because a build that fetched one
-  // field and drew the other is the failure this whole switch exists to make
-  // impossible.
-  //
-  // THE ENTRIES ARE NOT IN THE DELIVERY EITHER, since the walk that retired the
-  // generated field. So this asks for a name the manifest no longer carries,
-  // the gateway says so, and the catch below turns it into the same null the
-  // predicate already returns — which is the behaviour this branch was written
-  // to have when the pieces had not been baked yet.
-  const generated = () => (PLATE_FIELD ? Promise.resolve(null)
-    : assets.load('cloud-relit').catch(() => null).then((manifest) => {
-      if (!manifest) return null;
-      // Past this point the table IS there, so a texture that is not is a
-      // delivery that disagrees with itself — a packing that opened a third
-      // atlas and a declaration that still lists two. The weather falls back to
-      // the photographic field either way, but silently would be the wrong way:
-      // the sky would look a session old and nothing would say why.
-      return Promise
-        .all((manifest.atlas.textures || []).map((t) => assets.load(t.file.replace(/\.[^.]+$/, ''))))
-        .then((textures) => ({ manifest, textures }))
-        .catch((error) => {
-          console.warn('[clouds] the generated table asks for '
-            + `${manifest.atlas.textures.length} texture(s) and the delivery does not carry them `
-            + `(${error.message}): the photographic field is drawn instead`);
-          return null;
-        });
-    }));
+  // `cloud-relit` was a generated table asked for by name and allowed not to be
+  // there, and whether the delivery carried it decided whether the sky was
+  // relit volumes or the plates cut out of the reference's own photograph. Both
+  // fields are gone -- the weather is a roster of density in
+  // assets-src/sky/sky.json and a mesh of cubes built at load -- so there is
+  // nothing left to switch between and nothing left to fetch. The layer asks
+  // for no asset at all.
   // The seven pieces by weight, for anything watching the load. Three megabytes
   // that are not seven equal thirds — the cloud sheets alone are more than half
   // of it — so a fraction counted in files would move in steps the wrong size.
@@ -748,13 +709,8 @@ function plantWhenReady() {
       return null;
     });
   Promise.all(wanted.map(ask))
-    .then(() => generated())
-    .then((relit) => hub.plant({
+    .then(() => hub.plant({
       ...bagFor('plant'),
-      // The one asset the register cannot describe: it is asked for by name,
-      // allowed not to be there, and its own table says how many textures
-      // follow it. See generated() above.
-      relit,
       frozen: isClockFrozen(),
       warm,
     }))

@@ -63,17 +63,21 @@ const SELF = flags.includes('--self');
 // and the entry left with the defect. Its owner cured it, which is the only way
 // an entry may ever leave.
 const REGISTER = [
-  {
-    what: 'nuvole 0', owner: 'V6',
-    where: 'src/world/clouds.js: il materiale non dichiara side',
-    why: 'le lastre stanno in aria con un orientamento ciascuna e non si voltano '
-      + 'verso nessuno: a faccia singola, quelle che danno il rovescio al '
-      + 'camminatore costano la loro parte della draw e non disegnano niente '
-      + '(lezione 5, E-V6c). SUL CAMMINO LA CURA ESISTE GIA: V6 dichiara '
-      + 'side: DoubleSide -- e la cura arriva qui con la prossima fusione: '
-      + 'quel giorno questa riga diventa rossa e va tolta',
-    reversed: 0, inconsistent: 0, side: 'FrontSide',
-  },
+  // VUOTO, E LA RIGA CHE C'ERA E' USCITA COME IL REGISTRO PRESCRIVE.
+  //
+  // Diceva: «nuvole 0, V6, src/world/clouds.js: il materiale non dichiara side
+  // -- le lastre stanno in aria con un orientamento ciascuna e non si voltano
+  // verso nessuno: a faccia singola, quelle che danno il rovescio al
+  // camminatore costano la loro parte della draw e non disegnano niente». La
+  // cura scritta accanto era `side: DoubleSide`, in arrivo dal cammino.
+  //
+  // Non e' quella che e' arrivata. U-NUV-1 ha ritirato le lastre: il tempo e'
+  // fatto di CUBI, e un cubo e' un guscio chiuso di cui il camminatore vede
+  // sempre e solo le facce davanti. `FrontSide` non e' piu' un difetto da
+  // condonare, e' la risposta giusta -- disegnare anche i rovesci
+  // raddoppierebbe i frammenti per coprirli subito dopo. Il difetto e' curato
+  // perche' la cosa che lo portava non si costruisce piu', ed e' esattamente
+  // il modo in cui E-FIORI3 vuole che una riga esca da qui.
 ];
 
 const registered = (name) => REGISTER.find((entry) => entry.what === name);

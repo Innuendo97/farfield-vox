@@ -1,5 +1,4 @@
-import { setCloudDrift, setCloudSky } from '../../core/sky.js';
-import { CLOUD_LEVEL, createClouds } from '../clouds.js';
+import { createVoxelClouds } from '../voxel-clouds.js';
 
 // THE SKY AND THE WEATHER. Owned by V6.
 //
@@ -9,15 +8,27 @@ import { CLOUD_LEVEL, createClouds } from '../clouds.js';
 // here is the weather -- bodies standing in FRONT of that dome -- which can be
 // hung a moment later without anybody ever waiting on a sky.
 //
-// WHAT V6 REPLACES IT WITH: the optics of the dome (the third step of the light
-// refit, under a written invariant -- irradiance within five per cent, no more,
-// without an amendment to the campaign), and an atlas recut to silhouettes of
-// cubes. The tiles, the placements and the model of the motion all stay.
+// AND IT NEEDS NOTHING NOW. `needs` was three textures and 2.24 MB of KTX2 --
+// the plates, their coverage, and the equirect the water reflected them through
+// -- and it is empty, because a cumulus of cubes is a field of density and a
+// roster of forty-three rows inside assets-src/sky/sky.json. The weather still
+// lands at PLANT rather than at DRESS: the field is built on the main thread
+// and costs a few milliseconds, and the first walkable frame is the ground, the
+// blocks and the sky behind them.
 //
-// UASTC AND NEVER ETC1S for that atlas, and it is not a preference: a block
-// codec cannot hold a block that is part cloud and part nothing, and every texel
-// of clear sky it lifts above nought is a square of false cloud the frame blends
-// over open blue.
+// WHAT REPLACED THE PLATES, AND WHY NO PARAMETER OF THEM COULD HAVE: the long
+// note at the head of src/world/voxel-clouds.js. In one line -- a photograph of
+// cubes cut at one scale and stood at eight is a photograph of eight different
+// cubes.
+//
+// AND WHAT WENT WITH THEM, DECLARED HERE BECAUSE THIS IS WHERE IT WAS HUNG: the
+// weather no longer reaches the surfaces that REFLECT the sky. setCloudSky()
+// took `cloud-equirect` -- a photograph of the plate composition laid down once
+// against direction -- and the water and the wet stone composited it over the
+// dome. That picture was of a field that no longer exists, so it left with it,
+// and until the equirect is re-made from the voxel field the lake reflects a
+// sky with no weather in it. It is R4 §S7, it is a residual of this unit, and
+// it is written down rather than left to be noticed.
 const layer = {
   id: 'v6-cielo-nuvole',
 
@@ -26,29 +37,16 @@ const layer = {
   clouds: null,
 
   plant: {
-    needs: ['cloud-sprites', 'cloud-cover', 'cloud-equirect'],
+    needs: [],
 
     build(assets) {
-      layer.clouds = createClouds({
-        clouds: assets['cloud-sprites'],
-        // The silhouette, on its own: see the note over the coverage profile in
-        // tools/build-assets.mjs for why it does not travel in the colour atlas.
-        cover: assets['cloud-cover'],
-        // The generated table and its textures, which are asked for by name and
-        // allowed not to be there. It is not in `needs` because it is the one
-        // asset whose very presence is the switch between two fields, and the
-        // number of textures that follow it is written inside it: a list here
-        // would be a second copy of a decision taken when the volumes were
-        // packed. src/main.js fetches it and hands the result through.
-        relit: assets.relit,
-        blockers: assets.blockers,
-        frozen: assets.frozen,
-      });
-      layer.meshes = layer.clouds.meshes;
-      // The same weather, for everything that reflects the sky rather than
-      // stands in front of it. It arrives with the atlas because it is the same
-      // bake, and until it does those surfaces reflect an empty sky.
-      setCloudSky(assets['cloud-equirect'], CLOUD_LEVEL);
+      // ?t0 FERMA ANCHE IL TEMPO. Ogni misura di questa campagna si prende
+      // dietro quel flag, e un cielo che deriva di tre metri al secondo mentre
+      // il resto del mondo sta fermo renderebbe due scatti della stessa posa
+      // due scatti diversi -- che e' esattamente cio' che E-V5j vieta. A t0 il
+      // roster e' la composizione del target, esatta.
+      layer.clouds = createVoxelClouds({ frozen: !!(assets && assets.frozen) });
+      layer.meshes = [layer.clouds.mesh];
       return layer.clouds;
     },
   },
@@ -58,37 +56,26 @@ const layer = {
     if (layer.clouds) layer.clouds.setVisible(visible);
   },
 
-  /** And one layer of it at a time, because the whole field is one draw. */
-  setLayers(kinds) {
-    if (layer.clouds) layer.clouds.setLayers(kinds);
-  },
-
-  /** The air in front of the weather, for the fit and for a day and night. */
-  setAerial(...values) {
-    return layer.clouds ? layer.clouds.setAerial(...values) : null;
-  },
-
-  /** How much of that air this delivery has not already got baked into it. */
-  setAerialOwed(owed) {
-    return layer.clouds ? layer.clouds.setAerialOwed(owed) : null;
-  },
-
-  /** The level the weather is read at, for the sweep that settles the gain. */
-  setLevel(scale) {
-    return layer.clouds ? layer.clouds.setLevel(scale) : null;
-  },
-
   /** Development handle: what the weather's own clock reads, in seconds. */
   seconds() {
     return layer.clouds ? layer.clouds.seconds() : 0;
   },
 
-  update({ elapsed }) {
-    if (!layer.clouds) return;
-    layer.clouds.update(elapsed);
-    // The drift is a rigid turn of the whole field, so everything that reflects
-    // the sky is handed the one number that describes it rather than the field.
-    setCloudDrift(layer.clouds.turns());
+  /**
+   * Where the weather's shadow falls on the meadow (E-DECISIONI21 D5 = A).
+   *
+   * THE SEAT AND NOT THE TERM. What is published here is WHERE the shadow is;
+   * what reads it is the ground's own fragment, and
+   * src/world/voxel/campo-material.js is not this session's to write.
+   */
+  cloudShadowAt(x, z) {
+    return layer.clouds ? layer.clouds.cloudShadowAt(x, z) : 0;
+  },
+
+  update() {
+    // Nothing a frame. The drift is one uniform, read at draw time, and the
+    // field's own clock is advanced in onBeforeRender so a frame that is never
+    // drawn never moves the weather.
   },
 };
 
