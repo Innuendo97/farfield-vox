@@ -1181,6 +1181,52 @@ export function voxelMaterial(voxel, settings) {
 // and it is fifty two rectangles of the disc.
 
 /** The paving's tunables, live, so a sweep costs a redraw and not a rebuild. */
+// THE ONE CONSTANT OF LIGHT THIS CORRIDOR CARRIES OF ITS OWN, AND IT IS A
+// DECISION THAT WAS TAKEN AND NOT A TASTE THAT WAS INDULGED.
+//
+// WHAT STOOD HERE BEFORE, in as many words: «the exposure is the ground's, to
+// the factor ... the two readings this material is gated on -- stone against
+// grass, 1.70 near and 3.41 far -- are RATIOS between this surface and that
+// one, so a second exposure here would move them both without moving anything
+// anybody can see». The last clause has now been measured and it is false. At
+// the fitted camera, with the arrival veil divided out of BOTH pictures, the
+// middle of the corridor develops to L* 47.5 where the reference's own frame
+// has 52.6, and the far stretch to 49.9 against 55.1. Five levels is not
+// nothing anybody can see: it is the difference the committente named as «il
+// selciato e' piu' spento».
+//
+// AND IT IS NOT THE PIGMENT'S TO CLOSE, which is why it lands on the light.
+// STONE_PALE's red stands at 0.900 -- «as red as a surface may be», the ceiling
+// this world puts on a pigment and the one guard-tasselli gates -- and the
+// corridor is still five levels short under it. E-SENT7 measured the lever
+// offline and named the number; U-LUCE-4 then took two and a half of those five
+// levels off again when the sun's own strength fell 21 per cent, and left the
+// residue with an owner. This is that residue closed.
+//
+// THE NUMBER IS MEASURED AND NOT CHOSEN. Swept live in the engine over six
+// settings and read on the frame in the reference's own space
+// (fondazione/luce-5/13-scala.mjs), the middle of the corridor answers:
+//
+//   x1.00  47.5      x1.24  50.3      x1.48  52.6   <- the reference's own 52.6
+//   x1.12  49.1      x1.36  51.4      x1.60  53.5
+//
+// which is E-SENT7's own x1.48, arrived at from the other side.
+//
+// WHAT IT COSTS, WRITTEN DOWN BECAUSE IT IS NOT NOTHING. The stone of this
+// corridor against the grass beside it rises with it, and that pair is a
+// reading the reference publishes. On the frame it was already four times the
+// reference's own -- because THIS WORLD'S MEADOW at that distance is half the
+// level of the reference's, which is U-CAMPO-2's residue and not this file's --
+// and it rises by the factor. A corridor kept five levels dark to hold a ratio
+// that is wrong for another surface's reason would be two defects instead of
+// one.
+//
+// AND THE OFFLINE BENCH READS IT FROM HERE. guard-tasselli weighs this paving
+// through the same chain guard-pietra is weighed on, and a scale the guard could
+// not see would make every level in that guard a reading of a corridor that no
+// longer ships. It imports this constant.
+export const PAVING_LIGHT = 1.48;
+
 export function pavingSettings() {
   return {
     earth: new Vector3(...PATH_EARTH),
@@ -1700,13 +1746,9 @@ export function pavingMaterial(voxel, settings, maps) {
       uReliefShade: { value: settings.reliefShade },
       uReliefWall: { value: settings.reliefWall },
       uReliefMean: { value: settings.reliefMean },
-      // THE EXPOSURE IS THE GROUND'S, TO THE FACTOR, and it is not a copy of a
-      // taste. The corridor stands in the ground's air and is read against the
-      // grass beside it: the two readings this material is gated on -- stone
-      // against grass, 1.70 near and 3.41 far -- are RATIOS between this surface
-      // and that one, so a second exposure here would move them both without
-      // moving anything anybody can see.
-      ...faceLightUniforms(TERRAIN.lightScale * GROUND_EXPOSURE),
+      // THE EXPOSURE IS THE GROUND'S, TIMES PAVING_LIGHT. See that constant
+      // above for the whole of the reason, the number and what it costs.
+      ...faceLightUniforms(TERRAIN.lightScale * GROUND_EXPOSURE * PAVING_LIGHT),
       ...zoneUniforms(),
       ...SCENE_LIGHT_UNIFORMS,
       ...fogUniforms(),

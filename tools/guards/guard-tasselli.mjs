@@ -7,6 +7,14 @@ import {
   pathCentreX, pathHalfWidth, pathRun,
 } from '../../src/world/terrain-field.js';
 import { MANTO } from '../../src/world/voxel/worldgen.js';
+// THE ONE CONSTANT OF LIGHT THE CORRIDOR CARRIES OF ITS OWN, read from the seat
+// that ships it. U-LUCE-5 put the level of this paving where the reference's own
+// frame has it, and it did it on the LIGHT because the pigment was already at
+// the ceiling this file gates. A guard that kept multiplying by the ground's
+// exposure alone would be weighing a corridor that no longer ships -- the ratio
+// below would survive it, being a ratio, but the hue, the chroma and the joint's
+// depth all run through AgX and a LUT and none of the three is linear.
+import { PAVING_LIGHT } from '../../src/world/voxel/material.js';
 import {
   GROUND_BOUNCE, faceColour, readLight, renderChain,
 } from '../lighting/render-chain.mjs';
@@ -255,8 +263,12 @@ const WARMTH = /warmth: new Vector3\(([0-9.]+), ([0-9.]+), ([0-9.]+)\)/
 export async function levels(z0 = 4.0, z1 = 7.0, span = 0.6) {
   const light = readLight();
   const composite = await renderChain();
+  // The paving's own scale rides on the albedo, which is exactly where a scale
+  // on the light lands: faceColour is linear in its albedo, so albedo x k and
+  // light x k are the same three numbers before the curve, and the curve is the
+  // only thing downstream that cares.
   const dev = (albedo) => lch(composite(faceColour([0, 1, 0], light,
-    albedo.map((v, i) => v * WARMTH[i]), GROUND_BOUNCE)));
+    albedo.map((v, i) => v * WARMTH[i] * PAVING_LIGHT), GROUND_BOUNCE)));
   const stone = []; const earth = []; const joint = [];
   for (let z = z0; z <= z1; z += 0.01) {
     const centre = pathCentreX(z);
@@ -486,11 +498,20 @@ report.check(under >= PIGMENT.jointUnder[0] && under <= PIGMENT.jointUnder[1],
   + 'either side of it, walked to the floor of the slot -- the reference reads 9.7 through a '
   + "picture's own ruler and this paving 8.9 on the same one",
   `${under.toFixed(1)} L*`);
-report.note('the LEVEL is not gated and E-LUCE7 is why: the pigment is at the ceiling this world '
-  + 'puts on a pigment (0.900 of red, «as red as a surface may be») and the corridor still '
-  + 'develops seven levels under the reference at the fitted camera. Closing it takes a constant '
-  + "of the light on the paving -- x1.48 on its own lightScale, measured -- which is the "
-  + "coordinator's and not this unit's");
+report.note('the LEVEL is still not gated here, and what changed is that it is no longer OPEN. '
+  + 'The pigment stands at the ceiling this world puts on a pigment (0.900 of red, «as red as a '
+  + 'surface may be», gated below) and the corridor developed five levels under the reference at '
+  + 'the fitted camera under it. U-LUCE-5 closed that on the LIGHT, at the x1.48 E-SENT7 measured '
+  + 'offline and 13-scala.mjs then swept live in the engine -- PAVING_LIGHT in '
+  + 'src/world/voxel/material.js, which THIS FILE now reads, so the levels printed above are the '
+  + "corridor that ships. What is gated stays what a pigment owns: the ratio, the hue, the chroma "
+  + 'and the joint, none of which a constant on the light can move. The frame itself reads L* 52.6 '
+  + "against the reference's own 52.6, veil out of both");
+report.note('and what that constant COSTS is a ratio between two surfaces, printed here because '
+  + 'nothing else prints it: the stone of this corridor against the grass beside it rises by the '
+  + "factor. On the frame that pair was already four times the reference's own before it moved, "
+  + "because this world's meadow at that distance is half the level of the reference's -- which is "
+  + "U-CAMPO-2's residue and not this corridor's. Owner: U-CAMPO-2");
 
 // ------------------------------------------------------------------- 5
 report.line('');
