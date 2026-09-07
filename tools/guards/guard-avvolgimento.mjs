@@ -52,14 +52,17 @@ const SELF = flags.includes('--self');
  * The counts are the ones measured over the whole world on the cammino
  * (b9589f4) and they are reproduced on this branch by the same builder.
  */
+//
+// AND ONE ENTRY HAS COME OUT, WHICH IS THE RATCHET DOING ITS JOB. The trees
+// carried one edge between two discordant faces after E-GUARDIA1 cured their
+// winding -- «alberi chiome e tronchi, V4, trees.js mergeFaces/geometryOf, il
+// giunto fra due piani», reversed 0, inconsistent 1. U-ALBERI-1 rebuilt the
+// crown as a solid of tiers on a disc instead of an ellipsoid with a bitten
+// shell, and the joint that carried that edge is not built any more: measured
+// 0 over the whole population. The gate went red at 0/1, as it is designed to,
+// and the entry left with the defect. Its owner cured it, which is the only way
+// an entry may ever leave.
 const REGISTER = [
-  {
-    what: 'alberi chiome e tronchi', owner: 'V4',
-    where: 'src/world/trees.js: mergeFaces/geometryOf, il giunto fra due piani',
-    why: 'dopo la cura del coordinatore delle facce Y (E-GUARDIA1) resta UNO spigolo '
-      + 'fra due facce discordi: registrato per il proprietario, non un buco disegnato',
-    reversed: 0, inconsistent: 1,
-  },
   {
     what: 'nuvole 0', owner: 'V6',
     where: 'src/world/clouds.js: il materiale non dichiara side',
@@ -124,9 +127,13 @@ if (SELF) {
         && isAdditive({ side: 0, blending: 2 }) },
     { what: '... anche quando il side gli e\' stato assegnato dopo (buco E-V7g)',
       caught: drawsFromEitherSide(Object.assign({ blending: 2 }, { side: 2 })) },
+    // THE REGISTER BITES IN BOTH DIRECTIONS, and this leg no longer borrows a
+    // real entry to prove it: the last one that carried a count was the trees'
+    // and it came out when V4 cured it. A leg that reads whatever defect the
+    // world happens to have today is a leg that changes meaning every time one
+    // of them is fixed, so it reads a register of its own.
     { what: 'il registro morde nei due versi: un conto diverso e\' rosso',
-      caught: registered('alberi chiome e tronchi').inconsistent !== 0
-        && registered('alberi chiome e tronchi').inconsistent !== 2 },
+      caught: ((e) => e.inconsistent !== 0 && e.inconsistent !== 2)({ inconsistent: 1 }) },
   ]);
 }
 
