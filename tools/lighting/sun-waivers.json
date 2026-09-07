@@ -43,16 +43,20 @@
       "consumer": "assets-src/terrain/terrain.json",
       "owner": "V1+V3",
       "note": "shared atlas (ground+path): cleared jointly at the second delivery"
-    },
-    {
-      "consumer": "assets-src/monoliths/monoliths.json",
-      "owner": "V2",
-      "note": "scheduled for replacement: the stone is rebuilt as courses of masonry"
-    },
-    {
-      "consumer": "assets-src/rocks/rocks-bake.json",
-      "owner": "V2",
-      "note": "scheduled for replacement: the rocks are rebuilt as cubes"
     }
+  ],
+  "paid": [
+    "assets-src/rocks/rocks-bake.json [V2], 2026-08-29. The note said 'scheduled for",
+    "replacement: the rocks are rebuilt as cubes', and that is what happened. The",
+    "waiver was not lifted because the consumer came to agree with the seat -- it",
+    "could not, being a manifest of a render nobody can re-run -- it was lifted",
+    "because the CONSUMER IS GONE: the bake manifest, the glTF scene of ten decimated",
+    "spheres and the light atlas over them were all deleted in the same commit that",
+    "made the rocks piles of cubes lit by the arithmetic in the fragment.",
+    "",
+    "Written down rather than merely removed. A roster that only ever shortens",
+    "silently is a roster in which nobody can tell a debt that was paid from one",
+    "that was quietly dropped, and this file's own rule is that every line of it is",
+    "a debt."
   ]
 }

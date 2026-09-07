@@ -91,7 +91,8 @@ self.onmessage = (event) => {
 
   const woke = performance.now();
   const {
-    grain = true, tile = 512, block = '05', radius = DISC_RADIUS, focus = null,
+    grain = true, tile = 512, blocks = MONOLITHS, disc = true,
+    radius = DISC_RADIUS, focus = null,
   } = event.data || {};
 
   const tileStarted = performance.now();
@@ -100,15 +101,18 @@ self.onmessage = (event) => {
     kind: 'tile', side: tile, data, elapsedMs: performance.now() - tileStarted,
   }, [data.buffer]);
 
-  const spec = MONOLITHS.find((m) => m.id === block);
-  const masonryStarted = performance.now();
-  const built = buildMasonry(spec);
-  self.postMessage({
-    kind: 'masonry', id: block, built, elapsedMs: performance.now() - masonryStarted,
-  }, [
-    built.positions.buffer, built.normals.buffer,
-    built.block.buffer, built.stone.buffer, built.indices.buffer,
-  ]);
+  // THE SIX, ONE BLOCK PER MESSAGE: each block is posted the moment it is cut,
+  // and the specs come down the message (V2 owns spec.masonry).
+  for (const spec of blocks) {
+    const masonryStarted = performance.now();
+    const built = buildMasonry(spec);
+    self.postMessage({
+      kind: 'masonry', id: spec.id, built, elapsedMs: performance.now() - masonryStarted,
+    }, [built.positions.buffer, built.normals.buffer, built.indices.buffer]);
+  }
+
+  // The disc, if it was asked for (the hub asks only for stone).
+  if (!disc) return;
 
   // THE PLAN IS ANNOUNCED BEFORE A SINGLE HEIGHT IS SAMPLED, and that is the
   // seam the ground times against: everything before this message is startup —

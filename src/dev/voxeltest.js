@@ -29,6 +29,8 @@ import {
   CHUNK, DISC_RADIUS, NO_COLUMN, VOXEL,
   createMasonry, runInWorker, stoneTile, voxelMaterial, voxelSettings,
 } from '../world/voxel/index.js';
+import { stoneSpecs } from '../world/stone.js';
+import MASONRY_SPEC from '../../assets-src/monoliths/masonry-spec.json' with { type: 'json' };
 import SKY from '../../assets-src/sky/sky.json' with { type: 'json' };
 import SCENE_LIGHT from '../../assets-src/sky/scene-light.json' with { type: 'json' };
 import TERRAIN from '../../assets-src/terrain/terrain.json' with { type: 'json' };
@@ -211,7 +213,14 @@ function addChunk(chunk) {
 
 // The engine's own arithmetic, off the thread the walker is on, through the
 // one seat that knows where the worker file is.
-runInWorker({ grain: query.get('grana') !== '0', radius: RADIUS }, (message) => {
+//
+// ONE BLOCK AND NOT SIX, because this bench is one CORNER of the hub: the disc
+// is fourteen metres across and only 05 stands in it. The spec it is cut from
+// is the same one the world's own stone comes through — src/world/stone.js —
+// so what stands here is the wall the hub is built of and not a second reading
+// of it.
+const BENCH_BLOCK = stoneSpecs(MASONRY_SPEC).filter((s) => s.id === '05');
+runInWorker({ grain: query.get('grana') !== '0', radius: RADIUS, blocks: BENCH_BLOCK }, (message) => {
   // Timed from the first statement, because this handler IS the main thread's
   // share of the work and the gate is about how long it holds the frame.
   const started = performance.now();
@@ -221,7 +230,7 @@ runInWorker({ grain: query.get('grana') !== '0', radius: RADIUS }, (message) => 
     if (masonry) masonry.material.uniforms.tStone.value = stone;
   } else if (message.kind === 'masonry') {
     boot.masonryMs = message.elapsedMs;
-    masonry = createMasonry(message.id, stone, message.built);
+    masonry = createMasonry(BENCH_BLOCK[0], stone, message.built);
     scene.add(masonry.mesh);
     engraveBlock();
   } else if (message.kind === 'plan') {
