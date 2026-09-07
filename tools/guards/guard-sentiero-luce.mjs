@@ -125,6 +125,31 @@ const RELIEF = /uRelief[A-Z]/;
 // baked from there.
 const SHADE = /uShade[A-Z]|tShade/;
 
+// AND A THIRD, WHICH IS THE LIGHT BY PLACE, DECLARED THE SAME WAY AGAIN.
+//
+// U-ZONE-1 painted one picture of how dark each square metre of this world
+// stands -- the law of the seats the world publishes times the residual
+// measured off the reference -- and delivered it as a SEAT: `zoneAt(xz)`, one
+// function, one texture, read by the field and by the three programs of
+// ../../src/world/vegetation.js. Residues 3 and 4 of E-ZONE1 are the two that
+// were not reading it, and one of them is this corridor: «il sentiero del
+// bersaglio e' scuro dove il prato e' scuro».
+//
+// AND IT IS THE LIGHT AND NOT THE PIGMENT, WHICH IS WHY IT COMES THROUGH HERE
+// AND NOT THROUGH jointIsPigment. A zone is how much of the sky and the sun
+// reach a square metre of ground; a stone that stood in it would be pale again
+// at noon and dark again at dusk, which is what a light does and what a colour
+// cannot. The joint went the other way for the same reason and the two rules
+// are one rule read from both ends.
+//
+// SO IT IS ALLOWED THE SAME WAY THE MAT'S SHADOW IS AND NOT BY WIDENING THE
+// RULE: the line has to name the seat's own function or its own uniform, and
+// never with the joint riding along on it. What still cannot happen is the
+// thing this guard exists for -- a fragment that decides for itself where the
+// sun is -- because `zoneAt` does not know where the sun is either: it is a
+// picture of the ground, in XZ, painted offline and gated by guard-zone.
+const ZONE = /zoneAt\s*\(|uZone|tZone/;
+
 export function lightsTheJoint(source) {
   const bad = [];
   // Every assignment whose left hand side is the light or the terms.
@@ -140,6 +165,9 @@ export function lightsTheJoint(source) {
     // Or the pair being bent by the mat's own shadow, through a uniform that
     // says so, and never with the joint riding along on it either.
     if (SHADE.test(line) && !/uJoint/.test(line)) continue;
+    // Or the light being multiplied by the place it stands in, through the
+    // seat's own name, and never with the joint riding along on that either.
+    if (ZONE.test(line) && !/uJoint/.test(line)) continue;
     bad.push({ line, at: lineOf(source, hit.index) });
   }
   return bad;
@@ -209,6 +237,18 @@ if (process.argv.includes('--self')) {
       caught: jointIsPigment('  terms *= 1.0 - inSlot * uJointDark.x;').length > 0,
     },
     {
+      what: 'the light multiplied by the zone, through the name of the seat, is let through',
+      caught: lightsTheJoint('  light *= zoneAt(vWorld.xz);').length === 0,
+    },
+    {
+      what: 'and a zone the seat did not paint -- a second opinion about the place -- is caught',
+      caught: lightsTheJoint('  light *= 1.0 - 0.4 * smoothstep(2.6, 0.0, footDistance);').length > 0,
+    },
+    {
+      what: 'the joint riding onto the light behind the zone is caught too',
+      caught: lightsTheJoint('  light *= zoneAt(vWorld.xz) * (1.0 - uJointDark.x);').length > 0,
+    },
+    {
       what: 'a fetch hidden in a comment is still not a fetch',
       caught: names(code('// the old terrain-light is gone\nvec3 c = albedo;'),
         ATLASES).length === 0,
@@ -251,8 +291,20 @@ report.check(pigment.length === 0,
 
 const joint = lightsTheJoint(fragment);
 report.check(joint.length === 0,
-  'and the only thing that bends the light is the relief, through its own uniforms',
+  'and what bends the light is the relief, the shadow of the mat and the zone, each through its own uniforms',
   joint.map((h) => `line ${h.at}`).join(' | '));
+
+// AND THE CORRIDOR ACTUALLY READS THE ZONE, which is the other half of the
+// same sentence: a rule that only says «if you touch the light, name the seat»
+// is satisfied by a fragment that never touches the light at all, and that is
+// precisely the state E-ZONE1 left this file in. The paving's own fragment has
+// to multiply by it, and it has to be handed the pair through zoneUniforms()
+// rather than through a sampler of its own.
+report.check(/light\s*\*=\s*zoneAt\s*\(/.test(fragment),
+  'the paving and the cubes take the light by place, through zoneAt',
+  'E-ZONE1 residues 3 and 4: the seat is published and one line reads it');
+report.check(/zoneUniforms\s*\(/.test(fragment) && /zoneGlsl\s*\(/.test(fragment),
+  'and they take it from the ONE seat, not from a sampler of their own');
 
 // AND THE DOOR THE SHADER CANNOT SEE. A layer asks for its assets by id, and an
 // atlas handed to a material through that door is an atlas whatever the GLSL
