@@ -14,7 +14,7 @@ import { engrave, loadEngravingFont } from './world/engraving.js';
 import { createInteraction } from './world/interact.js';
 import { MONOLITHS } from './world/layout.js';
 import {
-  DEFAULT_FOV, POSE_SPAWN, POSE_TARGET, POSE_TARGET_TERZA, POSES,
+  DEFAULT_FOV, POSE_SPAWN, POSE_TARGET,
 } from './core/poses.js';
 import { RIG, SWITCH } from './core/avatar.js';
 import { loadLut } from './core/post.js';
@@ -24,6 +24,7 @@ import { buildHub } from './world/hub.js';
 import { needsAt } from './world/layers/registry.js';
 import { createStartOverlay } from './ui/overlay.js';
 import { createSkyVeil } from './ui/veil.js';
+import { createDevPose } from './dev/pose.js';
 import { createHud } from './ui/hud.js';
 import { createReticle } from './ui/reticle.js';
 import { LOOK, choose } from './world/avatar/look.js';
@@ -506,6 +507,9 @@ let freshCostMs = 0;
 let lastTimings = null;
 
 const dev = isDevMode() ? createDevHud(ui) : null;
+// The one seat a pose is imposed through, built where the walker, the lens and
+// the arrival veil are all in scope and nowhere else.
+const devPose = createDevPose({ player, camera, veil });
 const grade = isDevMode() ? createGradePanel(ui, renderer.post) : null;
 if (dev) {
   // WHERE TO STAND, FROM OUTSIDE THE PAGE, and only ever in development.
@@ -518,23 +522,16 @@ if (dev) {
   // panorama — reachable by a driver that takes the shot as well.
   //
   // It is behind isDevMode, so a visitor's page never defines it.
-  // BY NAME OR BY NUMBERS. A harness that asks for 'bordo-indietro' and a
-  // verbale that calls it 'bordo-indietro' cannot drift apart; a harness
-  // carrying its own copy of x, z, yaw and pitch drifts the first time one of
-  // them is refitted. The numbers are still accepted, for a pose being swept
-  // rather than one that has a name.
-  window.setDevPose = (asked) => {
-    const p = typeof asked === 'string' ? POSES[asked] : asked;
-    if (!p) throw new Error(`no pose "${asked}" in src/core/poses.js`);
-    const at = p.position || p;
-    player.setPose({
-      position: { x: at.x, y: at.y ?? POSE_TARGET.position.y, z: at.z },
-      yaw: p.yaw,
-      pitch: p.pitch,
-    });
-    camera.fov = p.fov || POSE_TARGET.fov;
-    camera.updateProjectionMatrix();
-  };
+  //
+  // AND IT IS NOT WRITTEN HERE. The P key below and this handle used to be two
+  // placements with one name between them -- this one moved the eye and left the
+  // person alone, P asked which person the walker was in and placed the FIGURE
+  // when he was in third, five metres in front of the lens -- so a bench and a
+  // session were photographing two different cameras (E-LUCE5). Both now go
+  // through src/dev/pose.js, which is the single seat: first person, the fitted
+  // camera, the arrival veil off the frame, and the six numbers the camera
+  // actually reads handed back so that a caller can check rather than trust.
+  window.setDevPose = (asked) => devPose.place(asked);
   // AND THE SWITCH, SLOWED, FOR THE ONE THING A CAMERA CANNOT PHOTOGRAPH.
   //
   // The run from one person to the other lasts 0.35 s and a screenshot costs
@@ -551,17 +548,12 @@ if (dev) {
   };
 
   input.onKey((code) => {
-    if (code === 'KeyP') {
-      // THE REFERENCE FRAMING, FROM WHICHEVER SIDE OF IT THE WALKER IS ON. In
-      // first person the pose is the camera; in third the camera is on the arm,
-      // so what the pose has to place is the FIGURE -- where the picture draws
-      // his soles -- and the rule carries the camera back to the same fit. Two
-      // poses, one framing; see POSE_TARGET_TERZA in src/core/poses.js.
-      const p = player.person === 'terza' ? POSE_TARGET_TERZA : POSE_TARGET;
-      player.setPose(p);
-      camera.fov = p.fov;
-      camera.updateProjectionMatrix();
-    }
+    // THE REFERENCE FRAMING, AND THERE IS ONLY ONE OF IT. P used to place the
+    // FIGURE when the walker was in third person and leave the camera on the end
+    // of the boom, which meant the committente was shown one camera and the
+    // campaign measured another (E-LUCE5, D-L5-1 = A). It goes through the same
+    // seat window.setDevPose goes through, so the two cannot come apart again.
+    if (code === 'KeyP') devPose.place(POSE_TARGET);
     if (code === 'KeyG') grade.cycleStage();
     // The calibration again, from nothing: the stored answer is thrown away
     // first, so what runs is exactly what a machine sees on its first visit.

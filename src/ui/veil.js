@@ -319,6 +319,36 @@ export function createSkyVeil(before) {
       if (letGo) release();
     },
 
+    /**
+     * A pose was imposed on the frame, so there is no arrival left to hold.
+     *
+     * WHY firstStep() COULD NOT DO IT. That one is the walker's, and it only
+     * ever lets go of a clock that is already running: called before begin() it
+     * arms a flag, and under a HELD clock — which is how every measurement in
+     * this campaign stops the arrival long enough to photograph it — begin()
+     * returns before the clock is ever set, so nothing is holding the veil and
+     * nothing can be released. The frame then carries the arrival shading for as
+     * long as the page is open, which is a quarter to a half of the light in the
+     * corners of every plate taken that way, and it is one photograph minus one
+     * smooth sky rather than a lens: it cannot be divided out afterwards.
+     *
+     * SO THIS ONE IS THE POSE'S, AND IT IS UNCONDITIONAL. src/dev/pose.js is the
+     * single seat a pose is imposed through (E-LUCE5, D-L5-1 = A), and a pose
+     * imposed from outside is not an arrival: nobody walked in, so there is
+     * nothing to arrive from. Safe before begin(), after it, on a held clock and
+     * on a running one, and safe twice — release() has its own gate, and a
+     * begin() that lands afterwards finds the arrival already accounted for and
+     * does not raise a second veil over a frame somebody is measuring.
+     *
+     * It is behind the development flag in every caller it has, because the one
+     * thing that imposes a pose is behind that flag.
+     */
+    dismiss() {
+      walked = true;
+      if (!raisedFor) raisedFor = 'posa imposta';
+      release();
+    },
+
     /** Whether the veil went up on the whole ground or on the ceiling, and when. */
     get raisedFor() { return raisedFor; },
   };
