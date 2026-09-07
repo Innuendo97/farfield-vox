@@ -1,9 +1,11 @@
 import {
   BLADE, BLADES_PER_VOXEL, CHUNK, MANTO, MATERIAL, NO_COLUMN, PIGMENT, PLATEAU, SUB, VOXEL,
-  CAMPO, CAMPO_BIAS, CAMPO_BLADE_CEIL, CAMPO_FAR, CAMPO_FAR_BLADE, CAMPO_FAR_RATIO,
-  CAMPO_FAR_SHIFT,
+  CAMPO, CAMPO_BIAS, CAMPO_BLADE_CEIL, CAMPO_BLADE_MASK, CAMPO_FAR, CAMPO_FAR_BLADE,
+  CAMPO_FAR_LOOK, CAMPO_FAR_RATIO, CAMPO_FAR_SHIFT,
+  CAMPO_LOOK_DEPTH, CAMPO_LOOK_MAX, CAMPO_LOOK_SHIFT,
   CAMPO_MATERIAL, CAMPO_PRESENT, CAMPO_RUNG, CAMPO_SOIL_WALL,
-  campoDecode, campoFarTile, campoGroundByte, campoHeights, campoSlimCode, campoSlimEighths,
+  campoBladeOf, campoDecode, campoFarTile, campoGroundByte, campoHeights, campoLookOf,
+  campoSlimCode, campoSlimEighths,
   campoSlot, campoTile, campoTintByte, campoTintOf, campoTopStep, chunkColumns, columnSpec,
   pigTint,
 } from '../../src/world/voxel/pure.js';
@@ -249,6 +251,13 @@ let farBeyond = 0;
       else if (texel.mat !== family) farWrong += 1;
       else if (texel.blade !== (family === CAMPO_MATERIAL.PATH ? 0 : CAMPO_FAR_BLADE)) {
         farWrong += 1;
+      } else if (texel.look !== (family === CAMPO_MATERIAL.PATH
+        ? 0 : CAMPO_FAR_LOOK / CAMPO_LOOK_MAX)) {
+        // AND THE STATISTIC RIDES IN THE SAME BYTE. A far texel draws the mat's
+        // EXPECTATION and hides the whole law under it, so it carries the look
+        // the law itself says it is hiding (CAMPO_FAR_LOOK), from the first
+        // byte it is written with and not only after a reduction.
+        farWrong += 1;
       } else if (texel.tint !== campoTintByte(ix, iz)) farWrong += 1;
     }
   }
@@ -271,6 +280,8 @@ report.check(farWrong === 0 && farPresent > 0 && farBeyond > 0,
 // distance.
 // --------------------------------------------------------------------------
 let pyramidBad = 0;
+let lookBad = 0;
+let lookCells = 0;
 {
   const tile = campoTile(0, 1, RADIUS);
   if (injected) {
@@ -284,7 +295,7 @@ let pyramidBad = 0;
       let done = false;
       for (let i = 0; i < size && !done; i += 1) {
         const o = ((dst.y + j) * CAMPO.tiles.width + (dst.x + i)) * 4;
-        if (tile.data[o] > 0) { tile.data[o] -= 1; done = true; }
+        if (campoBladeOf(tile.data[o]) > 0) { tile.data[o] -= 1; done = true; }
       }
       if (done) break;
     }
@@ -306,16 +317,61 @@ let pyramidBad = 0;
         }
         if (bo < 0) continue;
         const o = ((dst.y + j) * CAMPO.tiles.width + (dst.x + i)) * 4;
-        for (let c = 0; c < 4; c += 1) {
-          if (tile.data[o + c] !== tile.data[bo + c]) { pyramidBad += 1; break; }
+        // THREE CHANNELS WHOLE, AND THE FOURTH IN ITS TWO HALVES. The ground,
+        // the flags and the tint are the winning child's word for word; the
+        // first byte carries the winner's BLADE in its low five bits and, in
+        // its high three, the statistic of what the merge covered over -- which
+        // is not any child's number and has to be re-derived here rather than
+        // compared.
+        if (campoBladeOf(tile.data[o]) !== campoBladeOf(tile.data[bo])) pyramidBad += 1;
+        else if (tile.data[o + 1] !== tile.data[bo + 1]
+          || tile.data[o + 2] !== tile.data[bo + 2]
+          || tile.data[o + 3] !== tile.data[bo + 3]) pyramidBad += 1;
+        else {
+          const top = tile.data[bo + 1] * CAMPO_RUNG + campoBladeOf(tile.data[bo]);
+          let deficit = 0;
+          let seen = 0;
+          for (let dj = 0; dj < 2; dj += 1) {
+            for (let di = 0; di < 2; di += 1) {
+              const s = ((src.y + j * 2 + dj) * CAMPO.tiles.width + (src.x + i * 2 + di)) * 4;
+              if (!tile.data[s + 2]) continue;
+              seen += 1;
+              deficit += campoLookOf(tile.data[s]) * CAMPO_LOOK_DEPTH
+                + Math.max(0, top - (tile.data[s + 1] * CAMPO_RUNG + campoBladeOf(tile.data[s])));
+            }
+          }
+          const want = seen
+            ? Math.min(CAMPO_LOOK_MAX,
+              Math.round((deficit / seen) * CAMPO_LOOK_MAX / CAMPO_LOOK_DEPTH))
+            : 0;
+          if ((tile.data[o] >> CAMPO_LOOK_SHIFT) !== want) { pyramidBad += 1; lookBad += 1; }
+          if (want > 0) lookCells += 1;
         }
       }
     }
   }
 }
 report.check(pyramidBad === 0,
-  'every coarse cell is the WHOLE word of the column with the highest ground',
-  pyramidBad ? `${pyramidBad} are not` : '');
+  'every coarse cell is the winning column word for word, and its statistic is '
+  + 'the mean depth of the mat it covered',
+  pyramidBad ? `${pyramidBad} are not (${lookBad} of them on the statistic)` : `${lookCells} carry one`);
+
+// AND THE STATISTIC CANNOT REACH THE HEIGHT, WHICH IS THE WHOLE OF WHY IT WAS
+// FREE TO CARRY. A blade is at most five rungs of MANTO.law at SUB steps each;
+// the mask has to hold every one of them with nothing left over to borrow.
+{
+  const ceil = Math.round(CAMPO_BLADE_CEIL / CAMPO.unitBlade);
+  report.check(ceil <= CAMPO_BLADE_MASK && (CAMPO_BLADE_MASK + 1) * (CAMPO_LOOK_MAX + 1) === 256,
+    'the blade fits under the statistic in one byte',
+    `tallest blade ${ceil}, mask ${CAMPO_BLADE_MASK}, ${CAMPO_LOOK_MAX + 1} steps of look`);
+  let mad = 0;
+  for (let i = 0; i < MANTO.law.length; i += 1) {
+    for (let j = 0; j < MANTO.law.length; j += 1) mad += MANTO.law[i] * MANTO.law[j] * Math.abs(i - j);
+  }
+  report.check(CAMPO_LOOK_DEPTH === Math.max(1, Math.round(mad * SUB)),
+    'the full scale of the statistic is derived from MANTO.law and not written down',
+    `${CAMPO_LOOK_DEPTH} SUB-steps against ${(mad * SUB).toFixed(3)}`);
+}
 
 // AND THE BOUND IS NEVER UNDER WHAT IS INSIDE THE CELL.
 let bound = 0;
@@ -339,7 +395,7 @@ let slack = 0;
           for (let di = 0; di < step; di += 1) {
             const s = ((j * step + dj) * CAMPO.tile + (i * step + di)) * 4;
             if (!tile.data[s + 2]) continue;
-            const top = (tile.data[s + 1] - CAMPO_BIAS) * CAMPO_RUNG + tile.data[s];
+            const top = (tile.data[s + 1] - CAMPO_BIAS) * CAMPO_RUNG + campoBladeOf(tile.data[s]);
             if (top > worst) worst = top;
           }
         }

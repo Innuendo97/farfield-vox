@@ -11,7 +11,7 @@ import { SHEET_GLSL, sheetArray, sheetUniforms } from './sheet.js';
 import { bladeSettings, earthSettings, voxelSettings } from './material.js';
 import {
   CAMPO, CAMPO_BEARINGS, CAMPO_BIAS, CAMPO_BLADE_CEIL, CAMPO_CUT_GLSL, CAMPO_FAR,
-  CAMPO_FAR_SHIFT, CAMPO_RUNG, campoCutUniform,
+  CAMPO_FAR_SHIFT, CAMPO_LOOK_MAX, CAMPO_LOOK_SHIFT, CAMPO_RUNG, campoCutUniform,
 } from './campo.js';
 
 // THE FIELD'S OWN MATERIAL: ONE BOX, ONE FRAGMENT A PIXEL, AND THE WORLD
@@ -76,13 +76,14 @@ import {
 //    the ray steps cell to cell exactly, and where a coarse cell's maximum is
 //    under it the whole cell is skipped and the ray climbs a level; where it is
 //    not, it descends. That is what makes the far field cost what the near does.
-// 2. THE LEVEL OF DETAIL IS THE PIXEL'S OWN FOOTPRINT AND IT IS DITHERED. The
-//    finest cell a ray may stop at is the one that covers about uLodGain pixels
-//    on the screen, which is a continuous number; the pixel's own hash decides
-//    which side of it this pixel takes, so two levels INTERLEAVE over a band
-//    instead of meeting at a line. That is a stochastic mip and it is the
-//    cheapest half of the answer to the scintillation of phase one: geometry
-//    finer than a pixel is not drawn at all rather than sampled once.
+// 2. THE LEVEL OF DETAIL IS A DISTANCE IN METRES FROM THE WALKER. Inside
+//    uLodNear the mat is drawn whole, at five centimetres; after it the cell
+//    grows by uLodStep at each front. Nothing in that rule knows the field of
+//    view, the viewport or where the eye is looking, which is what stops the
+//    meadow from redrawing itself when the walker zooms or turns; and what a
+//    coarse cell then loses is given back not as geometry but as the
+//    STATISTIC of the mat it covered, so a plate is lit like the blades and
+//    wells it stands for. See march() for the ladder and shade() for the look.
 // 3. AND THE OTHER HALF IS MORE THAN ONE RAY. `uRays` sub-pixel samples are
 //    marched through the same fragment on a rotated grid and averaged -- which
 //    is the only thing that antialiases a silhouette the RAY finds, since
@@ -139,8 +140,21 @@ const FRAGMENT = /* glsl */`
   uniform int uSteps;
   uniform int uTopLevel;
   uniform int uStartLevel;
-  uniform float uLodGain;
+  // THE LEVEL OF DETAIL, IN METRES FROM THE WALKER. uLodNear is the radius of
+  // the ring the mat is drawn whole inside, uLodStep the factor between one
+  // front and the next, uLodCentre the point on the plane they are measured
+  // from -- which is the WALKER and not the eye, and is held back by
+  // uLodSnap metres of hysteresis so that a step taken and taken back changes
+  // no cell at all. See march().
+  uniform float uLodNear;
+  uniform float uLodStep;
+  uniform vec2 uLodCentre;
   uniform float uDither;
+  // How hard the statistic of the mat pulls a coarse cell towards the light of
+  // the mat it stands for, and how deep under its own canopy that mat sits.
+  // See campoReduce in ./campo.js and the foot of shade().
+  uniform float uLookGain;
+  uniform float uLookRung;
   uniform int uRays;
   uniform float uRayNear;
   uniform float uHorizon;
@@ -194,15 +208,26 @@ const FRAGMENT = /* glsl */`
   // The narrowest a blade may stand, in eighths of its cell, from the law that
   // decides it rather than from a number written twice.
   const float SLIM_LOW = ${MANTO.slim.low.toFixed(1)};
+  // Where the blade stops and the statistic starts in the first byte, as the
+  // wrap and the full scale the fragment divides by. See campoReduce.
+  const float BLADE_WRAP = ${(1 << CAMPO_LOOK_SHIFT).toFixed(1)};
+  const float LOOK_MAX = ${CAMPO_LOOK_MAX.toFixed(1)};
 
   // ---------------------------------------------------------------- the pair
   // What a texel says about height, in the two units it holds it in: the ground
   // in whole voxels off a biased byte, the blade in quarter-blades over it. See
   // the head of ./campo.js for why the two are not one unit any more.
+  // AND THE FIRST BYTE CARRIES TWO NUMBERS. The low five bits are the blade --
+  // five rungs of MANTO.law at SUB steps each is twenty, which is what five
+  // bits hold -- and the high three are the mat's own statistic, written by
+  // campoReduce for every level over the finest. Every reader of the height
+  // takes the mask first; the statistic is read only by the light.
+  float bladeSubOf(vec4 t) { return mod(floor(t.r * 255.0 + 0.5), BLADE_WRAP); }
+  float lookOf(vec4 t) { return floor((t.r * 255.0 + 0.5) / BLADE_WRAP) / LOOK_MAX; }
   float groundYOf(vec4 t) { return (t.g * 255.0 - uBias) * uGroundUnit; }
-  float topYOf(vec4 t) { return groundYOf(t) + t.r * 255.0 * uBladeUnit; }
+  float topYOf(vec4 t) { return groundYOf(t) + bladeSubOf(t) * uBladeUnit; }
   // And the same top in the SUB-steps the sun's own march counts in.
-  float topSubOf(vec4 t) { return (t.g * 255.0 - uBias) * RUNG + t.r * 255.0; }
+  float topSubOf(vec4 t) { return (t.g * 255.0 - uBias) * RUNG + bladeSubOf(t); }
   float floorSubOf(vec4 t) { return (t.g * 255.0 - uBias) * RUNG; }
 
   // ONE FETCH, TWO PICTURES, AND THE SAME CELL INDEX FOR BOTH. At level L both
@@ -338,66 +363,84 @@ const FRAGMENT = /* glsl */`
     int level = dir.y > 0.0 ? uTopLevel : min(uStartLevel, uTopLevel);
     vec3 n = vec3(0.0, 1.0, 0.0);
 
-    // THE FLOOR OF THE DETAIL, AS A LADDER AND NOT AS A LOGARITHM.
+    // THE FLOOR OF THE DETAIL, IN METRES FROM THE WALKER, AS A LADDER.
     //
-    // The cell the ray is allowed to stop at is the one that covers about
-    // uLodGain pixels; the pixel's own hash pushes the threshold up or down by
-    // up to a whole level, so the place where one level gives way to the next
-    // has no line on it -- the two interleave over a band. It is the cheap half
-    // of Cesium's screen space cross fade: one hash, no second draw, nothing to
-    // sort.
+    // ------------------------------------------------------------------------
+    // WHAT CHANGED AND WHY, IN THE COMMITTENTE'S OWN WORDS. «Vedo generare il
+    // prato a piu' punti quando cammino o ZOOMMO, da' molto fastidio
+    // all'occhio.» The floor used to be a FOOTPRINT: the finest cell a ray
+    // could stop at was the one covering about a gain of pixels (uLodGain,
+    // which this file no longer has), so it stood where
+    // travelled * uPixelScale * uLodGain / uCell crossed a power of
+    // two. Two things follow from that and both are the defect.
     //
-    // WHAT CHANGED, AND WHY IT IS THE SAME ANSWER. The floor used to be written
-    // the way the arithmetic says it -- floor(log2(want) + dither) -- and that
-    // put A LOGARITHM AND A SQUARE ROOT IN THE INNER LOOP, taken once for every
-    // cell every ray crossed. Thirty and a half of them a pixel over a million
-    // pixels is thirty million of each a frame, for a number that only ever
-    // goes UP: the floor is a non-decreasing function of how far the ray has
-    // travelled, and how far the ray has travelled is a non-decreasing function
-    // of the step it is on.
+    //   IT MOVES WITH THE FIELD OF VIEW. uPixelScale is 2 tan(fov/2) / height,
+    //   so zooming from 44.2 to 25 degrees pushes every front out by 1.83x:
+    //   measured (R2 §1.2), the same meadow from the same spot redraws itself
+    //   at another cell size, and 202 000 pixels of one level become 99 000. A
+    //   photograph enlarged does not redraw its grass; this did.
     //
-    // So it is a LADDER. The distance at which level k becomes the floor is
+    //   IT MOVES WITH THE EYE AND NOT WITH THE WALKER. travelled is distance
+    //   from the CAMERA, so a head that turns -- or a camera that leans off the
+    //   walker -- drags the fronts round with it.
     //
-    //     want >= 2^(k - dither)  <=>  travelled >= 2^(k - dither) * uCell
-    //                                              / (uPixelScale * uLodGain)
+    // So the floor is now a DISTANCE IN METRES FROM THE WALKER, on the plane:
+    // level 0 inside uLodNear, and one rung every factor uLodStep after it.
+    // The fronts are the tier's own numbers (quality.js groundDetail), the fov
+    // is not in them anywhere, and zooming enlarges the cells that are there.
     //
-    // and each rung is the one below times two, so the whole march pays ONE
-    // doubling per level it actually climbs -- at most uTopLevel of them over
-    // the entire ray -- against a log2 at every step. The distance goes with
-    // it: dir is a unit vector, so the ray's own parameter IS the distance
-    // travelled, and the traversal already computes every crossing it is made
-    // of. It is also the unit tEnter and tLeave were always measured in.
+    // AND THE STEP CHANGES AT THE FAR WINDOW'S OWN LEVEL, which is not a magic
+    // number. Below FAR_SHIFT the rungs are the ring's -- a slow factor, so
+    // the full detail reaches as far out as it can before the near window ends
+    // (the constraint is uLodNear * uLodStep^2 <= 19.2 m: past that there is
+    // only the forty centimetre texel and a law that held level 2 out there
+    // would make a ring that JUMPS with the window, measured at 8.2% of the
+    // ground in one step). At and above FAR_SHIFT the picture itself is forty
+    // centimetres, so the rung doubles like the pyramid does and four levels
+    // carry the ray over four hundred metres, which is what keeps the march
+    // inside uSteps.
     //
-    // THE TWO ARE THE SAME PICTURE, AND IT IS MEASURED AND NOT ASSERTED. The
-    // ladder and the logarithm agree wherever the arithmetic is exact; where it
-    // is not -- a want within an ulp of a power of two, or a parameter that has
-    // accumulated a rounding the square root would not have -- they could
-    // differ by a level on a pixel. Shot at the pose the campaign judges on, at
-    // the back edge looking in, and at the worst pose of the sweep: IDENTICAL
-    // TO THE BYTE on all 1 668 480 pixels of each, both halves of the change
-    // separately and together. (The panels of the monoliths are put out for
-    // that comparison and only for it: their diamond and its swarm have a clock
-    // of their own that ?t0 does not stop, and they move 15 000 pixels between
-    // two shots of the SAME build.)
-    float lodRung = (uCell / max(uPixelScale * uLodGain, 1e-9)) * exp2(1.0 - dither);
+    // ------------------------------------------------------------------------
+    // IT IS STILL A LADDER AND NOT A LOGARITHM, and now it is a ladder in the
+    // SQUARE of the distance so that no step pays a square root either. The
+    // floor only ever climbs -- see the running maximum below -- so this is one
+    // compare a step and one multiply per level, against a log2 and a sqrt at
+    // every step of every ray.
+    //
+    // AND THE DISTANCE IS A RUNNING MAXIMUM, WHICH IS WHAT KEEPS IT A LADDER.
+    // Distance from the EYE grows along a ray by construction; distance from
+    // the WALKER does not, because the centre is held back by the hysteresis
+    // below and a ray may close on it before it recedes. The dip is at most
+    // uLodSnap metres and it is inside the ring, where the floor is nought
+    // anyway; taking the farthest the ray has been keeps the invariant the
+    // whole traversal is written on -- a level is never given back -- for the
+    // price of one max.
+    //
+    // THE DITHER STILL SPREADS THE FRONT, IN THE LADDER'S OWN OCTAVE. At
+    // uDither nought (what ships: E-PERF-3 measured an octave as «una poltiglia
+    // di due misure di blocco») this is exactly one and costs a compare.
+    float jitter = uDither > 0.0 ? pow(uLodStep, uDither * (dither - 0.5)) : 1.0;
+    float lodRung = uLodNear * jitter;
+    float lodRung2 = lodRung * lodRung;
+    float step2 = uLodStep * uLodStep;
     int lodFloor = 0;
-    // THE RAY'S OWN PARAMETER, WHICH IS THE DISTANCE FROM THE EYE. dir is a
-    // unit vector, so the parameter and the distance are the same number; the
-    // traversal already computes every crossing it is made of, and tEnter and
-    // tLeave were always measured in it. Keeping it costs an add a step where
-    // asking distance() for it cost a square root a step.
+    // How far from the WALKER, squared, the ray has been at its farthest.
+    float far2 = 0.0;
+    // The ray's own parameter, kept because tEnter and tLeave are measured in
+    // it and the crossings are added to it.
     float tRay = tEnter + 1e-4;
 
     for (int i = 0; i < 512; i++) {
       if (i >= uSteps) break;
       gSteps = i;
-      float travelled = tRay;
+      vec2 fromWalker = p.xz - uLodCentre;
+      far2 = max(far2, dot(fromWalker, fromWalker));
       // WHICH RUNG THE RAY HAS REACHED. It only ever climbs, so this is one
-      // compare a step and one doubling a level, and never a level twice.
+      // compare a step and one multiply a level, and never a level twice.
       for (int k = 0; k < ${CAMPO.levels + CAMPO_FAR.levels}; k++) {
-        if (travelled < lodRung || lodFloor >= uTopLevel) break;
+        if (far2 < lodRung2 || lodFloor >= uTopLevel) break;
         lodFloor++;
-        lodRung *= 2.0;
+        lodRung2 *= lodFloor < FAR_SHIFT ? step2 : 4.0;
       }
       // AND THE LADDER IS NOT THE FLOOR ITSELF. The far window raises the floor
       // for the step it is answering (below), and that raise belongs to the
@@ -692,6 +735,51 @@ const FRAGMENT = /* glsl */`
     float bounce = hit.blade ? uBounce : 0.0;
     vec3 light = faceLightOf(matTerms(hit.n, sun, sky, bounce));
 
+    // ------------------------------------------------- THE ASPECT, CONSERVED
+    // WHY A COARSE CELL IS NOT ALLOWED TO BE A BRIGHT PLATE (R1 S1c, R2 §2.3).
+    //
+    // Over the ring the cell is bigger than a blade, and the blade it draws is
+    // a SAMPLE of the sixteen or sixty four under it (campoReduce, and the note
+    // there for why a maximum would draw a flat meadow). The geometry of that
+    // is right and it is what makes distance read as cubes. The LIGHT of it is
+    // not: a top face at the sampled height, lit as a top face all the way
+    // across, where what stands there is a mat -- tops, flanks and the wells
+    // between them. Measured, that is the whole of the defect: dark/middle/
+    // light 49/16/35 against the target's 57/39/5 at five to seven metres, and
+    // a mean luma that JUMPS by three and a half levels at the front, which is
+    // what makes a front read as «prato che si genera» rather than as a cube
+    // changing size.
+    //
+    // So the cell carries the STATISTIC of what it covered -- how deep, on
+    // average, the mat lies under the top that is drawn for it -- and the light
+    // is mixed by it towards the light of that mat: the sun a FLANK takes,
+    // averaged over the four bearings a cube shows, and the sky seen from
+    // uLookRung of canopy down. Not a second sample and not a texture: one
+    // reading of a byte that was already in the fetch, and one more face.
+    //
+    // AND IT IS THE LIGHT AND NOT THE ALBEDO. The pigment, the grain and the
+    // joint are the cubes' own and are left exactly where they were; what a
+    // level of detail may change is how much light a face is standing in.
+    float look = hit.level > 0 ? lookOf(hit.tex) * uLookGain : 0.0;
+    if (look > 0.0) {
+      // THE SUN A FACE INSIDE THE MAT TAKES, WHICH IS THE MAT'S OWN SHADOW AND
+      // NOT A SECOND OPINION ABOUT IT. What is hidden under the plate is hidden
+      // BY THE MAT, so its survival of the sun is the survival this material
+      // already carries for exactly that -- uShadeSun, the sun a blade keeps
+      // under its own line -- composed with whatever shadow the cell as a whole
+      // is standing in. E-LUCE7 measured the same thing on the reference from
+      // the other side: half of the target's grass IS its own internal shadow,
+      // and a term that lit the hidden half like the top would draw the plate
+      // this change exists to remove.
+      //
+      // AND THE FOUR HORIZONTAL FACES OF A CUBE share their sky and average
+      // their sun to (|x| + |z|) / 4 of the bearing, which is the closed form
+      // of a mean that would otherwise cost four faceLightOf calls.
+      float sunSide = (abs(uSunDir.x) + abs(uSunDir.z)) * 0.25 * sun * uShadeSun;
+      float skyUnder = 1.0 - uBase.x * (1.0 - pow(uBase.y, rung + uLookRung));
+      light = mix(light, faceLightOf(vec2(sunSide, min(1.0, 0.5 + uBounce) * skyUnder)), look);
+    }
+
     // ---------------------------------------------------- the lightened arris
     float up = fract(p3.y / span);
     float band = min(uArrisPixels * pixel, span * 0.30) / span;
@@ -915,37 +1003,50 @@ export function campoMaterial({
        */
       uStartLevel: { value: 4 },
       /**
-       * How many pixels a cell has to cover before the ray may stop at it.
+       * THE RING: how far from the WALKER the mat is drawn whole, in metres.
        *
-       * TWENTY FOUR, AND IT IS THE ONE NUMBER THE SCINTILLATION WAS WON ON.
+       * NINE, AND IT IS THE COMMITTENTE'S OWN QUESTION MADE INTO A NUMBER. He
+       * asked for «cubi veri dove si guarda»; R1 measured what the target shows
+       * inside the near field (blades, their wells, their risers) against what
+       * this drew there (plates of twenty and forty centimetres from five
+       * metres out), and R2 priced the ring at three sizes on the card: six
+       * metres +3.9 ms at the pose the campaign judges on, nine +3.4 to +4.5,
+       * twelve +8 to +15. Nine is the largest that stays inside the gate with
+       * the reach pulled in, and it is a handle: the address `campolod=R,s`
+       * and quality.js's own groundDetail both move it.
        *
-       * Phase one's ladder -- the finest cells inside eight metres, the next
-       * inside sixteen (D-P3) -- is a footprint rule with the footprint left
-       * implicit: at the high tier's own pixel a five centimetre cell at eight
-       * metres covers 6.7 of them. Written as the footprint it is one number
-       * instead of two and it follows the viewport and the field of view
-       * instead of standing still while they move.
-       *
-       * AND THEN IT WAS SWEPT, because it is the dial the scintillation is
-       * fought on: geometry finer than this is not drawn at all rather than
-       * sampled once a pixel. Measured on the walk, as the mean change of a
-       * pixel between two consecutive frames, against the CUBES the committente
-       * has already accepted (levels of 255, four windows of the frame):
-       *
-       *     cubi        12.16  12.37  11.33  6.84
-       *     gain  6.5   17.89  18.11  14.57  7.78     worse everywhere
-       *     gain 12     15.17  14.99  10.63  5.88
-       *     gain 18     13.22  11.28  10.22  5.24
-       *     gain 24     10.88  11.07   8.27  5.07     under the cubes everywhere
-       *     gain 32      9.00   6.71   4.56  3.96     and the meadow goes flat
-       *
-       * Twenty four is the coarsest the meadow can be drawn at while still
-       * reading as blades in the near field, and the finest at which nothing
-       * scintillates more than the cubes did. What it costs is that the narrow
-       * blade of E-DECISIONI10 G3 is only resolved inside 2.2 m; that is
-       * declared in the verbale and it is a dial the committente may move.
+       * IT IS FROM THE WALKER AND NOT FROM THE EYE, and it is in METRES and not
+       * in pixels. See the head of march() for the two defects that followed
+       * from the footprint rule this replaced -- the fronts moving 1.83x with
+       * the zoom, and moving with a head that turns.
        */
-      uLodGain: { value: 24 },
+      uLodNear: { value: 9 },
+      /**
+       * The factor between one front and the next, under the far window.
+       *
+       * 1.45, AND THE CONSTRAINT IS THE NEAR WINDOW'S OWN SIZE. Past 19.2 m
+       * from the walker there is no picture finer than forty centimetres (see
+       * campo-field.js: the near window is 51.2 m of texels and the walker
+       * stands in the middle tile of eight), so any law that still wants level
+       * two out there gets a ring that JUMPS by 6.4 m whenever the window
+       * moves -- measured at 8.2% of the ground in one step. So the third front
+       * has to land inside the window: uLodNear * uLodStep^2 <= 19.2, which at
+       * nine metres is 1.46 and at six is 1.79. The fronts that ship at the top
+       * tier are 9 / 13.05 / 18.92 m.
+       */
+      uLodStep: { value: 1.45 },
+      /**
+       * WHERE THE RING IS CENTRED, AND WHY IT LAGS THE WALKER ON PURPOSE.
+       *
+       * The point the distances are measured from is the walker's own place on
+       * the plane, held back until they have left a ball of uLodSnap metres
+       * around it (see update() in ./campo-field.js). That is the hysteresis:
+       * inside the ball NOTHING changes level at all, so a step taken and taken
+       * straight back leaves the frame identical to the byte instead of
+       * refining a ring and coarsening it again. It is written by the layer and
+       * never by this file.
+       */
+      uLodCentre: { value: new Vector2(0, 0) },
       /**
        * How wide the band is where one level of detail gives way to the next,
        * in levels, spread by the pixel's own hash.
@@ -962,6 +1063,51 @@ export function campoMaterial({
        * made of cubes, which is a thing this world does everywhere anyway.
        */
       uDither: { value: 0 },
+      /**
+       * HOW MUCH OF A COARSE CELL'S LIGHT THE MAT UNDER IT IS ALLOWED TO OWN.
+       *
+       * THREE QUARTERS, AND IT IS FITTED AGAINST THE FRONT AND NOT CHOSEN. The
+       * byte campoReduce writes is a DEPTH -- how far under the drawn top the
+       * mat lies, in the law's own spread -- and what the light needs is a
+       * SHARE: how much of the cell the eye is being shown mat instead of
+       * plate. The one turns into the other by a factor, and the factor has a
+       * measurement that decides it: THE FRONT MUST NOT BE A STEP OF LUMA.
+       *
+       * Read at the pose the campaign judges on, on the pixels the field itself
+       * draws (it draws 31.6% of that frame; a mean over the whole of it
+       * dilutes this by three), the band 7-8.5 m against the band 10.5-12.5 m
+       * -- one safely inside the ring and one safely outside it, a metre and a
+       * half clear of the front either way, because a blade a quarter of a
+       * metre tall seen from 1.58 m is hit a metre and a half before its pixel
+       * cuts the plane:
+       *
+       *     the law that shipped (3.41 m x2)   +5.75 levels across the front
+       *     ring 9 m, no statistic             +4.08
+       *     ring 9 m, share 0.50               +1.97
+       *     ring 9 m, share 0.75               +0.28   <- what ships
+       *     ring 9 m, share 1.00               -2.27
+       *
+       * At three quarters the front is a quarter of a level, which is under the
+       * grain of the meadow, and R1's «una media che si affina» is what the eye
+       * gets instead of «una placca chiara che si spacca in fili scuri». The
+       * band beyond the ring lands, at the same value, on 33@55 57@31 98@14
+       * against the target's own 32@58 52@26 113@16 at that distance: three
+       * shares inside five points, where the law that shipped was out by
+       * seventeen on the bright one.
+       */
+      uLookGain: { value: 0.75 },
+      /**
+       * HOW DEEP UNDER ITS OWN CANOPY THE MAT'S AVERAGE FACE STANDS, IN CELLS.
+       *
+       * From MANTO.law and not chosen: the mat's mean height is 2.455 blades,
+       * a blade is one cell of this field, and a flank averaged over its own
+       * height stands at half of it. Two cells is that number taken in the step
+       * the sky term is counted in (uBase's ladder is whole cells), and it is
+       * the same fall the near blades take at that depth -- so a plate at the
+       * front and the blades just inside it are lit off ONE law, which is what
+       * stops the front from carrying a step of luma.
+       */
+      uLookRung: { value: 2 },
       uRays: { value: rays },
       /**
        * How far a hit may be and still be worth a second ray, in metres.

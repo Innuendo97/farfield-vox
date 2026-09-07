@@ -76,11 +76,45 @@ import { SPAWN } from '../layout.js';
  *                  the multisampling's own 1.4 ms into
  *   campopassi=N   the ceiling on the steps of one ray
  *   campotop=N     the level of the pyramid the traversal starts at
- *   campolod=N     how many pixels a cell must cover before a ray may stop at it
+ *   campolod=R,s,h the ring in METRES: R the radius the mat is drawn whole
+ *                  inside, s the factor between one front and the next, h the
+ *                  hysteresis of the centre. `campolod=9,1.45,0` is the shipped
+ *                  ring with the hysteresis taken off, which is the arm it is
+ *                  measured against.
+ *   campolook=g,r  how much of a coarse cell's light the mat's own statistic
+ *                  owns, and how deep under its canopy that mat stands
  *   campoombra=0   the sun's own march off, to price it
  *   campodepth=0   gl_FragDepth off, to price the early test it costs
  *   campodebug=2   magenta where a ray ran out without finding anything
  */
+/**
+ * The ring as an address asks for it: `R`, `R,s` or `R,s,h`, in metres.
+ *
+ * Nought is a legal hysteresis and means «no hysteresis», so it is read apart
+ * from «not given»: a measurement whose whole point is the arm without it
+ * cannot be spelled by a rule that treats nought as absent.
+ */
+function ringAsked(raw) {
+  if (!raw) return null;
+  const n = raw.split(',').map(Number);
+  if (!(n[0] > 0)) return null;
+  return {
+    near: n[0],
+    step: n.length > 1 && n[1] > 1 ? n[1] : null,
+    snap: n.length > 2 && Number.isFinite(n[2]) && n[2] >= 0 ? n[2] : null,
+  };
+}
+
+/** Two numbers off an address, for the handles that come in pairs. */
+function pairAsked(raw) {
+  if (!raw) return null;
+  const n = raw.split(',').map(Number);
+  return {
+    a: Number.isFinite(n[0]) ? n[0] : null,
+    b: n.length > 1 && Number.isFinite(n[1]) ? n[1] : null,
+  };
+}
+
 function asked() {
   const query = new URLSearchParams(window.location.search);
   const asAsked = Number(query.get('voxradius'));
@@ -98,7 +132,8 @@ function asked() {
     campoRays: Number(query.get('camporaggi')) > 0 ? Number(query.get('camporaggi')) : null,
     campoSteps: Number(query.get('campopassi')) > 0 ? Number(query.get('campopassi')) : null,
     campoTop: query.get('campotop') === null ? null : Number(query.get('campotop')),
-    campoLod: Number(query.get('campolod')) > 0 ? Number(query.get('campolod')) : null,
+    campoLod: ringAsked(query.get('campolod')),
+    campoLook: pairAsked(query.get('campolook')),
     campoDither: query.get('campodither') === null ? null : Number(query.get('campodither')),
     campoShadow: query.get('campoombra') !== '0',
     campoDepth: query.get('campodepth') !== '0',
@@ -189,7 +224,8 @@ const layer = {
         // moves the scintillation by ONE AND A HALF PER CENT while costing
         // fifteen milliseconds. What actually samples the ray properly is not
         // taking two of them: it is not putting geometry under the ray that is
-        // finer than the pixel, which is uLodGain above, and which is free.
+        // finer than the pixel, which is what the ring above decides, and
+        // which is free.
         // The handle stays so the number can be taken again.
         rays: wanted.campoRays ?? 1,
         // The engine's own worker seat, handed in rather than imported, so that
@@ -206,12 +242,18 @@ const layer = {
       if (wanted.campoSteps) u.uSteps.value = wanted.campoSteps;
       if (wanted.campoTop !== null) u.uTopLevel.value = wanted.campoTop;
       // THE TIER'S OWN ANSWER FIRST, THE ADDRESS'S OVER IT. What ships is
-      // quality.js's groundDetail; `campolod` is the handle it was measured
-      // with and it wins where it is given, which is what a measuring handle is
-      // for.
-      if (assets.groundDetail) u.uLodGain.value = assets.groundDetail;
-      if (wanted.campoLod) u.uLodGain.value = wanted.campoLod;
+      // quality.js's groundDetail -- the ring in metres, its step and its
+      // hysteresis -- and `campolod` is the handle it was measured with, which
+      // wins where it is given because that is what a measuring handle is for.
+      if (assets.groundDetail) layer.campo.setDetail(assets.groundDetail);
+      if (wanted.campoLod) layer.campo.setDetail(wanted.campoLod);
       layer.lodFromAddress = Boolean(wanted.campoLod);
+      // And the mat's own statistic, which is the other half of the same
+      // change: see the foot of shade() in ../voxel/campo-material.js.
+      if (wanted.campoLook) {
+        if (wanted.campoLook.a !== null) u.uLookGain.value = wanted.campoLook.a;
+        if (wanted.campoLook.b !== null) u.uLookRung.value = wanted.campoLook.b;
+      }
       if (wanted.campoDither !== null) u.uDither.value = wanted.campoDither;
       u.uHorizon.value = wanted.campoShadow ? 1 : 0;
       u.uDebug.value = wanted.campoDebug;
@@ -254,13 +296,13 @@ const layer = {
   /**
    * How finely the ground is resolved, from the tier that decided it.
    *
-   * ONE UNIFORM, so a tier that moves reaches the next frame. The address wins
-   * where it was given: a measurement taken at a stated gain has to stay at it
-   * while the governor is free to move the tier under it.
+   * THREE UNIFORMS AND ONE SEAT, so a tier that moves reaches the next frame.
+   * The address wins where it was given: a measurement taken at a stated ring
+   * has to stay at it while the governor is free to move the tier under it.
    */
-  setGroundDetail(gain) {
-    if (!layer.campo || !gain || layer.lodFromAddress) return;
-    layer.campo.material.uniforms.uLodGain.value = gain;
+  setGroundDetail(detail) {
+    if (!layer.campo || !detail || layer.lodFromAddress) return;
+    layer.campo.setDetail(detail);
   },
 
   update(frame) {

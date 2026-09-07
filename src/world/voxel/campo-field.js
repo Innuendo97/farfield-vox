@@ -206,6 +206,29 @@ export function createCampo({
   // Where the sky's bound was last taken, and whether a tile has landed since.
   let slopeAt = null;
   let dirty = true;
+  // ---------------------------------------------------------------------------
+  // WHERE THE LEVEL OF DETAIL IS CENTRED, AND WHY IT IS NOT SIMPLY THE EYE.
+  //
+  // The law is in metres from the WALKER (see march() in ./campo-material.js),
+  // and the walker's place on the plane is what this seat hands the fragment.
+  // Two things are decided here and nowhere else.
+  //
+  // IT IS THE WALKER AND NOT THE CAMERA'S DIRECTION. A head that turns and a
+  // lens that zooms leave this number alone, which is the whole of the answer
+  // to «il prato si ridisegna quando zoommo».
+  //
+  // AND IT IS HELD BACK, WHICH IS THE HYSTERESIS. A front is a place where a
+  // cell changes size, and a front that follows a continuous position changes a
+  // ring of cells on EVERY frame -- a step of half a metre taken and taken
+  // straight back refines a ring and coarsens it again, which the eye reads as
+  // the meadow being redrawn under it. So the centre stays where it is until
+  // the walker has left a ball of `snap` metres around it: inside that ball
+  // NOTHING changes level, and a half metre there and back is identical to the
+  // byte. What it costs is that the change, when it comes, comes at once -- the
+  // crossfade that spreads it over a few frames is R2's S3 and belongs to
+  // U-CAMPO-2, not here -- so `snap` is a handle and the tier sets it.
+  let lodCentre = null;
+  let lodSnap = 0.75;
   // The ring of bearings, and the vec4s the fragment reads it through: the
   // uniform is allocated once and written in place, because this is rewritten
   // four times a second on the thread the walker is on.
@@ -501,6 +524,17 @@ export function createCampo({
       flush(near.centre === null ? Infinity : budget);
       if (!eye) return;
       moveTo(near, eye.x, eye.z);
+      // AND THE CENTRE OF THE DETAIL, WHICH ONLY MOVES WHEN IT HAS TO. See the
+      // note over lodCentre: the first frame plants it, and after that it stays
+      // until the walker is more than `lodSnap` metres from it. At snap nought
+      // it is simply the walker, which is the arm the hysteresis is measured
+      // against.
+      if (!lodCentre) lodCentre = { x: eye.x, z: eye.z };
+      else if (Math.hypot(eye.x - lodCentre.x, eye.z - lodCentre.z) > lodSnap) {
+        lodCentre.x = eye.x;
+        lodCentre.z = eye.z;
+      }
+      material.uniforms.uLodCentre.value.set(lodCentre.x, lodCentre.z);
       // AND THE SKY'S OWN BOUND, WHEN THE EYE HAS MOVED ENOUGH TO CHANGE IT.
       // It is four thousand cells of arithmetic; at a quarter of a metre it is
       // asked about four times a second at walking pace, and what it can be
@@ -526,6 +560,25 @@ export function createCampo({
     /** Lays everything that has arrived, whatever it costs: for a bench. */
     settle() {
       flush(Infinity);
+    },
+
+    /**
+     * THE RING, ITS RUNGS AND ITS HYSTERESIS, AS ONE SEAT.
+     *
+     * The tier decides them (quality.js groundDetail) and the layer hands them
+     * over; nothing else may write the three uniforms. A snap that changes
+     * plants the centre again on the next frame rather than dragging it, so a
+     * measurement taken at one snap is never half of another.
+     */
+    setDetail({ near: ringNear, step, snap } = {}) {
+      const u = material.uniforms;
+      if (ringNear > 0) u.uLodNear.value = ringNear;
+      if (step > 1) u.uLodStep.value = step;
+      if (snap !== undefined && snap !== null && snap >= 0) {
+        lodSnap = snap;
+        lodCentre = null;
+      }
+      return { near: u.uLodNear.value, step: u.uLodStep.value, snap: lodSnap };
     },
 
     /** Every tile of both windows is in its picture. */

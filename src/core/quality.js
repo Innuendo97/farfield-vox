@@ -116,15 +116,34 @@ export const TIERS = [
     // Owners in brackets, so a reader knows whose number this is before
     // touching it. The disc's reach is measured: see the block over TIERS.
     voxelDiscRadius: 14,   // [V1] metres of ten centimetre ground from the centre
-    // HOW FINELY THE GROUND IS RESOLVED, as how many pixels a cell of the
-    // ray-marched field has to cover before a ray may stop at it. It is a
-    // tier's lever in exactly the sense E-V1a allows -- fewer SAMPLES of the
-    // same world, never a different one -- and it is the same lever
-    // voxelDiscRadius used to be, moved onto the thing that draws the ground
-    // now. 24 is what the scintillation was measured against at the top tiers
-    // (see uLodGain in src/world/voxel/campo-material.js); the tiers under
-    // them coarsen it, which is worth 3.1 ms at the bottom.
-    groundDetail: 24,   // [V1] pixels a cell must cover before a ray stops
+    // HOW FINELY THE GROUND IS RESOLVED, AND IT IS NOW IN METRES FROM THE
+    // WALKER AND NOT IN PIXELS ON THE SCREEN.
+    //
+    // `near` is the radius of the ring inside which the mat is drawn whole, at
+    // five centimetres -- the committente's «cubi veri dove si guarda» -- and
+    // `step` is the factor between one front and the next after it. A pixel
+    // rule (what this was: a cell had to cover N pixels) moves the fronts with
+    // the field of view, so the same meadow from the same place redrew itself
+    // at another cell size whenever the walker zoomed -- measured at 1.83x
+    // between fov 44.2 and 25 -- and it moved them with a head that turned.
+    // Neither is true of a distance in metres.
+    //
+    // THE CONSTRAINT IS THE NEAR WINDOW: near * step^2 <= 19.2 m, because past
+    // that there is no picture finer than forty centimetres and a law that
+    // wanted level two out there would make a ring that jumps with the window
+    // (8.2% of the ground in one step, measured). The fronts here are
+    // 9 / 13.05 / 18.92 m at the top, 6 / 10.5 / 18.4 in the middle, and
+    // 4.5 / 9 / 18 at the bottom: a tier buys its milliseconds by pulling the
+    // RING in, which is fewer samples of the same world and never another one.
+    // Priced on the card at the pose the campaign judges on: nine metres costs
+    // +3.4 to +4.5 ms over the pixel rule, six +3.9, twelve +8 to +15.
+    //
+    // `snap` is the hysteresis, in metres: the centre of the ring stays put
+    // until the walker has left a ball of it, so a step taken and taken back
+    // leaves the frame identical to the byte instead of refining a ring and
+    // coarsening it again. Nought is the arm it is measured against.
+    // See createCampo().setDetail in src/world/voxel/campo-field.js.
+    groundDetail: { near: 9, step: 1.45, snap: 0.75 },  // [V1] the ring, in metres
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
@@ -147,7 +166,7 @@ export const TIERS = [
     // Owners in brackets, so a reader knows whose number this is before
     // touching it. The disc's reach is measured: see the block over TIERS.
     voxelDiscRadius: 14,   // [V1] metres of ten centimetre ground from the centre
-    groundDetail: 24,   // [V1] pixels a cell must cover before a ray stops
+    groundDetail: { near: 9, step: 1.45, snap: 0.75 },  // [V1] the ring, in metres
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
@@ -170,7 +189,7 @@ export const TIERS = [
     // Owners in brackets, so a reader knows whose number this is before
     // touching it. The disc's reach is measured: see the block over TIERS.
     voxelDiscRadius: 14,   // [V1] metres of ten centimetre ground from the centre
-    groundDetail: 32,   // [V1] pixels a cell must cover before a ray stops
+    groundDetail: { near: 6, step: 1.75, snap: 0.75 },  // [V1] the ring, in metres
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
@@ -186,7 +205,7 @@ export const TIERS = [
     // touching it. TWELVE and not fourteen: the only lever this tier has on the
     // ground is how much of it there is. 119 614 triangles against 151 470.
     voxelDiscRadius: 12,   // [V1] metres of ten centimetre ground from the centre
-    groundDetail: 40,   // [V1] pixels a cell must cover before a ray stops
+    groundDetail: { near: 4.5, step: 2, snap: 1 },      // [V1] the ring, in metres
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },

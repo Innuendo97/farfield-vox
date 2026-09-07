@@ -281,6 +281,61 @@ export const CAMPO_PRESENT = 16;
  */
 export const CAMPO_SOIL_WALL = 32;
 
+// ---------------------------------------------------------------------------
+// THE STATISTIC OF THE MAT, AND WHY IT RIDES IN THREE BITS OF THE BLADE.
+//
+// A coarse cell carries the blade of ONE of its children (see campoReduce: a
+// maximum draws a flat meadow, so it takes a sample). What it does not carry is
+// what the other fifteen were, and that omission has a colour: sixteen blades
+// with their wells between them become ONE PLATE whose top face stands at the
+// sampled height and is lit as a top face all the way across. Measured on the
+// target and on the render at five to seven metres, the shares of dark, middle
+// and light in the meadow are 57/39/5 against 49/16/35 -- a third of the frame
+// is a highlight the target does not have -- and at the front where one level
+// gives way to the next the mean luma JUMPS by three and a half levels, which
+// is the «prato che si genera» read as light rather than as size (R1 S1c, R2
+// §1.2 and §2.3).
+//
+// So the coarse texel carries one more number: HOW DEEP, ON AVERAGE, THE REAL
+// MAT LIES UNDER THE TOP THAT IS DRAWN FOR IT. Nought is a cell whose children
+// all stand at the drawn height (a plate that really is a plate); one is a cell
+// whose children are a whole law's spread below it. The fragment spends it on
+// the LIGHT and not on the geometry: the silhouette stays the sample it always
+// was -- which is what makes distance read as cubes -- and what changes is that
+// the plate is lit like the mat it stands for.
+//
+// THREE BITS, AND THEY WERE FREE. A blade is at most five rungs of MANTO.law at
+// SUB steps each -- twenty, five bits -- and the byte that carries it has eight.
+// Nothing new is uploaded, no texel grows, and the mask below is what every
+// reader of the height takes first.
+export const CAMPO_LOOK_BITS = 3;
+export const CAMPO_LOOK_SHIFT = 8 - CAMPO_LOOK_BITS;
+export const CAMPO_LOOK_MAX = (1 << CAMPO_LOOK_BITS) - 1;
+export const CAMPO_BLADE_MASK = (1 << CAMPO_LOOK_SHIFT) - 1;
+
+/**
+ * The depth the statistic is measured against, in SUB-steps, FROM THE LAW.
+ *
+ * What makes the reading full scale is the mat's own mean absolute spread --
+ * what two blades drawn at random differ by -- because that is exactly the
+ * deficit a SAMPLE leaves when it stands in for its neighbours. It is derived
+ * from MANTO.law rather than written down, so a ladder that grows a sixth rung
+ * moves this with it, and the guard checks the derivation and not the digits.
+ */
+export const CAMPO_LOOK_DEPTH = (() => {
+  let mad = 0;
+  for (let i = 0; i < MANTO.law.length; i++) {
+    for (let j = 0; j < MANTO.law.length; j++) mad += MANTO.law[i] * MANTO.law[j] * Math.abs(i - j);
+  }
+  return Math.max(1, Math.round(mad * SUB));
+})();
+
+/** The blade of a texel's first byte, with the statistic masked off. */
+export const campoBladeOf = (byte) => byte & CAMPO_BLADE_MASK;
+
+/** The statistic of a texel's first byte, as nought to one. */
+export const campoLookOf = (byte) => (byte >> CAMPO_LOOK_SHIFT) / CAMPO_LOOK_MAX;
+
 /**
  * The material of a column as the field spells it, or -1 where the field draws
  * none.
@@ -342,7 +397,8 @@ export function campoDecode(data, offset) {
   return {
     present: (b & CAMPO_PRESENT) !== 0,
     soilWall: (b & CAMPO_SOIL_WALL) !== 0,
-    blade: data[offset],
+    blade: campoBladeOf(data[offset]),
+    look: campoLookOf(data[offset]),
     ground: data[offset + 1],
     mat: b & 3,
     slim: campoSlimEighths((b >> 2) & 3),
@@ -480,6 +536,26 @@ export const CAMPO_FAR_BLADE = (() => {
 })();
 
 /**
+ * And what a far texel HIDES under that expectation, as the statistic.
+ *
+ * The mean is an honest height and a dishonest FACE: a texel drawn at the
+ * mat's expectation and lit as a top face is the bright plate of R1 §2.1 at
+ * forty centimetres instead of at twenty. What stands under it is the law, and
+ * what the law puts below its own mean is E[max(0, mean - h)] -- taken here
+ * over the law itself, in the SUB-steps the statistic is scaled in. The far
+ * window's finest texel therefore carries a look from the first byte it is
+ * written with, and campoReduce accumulates over it exactly as it does near.
+ */
+export const CAMPO_FAR_LOOK = (() => {
+  let mean = 0;
+  for (let h = 0; h < MANTO.law.length; h++) mean += h * MANTO.law[h];
+  let under = 0;
+  for (let h = 0; h < MANTO.law.length; h++) under += MANTO.law[h] * Math.max(0, mean - h);
+  const code = Math.round(under * SUB * CAMPO_LOOK_MAX / CAMPO_LOOK_DEPTH);
+  return code < 0 ? 0 : code > CAMPO_LOOK_MAX ? CAMPO_LOOK_MAX : code;
+})();
+
+/**
  * ONE TILE OF THE FAR PICTURE, OUT OF THE LAW ITSELF, AND THE DIFFERENCE IS
  * DECLARED RATHER THAN HIDDEN.
  *
@@ -527,7 +603,8 @@ export function campoFarTile(cx, cz, radius) {
       const code = campoMaterialCode(spec.mat);
       if (code < 0) continue;
       const ground = campoGroundByte(spec.top);
-      data[o] = code === CAMPO_MATERIAL.PATH ? 0 : CAMPO_FAR_BLADE;
+      data[o] = code === CAMPO_MATERIAL.PATH ? 0
+        : CAMPO_FAR_BLADE | (CAMPO_FAR_LOOK << CAMPO_LOOK_SHIFT);
       data[o + 1] = ground;
       data[o + 2] = CAMPO_PRESENT | code
         | (soilWall(spec.under, spec.depth) ? CAMPO_SOIL_WALL : 0);
@@ -600,7 +677,32 @@ export function campoReduce(data, shape = CAMPO) {
         }
         const o = ((dst.y + j) * width + (dst.x + i)) * 4;
         if (bo < 0) continue;
-        data[o] = data[bo];
+        // ------------------------------------------------- AND THE STATISTIC
+        // The top this cell is DRAWN at, in the SUB-steps both heights share,
+        // and how far under it the children actually lie. A child that stands
+        // TALLER than the drawn top is not a debt: the sample missed it, which
+        // is what a sample does and what keeps a distant meadow reading as
+        // cubes. What is owed is only what the plate has covered over.
+        const top = data[bo + 1] * CAMPO_RUNG + campoBladeOf(data[bo]);
+        let deficit = 0;
+        let seen = 0;
+        for (let dj = 0; dj < 2; dj++) {
+          for (let di = 0; di < 2; di++) {
+            const s = ((src.y + j * 2 + dj) * width + (src.x + i * 2 + di)) * 4;
+            if (!data[s + 2]) continue;
+            seen += 1;
+            // What the child already knew it was hiding, plus what this merge
+            // hides on top of it: the statistic accumulates up the pyramid
+            // instead of being taken again over sixteen or sixty four columns.
+            deficit += campoLookOf(data[s]) * CAMPO_LOOK_DEPTH
+              + Math.max(0, top - (data[s + 1] * CAMPO_RUNG + campoBladeOf(data[s])));
+          }
+        }
+        const look = seen
+          ? Math.min(CAMPO_LOOK_MAX,
+            Math.round((deficit / seen) * CAMPO_LOOK_MAX / CAMPO_LOOK_DEPTH))
+          : 0;
+        data[o] = campoBladeOf(data[bo]) | (look << CAMPO_LOOK_SHIFT);
         data[o + 1] = data[bo + 1];
         data[o + 2] = data[bo + 2];
         data[o + 3] = data[bo + 3];
