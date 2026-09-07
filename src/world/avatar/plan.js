@@ -254,6 +254,90 @@ const pair = (id, x, y, z, opts) => {
   return [mirrored(right), right];
 };
 
+// ------------------------------------------------------------------ the step
+//
+// FOUR FRAMES, THREE BODIES, ONE DRAW. The figure does not deform: it SNAPS
+// between whole-cell poses, which is what this world's material does everywhere
+// else and the only kind of movement a body made of cubes can make without
+// growing a bone. A stride is contact, passing, the other contact, passing --
+// and the two passings are the same shape, so three lattices carry four frames.
+//
+// WHAT MOVES AND FROM WHERE. The shin and the boot swing from the knee, not the
+// whole leg from the hip: a rigid leg translated at the hip is a body sliding on
+// ice, and the knee is the one joint a walk is legible without. The forearm and
+// the hand swing from the elbow, in counter-phase, and the shoulder end of the
+// sleeve stays where the shoulder is. The armpit column never moves at all --
+// it is the piece that closes the slot between the torso and the sleeve, and a
+// slot that opens is a hole you can see the meadow through.
+//
+// THE AMPLITUDE IS DECLARED AND IT IS NOT MEASURED, because there is nothing to
+// measure it against: both reference pictures are of a figure standing still.
+// Four cells is 0.10 m -- one world cell -- which puts the feet 0.20 m apart at
+// contact and reads as 48 px at the framing the campaign is judged at. Three
+// cells of forearm reads as 18. Bigger would be a claim about the character that
+// no picture supports; smaller would not be seen at all. It is a taste bivio and
+// it goes up as one.
+export const STRIDE_CELLS = 4;
+export const SWING_CELLS = 3;
+
+/** Metres of ground covered by one whole four-frame cycle. */
+export const STRIDE_METRES = 1.4;
+
+const off = (v) => ({ lo: v, hi: v });
+const span = (v) => ({ lo: -v, hi: v });
+const REST = { legR: off(0), legL: off(0), armR: off(0), armL: off(0) };
+const shiftZ = (b, d) => ({ ...b, z0: b.z0 + d.lo, z1: b.z1 + d.hi });
+
+/**
+ * The same box on both sides of the spine, each side carried its own way along z.
+ *
+ * The shift is applied AFTER the mirror, so the left limb goes where the pose
+ * says it goes rather than where the reflection of the right one would put it --
+ * which is the whole of a walk: the two sides are never doing the same thing.
+ */
+const swung = (id, x, y, z, dR, dL) => {
+  const right = box(id, x, y, z);
+  return [shiftZ(mirrored(right), dL), shiftZ(right, dR)];
+};
+
+/**
+ * The three lattices, and the cycle that spends them.
+ *
+ * CYCLE is which lattice each of the four frames draws and LIFT is how many
+ * cells the whole body stands up by in it. The rise is a MESH offset and not a
+ * pose: the fragment reads the body's own frame, so moving the mesh moves the
+ * figure without moving one cell of its palette or its tint -- a bob that costs
+ * a float and cannot make his jacket crawl.
+ */
+export const CYCLE = [0, 1, 2, 1];
+export const LIFT = [0, 1, 0, 1];
+
+/** The pose of each of the three lattices: contact, passing, the other contact. */
+export const STEPS = [
+  {
+    legR: off(STRIDE_CELLS), legL: off(-STRIDE_CELLS),
+    armR: off(-SWING_CELLS), armL: off(SWING_CELLS),
+  },
+  REST,
+  {
+    legR: off(-STRIDE_CELLS), legL: off(STRIDE_CELLS),
+    armR: off(SWING_CELLS), armL: off(-SWING_CELLS),
+  },
+];
+
+// AND ONE MORE, WHICH IS NOT A POSE: the union of all of them, used ONLY to
+// generate the palette. The material rebuilds the colour of a cell by walking
+// this list in the fragment, and a body with a lattice per frame would need a
+// program per frame -- three shader compiles and three sets of uniforms for a
+// figure that is one draw. So the moving boxes are widened along z to cover
+// everywhere the step ever puts them, which costs nothing at all: the widened
+// region is the SAME garment in every frame, so a cell the mesh actually has is
+// answered identically, and a cell it does not have is never asked.
+const UNION = {
+  legR: span(STRIDE_CELLS), legL: span(STRIDE_CELLS),
+  armR: span(SWING_CELLS), armL: span(SWING_CELLS),
+};
+
 // ---------------------------------------------------------------- TWO BODIES
 //
 // The two pictures show ONE figure and the chapter's own table puts the female
@@ -267,7 +351,7 @@ const pair = (id, x, y, z, opts) => {
 // boxes are written ONCE, in `figure()`, and what a body IS is a handful of
 // numbers. Reading the two tables side by side IS the specification of the
 // difference, and no third reader has to be trusted to keep them in step.
-export function figure(d) {
+export function figure(d, step = REST) {
   return [
     // --------------------------------------------------------------- the legs
     // Rows 33 to 49 of the pictures are two columns of navy with the paving
@@ -277,7 +361,12 @@ export function figure(d) {
     // two, and the half cell that buys goes into the legs. Above row 33 the
     // jacket covers them, so where they actually JOIN is in neither picture: the
     // seat below is what closes them, and its height is the one the jacket hides.
-    ...pair('jeans', [1, d.leg], [4, 23], [-3, 2]),
+    // THE SHIN SWINGS AND THE THIGH DOES NOT, which is why the one leg is two
+    // boxes now. The split is at row 13 of the reading, a third of the way up
+    // him, which is where a knee is; below it the leg is carried by the step,
+    // above it the thigh stays under the seat that closes the two legs.
+    ...swung('jeans', [1, d.leg], [4, 12], [-3, 2], step.legR, step.legL),
+    ...pair('jeans', [1, d.leg], [13, 23], [-3, 2]),
     box('jeans', [-1 - d.hip, d.hip], [18, 24], [-3, 2]),
 
     // -------------------------------------------------------------- the boots
@@ -285,7 +374,7 @@ export function figure(d) {
     // and longer forward than back. The night picture is the one that says where
     // they stop: by day leather and stone are the same tint and the frame ends at
     // 940 before the sole does.
-    ...pair('scarpe', [1, d.leg], [0, 4], [-6, 2]),
+    ...swung('scarpe', [1, d.leg], [0, 4], [-6, 2], step.legR, step.legL),
 
     // ------------------------------------------------------------- the jacket
     // The hem is at cell 32, level with the middle of his hands. Twelve cells
@@ -339,8 +428,10 @@ export function figure(d) {
     // Four cells at the cuff and two at the shoulder is not an arm's anatomy, and
     // it is not meant to be: it is the outline the two pictures draw, on a figure
     // whose head is already nine cells across.
-    ...pair('giacca', [d.arm, d.arm + 3], [25, 28], [-3, 2]),
-    ...pair('giacca', [d.arm, d.arm + 2], [29, 32], [-3, 2]),
+    // The two lower plateaus swing from the elbow; the top one is the shoulder's
+    // and stays with it.
+    ...swung('giacca', [d.arm, d.arm + 3], [25, 28], [-3, 2], step.armR, step.armL),
+    ...swung('giacca', [d.arm, d.arm + 2], [29, 32], [-3, 2], step.armR, step.armL),
     ...pair('giacca', [d.arm, d.arm + 1], [33, 42], [-3, 2]),
     // The armpit, which nothing outside can see and every arm needs: the one
     // column between the torso's edge and the sleeve's, and without it rows 25,
@@ -349,7 +440,7 @@ export function figure(d) {
     // filling it moves no silhouette, because it is inside the outer edge on
     // every row the arm has.
     ...pair('giacca', [d.arm - 1, d.arm - 1], [25, 42], [-3, 2]),
-    ...pair('pelle', [d.arm, d.arm + 2], [21, 24], [-3, 2]),
+    ...swung('pelle', [d.arm, d.arm + 2], [21, 24], [-3, 2], step.armR, step.armL),
 
     // ------------------------------------------------------- the neck and head
     // Nine cells of head over two of neck, and the hair reads seven to eight of
@@ -484,8 +575,23 @@ export const DIM_F = {
 export const BODY_M = figure(DIM_M);
 export const BODY_F = figure(DIM_F);
 
+/** The three lattices of the step, per body, in the order CYCLE spends them. */
+export const WALK_M = STEPS.map((step) => figure(DIM_M, step));
+export const WALK_F = STEPS.map((step) => figure(DIM_F, step));
+
+/**
+ * The list the PALETTE is generated from, per body: every pose at once.
+ *
+ * It is never meshed. See UNION above for why one list has to serve three
+ * lattices, and why widening a garment along the axis it swings on is free.
+ */
+export const PAINT_M = figure(DIM_M, UNION);
+export const PAINT_F = figure(DIM_F, UNION);
+
 /** The two of them, under the names the personalisation calls them by. */
 export const BODIES = { m: BODY_M, f: BODY_F };
+export const WALKS = { m: WALK_M, f: WALK_F };
+export const PAINTS = { m: PAINT_M, f: PAINT_F };
 
 /**
  * The male body, which is what every tool older than the second one reads. Kept

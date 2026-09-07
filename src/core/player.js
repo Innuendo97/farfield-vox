@@ -532,6 +532,10 @@ export class Player {
     // plane and the lens; the fade is what carries him in and out over exactly
     // that metre, and `drawn` is still the flag the layer switches a mesh with,
     // so a body nobody can see costs nothing at all.
+    // AND HOW FAST HE IS GOING, because the step is spent in METRES and not in
+    // seconds: a walk and a run have to put the same foot on the same patch of
+    // ground, or the figure skates. The walker is the one seat that knows.
+    STANDING.speed = Math.hypot(this.#velocity.x, this.#velocity.z);
     STANDING.arm = this.#rigEye.arm;
     STANDING.fade = bodyFade(this.#rigEye.arm);
     STANDING.drawn = STANDING.fade > 0;

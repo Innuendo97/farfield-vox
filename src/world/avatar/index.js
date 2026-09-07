@@ -2,7 +2,7 @@ import { BufferAttribute, BufferGeometry, Mesh, Sphere, Vector3 } from 'three';
 import { VOXEL } from '../voxel/pure.js';
 import { build } from './mesher.js';
 import { avatarMaterial, avatarSettings } from './material.js';
-import { BODIES, SUBDIVISION } from './plan.js';
+import { PAINTS, SUBDIVISION, WALKS } from './plan.js';
 
 // THE DOOR. Everything above this line is arithmetic that runs under plain node;
 // this is the one file that knows there is a scene to put him in.
@@ -28,23 +28,45 @@ export const AVATAR_VOXEL = VOXEL / SUBDIVISION;
  * was built, so that a budget can be quoted from the same object the frame draws.
  */
 export function buildAvatar(kind = 'm') {
-  const plan = BODIES[kind];
-  if (!plan) throw new Error(`no such body: ${kind}`);
+  const walk = WALKS[kind];
+  const paint = PAINTS[kind];
+  if (!walk) throw new Error(`no such body: ${kind}`);
   const settings = avatarSettings();
-  const body = build(AVATAR_VOXEL, plan);
 
-  const geometry = new BufferGeometry();
-  geometry.setAttribute('position', new BufferAttribute(body.positions, 3));
-  // Three bytes rather than twelve: a normal has six values in this whole world
-  // and the frame is shorter on vertex fetch than on anything else.
-  geometry.setAttribute('normal', new BufferAttribute(body.normals, 3, true));
-  geometry.setIndex(new BufferAttribute(body.indices, 1));
-  geometry.boundingSphere = new Sphere(
-    new Vector3(body.sphere.x, body.sphere.y, body.sphere.z), body.sphere.radius,
-  );
+  // THREE LATTICES, ONE MATERIAL, ONE MESH. The step snaps between whole-cell
+  // poses, so what changes between frames is a buffer and nothing else: no
+  // program, no uniform, no add and remove from the scene. Swapping a geometry
+  // on a mesh that keeps its material is the cheapest thing three.js will do for
+  // a frame — the draw is the same draw.
+  const built = walk.map((plan) => build(AVATAR_VOXEL, plan));
 
-  const material = avatarMaterial(AVATAR_VOXEL, settings, plan);
-  const mesh = new Mesh(geometry, material);
+  // The bounding sphere is the WIDEST pose's, given to all three: a sphere fitted
+  // to the passing frame would cull the contact frames' own feet at the edge of
+  // the screen, and a body that vanishes when he steps is worse than a body that
+  // survives one frustum test he did not need.
+  let radius = 0;
+  const centre = { x: 0, y: 0, z: 0 };
+  for (const b of built) {
+    const r = Math.hypot(b.sphere.x - centre.x, b.sphere.y - centre.y, b.sphere.z - centre.z)
+      + b.sphere.radius;
+    if (r > radius) radius = r;
+  }
+
+  const steps = built.map((body) => {
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', new BufferAttribute(body.positions, 3));
+    // Three bytes rather than twelve: a normal has six values in this whole world
+    // and the frame is shorter on vertex fetch than on anything else.
+    geometry.setAttribute('normal', new BufferAttribute(body.normals, 3, true));
+    geometry.setIndex(new BufferAttribute(body.indices, 1));
+    geometry.boundingSphere = new Sphere(new Vector3(centre.x, centre.y, centre.z), radius);
+    return geometry;
+  });
+
+  // THE PALETTE IS GENERATED FROM THE UNION AND NOT FROM ANY ONE POSE, which is
+  // what lets three lattices share one program. See PAINTS in plan.js.
+  const material = avatarMaterial(AVATAR_VOXEL, settings, paint);
+  const mesh = new Mesh(steps[1], material);
   mesh.name = `v8-avatar-${kind}`;
   mesh.frustumCulled = true;
   // He is never in the first person's frame, and the switch is a flag rather
@@ -52,16 +74,23 @@ export function buildAvatar(kind = 'm') {
   // costs a re-sort, and this happens on a key press.
   mesh.visible = false;
 
+  const rest = built[1];
+  const sum = (pick) => built.reduce((a, b) => a + pick(b), 0);
   return {
     kind,
     mesh,
     material,
     settings,
-    quads: body.quads,
-    triangles: body.triangles,
-    vertices: body.vertices,
-    census: body.census,
+    steps,
+    quads: rest.quads,
+    triangles: rest.triangles,
+    vertices: rest.vertices,
+    census: rest.census,
     voxel: AVATAR_VOXEL,
+    /** The most any single frame of the step ever draws. */
+    peak: Math.max(...built.map((b) => b.triangles)),
+    /** And what holding all three costs in buffers. */
+    resident: { quads: sum((b) => b.quads), triangles: sum((b) => b.triangles) },
   };
 }
 

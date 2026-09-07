@@ -1,5 +1,7 @@
 import { STANDING } from '../../core/avatar.js';
 import { buildAvatar } from '../avatar/index.js';
+import { CYCLE, LIFT, STRIDE_METRES, SUBDIVISION } from '../avatar/plan.js';
+import { VOXEL } from '../voxel/pure.js';
 import { CORPI, LOOK, albedos } from '../avatar/look.js';
 
 // THE AVATAR AND THE THIRD PERSON. Owned by V8.
@@ -9,9 +11,16 @@ import { CORPI, LOOK, albedos } from '../avatar/look.js';
 // personalisation over them. The camera that exists because they do is next door
 // in src/core/avatar.js, and the walker who moves them all is src/core/player.js.
 //
-// WHAT IS STILL TO COME: the gait — stride, sway, the head that follows the look.
-// They stand still on purpose today: a body that walks is contracts re-derived on
-// builtHeightAt and groundHeightAt, and those belong to the unit after next.
+// AND THE GAIT, WHICH IS SPENT IN METRES. Four frames of a stride, carried by
+// three lattices (the two passings are the same shape), chosen by how far the
+// walker has actually travelled rather than by a clock: a walk and a run put the
+// same foot on the same patch of ground, and a body whose feet move at a rate of
+// their own is a body skating. One draw, one material, one mesh -- what changes
+// between frames is a buffer. The rise at the passings is a mesh offset, so not
+// one cell of his palette or his tint moves with it.
+//
+// STILL TO COME: the head that follows the look, which cannot be done with one
+// mesh and is not worth a second draw; and the sway of the shoulders.
 //
 // BOTH ARE BUILT AND ONE IS DRAWN. Building the second body at the moment a
 // walker picks it would put a mesher, a lattice of seven thousand cells and a
@@ -75,6 +84,10 @@ const layer = {
   /** Which revision of the personalisation the palettes were last written for. */
   painted: -1,
 
+  /** How far along the stride he is, 0 to 1, and which frame that lands on. */
+  phase: 0,
+  frame: 1,
+
   plant: {
     needs: [],
 
@@ -107,18 +120,39 @@ const layer = {
       voxel: drawn.voxel,
       draws: 1,
       corpo: drawn.kind,
+      /** The most a single frame of the step ever draws, which is the contacts'. */
+      peak: drawn.peak,
+      frame: layer.frame,
       resident: {
         corpi: all.length,
-        quads: sum((b) => b.quads),
-        triangles: sum((b) => b.triangles),
+        pose: CYCLE.length,
+        quads: sum((b) => b.resident.quads),
+        triangles: sum((b) => b.resident.triangles),
         vertices: sum((b) => b.vertices),
         celle: sum((b) => b.census.filled),
       },
     };
   },
 
-  update() {
+  update(frame = {}) {
     if (!layer.bodies) return;
+
+    // ------------------------------------------------------------- the step
+    //
+    // THE PHASE IS METRES WALKED AND NOT SECONDS ELAPSED. Divide the distance
+    // covered by the stride and the cadence comes out on its own: 2.1 cycles a
+    // second at the walk, 3.2 at the run, with no second number to keep in step
+    // with the first. Below a crawl he stands: a figure marking time on the spot
+    // is the one thing a phase driven by speed can still get wrong, and the
+    // guard against it is one comparison.
+    const speed = STANDING.speed || 0;
+    if (speed < 0.15) {
+      layer.phase = 0;
+      layer.frame = 1;
+    } else {
+      layer.phase = (layer.phase + (speed * (frame.delta || 0)) / STRIDE_METRES) % 1;
+      layer.frame = Math.min(CYCLE.length - 1, Math.floor(layer.phase * CYCLE.length));
+    }
 
     // THE PALETTE, ONLY WHEN IT MOVED. Writing eight vectors into two materials
     // every frame would be nearly free and would still be wrong: it would put the
@@ -156,7 +190,17 @@ const layer = {
       // The origin is the middle of the plane the soles stand on, which is what
       // the plan means by y = 0. So the stance goes straight in: no offset, and
       // nothing to get wrong the day the ground changes shape.
-      body.mesh.position.set(STANDING.x, STANDING.y, STANDING.z);
+      // WHICH LATTICE, AND HOW HIGH HE STANDS IN IT. Both are the step's, and
+      // both are one assignment: the geometry is a buffer swap on a mesh that
+      // keeps its material, and the rise is the mesh's own y. The feet never go
+      // BELOW the ground -- the passing frames lift and the contacts do not --
+      // which is what keeps the boots out of the paving they are standing on.
+      body.mesh.geometry = body.steps[CYCLE[layer.frame]];
+      body.mesh.position.set(
+        STANDING.x,
+        STANDING.y + LIFT[layer.frame] * (VOXEL / SUBDIVISION),
+        STANDING.z,
+      );
       body.mesh.rotation.y = STANDING.yaw;
     }
   },

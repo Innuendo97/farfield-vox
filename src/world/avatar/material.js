@@ -3,7 +3,7 @@ import { SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS } from '../../core/sky.js';
 import { FACE_LIGHT_GLSL, faceLightUniforms } from '../face-light.js';
 import { FOG_GLSL, GROUND_EXPOSURE, fogUniforms } from '../air.js';
 import TERRAIN from '../../../assets-src/terrain/terrain.json';
-import { BODY_M, PALETTE } from './plan.js';
+import { PAINT_M, PALETTE } from './plan.js';
 
 // THE FIGURE'S MATTER, AND IT IS THE WORLD'S.
 //
@@ -385,7 +385,7 @@ function fragment(body) {
  * @param {object} settings  from avatarSettings(), held by reference so a sweep
  *                           on the page moves the frame without a rebuild
  */
-export function avatarMaterial(voxel, settings, body = BODY_M) {
+export function avatarMaterial(voxel, settings, body = PAINT_M) {
   const uniforms = {
     uVoxel: { value: voxel },
     uTint: { value: settings.tint },

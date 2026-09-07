@@ -51,6 +51,8 @@ export const STANDING = {
   fade: 0,
   /** How long the boom is, in metres, so a reader can tell the switch is running. */
   arm: 0,
+  /** How fast he is walking, m/s: the step is spent in metres, not in seconds. */
+  speed: 0,
   /** Bumped by every write, so a reader can tell a stale frame from a still one. */
   serial: 0,
 };
