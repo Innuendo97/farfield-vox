@@ -20,11 +20,11 @@ import { BODY_M, PALETTE } from './plan.js';
 //
 // 1. THE CELL IS THE BODY'S AND NOT THE WORLD'S, in both senses.
 //
-//    In SIZE: uVoxel is a third of the meadow's step. That is measured — the
-//    figure's own step reads 6 px in the reference against the 15 px a world
-//    cell spans at his distance — and it is not the banned "ring of scales"
-//    either, because the size belongs to the BODY and not to how far away the
-//    walker is standing.
+//    In SIZE: uVoxel is a QUARTER of the meadow's step. That is measured — the
+//    figure's own step reads 6 px in the reference, and at the distance the
+//    fitted framing puts him a metre is 241.9 px, so 6 px is 24.8 mm and 0.10/4
+//    lands on it — and it is not the banned "ring of scales" either, because the
+//    size belongs to the BODY and not to how far away the walker is standing.
 //
 //    In FRAME: the meadow's fragment adds where its chunk stands to the cell it
 //    hashes, so that two chunks meeting cannot draw a seam. A body must NOT do

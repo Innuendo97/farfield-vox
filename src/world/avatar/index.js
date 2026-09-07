@@ -11,7 +11,7 @@ import { BODIES, SUBDIVISION } from './plan.js';
 // and the plan are imported by measuring tools that have no browser, and a
 // three.js import anywhere below here would take that away.
 
-/** His cell: a third of the world's own step, exactly. */
+/** His cell: a quarter of the world's own step, exactly. 25 mm. */
 export const AVATAR_VOXEL = VOXEL / SUBDIVISION;
 
 /**

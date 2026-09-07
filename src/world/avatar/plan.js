@@ -19,10 +19,27 @@
 // ------------------------------------------------------------- the lattice
 //
 // CELL (i, j, k) OCCUPIES [i, i+1) x [j, j+1) x [k, k+1) CELLS, and one cell is
-// a third of the world's own step: 0.10 / 3 = 33.33 mm. That third is measured
-// rather than chosen — the reference pictures put the figure's own step at 6 px
-// against the 15 px a world cell spans at his distance, which is 0.40 of a cell,
-// and the finest thing on him (the pack) carries it.
+// a QUARTER of the world's own step: 0.10 / 4 = 25 mm exactly.
+//
+// IT USED TO BE A THIRD, AND THE ARITHMETIC THAT MOVED IT IS ONE LINE. The step
+// was read as 6 px in the reference and the cell it was read against was worked
+// out from a figure assumed 1.80 m tall; on the framing this world is judged at,
+// with the figure at the height the plane itself measures (1.50 m), a metre at
+// his distance spans 241.9 px — so 6 px is 24.8 mm, and 0.10/4 is the subdivision
+// that lands on it. At the old third it would draw 8.1 px, which is a third too
+// coarse on the one number the pictures state about his surface. Sixty cells of
+// 25 mm is 1.50 m exactly, and both grids close on integers again: 15 world cells.
+//
+// THE FIGURE IS THE SAME FIGURE, RE-LAID. Nothing below was read a second time.
+// Every number in figure() and in the two tables is still the reading taken on
+// the 54-cell lattice the two pictures were resampled onto (v8-avatar/dev-b/
+// mappa.mjs), and box() carries it onto this one by scaling the PLANES between
+// cells — not the indices — by CELLS / READ_CELLS. Scaling planes is what keeps
+// the spine a plane and the mirror exact: a boundary at x = p goes to round(p S),
+// and p S is never a half for S = 10/9, so round is exactly odd-symmetric about
+// the spine and the two halves of him cannot come apart. What it costs is up to
+// one cell of extent, 25 mm, on any one edge; what it would cost to re-read the
+// pictures instead is a second, differently-noisy copy of the same measurement.
 //
 //   x   his RIGHT is positive. The spine is the PLANE x = 0, so the mirror is
 //       i -> -1 - i and both halves of him are the same cells. A part that
@@ -30,9 +47,9 @@
 //       and comes as a pair. Putting the spine on a boundary rather than
 //       through the middle of a cell is what makes the two halves identical
 //       instead of half a cell apart.
-//   y   0 is the ground his soles stand on and 53 is the cell his crown is the
-//       top of. Fifty four cells, which is 1.80 m exactly: that is what the
-//       ratified height MEANS on this lattice.
+//   y   0 is the ground his soles stand on and 59 is the cell his crown is the
+//       top of. Sixty cells, which is 1.50 m exactly: that is what the height
+//       the committente decided (E-DECISIONI21 D8) MEANS on this lattice.
 //   z   negative is in FRONT of him — the frame src/core/player.js walks in has
 //       forward at (-sin, -cos), so at yaw nought forward is -Z. The pack is
 //       therefore at positive z, and everything the two pictures show best is
@@ -41,10 +58,12 @@
 // ---------------------------------------------------------- where it comes from
 //
 // EVERY ROW IS READ OFF THE TWO PICTURES ON THE FIGURE'S OWN GRID, and the
-// reading is in v8-avatar/dev-b/ (mappa.mjs resamples each target onto this
-// lattice; mappa.txt and the two PNGs are what was looked at). The crown and
-// sole rows are the analysis unit's, measured with the campaign's tint rule:
-// 575 and 934 by day, 535 and 896 by night, which makes one cell 6.65 px.
+// reading is in v8-avatar/dev-b/ (mappa.mjs resamples each target onto the
+// 54-row lattice; mappa.txt and the two PNGs are what was looked at). The crown
+// and sole rows are the analysis unit's, measured with the campaign's tint rule:
+// 575 and 934 by day, 535 and 896 by night. On the framing the campaign is now
+// judged at those two rows are 359 px apart, so one of THESE cells is 6.05 px,
+// which is the 6 the pictures read on the pack.
 //
 // WHAT IS MEASURED AND WHAT IS NOT, SAID PLAINLY. The pictures are of his BACK.
 // So every height, every width, the pack and its pockets and the boots are read;
@@ -53,9 +72,9 @@
 // marked. The face is built because a head must have one, and it belongs
 // entirely to the right hand column of the chapter's own table.
 //
-// THE FIGURE IS STYLISED AND THE MEASUREMENTS SAY SO. His head is nine cells
-// across — 0.27 m, where a man's is 0.16 — and his arms take him to twenty two
-// cells at the cuff and eighteen at the shoulder. That is not an error to be
+// THE FIGURE IS STYLISED AND THE MEASUREMENTS SAY SO. His head is eight cells
+// across — 0.20 m, where a man's is 0.16 — and his arms take him to twenty four
+// cells at the cuff and twenty at the shoulder. That is not an error to be
 // corrected towards anatomy: it is what the two pictures draw, and drawing
 // something else would be building a different character.
 //
@@ -66,10 +85,30 @@
 // below are written as the staircase it found.
 
 /** The figure's own step, as a fraction of the world's. Exact. */
-export const SUBDIVISION = 3;
+export const SUBDIVISION = 4;
 
-/** How many cells tall he is. 54 x (0.10/3) = 1.80 m. */
-export const CELLS = 54;
+/** How many cells tall he is. 60 x (0.10/4) = 1.50 m. */
+export const CELLS = 60;
+
+/**
+ * The lattice the two pictures were READ on, which is not the one he is built
+ * on any more.
+ *
+ * It is kept as a number rather than folded into the boxes because it is the
+ * unit every measurement below is quoted in: the comments say "row 42" and mean
+ * row 42 of 54, and they will still mean it after the next time the height
+ * moves. LATTICE is the only place the two lattices meet.
+ */
+export const READ_CELLS = 54;
+
+/** From the reading's lattice to the built one. 60 / 54 = 10 / 9, exactly. */
+export const LATTICE = CELLS / READ_CELLS;
+
+// A BOUNDARY, NOT AN INDEX. Cell p sits between the planes p and p + 1, so what
+// carries across a change of lattice is the PLANE. Rounding indices instead
+// would move a box's near edge and its far edge by different amounts and hand
+// back a body whose parts no longer touch.
+const plane = (p) => Math.round(p * LATTICE);
 
 // ------------------------------------------------------------- the palette
 //
@@ -194,11 +233,20 @@ export const PALETTE_INDEX = Object.fromEntries(PALETTE.map((p, i) => [p.id, i])
 const box = (id, x, y, z, opts = {}) => ({
   id,
   palette: PALETTE_INDEX[id],
-  x0: x[0], x1: x[1], y0: y[0], y1: y[1], z0: z[0], z1: z[1],
+  x0: plane(x[0]), x1: plane(x[1] + 1) - 1,
+  y0: plane(y[0]), y1: plane(y[1] + 1) - 1,
+  z0: plane(z[0]), z1: plane(z[1] + 1) - 1,
   solid: opts.solid !== false,
 });
 
-/** The same box on the other side of the spine: i -> -1 - i. */
+/**
+ * The same box on the other side of the spine: i -> -1 - i.
+ *
+ * IT RUNS AFTER box() AND THEREFORE AFTER THE SCALE, which is the order that
+ * makes the two halves identical rather than nearly so: the scale is applied
+ * once, to one side, and the other side is its exact reflection whatever the
+ * rounding did.
+ */
 const mirrored = (b) => ({ ...b, x0: -1 - b.x1, x1: -1 - b.x0 });
 
 const pair = (id, x, y, z, opts) => {
@@ -389,7 +437,7 @@ export const DIM_M = {
 //
 // WHAT DECIDES IT AND WHAT DOES NOT. Nothing in either picture shows her, so
 // nothing here is measured — what is inherited is the METHOD and the MATTER: the
-// same lattice, the same 54 cells, the same eight pigments, the same grain per
+// same lattice, the same 60 cells, the same eight pigments, the same grain per
 // garment, the same construction above, the same one draw. What differs is a
 // handful of cells, and the rule is stated once: FOUR MOVES OF ONE CELL A SIDE,
 // no more, taken off the male profile the pictures gave.
@@ -402,18 +450,20 @@ export const DIM_M = {
 // and the hood, the pack and its pocket follow the shoulder they sit on, because
 // a pack left at the male width would hang out over her arms.
 //
-// WHY ONE CELL AND NOT A RATIO. A cell is 33 mm and reads 6.6 px at the two
-// fitted framings; on a figure 150 px tall, two cells of shoulder is 13 px, which
-// is visible. Half a cell does not exist on this lattice, and a ratio would land
+// WHY ONE CELL AND NOT A RATIO. A cell is 25 mm and reads 6.05 px at the fitted
+// framing; on a figure 360 px tall, two cells of shoulder is 12 px, which is
+// visible. (The moves are stated on the reading's lattice, so they are one of
+// ITS cells and land as one or two of these.) Half a cell does not exist on this lattice, and a ratio would land
 // between cells and be rounded to exactly this — so the rounding is done in the
 // open, as whole cells, rather than hidden inside a multiplication.
 //
-// HER HEIGHT IS HIS, and that is deliberate. H = 1.80 m is RATIFIED for the
-// campaign (U-V8-POSE: 54 cells exactly), the third person rule is written in
-// units of H, and both fitted framings are checked against a crown at row 53. A
-// second height would fork the camera rule and every crown check in the chapter.
-// If the committente wants her shorter it is one number here and a re-run of the
-// rig — but it is not a thing to settle in this seat.
+// HER HEIGHT IS HIS, and that is deliberate. H = 1.50 m is the committente's own
+// answer (E-DECISIONI21 D8, «1,50 in terza e 1,70 in prima») and it is what the
+// reference plane measures: the third person rule is written in units of H, and
+// the framing is checked against a crown at row 59. A second height would fork
+// the camera rule and every crown check in the chapter. If the committente wants
+// her shorter it is one number here and a re-run of the rig — but it is not a
+// thing to settle in this seat.
 //
 // WHAT IS NOT DECIDED HERE, and has gone up as a question with options: her hair,
 // and whether she wears these clothes at all. Both are taste, both are named in
