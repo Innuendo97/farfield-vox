@@ -39,6 +39,14 @@ import PLAN from '../../assets-src/rocks/rocks.json' with { type: 'json' };
 // The targets' cluster shows both: large flat faces carrying the orientation,
 // with a smaller broken course at the shoulders and the foot.
 export const SLAB = 2;                     // cells on a side, so 0.20 m
+// AND THE READING SAYS A THIRD, WHICH THIS FILE DOES NOT TAKE. Counted on the
+// day target's low right cluster (R5 SS1.8), the reference builds its piles out
+// of SINGLE cubes with a slab here and there -- eleven grey components over
+// 150 px, the two largest 1.08 x 0.65 m and 0.89 x 0.52 m, stepped -- where
+// 0.62 draws a pile that is mostly 0.20 m plates and reads as a stack of tiles.
+// 0.35 measured +72 triangles on the ten piles, and see the two paragraphs
+// below: the SHAPE of a pile belongs to the session that has a budget for
+// shape, and what the material session owes it is the pigment.
 export const SLAB_SHARE = 0.62;            // how much of a pile is laid in slabs
 
 // How far up a pile the slabs reach, and over how many metres the share falls
@@ -68,6 +76,15 @@ export const PROFILE_ROOT = 0.62;
 // How much of its own height a column may stray from the profile. This is what
 // makes a pile STEPPED rather than turned on a lathe, and it is the only place
 // randomness reaches the silhouette.
+// AND IT STAYS AT 0.34, WHICH IS THE SECOND REFUSAL OF THIS FILE AND IS WRITTEN
+// DOWN LIKE THE FIRST. R5 SS3 (S6) asks for 0.5, because a target pile is BROKEN
+// where ours comes out tidy -- the defect V2-DEV3 recorded in SS3.3 and left
+// standing -- and 0.5 is where its prototype was measured. It also measured
+// +374 triangles on the ten piles, because a rubble of stepped cubes shows
+// faces a tidy stack hides, and the mandate that carries this material is
+// budgeted at nought triangles. The SHAPE of the piles goes to the session that
+// has a budget for shape; what this one owes them is the PIGMENT, and that is
+// paid in src/world/rocks.js at no triangles at all.
 export const WOBBLE = 0.34;
 
 // ------------------------------------------------------------ what a cell is
@@ -84,6 +101,15 @@ export const GRASS = 2;
 // the stone breaks the turf, and without it a pile reads as a prop dropped on a
 // lawn. It is one cell deep, which is the depth the picture shows at this
 // range — a second course of it reads as a plinth.
+// AND IT STAYS AT ONE, WHICH IS A REFUSAL AND IS WRITTEN DOWN AS ONE. R5 SS3
+// (S6) asks for two courses of earth under a pile, because the reference shows
+// a band of brown with the grass climbing out of it; two of them measured +582
+// triangles on the ten piles, and the mandate that carries this material is
+// budgeted at nought. It is also the one recommendation in that section that
+// SS7 of the same research says it could not measure at the fitted pose -- the
+// meadow covers the foot -- so it is a change that costs a number and buys a
+// reading nobody has taken. It goes with the loose stones, which have a
+// triangle budget; here it would be spent blind.
 export const EARTH_COURSE = 1;
 
 // And the green cube on top of some piles. The reference shows turf that has

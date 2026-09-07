@@ -10,7 +10,7 @@ import { faceLightGlsl, faceLightUniforms } from './face-light.js';
 import { VOXEL } from './voxel/pure.js';
 import { voxelSettings } from './voxel/material.js';
 import {
-  MOSS_TINT, SKY_BLUR, STONE_ALBEDO, STONE_ARRIS, STONE_ARRIS_PIGMENT,
+  MOSS_TINT, SKY_BLUR, STONE_ARRIS, STONE_ARRIS_PIGMENT,
   STONE_ARRIS_PIXELS, STONE_EXPOSURE, STONE_F0, STONE_GAIN, STONE_JOINT,
   STONE_JOINT_PIXELS, STONE_LIGHT_SCALE, STONE_RIM, STONE_RIM_POWER,
   STONE_TINT,
@@ -105,6 +105,40 @@ const TURF_ALBEDO = voxelSettings().albedo;
 // what the wall's own fronts measure (0.45 to 0.63x).
 const ROCK_TILE_METRES = 0.55;
 
+// AND THE ROCKS ARE A SECOND STONE, WHICH IS A CORRECTION TO "ONE STONE, ONE
+// SEAT" AND NOT AN ESCAPE FROM IT.
+//
+// The doctrine was right about the wall and wrong about the world: the
+// reference does not have one stone, it has two, and the two are half a
+// lightness apart. Measured on the day target through one estimator
+// (R5 SS1.8), the low right cluster's lit caps read 130 / 124 / 104 -- L* 50.5,
+// chroma 13.4, HUE 95, which is a warm beige -- while the wall's own lit stone
+// reads L* 31 at hue 142 to 190. The same two stones build the low ruins past
+// 05 (lit faces L* 53, hue 89), which is the same rock and not the same wall.
+//
+// Ours were drawn from the wall's pigment and came out at hue 122 to 125: a
+// cold cap with the sky in it. Half of that was the grazing term, and it is
+// gone from the seat above; the other half is that a beige rock cannot be made
+// of grey stone. So the rock takes its OWN albedo and everything else about the
+// material -- the grain, the joint, the dressed edge, the moss, the exposure --
+// stays the wall's, which is what the doctrine was actually protecting.
+//
+// The residual is declared rather than fitted away: the target's DARK faces on
+// the same cluster read L* 12.8, near black, and no pigment brings ours below
+// about 26 while the vertical faces of this world receive the sky and the
+// meadow's bounce that they do (R5 SS3, S6, and D5's list).
+const ROCK_ALBEDO = [0.50, 0.47, 0.38];
+
+// AND HOW MUCH OF THE SKY A ROCK TAKES, which is the wall's own bend at a
+// different number for a shape that is not a wall.
+//
+// A pile of cubes on open grass sees more sky than a flat face of a monolith
+// does, and less of it than the seat hands a plane -- but what actually sets
+// this is the reading: the target's dark rock faces are the darkest stone in
+// the picture. 0.35 is where the sweep behind R5 SS3 (S6) left it, and the miss
+// that remains is written above.
+const ROCK_SKY_SHARE = 0.35;
+
 // The most piles the fragment can be handed. A uniform array has to be a fixed
 // size, and it is stated here so that an eleventh rock is a thing somebody has
 // to come and change rather than a thing that quietly draws the eleventh with
@@ -194,6 +228,7 @@ const FRAGMENT = /* glsl */`
   uniform float uSlabShare;
   uniform float uSlabFalloff;
   uniform float uSlabReach;
+  uniform float uSkyShare;
 
   // The piles: where each one stands and what its foot is, and which cell of
   // the world carries its cube of turf. Two vectors and a count, which is the
@@ -347,7 +382,13 @@ const FRAGMENT = /* glsl */`
       * smoothstep(2.5, 5.0, onScreen);
 
     // ----------------------------------------------------------- the light
-    vec3 light = faceLightOf(faceTerms(n));
+    //
+    // The pair is bent the way the wall bends it and for the same reason: this
+    // is a material taking less of the sky than an open plane does, not a
+    // second opinion about where the sun is. uLift is untouched.
+    vec2 terms = faceTerms(n);
+    terms.y *= uSkyShare;
+    vec3 light = faceLightOf(terms);
 
     // ------------------------------------------------- the lightened arris
     //
@@ -444,7 +485,7 @@ export function createRocks({ tile = null } = {}) {
       tStone: { value: tile },
       uVoxel: { value: VOXEL },
       uTile: { value: 1 / ROCK_TILE_METRES },
-      uAlbedo: { value: new Vector3(...STONE_ALBEDO) },
+      uAlbedo: { value: new Vector3(...ROCK_ALBEDO) },
       uEarth: { value: new Vector3(...EARTH_ALBEDO) },
       uTurf: { value: new Vector3(TURF_ALBEDO.x, TURF_ALBEDO.y, TURF_ALBEDO.z) },
       uGain: { value: STONE_GAIN },
@@ -468,6 +509,7 @@ export function createRocks({ tile = null } = {}) {
       uSlabShare: { value: SLAB_SHARE },
       uSlabFalloff: { value: SLAB_FALLOFF },
       uSlabReach: { value: SLAB_REACH },
+      uSkyShare: { value: ROCK_SKY_SHARE },
       uPile: { value: piles },
       uCap: { value: caps },
       uPiles: { value: Math.min(ROCK_PILES.length, MAX_PILES) },
