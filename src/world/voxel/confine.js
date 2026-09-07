@@ -46,7 +46,18 @@
 // somebody can go instead of a slope they slide off.
 //
 // ===========================================================================
-// THE CREST, AND WHY ITS RISER IS FOUR VOXELS AND NOT ONE.
+// THE CREST HAS FALLEN, AND THE LAW OF IT IS KEPT BEHIND A DIAL AT NOUGHT.
+//
+// E-DECISIONI21 (D7 = A): «cresta e giganti cadono, colline tutt'intorno». What
+// closes the horizon now is src/world/distant.js -- hills of real cubes beyond
+// the water, fitted per direction against the reference's own traced skyline --
+// and this ridge stood in front of them. `CONFINE.crest.height` is nought and
+// `crestRise` returns nought for every point in the world; the paragraph below
+// is what the number MEANT, kept because the dial is still here and turning it
+// back up brings all of it back with it.
+//
+// ===========================================================================
+// WHY ITS RISER IS FOUR VOXELS AND NOT ONE.
 //
 // A ridge that climbs twelve metres over forty is a slope of 0.3, and one voxel
 // of quantisation on that slope puts a riser every 33 cm -- which at ninety
@@ -217,23 +228,46 @@ export const CONFINE = {
     /** Where it has come back down to the basin behind itself. */
     back: 168,
     /**
-     * How high the crown of the ridge stands OVER THE PLATEAU, in metres --
-     * over the walkable floor of the world and not over the basin it grows out
-     * of, because that is the height a person can picture.
+     * How high the crown of the ridge stands OVER THE PLATEAU, in metres.
      *
-     * ELEVEN, AND IT IS THE ONE NUMBER HERE A PICTURE WAS CONSULTED ABOUT --
-     * read off the day target rather than fitted to it. The left ridge crowns
-     * about nine degrees over the horizon at the framing pose; at the radius
-     * this file puts the peak that is a dozen metres, and the waves below carry
-     * the tallest bearing to fourteen.
+     * NOUGHT, AND THAT IS A DECISION AND NOT A DEFECT: E-DECISIONI21, D7 = A,
+     * «cresta e giganti cadono, colline tutt'intorno». THE RIDGE IS GONE.
      *
-     * AND THERE IS A CEILING OVER IT THAT IS NOT A TASTE: the picture holds a
-     * ground in ONE byte of voxels biased by CAMPO_BIAS, which reaches 15.5 m
-     * over the plateau. The crown plus its sway has to stay under that or it
-     * goes FLAT and nothing looks broken. guard-confine sweeps the law and
-     * asserts it, so raising this is a change somebody is told about.
+     * WHAT IT WAS, AND WHAT WAS WRONG WITH IT. It was ELEVEN -- the one number
+     * in this file a picture was ever consulted about, read off the day target
+     * as the height that put the left ridge nine degrees over the horizon at
+     * the framing pose. It was ordered as a BASE (E-DECISIONI19: «cresta com'è
+     * ... il passaggio della cresta a V5, forma e aria come il target») and the
+     * passage to V5 never happened, so what shipped for two months was the base
+     * and only the base: ONE smooth hump, ONE material -- the meadow's own
+     * grass read at forty centimetres -- risers all the same four voxels, no
+     * rock, no beds, no shadow of its own, at eighty-five to a hundred metres
+     * from the eye. R6 measured what that reads as and E-OCCHIO1 had already
+     * named it: a blue-grey WALL at five to seven degrees on eighty-five
+     * bearings out of a hundred and eight, at a chroma of four and a half where
+     * the reference is at seventeen, with the frame's real distance hidden
+     * behind it.
+     *
+     * WHAT STANDS THERE NOW. The hills of src/world/distant.js: four planes of
+     * real cubes beyond the water, fitted per direction against the skyline the
+     * reference was traced for, with rock and grass and their own light. They
+     * begin past a hundred and ten metres, so this ridge was not merely
+     * redundant -- it stood IN FRONT of them.
+     *
+     * AND THE REST OF THE BOUNDARY IS UNTOUCHED, which is the point of the dial
+     * being a height rather than a deletion. The plateau, the fall cut into
+     * terraces a body can walk, and the level of the standing water are what
+     * E-DECISIONI13 asked this file for and they are all still here, doing
+     * exactly what they did. What has gone is one hump. Set this back to eleven
+     * and the wall returns, with every number it had.
+     *
+     * (The ceiling that used to be stated here -- the ground travels in ONE
+     * byte of voxels biased by CAMPO_BIAS, which reaches 15.5 m over the
+     * plateau, so a crown plus its sway had to stay under it or go flat -- is
+     * still true of anything this dial is ever raised to, and guard-confine
+     * still sweeps the law and asserts it.)
      */
-    height: 11,
+    height: 0,
     /**
      * The riser of a terrace on the RIDGE, in voxels.
      *
@@ -375,6 +409,18 @@ function gate(bearing) {
  */
 export function crestRise(r, bearing) {
   const c = CONFINE.crest;
+  // A CROWN OF NOUGHT IS NO RIDGE AT ALL, AND IT HAS TO BE SAID IN A LINE OF
+  // ITS OWN RATHER THAN LEFT TO THE ARITHMETIC BELOW.
+  //
+  // The height is counted from the PLATEAU and the ridge grows out of the
+  // BASIN, so the return at the bottom of this function adds back the four and
+  // three quarter metres the fall has already dropped by the time it gets
+  // there. With the crown at nought that expression does not answer nought: it
+  // answers a five-metre dome, all the way round, on every bearing outside the
+  // gate -- the wall at half height, wearing the same four-voxel riser. The
+  // dial would have looked as though it had been turned off and would not have
+  // been.
+  if (c.height <= 0) return 0;
   const s = sway(bearing);
   const g = gate(bearing);
   if (g <= 0) return 0;
