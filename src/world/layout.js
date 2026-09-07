@@ -1,3 +1,5 @@
+import ROCK_PLAN from '../../assets-src/rocks/rocks.json' with { type: 'json' };
+
 // Hub layout, in metres.
 //
 // Coordinate system: origin is the centre of the hub, +Y is up, north is -Z.
@@ -146,3 +148,26 @@ export const PATH = {
   toZ: -12.2,
   x: 0.25,
 };
+
+// ---------------------------------------------------------------- the rocks
+//
+// WHERE THE LOOSE STONE STANDS, AND HOW BIG A BOX IT IS, PUBLISHED ONCE. Two
+// things need it and they must not disagree: the walker, who may not walk
+// through a boulder, and the third person camera, which may not swing through
+// one. src/world/rocks.js builds the walker's footprints from this and
+// src/world/contracts.js builds the camera's boxes from it, so a stone cannot be
+// solid to a body and hollow to its lens. The seats themselves are the rock
+// plan's -- this is the LAYOUT's reading of it and not a second copy.
+
+/** How much of a rock's radius its box is allowed to be. */
+export const ROCK_SQUARE = 0.72;
+
+/**
+ * The rocks solid enough that passing through one would be a hole in the world.
+ *
+ * A SQUARE INSIDE THE ROUND: a box that reached the full radius would stop a
+ * body -- or a camera -- in the air beside the stone.
+ */
+export function rockSeats() {
+  return ROCK_PLAN.rocks.filter((rock) => rock.radius >= 0.45);
+}
