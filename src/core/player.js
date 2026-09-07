@@ -4,6 +4,7 @@ import {
   EYE_HEIGHT, RUN_SPEED, SPAWN, WALK_SPEED,
 } from '../world/layout.js';
 import { criticalStep, TUNING } from './presence.js';
+import { AVATAR, STANDING, SWITCH, bodyFade, reachEase, thirdPersonEye } from './avatar.js';
 
 // THE LOOK IS TWO ANGLES, NOT ONE.
 //
@@ -110,6 +111,25 @@ export class Player {
   // is the one in force. See setPose, which is the only thing that sets it, and
   // update, which is the only thing that hands it back.
   #placedEye = null;
+  // Which person the frame is drawn in, and where the boom put the camera last
+  // time it was asked. 'prima' | 'terza'.
+  //
+  // THE ARRIVAL IS THIRD PERSON, which is the committente's answer and also the
+  // only one of the two the reference pictures show. The walker who wants his
+  // own eyes presses V.
+  #person = 'terza';
+  // How much of the arm is out, and how much of the way through the switch we
+  // are. The person above is where we are GOING; this is where we have got to,
+  // and between the two of them is the third of a second the camera takes to
+  // leave the eye.
+  #reach = 1;
+  #reachFrom = 1;
+  #reachT = 1;
+  #rigEye = { x: 0, y: 0, z: 0, arm: 0 };
+  // What the camera cannot pass through. Not the same list as #blockers: that
+  // one is a footprint, and a camera also has to know how TALL a thing is --
+  // a rock a knee high is not in the way of an eye at a metre and a half.
+  #solids = [];
   #lookRate = 0;
   // Which way the eye is turning and how fast, in degrees a second. lookRate
   // above is unsigned and includes the pitch, because what reads it is a
@@ -128,6 +148,18 @@ export class Player {
 
   // Footprints the player cannot walk into: { x, z, halfWidth, halfDepth, rotationY }
   setBlockers(list) { this.#blockers = list; return this; }
+
+  /**
+   * Boxes the third person camera cannot pass through, with their heights:
+   * { x, z, halfWidth, halfDepth, rotationY, y0, y1 }.
+   *
+   * A SECOND LIST AND NOT A SECOND OPINION. It is built beside the walker's
+   * footprints, from the same plan, in the one seat that knows what this hub is
+   * made of -- see src/world/hub.js. What it adds is the vertical extent, which
+   * a body walking on the floor never needs and a lens on a five metre arm
+   * always does.
+   */
+  setSolids(list) { this.#solids = list || []; return this; }
 
   /**
    * How far a leaned-in lens has slowed the mouse, as a plain multiplier.
@@ -265,6 +297,7 @@ export class Player {
   update(dt, input) {
     if (input.locked) this.look(input.drainLook());
     this.#chase(dt);
+    this.#run(dt);
 
     const axis = input.engaged ? input.axis() : { x: 0, z: 0 };
     const speed = input.running ? RUN_SPEED : WALK_SPEED;
@@ -323,6 +356,22 @@ export class Player {
     if (this.#stance === null || ground >= this.#stance) this.#stance = ground;
     else this.#stance += (ground - this.#stance) * (1 - Math.exp(-dt / FALL_TAU));
     this.position.y = this.#placedEye === null ? this.#stance + EYE_HEIGHT : this.#placedEye;
+  }
+
+  /**
+   * One frame of the switch.
+   *
+   * The clock runs from wherever the arm was when the key was pressed, so a key
+   * pressed halfway through a switch turns the run round from where it is rather
+   * than snapping back to an end. What it never does is overshoot or hang: the
+   * timer is clamped, the easing is monotone, and at 0.35 s it is exactly there.
+   */
+  #run(dt) {
+    const want = this.#person === 'terza' ? 1 : 0;
+    if (this.#reach === want) return;
+    this.#reachT = Math.min(1, this.#reachT + dt / SWITCH.seconds);
+    this.#reach = this.#reachFrom + (want - this.#reachFrom) * reachEase(this.#reachT);
+    if (this.#reachT >= 1) this.#reach = want;
   }
 
   /**
@@ -396,8 +445,116 @@ export class Player {
     }
   }
 
+  /**
+   * First person or third, and it is one door rather than two.
+   *
+   * The walker does not change: this.position stays the AVATAR's eye in both,
+   * which is what lets the switch be continuous and what keeps every pose, the
+   * survey and the measuring harness meaning the same thing in either. What
+   * changes is where applyTo puts the camera.
+   *
+   * THE FIELD OF VIEW IS THE CALLER'S, as it already is for every pose: third
+   * person asks for RIG.fov, and whoever owns the camera applies it the same
+   * way src/main.js applies a pose's own fov today.
+   *
+   * AND THE TWO FITTED FRAMINGS STAY FIRST PERSON. Their y is where the CAMERA
+   * stood in the reference pictures, not where the avatar stood; placing one of
+   * them in third person would stand the avatar at the camera's altitude and
+   * swing the boom back from there, which is a different picture. They are
+   * camera placements and they are photographed as camera placements.
+   */
+  setPerson(which) {
+    const next = which === 'terza' ? 'terza' : 'prima';
+    if (next !== this.#person) {
+      this.#person = next;
+      this.#reachFrom = this.#reach;
+      this.#reachT = 0;
+    }
+    return this;
+  }
+
+  /**
+   * The switch, with no run at all: the person a placement arrives in.
+   *
+   * A POSE IS A PLACEMENT AND NOT A GESTURE, which is the same rule setPose
+   * keeps for the look: the very first frame at a pose has to BE the pose, and
+   * a camera still sliding out of the walker's head is not. Every paired crop
+   * this campaign judges anything on stands on that.
+   */
+  placePerson(which) {
+    this.#person = which === 'terza' ? 'terza' : 'prima';
+    this.#reach = this.#person === 'terza' ? 1 : 0;
+    this.#reachFrom = this.#reach;
+    this.#reachT = 1;
+    return this;
+  }
+
+  get person() { return this.#person; }
+
+  /** How far out the boom is, 0 to 1, for anything that has to wait for it. */
+  get reach() { return this.#reach; }
+
+  /** Where the boom put the camera last frame, for anything that draws a body. */
+  get rigEye() { return this.#rigEye; }
+
   applyTo(camera) {
-    camera.position.copy(this.position);
+    // WHERE HIS FEET ARE, ONCE, FOR BOTH OF THE THINGS THAT NEED IT. The boom
+    // swings from the stance and the body stands on it, and until now only the
+    // boom asked: a body that worked it out for itself would be a second
+    // opinion about one floor, which is the defect this campaign has already
+    // spent a session removing from the camera.
+    const stance = this.#stance === null
+      ? this.position.y - EYE_HEIGHT
+      : this.#stance;
+
+    // ZERO REACH IS FIRST PERSON, AND IT IS THE COPY AND NOT THE ARITHMETIC.
+    // The boom does arrive at the eye exactly -- every leg of it is multiplied by
+    // the same fraction -- but "exactly" through six trigonometric calls is a few
+    // parts in 10^16 away from the position itself, and first person is required
+    // to be bit-identical rather than nearly so. So the branch is on the arm
+    // being out at all, not on which person was asked for: mid-switch the camera
+    // is on the arm, and at the end of it, it is the eye.
+    if (this.#reach > 0) {
+      thirdPersonEye(
+        this.#rigEye,
+        { x: this.position.x, z: this.position.z, stance, yaw: this.#yawF.x },
+        this.#pitchF.x, PITCH_LIMIT, this.#groundHeight, AVATAR.height,
+        { reach: this.#reach, solids: this.#solids, eyeHeight: EYE_HEIGHT },
+      );
+      camera.position.set(this.#rigEye.x, this.#rigEye.y, this.#rigEye.z);
+    } else {
+      camera.position.copy(this.position);
+      this.#rigEye.x = this.position.x;
+      this.#rigEye.y = this.position.y;
+      this.#rigEye.z = this.position.z;
+      this.#rigEye.arm = 0;
+    }
+
+    // AND THE BODY IS TOLD, in the same call rather than in a second pass: this
+    // is the one place a frame decides where the walker is and which way he
+    // looks, so it is the one place that can say it without being asked twice.
+    // See STANDING in src/core/avatar.js for why it travels instead of being
+    // rebuilt from the eye.
+    STANDING.x = this.position.x;
+    STANDING.y = stance;
+    STANDING.z = this.position.z;
+    STANDING.yaw = this.#yawF.x;
+    // AND HOW MUCH OF HIM. For the first metre of the arm he is between the near
+    // plane and the lens; the fade is what carries him in and out over exactly
+    // that metre, and `drawn` is still the flag the layer switches a mesh with,
+    // so a body nobody can see costs nothing at all.
+    // AND HOW FAST HE IS GOING, because the step is spent in METRES and not in
+    // seconds: a walk and a run have to put the same foot on the same patch of
+    // ground, or the figure skates. The walker is the one seat that knows.
+    STANDING.speed = Math.hypot(this.#velocity.x, this.#velocity.z);
+    STANDING.arm = this.#rigEye.arm;
+    STANDING.fade = bodyFade(this.#rigEye.arm);
+    STANDING.drawn = STANDING.fade > 0;
+    STANDING.serial++;
+    // THE AIM IS THE WALKER'S IN BOTH, and in third person that is the whole
+    // of the framing: the camera does not look AT the avatar, it looks where
+    // the walker looks and the boom's offset puts him low and to the left of
+    // the middle, which is where both reference pictures draw him.
     this.#euler.set(this.#pitchF.x, this.#yawF.x, 0);
     camera.quaternion.setFromEuler(this.#euler);
   }

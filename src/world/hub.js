@@ -1,7 +1,7 @@
 import { Group, Scene } from 'three';
 import { applySky } from '../core/sky.js';
 import { setAir } from './air.js';
-import { builtHeightAt, groundHeightAt as meadowHeightAt } from './contracts.js';
+import { builtHeightAt, cameraSolids, groundHeightAt as meadowHeightAt } from './contracts.js';
 import { ROCK_BLOCKERS } from './rocks.js';
 import { MONOLITHS, PLATFORM } from './layout.js';
 import { LAYERS, layer, layersAt } from './layers/registry.js';
@@ -60,6 +60,14 @@ export function buildHub() {
   // reason the blocks are: what a body may walk through is a property of the
   // plan, not of whether a download has finished.
   blockers.push(...ROCK_BLOCKERS);
+
+  // WHAT A LENS CANNOT PASS THROUGH, which is the same stone with its height on
+  // it. A footprint is enough for a body, which is always on the floor; a third
+  // person camera is on a five metre arm at head height and has to know that a
+  // rock is knee high and a block is not. It is not assembled here: two lists
+  // built in two places is two opinions, so it comes from the one seat that
+  // publishes what this world is made of -- see cameraSolids in contracts.js.
+  const solids = cameraSolids();
 
   const arrived = { dress: false, plant: false };
   // What the quality tier has asked for. It is held here rather than pushed
@@ -133,6 +141,7 @@ export function buildHub() {
   return {
     scene,
     blockers,
+    solids,
     groundHeightAt,
 
     /**
