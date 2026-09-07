@@ -164,6 +164,28 @@ const ladder = (well, shadeSun, light, composite, albedo, ground, soil) => {
 const WELL_CEILING = 0.60;
 const TARGET_FLOOR = [0.10, 0.20];
 
+// LE QUOTE PER FASCIA, MISURATE E NON GATEATE, e la colonna che questa guardia
+// non aveva prima.
+//
+// PERCHE’ STANNO QUI E NON IN guard-zone. Sono la lettura di R1 §1.1 sulle
+// famiglie del prato: appartengono al PRATO, e la guardia del prato e’ il posto
+// dove un lettore le cerca. Quello che U-ZONE-1 ha aggiunto e’ la terza colonna,
+// che e’ la ragione per cui il mandato chiedeva a questa guardia di riportare
+// prima e dopo: la famiglia chiara a 4,8-7,5 m era sette volte quella del
+// bersaglio (E-OCCHIO1, divario 10) ed e’ la prima cifra della campagna a
+// coincidere.
+//
+// Lette con lo strumento di R1 riprodotto e validato (che sulle cinque finestre
+// del bersaglio riproduce esattamente le sue cifre pubblicate), alla posa
+// vox-giorno, tier alto, 1672x941, interfaccia spenta.
+const QUOTE = [
+  ['pp-sx', '57/38/6', '68/24/8', '71/23/6'],
+  ['pp-dx', '57/39/5', '58/12/30', '65/29/6'],
+  ['5-7 m', '53/34/13', '48/33/20', '50/31/18'],
+  ['7-8,5 m', '38/43/19', '46/26/28', '55/25/19'],
+  ['10-12 m', '44/43/13', '57/27/16', '49/31/20'],
+];
+
 function main() {
   const r = reporter('guard-prato -- the well between the cubes, and the ground under a thinning mat');
   const campo = read(CAMPO);
@@ -299,14 +321,24 @@ if (process.argv.includes('--self')) {
 } else {
   const { r, pigment } = main();
   const { depth } = await levels(r, pigment);
-  r.note('LE QUOTE DELLE TRE FAMIGLIE NON SONO GATEATE QUI, e questo e’ il numero: '
-    + 'a 5-7 m il campo sta a 59/12/30 contro il 57/39/5 del bersaglio (R1 §1.1). '
-    + 'Il pozzo di questa unita’ ha chiuso quello che poteva chiudere -- il suolo '
-    + 'che stava nel manto ed era illuminato come prato aperto -- e la distanza che '
-    + 'resta e’ di FORMA e non di pozzo: la nostra distribuzione e’ bimodale '
-    + '(un buco fra luma 35 e 75) dove quella del bersaglio e’ graduata. Le due '
-    + 'voci sono la LUCE A ZONE (R1 S3, U-ZONE-1) e l’occlusione fra filo e filo '
-    + '(un filo basso fra due alti sta al rung zero della propria colonna), che '
-    + 'costa fetch e non sta nei 0 ms di questo mandato: U-CAMPO-2.');
+  r.line('');
+  r.line('  LE QUOTE PER FASCIA, PRIMA E DOPO LA LUCE A ZONE (non gateate, §NOTA):');
+  r.line('    fascia         bersaglio   prima di U-ZONE-1   dopo');
+  for (const [fascia, want, before, after] of QUOTE) {
+    r.line(`    ${fascia.padEnd(14)} ${want.padEnd(11)} ${before.padEnd(19)} ${after}`);
+  }
+  r.note('LE QUOTE DELLE TRE FAMIGLIE NON SONO GATEATE QUI, e questi sono i numeri, '
+    + 'ripresi dopo la luce a zone di U-ZONE-1: a 5-7 m il campo sta a 50/31/18 '
+    + 'contro il 53/34/13 del bersaglio (era 48/33/20), e sulla finestra pp-dx di '
+    + 'R1 §1.1 la FAMIGLIA CHIARA — il divario che E-OCCHIO1 chiamava per nome, '
+    + 'sette volte il bersaglio — sta al 6% contro il 5% del bersaglio, da 30%. '
+    + 'Il pozzo di U-PRATO-2 ha chiuso il suolo che stava nel manto ed era '
+    + 'illuminato come prato aperto; le zone hanno chiuso il termine a bassa '
+    + 'frequenza. Quello che resta e’ il CONTRASTO sotto il metro e mezzo: il '
+    + 'bersaglio crudo sta a 0,314 del proprio p90 dove il suo stesso campo lento '
+    + 'sta a 0,449, cioe’ un terzo del suo chiaroscuro vive a una scala che '
+    + 'nessuna mappa di zone raggiunge. E’ l’occlusione fra filo e filo (un filo '
+    + 'basso fra due alti sta al rung zero della propria colonna), che costa fetch: '
+    + 'U-CAMPO-2.');
   r.end(`the well takes the ground to ${depth.toFixed(4)} of open ground`);
 }
