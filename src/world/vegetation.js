@@ -426,10 +426,75 @@ const FAR_SLACK = 5.0;
 // thirteen metres that collapse in the vertex shader and draw no pixel, counted
 // and charged with the rest of the scroll in the verbale.
 const CYAN_FILL = CYAN_REACH + FAR_SLACK;
-// AND THE OTHER EDGE IS NOT WIDENED AT ALL, because out there the same slack
-// would be a ring three metres wide at eighteen metres out -- five hundred
-// quads of buffer that never draw a pixel. What is done instead is to draw only
-// as far as the buffer is KNOWN to reach: the rim is pulled in by however far
+// AND THE OTHER EDGE IS WIDENED TOO, WHICH IS A CHANGE OF MIND WITH A
+// MEASUREMENT BEHIND IT (U-CAMPO-2, M3.1). It was not, and the reasoning was
+// the one below: out there the same five metres would be a ring three metres
+// wide at eighteen metres out, five hundred quads of buffer that never draw a
+// pixel. So the rim was pulled IN instead, by however far the walker had come
+// since the fill -- and that is the defect R8 measured as source (c): between
+// two sweeps the rim retreats by up to 1.6 m at three metres a second, and on
+// the frame the sweep lands it jumps back out. Heads inside the fade band
+// change size in one frame, twice a metre, for ever. «Lento nel ritirarsi,
+// istantaneo nel tornare» -- and the committente looks at the flowers.
+//
+// Rule one of the smooth loading is that nothing in frame changes without a
+// dissolve, and a rim that springs outwards is the plainest breach of it there
+// is. So the fill is widened by FAR_MARGIN and the rim is left STANDING STILL
+// in the world: what the walker's drift eats is margin, not flowers. It costs
+// the annulus between 18.55 m and 20.5 m -- 23 % more candidates in a sweep
+// that is already cut into slices, so it is three more slices and not one more
+// millisecond in any frame -- and it buys an edge that never moves at all.
+//
+// THE OLD CLAMP STAYS UNDER IT, and it is not redundant: it is what happens
+// when the margin is not enough (a run of 4.5 m/s, a sweep behind a long task).
+// With the margin covering the drift, `liveTo - drift` is already past
+// wantedReach and the minimum picks wantedReach -- the rim is simply still. Past
+// that, it degrades exactly as it used to instead of drawing heads the buffer
+// does not hold. One line, and the failure mode it had is the fallback now.
+const FAR_MARGIN = 2.5;
+
+// OVER HOW MANY METRES THE TWO FAMILIES CHANGE PLACES (U-CAMPO-2, M3.2).
+//
+// The exchange at 6.5 m was a HARD EDGE on purpose, and the purpose was sound:
+// the two families read one uniform by reference, so a gap or a double is not
+// something anybody has to check for. What it cost is that a head crossing that
+// radius changes REPRESENTATION in one frame -- a solid becomes a quad, same
+// ratified colour, different silhouette -- and at walking pace a few heads cross
+// it every second, for ever. R8 counted it inside source (c).
+//
+// A dissolve over sixty centimetres closes it without giving up the guarantee,
+// because the two halves are still one comparison: each head draws a number of
+// its own from its place in the world, and it is a quad if that number is under
+// the ramp and a solid if it is not. Never both, never neither -- not because
+// the two shaders agree, but because they are the SAME FUNCTION, written once
+// here and interpolated into each of them. A head therefore swaps once, at its
+// own radius somewhere inside the band, and no two heads swap on the same frame.
+const SWAP_BAND = 0.6;
+
+/**
+ * The exchange, as one function both families read.
+ *
+ * IT IS THE HEAD'S OWN PLACE AND NOT THE PIXEL'S that draws the number, which is
+ * the whole difference between a dissolve and a shimmer: a head keeps its number
+ * for as long as it stands there, so it crosses once and stays crossed. The
+ * place is quantised to the centimetre first, so that a float that arrives by a
+ * different route in the two programs cannot land on a different side of it.
+ */
+const SWAP_GLSL = /* glsl */`
+  uniform float uSwapBand;
+  float swapToFar(vec2 at, float reach, float ring) {
+    // A band of nought is the hard edge this replaced, and it is reachable from
+    // the bench so that the two can be weighed in the same half hour: smoothstep
+    // over an empty interval is a step, so no branch is needed to get it back.
+    float edge = uSwapBand * 0.5;
+    float across = smoothstep(ring - edge, ring + edge, reach);
+    vec2 cell = floor(at * 100.0);
+    float pick = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
+    return step(pick, across);
+  }
+`;
+// What the rim used to do, kept in words because the measurement refers to it:
+// the rim was pulled in by however far
 // the walker has moved from the fill it is currently drawing. The whole of that
 // movement is inside the rim's own fade band, so it is a slow swell of the
 // faintest heads in the frame rather than a bite out of the meadow.
@@ -2610,14 +2675,19 @@ function flowerVertex(kind) {
   ${BLOOM_GLSL}
   ${FOG_GLSL}
   ${ZONE_GLSL}
+  ${SWAP_GLSL}
 
   void main() {
-    // THE EXCHANGE RING, AND IT IS A HARD EDGE ON PURPOSE: the far family takes
-    // over at exactly this radius, off the same lattice and the same record, and
-    // the two families read the SAME uniform for it, shared by reference and not
-    // copied, so a gap or a double is not something that has to be checked for.
+    // THE EXCHANGE RING, AND IT IS A DISSOLVE OVER SIXTY CENTIMETRES: the far
+    // family takes over across this radius, off the same lattice and the same
+    // record, and the two families read the SAME uniform for it AND THE SAME
+    // FUNCTION over it (SWAP_GLSL), shared by reference and not copied, so a gap
+    // or a double is not something that has to be checked for. It was a hard
+    // edge, which had that guarantee too and cost a head changing shape in one
+    // frame every time one crossed; each head now draws a number from its own
+    // place and crosses once, at its own radius inside the band.
     float reach = length(aFlower.xz - uCentre);
-    float trim = 1.0 - step(uRadius, reach);
+    float trim = 1.0 - swapToFar(aFlower.xz, reach, uRadius);
 
     float petal = step(aRole, 0.5);
     float pistil = step(1.5, aRole) * step(aRole, 2.5);
@@ -2881,12 +2951,15 @@ const FAR_VERTEX = /* glsl */`
   ${BLOOM_GLSL}
   ${FOG_GLSL}
   ${ZONE_GLSL}
+  ${SWAP_GLSL}
 
   void main() {
     float reach = length(aFlower.xz - uCentre);
     // Inside the ring this head is drawn as a solid, by the family that reads
-    // this same uniform for the opposite half of the comparison.
-    float keep = step(uRing, reach);
+    // this same uniform -- and now the same FUNCTION -- for the opposite half of
+    // the comparison. See SWAP_GLSL: the head crosses once, at its own radius
+    // inside the band, and the two halves are exact complements.
+    float keep = swapToFar(aFlower.xz, reach, uRing);
     // And a cyan one stops sooner, because the census does. It is a THIRD trim
     // on the same live distance rather than a filter on the fill, for the reason
     // the other two are: the buffer holds a superset and every edge this family
@@ -3024,7 +3097,7 @@ const FAR_FRAGMENT = /* glsl */`
  *   families or a head drawn by both is not a thing that can happen and then be
  *   noticed. It is the same discipline the contract's two doors are built on.
  */
-function createFarFlowers({ height, lightScale, pigments, ring, hour }) {
+function createFarFlowers({ height, lightScale, pigments, ring, swapBand, hour }) {
   const geometry = farGeometry();
   // Every candidate the two trims could ever ask for, out to the slack past the
   // rim. Sized for the top of the reach and never reallocated: growing a buffer
@@ -3078,6 +3151,7 @@ function createFarFlowers({ height, lightScale, pigments, ring, hour }) {
       ...SCENE_LIGHT_UNIFORMS,
       uCentre: { value: new Vector2() },
       uRing: ring,
+      uSwapBand: swapBand,
       uReach: { value: FAR_REACH },
       uFade: { value: FAR_FADE },
       ...fogUniforms(),
@@ -3137,7 +3211,7 @@ function createFarFlowers({ height, lightScale, pigments, ring, hour }) {
   function beginSweep(centreX, centreZ) {
     sweepCellX = Math.floor(centreX / FLOWER_CELL);
     sweepCellZ = Math.floor(centreZ / FLOWER_CELL);
-    sweepTo = wantedReach + FLOWER_CELL;
+    sweepTo = wantedReach + FAR_MARGIN;
     sweepFrom = Math.max(0, ring.value - FAR_SLACK);
     cursor = 0;
     sweepN = 0;
@@ -3304,6 +3378,10 @@ function createFlowers({ height, lightScale, pigments, hour }) {
   // radius: this object is handed to the far family whole, so the two halves
   // of the meadow read one number.
   const ring = { value: FLOWER_RADIUS };
+  // AND THE WIDTH OF THE EXCHANGE, declared beside it and for the same reason:
+  // the two families are handed this object whole, so they cannot disagree about
+  // where a head swaps or over how far. Nought is the hard edge it replaced.
+  const swapBand = { value: SWAP_BAND };
 
   /** One kind: its geometry, its buffers, its mesh. */
   function family(kind) {
@@ -3380,6 +3458,7 @@ function createFlowers({ height, lightScale, pigments, hour }) {
         ...SCENE_LIGHT_UNIFORMS,
         uCentre: { value: new Vector2() },
         uRadius: ring,
+        uSwapBand: swapBand,
         ...fogUniforms(),
         // AND THE GROUND'S OWN ZONE, bound by reference to the one picture the
         // field reads: ./voxel/campo-material.js is the seat, and the delivery
@@ -3509,6 +3588,8 @@ function createFlowers({ height, lightScale, pigments, hour }) {
     },
     /** The uniform itself, for the family that draws the other side of it. */
     ring,
+    /** And how wide the two change places over, shared the same way. */
+    swapBand,
     setVisible(visible) { for (const f of all) f.mesh.visible = visible; },
     stats: () => ({
       capacity,
@@ -3611,7 +3692,9 @@ export function createVegetation({
   const flowers = createFlowers({ height, lightScale, pigments, hour });
   // And the far half, which starts where the solids stop. It is handed the
   // solids' own radius uniform, so the exchange is one number and not two.
-  const far = createFarFlowers({ height, lightScale, pigments, ring: flowers.ring, hour });
+  const far = createFarFlowers({
+    height, lightScale, pigments, ring: flowers.ring, swapBand: flowers.swapBand, hour,
+  });
   const meshes = [grass.mesh, ...flowers.meshes, far.mesh];
 
   // Where the sowing is being taken, and where it has got to. The pair is what
