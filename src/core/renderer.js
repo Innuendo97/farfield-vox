@@ -115,6 +115,25 @@ export class Renderer {
 
   setBloomTier(tier) { return this.#post.setBloomTier(tier); }
 
+  /**
+   * Second lever of the tier, and the one that does NOT touch the picture the
+   * portfolio is made of.
+   *
+   * setRenderScale above takes the whole frame down together, writing included:
+   * the meadow holds it and the engraving on the monolith does not. This takes
+   * the pixel from the ray marched GROUND alone -- two thirds of the frame, and
+   * a cost that tracks its own pixel count to within a point -- and leaves the
+   * masonry, the writing, the flowers and the walker at the pixel they were
+   * always drawn at.
+   */
+  setCampoScale(scale) { return this.#post.setCampoScale(scale); }
+
+  /** How many samples the ground's own buffer resolves. A bench's arm. */
+  setCampoSamples(count) { return this.#post.setCampoSamples(count); }
+
+  /** What that buffer actually is, read back rather than deduced. */
+  campoStats() { return this.#post.campoStats(); }
+
   setTiming(on) { return this.#post.setTiming(on); }
 
   /** What the GPU spent on the last timed frame, in milliseconds, or null. */

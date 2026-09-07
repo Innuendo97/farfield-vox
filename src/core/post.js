@@ -2069,8 +2069,15 @@ function identityLut(size = LUT_SIZE) {
 // same buffer — but they are apart now because the split put them there anyway,
 // and a consumer that can read what its own additive layer costs without
 // building a bench is worth the line.
+// `campo` is the field's own pass and NOTHING ELSE: the ray marched ground,
+// drawn alone into a buffer of its own at a fraction of the frame's pixels. It
+// stands beside `scene` for the same reason `depth` does -- the whole question
+// this pass was opened on is what the GROUND costs against what the rest of the
+// world costs, and a cost folded into the pass it stands beside is not a cost
+// anybody can quote. On a frame drawn whole it is an exact nought, because the
+// field is then drawn inside `scene`, where it always was.
 const CLOCK_STAGES = [
-  'prepass', 'scene', 'depth', 'soft', 'bloom', 'probe', 'eye', 'rays', 'composite',
+  'prepass', 'campo', 'scene', 'depth', 'soft', 'bloom', 'probe', 'eye', 'rays', 'composite',
 ];
 
 /**
@@ -2497,6 +2504,85 @@ ${RAY_DISTANCE_GLSL}
     gl_FragColor = vec4(sceneDistanceAt(texture2D(tDepth, vUv).x, vUv), 0.0, 0.0, 1.0);
   }
 `;
+
+// =============================================================================
+//                    THE FIELD'S OWN PASS, AT ITS OWN PIXEL
+// =============================================================================
+//
+// WHAT IT IS FOR. E-PERF5 weighed the frame draw by draw and found ONE item
+// carrying two thirds of it: the ray marched ground, 16,62 ms of a 25,61 ms
+// frame at the pose the campaign judges on. It is not dear because there is a
+// lot of it -- it is one box, twelve triangles, one draw -- it is dear PER
+// PIXEL OF EARTH, and the sweep of the resolution lever proved that to the
+// second digit: at scale 0,75 the frame draws 56,3 % of the pixels and the
+// field costs 55,2 % of what it cost. A cost that tracks the pixel count that
+// closely has exactly one cheap lever on it, and it is the pixel count.
+//
+// AND THE LEVER MAY NOT BE THE FRAME'S. `setRenderScale` takes the whole
+// picture down with it, and the plate 2026-09-06-perf-5-leva-risoluzione.png
+// is the reason that was refused: at 0,85 the meadow holds and THE WRITING ON
+// THE MONOLITH softens with it, and the writing is the portfolio. So the pixel
+// is taken from the ground ALONE. The field is drawn into a buffer of its own
+// at a fraction of a side, and put back at full resolution by a quad that
+// carries its colour and its depth; everything else in the world -- the
+// masonry, the engraving, the flowers, the walker -- is drawn at the pixel it
+// has always been drawn at, in the same one pass it has always been drawn in.
+//
+// WHY THE RECOMPOSITION IS A MESH IN THE WORLD AND NOT A PASS IN THIS FILE.
+// The field ships at renderOrder 10, last of the opaques, behind the sky and
+// the skyline and in front of nothing: that is what lets a partly covered pixel
+// stand against a sky that is already there, and it is what puts the whole
+// meadow's depth into the buffer before the transparent flowers are drawn over
+// it. A composite done here would have to be a SECOND render into the scene
+// target, and a second render into a multisampled target is a second full
+// resolve of it -- see the note on the one call in `render` below. Standing the
+// recomposition where the field itself stood costs no resolve, no binding and
+// no reordering: it IS the field's draw, with a cheaper fragment.
+//
+// Layer 2. Layer 1 is the depth service's, and 0 is where everything else in
+// this world already is.
+export const CAMPO_LAYER = 2;
+
+/** The field at rest: one texel that covers nothing, so the resolve discards. */
+const CAMPO_REST = new DataTexture(new Float32Array([0, 0, 0, 0]), 1, 1, RGBAFormat, FloatType);
+CAMPO_REST.needsUpdate = true;
+
+/** And its depth at rest: the far plane, which no fragment can be nearer than. */
+const CAMPO_DEPTH_REST = new DataTexture(new Float32Array([1]), 1, 1, RedFormat, FloatType);
+CAMPO_DEPTH_REST.needsUpdate = true;
+
+/**
+ * THE seat, shared by reference the way the depth service's is.
+ *
+ * `uCampoSize` is the reduced buffer in texels and `uCampoOn` is whether there
+ * is one at all. At rest the pair says "one texel, covering nothing", and a
+ * resolve that reads it discards every fragment -- which is what makes the null
+ * honest: switching the pass off has to leave the same picture, drawn the way
+ * it was drawn before this existed, and it does, because the field's own mesh
+ * goes back into `scene` on the same frame.
+ */
+const CAMPO_SEAT = {
+  tCampo: { value: CAMPO_REST },
+  tCampoDepth: { value: CAMPO_DEPTH_REST },
+  uCampoSize: { value: new Vector2(1, 1) },
+  uCampoOn: { value: 0 },
+};
+
+// How many materials have sat down. Like the depth service: a chain nobody
+// reads from allocates no buffer, splits no render, and reports nought.
+let campoSeats = 0;
+
+/**
+ * The four uniforms the recomposition declares, and the act of asking for them
+ * is what tells this file there is a field to draw apart.
+ *
+ * @returns {object} the chain's own, by reference -- spread into a material's
+ *   uniforms, never copied by value.
+ */
+export function campoUniforms() {
+  campoSeats++;
+  return { ...CAMPO_SEAT };
+}
 
 export function createPostPipeline(gl) {
   // The scene is drawn in light units and stays that way until the composite;
@@ -3052,6 +3138,22 @@ export function createPostPipeline(gl) {
   });
 
   let sceneTarget = null;
+  // The field's own buffer, and null for as long as the frame is drawn whole.
+  let campoTarget = null;
+  // What fraction of a SIDE the ground is drawn at. One is the world as it
+  // shipped: no second buffer, no second pass, the field's own mesh back inside
+  // `scene`. A half is a quarter of the pixels.
+  let campoScale = 1;
+  // AND HOW MANY SAMPLES THAT BUFFER RESOLVES, which is a handle for a bench
+  // and NOUGHT for what ships. Multisampling is charged per triangle edge and
+  // the field has twelve of them, all of them off screen: the walker stands
+  // inside the box. Every edge anybody can see in the meadow -- the arris of a
+  // cube, the rim of the ridge against the sky -- is decided by the ray marcher
+  // in the fragment, and a coverage mask knows nothing about it. So four
+  // samples here would buy a quarter of nothing at four times the bandwidth of
+  // it; what the field antialiases with is `uRays`, its own sub pixel budget,
+  // and the pixels this pass gives back are what pays for a second one.
+  let campoSamples = 0;
   let bloomTargets = [];
   let focusTargets = [];
   let raysTargets = [];
@@ -3176,6 +3278,54 @@ export function createPostPipeline(gl) {
     const probed = probeTarget(width, height, wantedSamples, wantedFormats());
     sceneTarget = probed.target;
     quality = probed.quality;
+  }
+
+  /**
+   * The field's buffer: a fraction of a side, four channels, and a depth.
+   *
+   * FOUR CHANNELS WHERE THE SCENE HAS THREE, and that is the one place this
+   * pass gains something the whole frame cannot have. R11F_G11F_B10F carries no
+   * alpha, so the coverage the field already computes -- the share of a pixel's
+   * rays that found ground -- has nowhere to go and is thrown away the moment
+   * it is written: a pixel half covered by the ridge is drawn as if it were
+   * covered whole. Here it is kept, and the recomposition spends it against the
+   * sky that is already in the frame. Eight bytes of half float over a quarter
+   * of the pixels is two bytes per pixel of the frame, which is half what the
+   * three channels of the scene buffer cost over the same ground.
+   *
+   * AND IT IS SAMPLED NEAREST, always. The recomposition does its own weighing
+   * -- four texels, four weights, a gate on the depth between them -- and a
+   * bilinear tap underneath that would be a second filter nobody asked for,
+   * smearing the very edges the gate exists to keep.
+   */
+  function allocateCampo() {
+    const w = Math.max(1, Math.round(width * campoScale));
+    const h = Math.max(1, Math.round(height * campoScale));
+    if (campoTarget && campoTarget.width === w && campoTarget.height === h
+      && campoTarget.samples === campoSamples) return;
+    if (campoTarget) {
+      if (campoTarget.depthTexture) campoTarget.depthTexture.dispose();
+      campoTarget.dispose();
+    }
+    campoTarget = new WebGLRenderTarget(w, h, {
+      format: RGBAFormat,
+      type: HalfFloatType,
+      colorSpace: LinearSRGBColorSpace,
+      minFilter: NearestFilter,
+      magFilter: NearestFilter,
+      depthBuffer: true,
+      depthTexture: makeDepthTexture(w, h),
+      stencilBuffer: false,
+      samples: campoSamples,
+    });
+  }
+
+  /** Puts the seat back where a resolve reads it as "there is no field here". */
+  function restCampo() {
+    CAMPO_SEAT.tCampo.value = CAMPO_REST;
+    CAMPO_SEAT.tCampoDepth.value = CAMPO_DEPTH_REST;
+    CAMPO_SEAT.uCampoSize.value.set(1, 1);
+    CAMPO_SEAT.uCampoOn.value = 0;
   }
 
   function allocateBloom() {
@@ -3429,6 +3579,9 @@ export function createPostPipeline(gl) {
       // Only once somebody has sat down. A window that changes shape while the
       // service is idle allocates nothing at all.
       if (softDepthTarget) allocateSoftDepth();
+      // And the field's, on the same rule: a frame drawn whole has no buffer
+      // here to resize.
+      if (campoTarget) allocateCampo();
       if (probeTargets.length !== 2) allocateProbe();
     },
 
@@ -3469,6 +3622,56 @@ export function createPostPipeline(gl) {
       return true;
     },
 
+    /**
+     * WHAT FRACTION OF A SIDE THE GROUND IS DRAWN AT.
+     *
+     * One puts the field back inside the world's own pass, at the world's own
+     * pixel, with no second buffer and no recomposition -- which is not a
+     * fallback but the null this whole pass is measured against, and it has to
+     * be reachable in the same page and the same half hour as the other arms
+     * (E-V7k). A half is a quarter of the pixels of the earth.
+     *
+     * Asked standing still, like every other allocation on this file: a bench
+     * about to measure the difference, a tier settling, or once at start up.
+     */
+    setCampoScale(scale) {
+      const next = Math.min(1, Math.max(0.25, Number(scale) || 1));
+      if (next === campoScale) return false;
+      campoScale = next;
+      if (campoScale >= 1) {
+        if (campoTarget) {
+          if (campoTarget.depthTexture) campoTarget.depthTexture.dispose();
+          campoTarget.dispose();
+          campoTarget = null;
+        }
+        restCampo();
+      } else if (campoTarget) {
+        allocateCampo();
+      }
+      return true;
+    },
+
+    /** And how many samples that buffer resolves. A bench's arm; see the note. */
+    setCampoSamples(count) {
+      const next = Math.max(0, Number(count) || 0);
+      if (next === campoSamples) return false;
+      campoSamples = next;
+      if (campoTarget) allocateCampo();
+      return true;
+    },
+
+    /** What the field's own buffer is, for a bench that must not deduce it. */
+    campoStats() {
+      return {
+        scale: campoScale,
+        samples: campoSamples,
+        on: CAMPO_SEAT.uCampoOn.value === 1,
+        seats: campoSeats,
+        width: campoTarget ? campoTarget.width : 0,
+        height: campoTarget ? campoTarget.height : 0,
+      };
+    },
+
     render(worldScene, worldCamera) {
       // Counters cover the whole frame, scene and composite together, which is
       // the number that has to fit the budget.
@@ -3492,6 +3695,50 @@ export function createPostPipeline(gl) {
       // and this pass is a guest in it.
       const cameraLayers = worldCamera.layers.mask;
 
+      // ------------------------------------------------ THE FIELD'S OWN PASS
+      //
+      // BEFORE THE WORLD AND NOT AFTER IT, because what the world's own pass
+      // does with the answer is read it: the recomposition stands in the scene
+      // at the field's own place in the order, and it cannot stand there
+      // reading a buffer that has not been drawn yet.
+      //
+      // AND WHAT IT COSTS THE FIELD IS THE ONE THING WORTH DECLARING. Drawn
+      // here, the ground no longer has the monoliths' depth already written in
+      // front of it. That was never a saving on the marching -- a program that
+      // writes gl_FragDepth has given up its early test whatever stands in
+      // front of it, so those fragments were shaded and then thrown away -- but
+      // it was a saving on the write, and it is gone. What replaces it is
+      // better: the recomposition IS depth tested, at full resolution, against
+      // a buffer that has every monolith in it, so a field pixel still cannot
+      // land on the masonry -- and now it is a whole pixel of masonry that
+      // decides, not a half resolution guess at one.
+      const campoing = campoScale < 1 && campoSeats > 0;
+      if (campoing) {
+        allocateCampo();
+        if (slot) clock.begin(slot, 'campo');
+        worldCamera.layers.set(CAMPO_LAYER);
+        // CLEARED TO NOTHING, AND IT HAS TO BE SAID OUT LOUD. The fourth channel
+        // of this buffer is the field's COVERAGE, and the recomposition reads a
+        // nought there as "no ray found ground in this texel, let the sky
+        // through". three's own clear alpha is ONE whenever the canvas is
+        // opaque -- which this one is, and should be -- so a buffer left to the
+        // default arrives with every texel already claiming to be ground, and
+        // the recomposition dutifully paints the whole sky black. Measured, on
+        // the first frame this pass ever drew.
+        const keptAlpha = gl.getClearAlpha();
+        gl.setClearAlpha(0);
+        gl.setRenderTarget(campoTarget);
+        gl.render(worldScene, worldCamera);
+        gl.setClearAlpha(keptAlpha);
+        worldCamera.layers.mask = cameraLayers;
+        CAMPO_SEAT.tCampo.value = campoTarget.texture;
+        CAMPO_SEAT.tCampoDepth.value = campoTarget.depthTexture;
+        CAMPO_SEAT.uCampoSize.value.set(campoTarget.width, campoTarget.height);
+        CAMPO_SEAT.uCampoOn.value = 1;
+      } else if (CAMPO_SEAT.uCampoOn.value !== 0) {
+        restCampo();
+      }
+
       if (slot) clock.begin(slot, 'scene');
       gl.setRenderTarget(sceneTarget);
       // Taken out of the world's pass when there is somewhere else to put it,
@@ -3503,6 +3750,12 @@ export function createPostPipeline(gl) {
         worldCamera.layers.enable(SOFT_DEPTH_LAYER);
         SOFT_DEPTH_SEAT.tSceneDepth.value = SOFT_DEPTH_REST;
       }
+      // The same contract, one layer up: taken out of the world's pass when
+      // there is somewhere else to put it and PUT BACK INTO IT when there is
+      // not, so a frame drawn whole is the frame that shipped -- the field's own
+      // mesh, in its own place in the order, marching at the frame's own pixel.
+      if (campoing) worldCamera.layers.disable(CAMPO_LAYER);
+      else worldCamera.layers.enable(CAMPO_LAYER);
       // ONE CALL, AND IT STAYS ONE CALL. See the depth service's own comment:
       // a second render into this target costs a second full resolve of it.
       gl.render(worldScene, worldCamera);
@@ -4084,6 +4337,12 @@ export function createPostPipeline(gl) {
       softDepthTarget = null;
       softGlowTarget = null;
       SOFT_DEPTH_SEAT.tSceneDepth.value = SOFT_DEPTH_REST;
+      if (campoTarget) {
+        if (campoTarget.depthTexture) campoTarget.depthTexture.dispose();
+        campoTarget.dispose();
+      }
+      campoTarget = null;
+      restCampo();
       fallbackLut.dispose();
       quad.geometry.dispose();
       for (const material of [prefilter, down, up, lift, probeAf, defocus, sunrays, composite]) {
