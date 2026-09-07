@@ -16,7 +16,7 @@ import { MONOLITHS } from './world/layout.js';
 import {
   DEFAULT_FOV, POSE_SPAWN, POSE_TARGET, POSE_TARGET_TERZA, POSES,
 } from './core/poses.js';
-import { RIG } from './core/avatar.js';
+import { RIG, SWITCH } from './core/avatar.js';
 import { loadLut } from './core/post.js';
 import { createQuality, forgetStored, needsBenchmark } from './core/quality.js';
 import { createBenchmark, tierOf } from './core/bench.js';
@@ -491,6 +491,21 @@ if (dev) {
     camera.fov = p.fov || POSE_TARGET.fov;
     camera.updateProjectionMatrix();
   };
+  // AND THE SWITCH, SLOWED, FOR THE ONE THING A CAMERA CANNOT PHOTOGRAPH.
+  //
+  // The run from one person to the other lasts 0.35 s and a screenshot costs
+  // longer than that, so every attempt to photograph it catches the end. This
+  // stretches the SAME law over as long as it takes to take a picture of it --
+  // the profile, the monotonicity and the arithmetic are untouched, only the
+  // clock is -- so a plate can show the body dissolving while the arm comes out.
+  // It is a bench handle beside window.setDevPose and it lives behind the same
+  // flag: what it must never become is a tuning knob, because the duration is a
+  // decision and guard-avatar reads it from the seat.
+  window.setDevSwitch = (seconds) => {
+    SWITCH.seconds = seconds > 0 ? seconds : 0.35;
+    return SWITCH.seconds;
+  };
+
   input.onKey((code) => {
     if (code === 'KeyP') {
       // THE REFERENCE FRAMING, FROM WHICHEVER SIDE OF IT THE WALKER IS ON. In
