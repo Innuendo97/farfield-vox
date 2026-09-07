@@ -61,6 +61,11 @@ export {
 // pure half may not.
 export { createCampo } from './campo-field.js';
 export { campoBox, campoMaterial } from './campo-material.js';
+// AND THE LIGHT BY PLACE, which is the ground's and is read by everything that
+// stands in it: the flowers and the sprays of ../vegetation.js take the same
+// picture through the same function, so a head cannot stand at open-meadow
+// brightness inside a band the ground has gone dark in.
+export { setZoneMap, zoneGlsl, zoneUniforms } from './campo-material.js';
 export { createMasonry, stoneTile } from './masonry.js';
 
 /**

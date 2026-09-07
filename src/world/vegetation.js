@@ -11,12 +11,31 @@ import {
 } from './terrain-field.js';
 import { MONOLITHS, PLATFORM, STAIRS } from './layout.js';
 import { ROCKS } from './rocks.js';
-import { ALBEDO, voxelSettings } from './voxel/index.js';
+import { ALBEDO, voxelSettings, zoneGlsl, zoneUniforms } from './voxel/index.js';
 import { FAMILY, PIGMENT, pigTint } from './voxel/pigment.js';
 import { columnTop, DISC_RADIUS, EMPTY, mantoAt } from './voxel/worldgen.js';
 import { VOXEL } from './voxel/columns.js';
 import TERRAIN from '../../assets-src/terrain/terrain.json' with { type: 'json' };
 import GRASS from '../../assets-src/vegetation/grass.json' with { type: 'json' };
+
+// HOW THE THREE PROGRAMS OF THIS FILE READ THE GROUND'S OWN ZONE.
+//
+// ONE PICTURE AND ONE FUNCTION, and both come from the seat that owns them
+// (./voxel/campo-material.js): what dims the meadow under a flower is exactly
+// what dims the flower, to the byte, or a dark band has white heads standing in
+// it at open-meadow brightness -- which is what the first cut of U-ZONE-1
+// looked like, and what the reference never shows.
+//
+// READ IN THE VERTEX SHADER, WHICH IS WHERE IT COSTS NOTHING. A zone has no
+// structure under three metres; a flower is eight centimetres and a spray a
+// quarter of a metre, so the whole plant stands in one value of it and a fetch
+// per fragment would be paying for a gradient that cannot exist. These are
+// ESSL1 programs, and three rewrites their texture2D onto the WebGL2 sampler.
+//
+// AND IT MULTIPLIES THE TINT AND NOT THE GLOW. A zone is a factor on the light
+// a surface STANDS IN; the lamp inside a night flower is a source and is not
+// standing in anything. vEmit and vHalo are left exactly where they were.
+const ZONE_GLSL = zoneGlsl('texture2D(tZone, uv)');
 
 // The accents of the meadow: rare sprays of blades, and the loose flowers.
 //
@@ -477,6 +496,7 @@ const VERTEX = /* glsl */`
   // the unpacking — the sky term lives in alpha.
   ${BAKED_TERMS_GLSL}
   ${FOG_GLSL}
+  ${ZONE_GLSL}
 
   void main() {
     vec3 base = aOffset.xyz;
@@ -514,7 +534,7 @@ const VERTEX = /* glsl */`
 
     vec2 cell = vec2(mod(aParams.z, uColumns), floor(aParams.z / uColumns));
     vUv = (cell + uv) * uCellSize;
-    vTint = light * aParams.w;
+    vTint = light * aParams.w * zoneAt(world.xz);
     vFog = fogAmount(length(cameraPosition - world), world.y);
 
     gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
@@ -798,6 +818,7 @@ function ringOffsets(radius, cell) {
   return offsets;
 }
 
+
 function makeMaterial({ atlas, light, lightScale, columns, rows, radius, fade: band }) {
   return new ShaderMaterial({
     uniforms: {
@@ -819,6 +840,10 @@ function makeMaterial({ atlas, light, lightScale, columns, rows, radius, fade: b
       uColumns: { value: columns },
       uCutoff: { value: ALPHA_CUTOFF },
       ...fogUniforms(),
+      // AND THE GROUND'S OWN ZONE, bound by reference to the one picture the
+      // field reads: ./voxel/campo-material.js is the seat, and the delivery
+      // reaches it whichever layer is built first.
+      ...zoneUniforms(),
     },
     vertexShader: VERTEX,
     fragmentShader: FRAGMENT,
@@ -2584,6 +2609,7 @@ function flowerVertex(kind) {
   ${HEAD_LIGHT_GLSL}
   ${BLOOM_GLSL}
   ${FOG_GLSL}
+  ${ZONE_GLSL}
 
   void main() {
     // THE EXCHANGE RING, AND IT IS A HARD EDGE ON PURPOSE: the far family takes
@@ -2706,6 +2732,8 @@ function flowerVertex(kind) {
     // would be a fifth of the glow the committente asked to see -- and the floor
     // of the cup is the bottom a lamp stands on rather than a wall.
     vAlpha = mix(1.0, uPetalAlpha, petal);
+    // THE GROUND'S OWN ZONE, on the tint and not on the lamp: see ZONE_GLSL.
+    vTint *= zoneAt(world.xz);
     vFog = fogAmount(length(cameraPosition - world), world.y);
 
     gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
@@ -2852,6 +2880,7 @@ const FAR_VERTEX = /* glsl */`
   ${HEAD_LIGHT_GLSL}
   ${BLOOM_GLSL}
   ${FOG_GLSL}
+  ${ZONE_GLSL}
 
   void main() {
     float reach = length(aFlower.xz - uCentre);
@@ -2956,7 +2985,7 @@ const FAR_VERTEX = /* glsl */`
     // NO ADDITIVE BLEND AND NO SECOND OPINION ABOUT THE HOUR: the halo above is
     // the SAME uniform the near family reads, times the same alpha, and it is
     // added to the surface rather than drawn as a second pass.
-    vTint = head * aLook.y;
+    vTint = head * aLook.y * zoneAt(aFlower.xz);
     vEmit = halo;
     vFog = fogAmount(length(cameraPosition - aFlower.xyz), aFlower.y);
 
@@ -3052,6 +3081,10 @@ function createFarFlowers({ height, lightScale, pigments, ring, hour }) {
       uReach: { value: FAR_REACH },
       uFade: { value: FAR_FADE },
       ...fogUniforms(),
+      // AND THE GROUND'S OWN ZONE, bound by reference to the one picture the
+      // field reads: ./voxel/campo-material.js is the seat, and the delivery
+      // reaches it whichever layer is built first.
+      ...zoneUniforms(),
     },
     vertexShader: FAR_VERTEX,
     fragmentShader: FAR_FRAGMENT,
@@ -3348,6 +3381,10 @@ function createFlowers({ height, lightScale, pigments, hour }) {
         uCentre: { value: new Vector2() },
         uRadius: ring,
         ...fogUniforms(),
+        // AND THE GROUND'S OWN ZONE, bound by reference to the one picture the
+        // field reads: ./voxel/campo-material.js is the seat, and the delivery
+        // reaches it whichever layer is built first.
+        ...zoneUniforms(),
       },
       vertexShader: flowerVertex(kind),
       fragmentShader: flowerFragment(kind),

@@ -85,6 +85,10 @@ import { SPAWN } from '../layout.js';
  *                  owns, and how deep under its canopy that mat stands
  *   campoombra=0   the sun's own march off, to price it
  *   campodepth=0   gl_FragDepth off, to price the early test it costs
+ *   campozone=0    bind the NEUTRAL zone instead of the delivered map, which
+ *                  is the null arm this term is priced against: one fetch and
+ *                  one multiply, in the field and in the three programs of the
+ *                  vegetation, with everything else in the frame identical
  *   campodebug=2   magenta where a ray ran out without finding anything
  */
 /**
@@ -138,6 +142,7 @@ function asked() {
     campoShadow: query.get('campoombra') !== '0',
     campoDepth: query.get('campodepth') !== '0',
     campoDebug: Number(query.get('campodebug')) || 0,
+    campoZone: query.get('campozone') !== '0',
   };
 }
 
@@ -160,7 +165,7 @@ const layer = {
     // on every material of the ground, and no arithmetic on a cell can produce
     // it, because it is a picture of what a face is MADE OF rather than a field
     // of where the face stands. The field reads the same array by reference.
-    needs: ['path-joint', 'path-tone', 'path-grain', 'soil-sheets'],
+    needs: ['path-joint', 'path-tone', 'path-grain', 'soil-sheets', 'zone-shade'],
 
     /**
      * @param {object} assets  keyed by asset id, plus what the hub knows
@@ -215,6 +220,12 @@ const layer = {
         // where the meadow's law stops is a property of the world.
         radius: PLATEAU,
         sheets: layer.voxel.settings.sheet,
+        // THE LIGHT BY PLACE. One picture of the ground plane, half a metre to
+        // a texel, and the only thing in this world that says where the meadow
+        // is dark: the law of the seats times the residual measured off the
+        // reference (tools/zone/paint-zone.mjs). It is handed in rather than
+        // reached for, like everything else this layer dresses the field with.
+        zone: (wanted.campoZone && assets['zone-shade']) || null,
         depth: wanted.campoDepth,
         // ONE RAY, AND IT IS A MEASUREMENT AND NOT A RETREAT. E-DECISIONI14
         // spends the 1.4 ms that two multisamples free on «il campionamento

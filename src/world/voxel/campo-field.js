@@ -148,6 +148,7 @@ function makeWindow(shape, job) {
  * @param {object} options
  * @param {number} options.radius  how far the PLATEAU reaches, the layer's own
  * @param {object} options.sheets  the delivered strip of grey squares
+ * @param {object} options.zone    the delivered map of the light by place
  * @param {boolean} options.depth  write gl_FragDepth; false prices the early
  *                                 depth test this draw gives up
  * @param {number} options.rays    sub-pixel samples a fragment marches
@@ -155,7 +156,8 @@ function makeWindow(shape, job) {
  *                                 in so this file imports no page machinery
  */
 export function createCampo({
-  radius = DISC_RADIUS, sheets = null, depth = true, rays = 1, worker: makeWorker = null,
+  radius = DISC_RADIUS, sheets = null, zone = null, depth = true, rays = 1,
+  worker: makeWorker = null,
 } = {}) {
   const group = new Group();
   group.name = 'campo';
@@ -165,7 +167,7 @@ export function createCampo({
   const windows = [near, far];
 
   const material = campoMaterial({
-    texture: near.texture, far: far.texture, sheets, depth, rays,
+    texture: near.texture, far: far.texture, sheets, zone, depth, rays,
   });
   // THE RENDERER ARRIVES WITH THE FIRST DRAW AND NOT FROM A LAYER. Nothing in
   // src/world/layers is handed one, and reaching for the page's own would put a

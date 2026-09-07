@@ -96,6 +96,34 @@ import { PIGMENT, pigTint } from './pigment.js';
 export const CAMPO_RUNG = BLADES_PER_VOXEL * SUB;
 
 /**
+ * WHERE THE MAP OF THE LIGHT BY PLACE STANDS, and what one texel of it is.
+ *
+ * The picture itself is baked by tools/zone/paint-zone.mjs and delivered as
+ * `zone-shade`; what lives here is the only thing both ends have to agree on,
+ * which is the frame it is laid in. The painter walks this square texel by
+ * texel and the fragment addresses it with these three numbers, so a map and a
+ * shader that disagreed about where a metre is would be a thing that cannot be
+ * written rather than a thing that has to be caught.
+ *
+ * HALF A METRE TO A TEXEL, which is R1 §1.6's own pitch: the field this carries
+ * has no structure under three metres -- that is what a ZONE is -- so a finer
+ * texel would spend bytes writing down a smoothness.
+ *
+ * AND EIGHTY METRES ON A SIDE, which is the plateau (35 m from the middle of
+ * the walkable world) with room to spare at the rim. Everything past the edge
+ * of this square reads the edge, because the sampler clamps; the painter
+ * refuses a map whose rim is not open meadow, so what the whole boundary of the
+ * world is lit by is exactly one.
+ */
+export const ZONE = { cell: 0.5, side: 160, centre: { x: 0, z: 0 } };
+
+/** Where the corner of that square stands, in metres, and one over its side. */
+export function zoneFrame() {
+  const span = ZONE.side * ZONE.cell;
+  return [ZONE.centre.x - span / 2, ZONE.centre.z - span / 2, 1 / span];
+}
+
+/**
  * How far below y = 0 a ground byte can reach, in VOXELS.
  *
  * A HUNDRED, AND IT IS THE BOUNDARY'S OWN NUMBER AND NOT A ROUND ONE. The basin

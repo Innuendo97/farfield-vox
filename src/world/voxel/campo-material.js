@@ -1,5 +1,6 @@
 import {
-  BackSide, BoxGeometry, GLSL3, Matrix4, Mesh, ShaderMaterial, Vector2, Vector3, Vector4,
+  BackSide, BoxGeometry, DataTexture, GLSL3, LinearFilter, Matrix4, Mesh, RedFormat,
+  ShaderMaterial, Vector2, Vector3, Vector4,
 } from 'three';
 import { SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS } from '../../core/sky.js';
 import { FACE_LIGHT_GLSL, faceLightUniforms } from '../face-light.js';
@@ -12,6 +13,7 @@ import { bladeSettings, earthSettings, voxelSettings } from './material.js';
 import {
   CAMPO, CAMPO_BEARINGS, CAMPO_BIAS, CAMPO_BLADE_CEIL, CAMPO_CUT_GLSL, CAMPO_FAR,
   CAMPO_FAR_SHIFT, CAMPO_LOOK_MAX, CAMPO_LOOK_SHIFT, CAMPO_RUNG, campoCutUniform,
+  zoneFrame,
 } from './campo.js';
 
 /**
@@ -133,6 +135,93 @@ export const CAMPO_WELL = [0.85, 0.50];
 
 const SCRATCH = new Vector2();
 
+// ---------------------------------------------------------------------------
+// THE LIGHT BY PLACE: ONE PICTURE, ONE ARITHMETIC, AND EVERY MATERIAL THAT
+// STANDS ON THIS GROUND READS THE SAME ONE.
+//
+// The map is tools/zone/paint-zone.mjs's -- the law of the world's own seats
+// times the residual measured off the reference -- and it is delivered as
+// `zone-shade`. What lives here is the SEAT: the one line of GLSL that turns a
+// point on the ground into the factor its light is multiplied by, and the one
+// place the delivered texture is bound.
+//
+// WHY IT IS A SEAT AND NOT A TERM IN THIS FILE. The field draws the meadow and
+// the ground it stands on; the flowers and the sprays of ../vegetation.js stand
+// IN that meadow and are drawn by three other programs. A zone that dimmed the
+// grass and left the flowers at full sun would be two different weathers over
+// one square metre -- which is exactly what the first cut of this looked like,
+// with white heads at open-meadow brightness standing inside a band the ground
+// had gone dark in. One picture, one function, one uniform, four programs.
+//
+// IN XZ AND NOT ALONG THE SURFACE, because a zone is a fact about the GROUND
+// and not about a face: the flank of a blade, the top of the column it stands
+// on, the earth of the wall beside it and the head of a flower over it are all
+// standing in the same weather and have to be dimmed by the same number, or the
+// zone reads as a pattern on the geometry instead of as light lying over it.
+//
+// AND OUTSIDE THE SQUARE IT IS ONE. The sampler clamps to its own edge and the
+// painter refuses a map whose rim is not open meadow, so a point four hundred
+// metres out on the boundary reads exactly the value this term is neutral at.
+// There is no branch here, and a branch is what asking would cost.
+
+/**
+ * @param {string} fetch  how this program's dialect reads a sampler. The field
+ *                        is GLSL3 and reads `texture`; the three programs of
+ *                        the vegetation are ESSL1 and read it from a VERTEX
+ *                        shader, where the level has to be named. One
+ *                        arithmetic, two spellings, and neither is a copy.
+ */
+export const zoneGlsl = (fetch = 'texture(tZone, uv)') => /* glsl */`
+  uniform sampler2D tZone;
+  uniform vec3 uZone;
+  float zoneAt(vec2 xz) {
+    vec2 uv = (xz - uZone.xy) * uZone.z;
+    return ${fetch}.r;
+  }
+`;
+
+/**
+ * ONE WHITE TEXEL, for the frames drawn before the map has landed.
+ *
+ * A program built with no zone has to draw the world that shipped before the
+ * zone existed, which is a factor of one everywhere -- not a black meadow, and
+ * not a branch in the fragment either.
+ */
+const ZONE_NEUTRAL = (() => {
+  const texture = new DataTexture(new Uint8Array([255]), 1, 1, RedFormat);
+  texture.magFilter = LinearFilter;
+  texture.minFilter = LinearFilter;
+  texture.generateMipmaps = false;
+  texture.needsUpdate = true;
+  return texture;
+})();
+
+let zoneMap = ZONE_NEUTRAL;
+/** Every uniform waiting on the delivery, so the order of the layers cannot matter. */
+const zoneBound = [];
+
+/** The pair a program reads the zone through. Bound by reference, not copied. */
+export function zoneUniforms() {
+  const tZone = { value: zoneMap };
+  zoneBound.push(tZone);
+  return { tZone, uZone: { value: new Vector3(...zoneFrame()) } };
+}
+
+/**
+ * THE DELIVERY LANDS ONCE, HERE, AND REACHES EVERY PROGRAM THAT ASKED.
+ *
+ * Called by the layer that owns the ground the moment the fetch returns. It is
+ * a seat and not an argument threaded through four constructors because the
+ * vegetation is built by a different layer, in an order this file may not
+ * assume: a program that asked before the delivery is updated, and one that
+ * asks after it is handed what is already there.
+ */
+export function setZoneMap(texture) {
+  if (!texture) return;
+  zoneMap = texture;
+  for (const u of zoneBound) u.value = texture;
+}
+
 /** The eight steps of the sun's march, as the shader is handed them. */
 const SUN_MARCH = SUN_STEPS.map((s) => new Vector3(s.di, s.dj, s.rise));
 
@@ -223,6 +312,8 @@ const FRAGMENT = /* glsl */`
   uniform float uEarthMinStep;
   uniform float uEarthToEye;
 
+
+  ${zoneGlsl()}
   ${SCENE_LIGHT_GLSL}
   ${FACE_LIGHT_GLSL}
   ${PIGMENT_GLSL}
@@ -897,6 +988,29 @@ const FRAGMENT = /* glsl */`
       light = mix(light, faceLightOf(matTerms(leaning, sun, sky, bounce)), arris);
     }
 
+    // ------------------------------------------------- THE LIGHT BY PLACE
+    // AND IT MULTIPLIES ALL THREE TERMS AND NOT THE SUN ALONE, which is the
+    // one decision in this file that had to be measured rather than argued.
+    //
+    // R1 S3 writes the term as a factor on the SUN alone, and R1 S3's own
+    // reading of the reference is a FACTOR OF 0.31 at the low decile of the
+    // luma of its meadow. Those two cannot both be had: measured through the chain, a zone that took the
+    // whole of the sun off a top face still leaves it at 0.55 of open meadow,
+    // because ../face-light.js hands back as ground return a fraction of ONE
+    // MINUS the sky term, and the sky term has not moved. It is the same
+    // arithmetic that stops the well of U-PRATO-2 at 0.505 and it stops a
+    // sun-only zone in the same place -- at nearly twice the factor the
+    // reference shows.
+    //
+    // What a zone IS also says the same thing. A patch of meadow under a slower
+    // sky is not a patch with the sun taken off it and the whole hemisphere
+    // still pouring in: sun, sky and the light the ground beside it returns are
+    // all down together, which is exactly a factor on the light. So the term is
+    // one multiply on the finished light -- after the well, after the aspect,
+    // after the arris, so that every one of those keeps its own SHAPE and only
+    // the level of the place moves.
+    light *= zoneAt(hit.p.xz);
+
     vec3 colour = albedo * light;
     colour = mix(colour, uFogColour, fogAmount(travelled, hit.p.y));
     return vec4(colour, 1.0);
@@ -1059,13 +1173,19 @@ const FRAGMENT = /* glsl */`
  *                                  picture to a sampler that wants an array.
  *                                  Nought builds a neutral one, which is the
  *                                  world that shipped before the grain existed.
+ * @param {object} options.zone     THE MAP OF THE LIGHT BY PLACE, delivered:
+ *                                  tools/zone/paint-zone.mjs bakes it and
+ *                                  assets-src/assets.d/v1-suolo.json ships it.
+ *                                  Nought binds one white texel, which is the
+ *                                  world that shipped before it existed.
  * @param {boolean} options.depth   write gl_FragDepth. False prices what the
  *                                  early depth test on this draw is worth.
  * @param {number} options.rays     sub-pixel samples a fragment marches.
  */
 export function campoMaterial({
-  texture, far = null, sheets = null, depth = true, rays = 1,
+  texture, far = null, sheets = null, zone = null, depth = true, rays = 1,
 } = {}) {
+  setZoneMap(zone);
   const blade = bladeSettings();
   const earth = earthSettings();
   const ground = voxelSettings();
@@ -1257,6 +1377,7 @@ export function campoMaterial({
       uShadeSun: { value: blade.shadeSun },
       uEarthMinStep: { value: EARTH.minStep },
       uEarthToEye: { value: EARTH.toEye ? 1 : 0 },
+      ...zoneUniforms(),
       ...faceLightUniforms(TERRAIN.lightScale * GROUND_EXPOSURE),
       ...SCENE_LIGHT_UNIFORMS,
       ...fogUniforms(),
