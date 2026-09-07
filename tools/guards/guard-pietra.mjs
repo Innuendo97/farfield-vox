@@ -1,5 +1,9 @@
+import { createLooseStone, RUIN_ALBEDO, TURF_ALBEDO } from '../../src/world/loose-stone.js';
+import { FOUNTAIN } from '../../src/world/monoliths.js';
+import { RUINS } from '../../src/world/rock-piles.js';
+import { stoneSpecs } from '../../src/world/stone.js';
 import { stoneTileData } from '../../src/world/voxel/pure.js';
-import { GROUND_BOUNCE, readLight, renderChain } from '../lighting/render-chain.mjs';
+import { GROUND_BOUNCE, MEADOW_ALBEDO, readLight, renderChain } from '../lighting/render-chain.mjs';
 import { sunVector } from '../lighting/sun.mjs';
 import { read, readJson, reporter, selfTest } from './lib.mjs';
 
@@ -64,6 +68,7 @@ const DEG = Math.PI / 180;
 const MASONRY = 'src/world/voxel/masonry.js';
 const ROCKS = 'src/world/rocks.js';
 const COURSES = 'src/world/voxel/courses.js';
+const LOOSE = 'src/world/loose-stone.js';
 
 /** One numeric literal of a source, by the name it is declared under. */
 export function literal(text, name) {
@@ -347,6 +352,85 @@ const BAND = {
   mossShadedFront: [0.0, 5.0],
   mossLitFront: [2.0, 10.0],
   mossWestFlank: [10.0, 30.0],
+
+  // ------------------------------------------------------- THE LOOSE STONE
+  //
+  // The turf on the heads, the squared ruins in the grass and the fountain's
+  // basin: one mesh, and the bands it answers to.
+  //
+  // THE TURF'S LEVEL. The target's cubes on the heads read L* 36 in its own
+  // frame (R5 SS1.6). What is held here is the BARE level, for the reason every
+  // level in this file is bare, and the band is the reading plus and minus six.
+  turfLevel: [30.0, 42.0],
+  // AND THAT IT IS THE MOSS AND NOT THE MEADOW, which is the one thing R5 says
+  // twice about this green: hue 143 to 155 at chroma 7 to 13 is moss, hue 129 at
+  // chroma 27.6 is grass, and a head dressed in grass is a head dressed in the
+  // wrong green. The chroma is what separates them cleanly on the bare face --
+  // the two hues are 15 degrees apart and the air moves hue, where 27.6 against
+  // 13 is a factor of two nothing downstream closes.
+  // AND IT HAS TO BE GREEN AT ALL, which is the other end of the same leg and
+  // the one an upper bound alone leaves open: the wall's own stone, dressed on a
+  // head with the moss tint dropped out of the product, develops at a level
+  // INSIDE the band above and would go straight through. A floor under the
+  // chroma and a hue band around the target's 143 to 155 is what says green
+  // rather than merely says not-grass.
+  turfChroma: [6.0, 20.0],
+  turfHue: [110, 175],
+  // How many cubes the target shows on a head. It gives 4.0% of the band over
+  // the lid of the fifth, 1.4% over the second and three bright pixels on the
+  // first, which at this scale is a handful and not a fringe: four is the floor
+  // and it is a floor rather than a band because the law is a hash and the count
+  // is what the law comes to, not what it was asked for.
+  turfPerHead: 4,
+  // THE RUINS. A metre is the cap the mandate sets and R5 SS1.8 measures the
+  // pale squared blocks at 0.3 to 0.4 m in one or two courses; the tallest
+  // component in the two windows measures 1.27 m on a stack seen at 17 m with a
+  // block's shadow behind it, which is as much shadow as stone.
+  ruinHeight: 1.0,
+  // And they are the pale stone, held to the band the piles are already held to:
+  // the target's lit ruin faces read L* 50.5 at hue 95 (R5 SS1.8).
+  ruinCap: [45.0, 58.0],
+  ruinCapHue: [90, 115],
+  // THE BASIN. 1.61 m across on the target, holding a mirror 1.22 m across
+  // (R5 SS1.10, V2-DEV5's own reading).
+  basin: [1.55, 1.70],
+  // AND WHAT THE WHOLE THING IS ALLOWED TO COST. One draw is what the amendment
+  // to E-V2i bought (nine to ten at the pose) and it buys exactly one: a second
+  // mesh or a second material in this file spends an allocation the coordinator
+  // had to open the ledger for. The triangles are the mandate's own ceiling.
+  looseTriangles: 3000,
+
+  // ------------------------------------------------------------- THE INK
+  //
+  // WHAT IS GATED IS THE COLOUR OF THE STROKE AND NOT ITS WATTAGE, and the
+  // reason is a measurement rather than a preference. R5 SS1.7 reads our core at
+  // luma 124 to 136 against the target's 224 to 228 and asks for it to be
+  // brightened; both sides of that comparison were taken through the campaign's
+  // cyan detector (b > 1.5r + 8), and OUR core does not pass it -- swept on the
+  // frame, five and a half times the gain moves that reading by four levels
+  // while the share of the face the stroke covers goes from 2.8 to 14.6 per
+  // cent. The detector was reading the cyan FRINGE of a white stroke. On a mask
+  // that does not presume the answer the same stroke already stands at luma 197
+  // / 194 / 180 and covers as much of the title as the target's does. So the
+  // level gets a floor, wide, and the leg that BITES is the tint.
+  inkLuma: [190, 240],
+  // The developed blue over red of the core. The delivered material comes to
+  // 1.39 and the triple this world wrote before it came to 1.24; the target
+  // reads 1.73 to 1.90 and the rest of that is not in this file (see the note
+  // at the foot of this guard, and R5 SS5).
+  inkBlueOverRed: 1.35,
+  // And the developed RED, which is the half of the tint a material can be held
+  // to on its own: the target's core stands at 134 to 147 and a stroke redder
+  // than the stone it is cut in is a stroke that comes out white whatever its
+  // blue does. The delivered material develops to 158 and the one before it to
+  // 177.
+  inkRed: 168,
+  // AND THE PIGMENT ITSELF HAS TO BE BLUE, which is a separate leg from the
+  // three above for exactly the reason pigmentGrey is separate from the
+  // developed colour: what the tone curve and the grade do to a bright stroke is
+  // the seat's and has already changed once. Blue over red of INK_CORE:
+  // delivered 28.6, and the triple before it 4.5.
+  inkPigmentBlue: 10.0,
 };
 
 // --------------------------------------------------------------- the running
@@ -391,6 +475,21 @@ const law = {
 const WEIGHT_UNIFORMS = ['uMossFoot', 'uMossFootRise', 'uMossHead', 'uMossEdgeGain',
   'uMossReach', 'uMossShade', 'uMossWest', 'uMossWest0', 'uMossWest1', 'uMossWestRise'];
 
+/**
+ * Whether the loose stone is still one mesh and one material.
+ *
+ * COUNTED IN THE SOURCE AND NOT IN THE SCENE, because what the amendment to
+ * E-V2i bought is a DRAW and a draw is one mesh with one material submitted
+ * once. Cutting the mesh here and counting objects would say nothing: three
+ * meshes hung off the same layer are still three calls, and the object this
+ * guard builds would report one of them.
+ */
+export function oneMeshOneMaterial(text) {
+  const meshes = (text.match(/new Mesh\(/g) || []).length;
+  const materials = (text.match(/new ShaderMaterial\(/g) || []).length;
+  return meshes === 1 && materials === 1;
+}
+
 /** Whether the fragment's weight still names every term this file walks. */
 export function weightNamesEveryTerm(text, names) {
   const at = text.indexOf('float west = ');
@@ -400,6 +499,45 @@ export function weightNamesEveryTerm(text, names) {
 }
 
 const heads = Object.fromEntries(Object.entries(spec.heads.perBlock).map(([k, v]) => [k, v.builtHead]));
+
+// ---------------------------------------------------- THE LOOSE STONE, CUT
+//
+// Cut here rather than described: src/world/loose-stone.js is arithmetic and
+// three.js buffers, and neither needs a browser, so this guard can ask the mesh
+// itself how many cubes it laid on which head and how many triangles that came
+// to instead of reading a law out of a source and hoping the law is what runs.
+// It is the same property that lets tools/guards/guard-avvolgimento.mjs cut a
+// rock pile to look at its winding.
+const specs = stoneSpecs(spec);
+const loose = createLooseStone(specs);
+
+/** How many turf cubes stand on one head, counted off the mesh's own vertices. */
+export function turfPerHead(specs2, built) {
+  const position = built.mesh.geometry.attributes.position.array;
+  const counts = {};
+  // The turf is the only family laid ABOVE a block, so a cube whose foot is at
+  // the height of a head and inside that head's footprint belongs to it. The
+  // ruins and the basin stand on the meadow, metres below every lid.
+  for (const block of specs2) {
+    const m = block.masonry;
+    if (!m || !m.head) continue;
+    const low = block.baseY + Math.min(...m.head.map((r) => r.courses)) * m.rise - 0.01;
+    const reach = Math.max(block.size[0], block.size[2]) / 2 + 0.2;
+    const seen = new Set();
+    for (let i = 0; i < position.length; i += 3) {
+      const x = position[i]; const y = position[i + 1]; const z = position[i + 2];
+      if (y < low) continue;
+      if (Math.hypot(x - block.position.x, z - block.position.z) > reach) continue;
+      seen.add(`${x.toFixed(3)}|${z.toFixed(3)}`);
+    }
+    // Four corners of one cube share a column, and a cube is five faces: what a
+    // column of x and z is worth is one cube, so the corners are what is counted
+    // and divided by the four a cube shows.
+    counts[block.id] = Math.round(seen.size / 4);
+  }
+  return counts;
+}
+
 
 if (process.argv.includes('--self')) {
   const tile = stoneTileData(512);
@@ -472,13 +610,92 @@ if (process.argv.includes('--self')) {
       caught: !weightNamesEveryTerm(masonry, [...WEIGHT_UNIFORMS, 'uMossNobodyWrote']),
     },
     {
+      // ------------------------------------------------- THE LOOSE STONE
+      //
+      // A HEAD DRESSED IN THE MEADOW'S GREEN instead of in the moss. R5 SS1.6
+      // says outright which green the target's cubes are -- hue 143 to 155 at
+      // chroma 7 to 13, "il verde del muschio, non quello del prato (h 129,
+      // C* 27,6)" -- so the injection is the grass this world actually plants,
+      // read out of the same census tools/lighting/render-chain.mjs takes the
+      // meadow's own pigment from.
+      what: 'a turf cut in the green of the meadow instead of the green of the moss is caught',
+      caught: (() => {
+        const c = lch(composite(bareFace([0, 1, 0], light, MEADOW_ALBEDO, material.scale,
+          material.skyShare)));
+        return c.C > BAND.turfChroma[1] || c.L < BAND.turfLevel[0] || c.L > BAND.turfLevel[1];
+      })(),
+    },
+    {
+      // And the other way a turf goes wrong: dressed in the stone it stands on,
+      // which is what a head gets if the moss tint is dropped from the product.
+      what: 'and a turf cut in the stone of the wall, with no moss in it, is caught by the level',
+      caught: (() => {
+        const c = lch(composite(bareFace([0, 1, 0], light, material.albedo, material.scale,
+          material.skyShare)));
+        return c.L > BAND.turfLevel[1] || c.C < BAND.turfChroma[0]
+          || c.h < BAND.turfHue[0] || c.h > BAND.turfHue[1];
+      })(),
+    },
+    {
+      what: 'a ruin built as tall as the bounding box the target boxes one in is caught',
+      caught: 1.27 > BAND.ruinHeight,
+    },
+    {
+      // A basin narrower than the water in it is the one defect of this piece
+      // that no picture is needed to see, and the reason the two diameters are
+      // read from one place.
+      what: 'a basin narrower than its own pool is caught',
+      caught: !(FOUNTAIN && 1.10 > FOUNTAIN.poolDiameter),
+    },
+    {
+      what: 'the loose stone cut as three meshes -- three draws for the price of one -- is caught',
+      caught: !oneMeshOneMaterial('new Mesh( new Mesh( new Mesh( new ShaderMaterial('),
+    },
+    {
+      what: 'and cut as one mesh with a material for each family, which is three draws as well',
+      caught: !oneMeshOneMaterial('new Mesh( new ShaderMaterial( new ShaderMaterial('),
+    },
+    {
+      // THE INK, AND THE TRIPLE THIS WORLD WROTE BEFORE THIS UNIT. Red 0.44
+      // develops to 177 against the target's 134 and to a blue over red of 1.24
+      // against 1.90: the white writing, in one number. It is the injection that
+      // says the new leg bites rather than accommodates, because the level of
+      // that same stroke -- luma 202 -- goes through the level leg untouched.
+      what: 'the whitish ink this world wrote before is caught by the tint and not by the level',
+      caught: (() => {
+        const stone = bareFace(front.normal, light, material.albedo, material.scale,
+          material.skyShare);
+        const c = composite(stone.map((v, i) => v + [0.44, 1.60, 2.00][i] * 0.78));
+        const lum = 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+        return (c[2] / c[0] < BAND.inkBlueOverRed || c[0] > BAND.inkRed)
+          && lum >= BAND.inkLuma[0] && lum <= BAND.inkLuma[1];
+      })(),
+    },
+    {
+      // AND THE ANSWER THE RESEARCH ASKED FOR, which this unit did not give and
+      // has to show is caught rather than merely declined: five and a half times
+      // the gain, which on the frame moved the cyan reading by four levels and
+      // made the white part of the stroke five times wider.
+      what: 'brightening the same white stroke instead of colouring it is caught too',
+      caught: (() => {
+        const stone = bareFace(front.normal, light, material.albedo, material.scale,
+          material.skyShare);
+        const c = composite(stone.map((v, i) => v + [0.44, 1.60, 2.00][i] * 4.4));
+        return c[2] / c[0] < BAND.inkBlueOverRed || c[0] > BAND.inkRed;
+      })(),
+    },
+    {
       what: 'the delivered material passes every one of those',
       caught: material.rim === 0 && material.f0 === 0
         && material.mossTint.every((v) => v < 1)
         && mottleSpread(composite, light, front.normal, material, material.tint, material.gain, tile) <= BAND.mottle
         && tileFeatureMetres(tile, 1.6) <= BAND.tileFeature
         && weightNamesEveryTerm(masonry, WEIGHT_UNIFORMS)
-        && greyness(material.albedo) <= BAND.pigmentGrey,
+        && greyness(material.albedo) <= BAND.pigmentGrey
+        && loose.triangles <= BAND.looseTriangles
+        && oneMeshOneMaterial(read(LOOSE))
+        && RUINS.every((r) => r.height <= BAND.ruinHeight)
+        && triple(masonry, 'INK_CORE')[2] / triple(masonry, 'INK_CORE')[0] >= BAND.inkPigmentBlue,
     },
   ]);
 }
@@ -602,6 +819,97 @@ report.check(cap.h >= 40 && cap.h <= 130,
   'and its lit cap develops warm, not blue',
   `hue ${cap.h.toFixed(0)} against the target's ${spec.palette.rocks.litFaces.h}`);
 
+// --------------------------------------------------------- THE LOOSE STONE
+report.line('');
+report.line(`  the loose stone   ${loose.cubes} cubes, ${loose.triangles} triangles, `
+  + `one mesh and one material  (turf ${loose.counts.turf} / ruins ${loose.counts.ruins} `
+  + `/ basin ${loose.counts.basin})`);
+
+// (a) THE TURF ON THE HEADS. Two legs, and they are two because a green that is
+// the right level and the wrong green is exactly what the target rules out.
+const turf = turfPerHead(specs, loose);
+const heavy = Object.entries(turf).filter(([id]) => ['01', '02', '05'].includes(id));
+const turfColour = lch(composite(bareFace([0, 1, 0], light, TURF_ALBEDO, material.scale, material.skyShare)));
+report.line(`  heads             ${Object.entries(turf).map(([id, n]) => `${id}:${n}`).join('  ')}`
+  + `   pigment [${TURF_ALBEDO.map((v) => v.toFixed(3))}] -> L* ${turfColour.L.toFixed(1)} `
+  + `C* ${turfColour.C.toFixed(1)} h ${turfColour.h.toFixed(0)}`);
+report.check(heavy.every(([, n]) => n >= BAND.turfPerHead),
+  'the heads the target dresses in turf are dressed in it',
+  `${heavy.map(([id, n]) => `${id}:${n}`).join(', ')} cubes against ${BAND.turfPerHead} each`);
+report.check(turfColour.L >= BAND.turfLevel[0] && turfColour.L <= BAND.turfLevel[1]
+  && turfColour.C >= BAND.turfChroma[0] && turfColour.C <= BAND.turfChroma[1]
+  && turfColour.h >= BAND.turfHue[0] && turfColour.h <= BAND.turfHue[1],
+  'and it is the MOSS of the target and not the grass of its meadow',
+  `L* ${turfColour.L.toFixed(1)} in ${BAND.turfLevel.join(' to ')}, chroma `
+  + `${turfColour.C.toFixed(1)} in ${BAND.turfChroma.join(' to ')}, hue ${turfColour.h.toFixed(0)} `
+  + `in ${BAND.turfHue.join(' to ')}: the target reads L* 36 C* 7.4 h 145 on the head of 05 `
+  + 'and calls the meadow beside it C* 27.6 at h 129');
+
+// (b) THE RUINS. Squared, pale, and under the metre the mandate caps them at.
+const tallest = Math.max(...RUINS.map((r) => r.height));
+const ruinCap = lch(composite(bareFace([0, 1, 0], light, RUIN_ALBEDO, material.scale, rock.skyShare)));
+report.line(`  ruins             ${RUINS.length} pieces, tallest ${tallest.toFixed(2)} m, `
+  + `pigment [${RUIN_ALBEDO}] -> L* ${ruinCap.L.toFixed(1)} h ${ruinCap.h.toFixed(0)}`);
+report.check(tallest <= BAND.ruinHeight,
+  'no ruin stands taller than the metre the reading allows one',
+  `${tallest.toFixed(2)} m against ${BAND.ruinHeight}, where the target's own tallest `
+  + 'component in these windows boxes at 1.27 m with the shadow of a block inside the box');
+report.check(ruinCap.L >= BAND.ruinCap[0] && ruinCap.L <= BAND.ruinCap[1]
+  && ruinCap.h >= BAND.ruinCapHue[0] && ruinCap.h <= BAND.ruinCapHue[1],
+  'the ruins are the pale stone of the rocks and not the grey of the wall',
+  `L* ${ruinCap.L.toFixed(1)} at hue ${ruinCap.h.toFixed(0)}, against the target's `
+  + `${spec.palette.rocks.litFaces.L} at ${spec.palette.rocks.litFaces.h}`);
+report.check(RUIN_ALBEDO === rock.albedo || RUIN_ALBEDO.every((v, i) => v === rock.albedo[i]),
+  'and it is the SAME triple and not a second copy of it',
+  `[${RUIN_ALBEDO}] read from src/world/rocks.js`);
+
+// (c) THE BASIN. It has to be wider than the water it holds, which is the one
+// thing about a basin that cannot be a matter of taste.
+if (FOUNTAIN) {
+  report.line(`  the basin         ${FOUNTAIN.basinDiameter.toFixed(2)} m over a pool of `
+    + `${FOUNTAIN.poolDiameter.toFixed(2)} m, at (${FOUNTAIN.x.toFixed(2)}, ${FOUNTAIN.z.toFixed(2)})`);
+  report.check(FOUNTAIN.basinDiameter >= BAND.basin[0] && FOUNTAIN.basinDiameter <= BAND.basin[1]
+    && FOUNTAIN.poolDiameter < FOUNTAIN.basinDiameter,
+    'the fountain stands in a basin of the size the target draws, wider than its own water',
+    `${FOUNTAIN.basinDiameter.toFixed(2)} m in ${BAND.basin.join(' to ')} over `
+    + `${FOUNTAIN.poolDiameter.toFixed(2)} m of water`);
+}
+
+// (d) WHAT IT COSTS. The amendment to E-V2i bought ONE draw at the pose, and
+// one mesh with one material is what one draw is.
+report.check(loose.triangles <= BAND.looseTriangles,
+  'and the whole of it is inside the triangle budget the mandate set',
+  `${loose.triangles} against ${BAND.looseTriangles}`);
+report.check(oneMeshOneMaterial(read(LOOSE)),
+  'the loose stone is ONE mesh and ONE material, which is what the amended draw bought',
+  'src/world/loose-stone.js builds new Mesh once and new ShaderMaterial once');
+
+// ---------------------------------------------------------------- THE INK
+report.line('');
+const inkCore = triple(masonry, 'INK_CORE');
+const inkGain = literal(masonry, 'INK_GAIN');
+const inkOn = (n) => {
+  const stone = bareFace(n, light, material.albedo, material.scale, material.skyShare);
+  return composite(stone.map((v, i) => v + inkCore[i] * inkGain));
+};
+const ink01 = inkOn(front.normal);
+const inkLuma = 0.299 * ink01[0] + 0.587 * ink01[1] + 0.114 * ink01[2];
+const inkBR = ink01[2] / ink01[0];
+report.line(`  the ink           core [${inkCore}] x ${inkGain} -> `
+  + `${ink01.map((v) => Math.round(v)).join('/')}   luma ${inkLuma.toFixed(0)}  B/R ${inkBR.toFixed(2)}`);
+report.line(`  the target's                                        134/248/254   luma 224  B/R 1.90`);
+report.check(inkLuma >= BAND.inkLuma[0] && inkLuma <= BAND.inkLuma[1],
+  'the writing burns at the level the target writes at',
+  `${inkLuma.toFixed(0)} in ${BAND.inkLuma.join(' to ')}, against the target's 224 to 228`);
+report.check(inkBR >= BAND.inkBlueOverRed && ink01[0] <= BAND.inkRed,
+  'and it is CYAN and not white, which is the half of it a material owns',
+  `blue over red ${inkBR.toFixed(2)} at or over ${BAND.inkBlueOverRed}, red `
+  + `${Math.round(ink01[0])} at or under ${BAND.inkRed}, where the target reads 1.90 and 134`);
+report.check(inkCore[2] / inkCore[0] >= BAND.inkPigmentBlue,
+  'and the pigment under it is blue, which the developed colour alone cannot say',
+  `${(inkCore[2] / inkCore[0]).toFixed(1)} between blue and red of INK_CORE, `
+  + `against ${BAND.inkPigmentBlue}`);
+
 report.line('');
 if (Math.abs(density - 0.0059) > 1e-9) {
   report.note(`the air of this tree is ${density} where the trunk fits 0.0059. Every level above is `
@@ -626,6 +934,11 @@ report.note('same reading, same owner, on the LIT faces: bare they develop warm 
 report.note('the target is not consistent with one sun (masonry-spec.json, palette.why): 04-front '
   + 'and 05-front both look south-west and the target has one at 19.1 and the other at 26.3, so '
   + 'two faces miss by ten levels whatever the pigment is');
+report.note('the ink reaches 1.39 of blue over red where the target reads 1.90, and the remaining '
+  + 'third is not in this material: fitted offline through the delivered chain, the best any triple '
+  + 'can do here is 1.38 -- at a red of 0.02, a stroke with no red in it at all -- because what sets '
+  + 'the final hue is the stone the stroke is added TO and the 32-cube grade that follows it. '
+  + 'R5 SS5 says the same and names the same owner. Owner: E-LUCE / D5');
 report.note('the readings that need a browser -- the course under autocorrelation, the moss a '
   + 'detector can see, the block period on 03 -- belong to the session gate; what is above is '
   + 'what that gate is read against');
