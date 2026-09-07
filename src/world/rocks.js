@@ -127,7 +127,13 @@ const ROCK_TILE_METRES = 0.55;
 // the same cluster read L* 12.8, near black, and no pigment brings ours below
 // about 26 while the vertical faces of this world receive the sky and the
 // meadow's bounce that they do (R5 SS3, S6, and D5's list).
-const ROCK_ALBEDO = [0.50, 0.47, 0.38];
+// EXPORTED, and for the reason every triple in this campaign that has two
+// readers is exported: src/world/loose-stone.js cuts the squared ruins in the
+// grass out of THIS stone -- R5 SS7 says they are the same pale stone -- and a
+// second copy of these three numbers is a second opinion about what the pale
+// stone of this world looks like, which is the defect the fit above was written
+// to close.
+export const ROCK_ALBEDO = [0.50, 0.47, 0.38];
 
 // AND HOW MUCH OF THE SKY A ROCK TAKES, which is the wall's own bend at a
 // different number for a shape that is not a wall.

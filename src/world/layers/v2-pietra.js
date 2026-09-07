@@ -1,4 +1,5 @@
 import { Group } from 'three';
+import { createLooseStone } from '../loose-stone.js';
 import { createMonoliths } from '../monoliths.js';
 import { createRocks } from '../rocks.js';
 import { createMasonry, runInWorker, stoneTile } from '../voxel/index.js';
@@ -53,6 +54,7 @@ const layer = {
   monoliths: null,
   stone: null,
   rocks: null,
+  loose: null,
   worker: null,
 
   /** Every wall that has landed, by the id of the piece it belongs to. */
@@ -77,6 +79,17 @@ const layer = {
 
       const pieces = [...stoneSpecs(MASONRY_SPEC), ...stairSpecs(MASONRY_SPEC)];
       const engraved = new Set(stoneSpecs(MASONRY_SPEC).map((s) => s.id));
+
+      // AND THE LOOSE STONE, which is arithmetic like the rest and so stands in
+      // the first walkable frame beside them. It is cut on THIS thread and not
+      // in the worker, and the reason is its size: two hundred and some cubes is
+      // under a millisecond of one task, where posting it would cost a message
+      // and a second geometry upload for a mesh smaller than any one wall.
+      //
+      // It reads the specs the worker is being handed, so the turf on a head is
+      // laid over the head the worker is about to cut -- one description of what
+      // a head is, cut twice.
+      layer.loose = createLooseStone(stoneSpecs(MASONRY_SPEC));
       let tile = null;
       // The disc is not asked for: the meadow is V1's and does not come from
       // here, and a worker that cut it anyway would spend tens of milliseconds
@@ -108,7 +121,8 @@ const layer = {
       // and the gate's budget is counted off them by object identity rather
       // than off a pattern of names — a second, hand-written rule for what
       // belongs to V2 is how seven meshes went uncounted once already.
-      layer.meshes = [layer.stone, ...layer.rocks.meshes, ...layer.monoliths.meshes];
+      layer.meshes = [layer.stone, ...layer.rocks.meshes, ...layer.monoliths.meshes,
+        layer.loose.mesh];
       return layer.monoliths;
     },
   },
@@ -134,6 +148,11 @@ const layer = {
   /** What the rocks are costing, for the development panel. */
   get rockTriangles() {
     return layer.rocks ? layer.rocks.triangles : 0;
+  },
+
+  /** And what the loose stone is costing, counted the same way. */
+  get looseTriangles() {
+    return layer.loose ? layer.loose.triangles : 0;
   },
 
   /** What the built stone is costing, for the development panel and the gate. */

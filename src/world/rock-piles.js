@@ -156,18 +156,90 @@ export const ROCK_PILES = PLAN.rocks.map((rock) => ({
   seed: rock.seed,
 }));
 
+// ---------------------------------------------------------------- THE RUINS
+//
+// SQUARED PALE BLOCKS, WHERE THE TARGET PUTS THEM AND THIS WORLD PUTS NOTHING.
+//
+// The piles above are the target's SASSI: rounded scree on the world's lattice,
+// traced through the reference camera, and R5 SS1.8 finds ours at the size the
+// target's are. What it also finds, and what nothing in this world answers, is
+// a second family in the same grass -- "blocchi squadrati pallidi ... la stessa
+// pietra della scalinata", stepped stacks of dressed cubes rather than scree,
+// beyond the fifth block and to the left of the first.
+//
+// WHERE THEY STAND IS MEASURED AND NOT PLACED. The detector of R5 SS1.1 (grey =
+// saturation under 0.30, luma 25 to 190, not blue) was run over the day target
+// and over this branch's own frame at the fitted pose in the two windows the
+// research names, and every component of 150 px or more was carried back onto
+// the meadow through the reference camera -- the ray against the ground the
+// contract delivers, not against the plane y = 0, which is a different answer
+// wherever the meadow is not flat. What is listed below is the components the
+// TARGET has and this branch's frame does not: everything within a rock's own
+// radius plus half a metre was struck out as a pile we already draw.
+//
+//   foot px        world           w x h target      what our frame has there
+//   (1524, 800)    ( 4.79, 6.48)   1.09 x 0.66 m     grass; our se-big is 1.37 m west
+//   (  78, 716)    (-7.18, 2.98)   1.26 x 0.85 m     grass; the nearest rock is 4.9 m off
+//   ( 266, 758)    (-4.12, 5.22)   0.57 x 0.30 m     grass
+//   ( 145, 894)    (-2.79, 8.80)   0.18 x 0.31 m     grass
+//   (1243, 903)    ( 2.27, 8.78)   0.12 x 0.08 m     grass
+//
+// AND THE HEIGHT IS CAPPED AT A METRE, which is the one number here that is a
+// ruling rather than a reading: the tallest component the target gives in these
+// windows measures 1.27 m on a stack seen at 17 m with the first block's shadow
+// behind it, where a bounding box is as much shadow as stone. The mandate that
+// carries this work says a metre and the tallest below is 0.85.
+//
+// THEY ARE A PLAN AND NOT A MESH. This file is the arithmetic half -- nothing
+// here reaches a browser -- so what it holds is where the stones are and how
+// big; src/world/loose-stone.js cuts them, in the one mesh that also carries
+// the turf on the heads and the fountain's basin.
+// AND THE HEIGHT IS THE COMPONENT'S OWN, ROUNDED TO WHOLE COURSES, which is
+// the one thing about a ruin this file will not round UP. It was tried the
+// other way -- the two large pieces written half a metre over their box,
+// because the grass of this world stands taller than the target's and was
+// burying them -- and what that measured, at the pose, was a WALL: a stack whose
+// top stands only half a metre under the eye at nine metres is a stack the
+// camera sees edge on, and every lid the target draws goes to two pixels. The
+// grass that hides the foot belongs to the meadow's session; making a stone
+// taller than the picture's to climb out of it is drawing the wrong thing twice.
+export const RUINS = [
+  { name: 'rovina-se', x: 4.79, z: 6.48, width: 1.09, depth: 0.76, height: 0.66, seed: 101 },
+  { name: 'rovina-so', x: -7.18, z: 2.98, width: 1.26, depth: 0.86, height: 0.85, seed: 103 },
+  { name: 'rovina-s', x: -4.12, z: 5.22, width: 0.57, depth: 0.44, height: 0.40, seed: 107 },
+  { name: 'rovina-s2', x: -2.79, z: 8.80, width: 0.24, depth: 0.24, height: 0.32, seed: 109 },
+  { name: 'rovina-e', x: 2.27, z: 8.78, width: 0.24, depth: 0.24, height: 0.20, seed: 113 },
+];
+
 /** The ones solid enough that walking through them would be a hole in the world. */
-export const ROCK_BLOCKERS = ROCK_PILES
-  .filter((rock) => rock.radius >= 0.45)
-  .map((rock) => ({
-    x: rock.x,
-    z: rock.z,
-    // A square inside the round: a blocker is a box, and one that reached the
-    // full radius would stop the walker in the air beside the stone.
-    halfWidth: rock.radius * 0.72,
-    halfDepth: rock.radius * 0.72,
-    rotationY: 0,
-  }));
+export const ROCK_BLOCKERS = [
+  ...ROCK_PILES
+    .filter((rock) => rock.radius >= 0.45)
+    .map((rock) => ({
+      x: rock.x,
+      z: rock.z,
+      // A square inside the round: a blocker is a box, and one that reached the
+      // full radius would stop the walker in the air beside the stone.
+      halfWidth: rock.radius * 0.72,
+      halfDepth: rock.radius * 0.72,
+      rotationY: 0,
+    })),
+  // AND THE RUINS BLOCK TOO, on the same rule and by the same reasoning. A
+  // squared stack of stone two thirds of a metre tall that the walker strolls
+  // through is the hole in the world this list exists to close; the ones under
+  // the threshold are things you step over and are left out, exactly as the
+  // scree under 0.45 m is. The box is the piece's own footprint rather than a
+  // square inside a circle, because a ruin IS a box.
+  ...RUINS
+    .filter((ruin) => ruin.height >= 0.45)
+    .map((ruin) => ({
+      x: ruin.x,
+      z: ruin.z,
+      halfWidth: ruin.width / 2,
+      halfDepth: ruin.depth / 2,
+      rotationY: 0,
+    })),
+];
 
 /**
  * Where a pile's foot is, in metres.

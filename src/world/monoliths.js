@@ -333,6 +333,42 @@ const ORB_LEFT = 0.40;
 const ORB_GAIN = 0.86;
 const POOL_GAIN = 0.62;
 
+// AND THE BASIN OF PALE STONE THE WHOLE THING STANDS IN, which is a thing this
+// file does not draw and has to say where anyway.
+//
+// The target holds the water inside a ring of dressed stone 1.61 m across
+// (R5 SS1.10, on the same reading the globe's own metres came off). That ring is
+// stone, so it belongs to the loose stone -- src/world/loose-stone.js cuts it
+// there, in the one mesh that also carries the turf on the heads -- and it is a
+// CIRCLE ROUND THE POOL, so where it goes cannot be a second opinion about
+// where the pool is. What is exported below is the one answer: the foot both of
+// them stand on and the two diameters, derived here where the three constants
+// above already live.
+const BASIN_DIAMETER = 1.61;
+
+/**
+ * The foot of the fountain of the fifth, and the two circles that stand on it.
+ *
+ * Null if the fifth is not in the plan, which is the same guard createMonoliths
+ * takes below: this hub's blocks are read from a layout file and a file that
+ * assumed one of them exists is a file that breaks the day somebody drops one.
+ */
+export const FOUNTAIN = (() => {
+  const spec = MONOLITHS.find((block) => block.id === '05');
+  if (!spec) return null;
+  const angle = spec.rotationY * DEG;
+  const front = { x: Math.sin(angle), z: Math.cos(angle) };
+  const right = { x: Math.cos(angle), z: -Math.sin(angle) };
+  const reach = spec.size[2] / 2 + MARKER_STANDOFF + ORB_FORWARD;
+  return {
+    x: spec.position.x + front.x * reach - right.x * ORB_LEFT,
+    z: spec.position.z + front.z * reach - right.z * ORB_LEFT,
+    poolDiameter: POOL_DIAMETER,
+    basinDiameter: BASIN_DIAMETER,
+    orbHeight: ORB_HEIGHT,
+  };
+})();
+
 /**
  * What hangs in front of the six blocks, and the seat their stone reports to.
  *
@@ -392,16 +428,12 @@ export function createMonoliths() {
   // the globe. The ground contract is the only answer that is right in both
   // worlds: when the meadow is cut down to what the target shows, the globe
   // goes down with it and lands where the picture puts it.
-  const target = placed.get('05');
-  if (target) {
-    const { spec, centre, angle } = target;
-    const front = new Vector3(Math.sin(angle), 0, Math.cos(angle));
-    const right = new Vector3(Math.cos(angle), 0, -Math.sin(angle));
-    const reach = spec.size[2] / 2 + MARKER_STANDOFF + ORB_FORWARD;
-    const foot = {
-      x: centre.x + front.x * reach - right.x * ORB_LEFT,
-      z: centre.z + front.z * reach - right.z * ORB_LEFT,
-    };
+  // AND WHERE IT STANDS IS ASKED OF FOUNTAIN ABOVE rather than worked out again
+  // here, because the basin of stone that holds this pool is cut in another file
+  // off the same answer, and a fountain whose water and whose rim are computed
+  // twice is a fountain that comes apart the day either sum is edited.
+  const foot = FOUNTAIN;
+  if (foot) {
     const ground = groundHeightAt(foot.x, foot.z);
     quads.push({
       centre: new Vector3(foot.x, ground + ORB_HEIGHT, foot.z),
