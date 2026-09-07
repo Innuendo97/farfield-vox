@@ -4,7 +4,7 @@ import {
 } from 'three';
 import SKY from '../../assets-src/sky/sky.json' with { type: 'json' };
 import SCENE_LIGHT from '../../assets-src/sky/scene-light.json' with { type: 'json' };
-import { rampBend } from './sky-ramp.js';
+import { rampBend, rampTint } from './sky-ramp.js';
 
 // The sky, and everything the scene takes from it.
 //
@@ -173,8 +173,39 @@ export function setSkyPreset(preset) {
   SKY_UNIFORMS.uSunDisc.value.set(
     preset.disc.radiusDeg, preset.disc.softDeg, preset.disc.level,
   );
+  // AND THE ONE COLOUR OUTSIDE THIS BLOCK THAT IS STILL THE PRESET'S. Written
+  // here because this is the door, and derived rather than written down because
+  // a distance that kept its own blue would go on being noon after the preset
+  // had moved. See AIR_NEAR below for what it is and why it is read at twenty
+  // degrees.
+  AIR_NEAR.set(...rampTint(ramp, Math.sin(AIR_NEAR_ELEVATION * DEG), rampBend(ramp))
+    .map((v, c) => v * preset.exposure[c]));
   return SKY_UNIFORMS;
 }
+
+const DEG = Math.PI / 180;
+
+// THE BLUE THE DISTANCE FIRST GOES OUT INTO, AND IT IS THE RAMP ITSELF.
+//
+// R6 §2.3 read the reference's own air on seven planes of hill and found two
+// things a single colour cannot say: the chroma of the veil passes through a
+// MAXIMUM (17 near, 30 at the middle crest, 19 at the far pale hills), and the
+// far end is PALER THAN THE SKY (L* 77 against 67 at eight degrees). So the
+// colour a surface goes out into is not one colour: it starts as the in-scatter
+// of the low sky, which is blue, and it ends as a pale veil. src/world/air.js
+// carries the far end and the turn; this is the near end.
+//
+// TWENTY DEGREES IS NOT A ROUND NUMBER. It is where R4 §1.8 read the reference's
+// own sky against ours band by band, and it is high enough to be clear of the
+// horizon glow and low enough to be the sky a hill at four hundred metres is
+// seen against.
+//
+// AND IT IS DERIVED AND NOT WRITTEN DOWN, which is the whole point of putting it
+// here: the day and the night hand this door two different ramps, and the air
+// each of them fades into is each ramp's own. A constant here would be a
+// distance that stayed at noon.
+export const AIR_NEAR_ELEVATION = 20;
+export const AIR_NEAR = new Vector3();
 
 setSkyPreset(DAY);
 

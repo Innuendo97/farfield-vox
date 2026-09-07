@@ -1012,7 +1012,7 @@ const FRAGMENT = /* glsl */`
     light *= zoneAt(hit.p.xz);
 
     vec3 colour = albedo * light;
-    colour = mix(colour, uFogColour, fogAmount(travelled, hit.p.y));
+    colour = throughAir(colour, travelled, hit.p.y);
     return vec4(colour, 1.0);
   }
 

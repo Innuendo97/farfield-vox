@@ -1076,7 +1076,7 @@ const FRAGMENT = /* glsl */`
 
     colour += mix(uInkHalo, uInkCore, cut.r) * cut.r * uInk;
 
-    colour = mix(colour, uFogColour, fogAmount(vDistance, vWorld.y));
+    colour = throughAir(colour, vDistance, vWorld.y);
     gl_FragColor = vec4(colour, 1.0);
   }
 `;

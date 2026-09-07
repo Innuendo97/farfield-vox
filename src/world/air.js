@@ -1,5 +1,5 @@
-import { ShaderMaterial, Vector3 } from 'three';
-import { HEIGHT_FOG, SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS } from '../core/sky.js';
+import { ShaderMaterial, Vector2, Vector3 } from 'three';
+import { AIR_NEAR, HEIGHT_FOG, SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS } from '../core/sky.js';
 
 // THE SEAT OF THE AIR, and of the surface that stands in it.
 //
@@ -72,6 +72,43 @@ import { HEIGHT_FOG, SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS } from '../core/sky.
 // on is the one the targets are emphatic about.
 export const FOG_RADIANCE = [0.0648, 0.3903, 0.8946];
 
+// THE CEILING ON THE LOW HAZE, and it is the one number of the old air that had
+// to move.
+//
+// E-LUCE2 fitted the haze on four windows of the reference's meadow, the
+// furthest at sixty metres, where it comes to 0.11. Beyond that it was an
+// extrapolation and it saturated at three hundred metres: a grey term at one,
+// on everything. The reference does not do that — at four hundred metres it
+// veils red by a quarter and blue by nearly two thirds — so the grey stops, and
+// it stops at 0.13, which is what it is worth a little past the last window it
+// was measured on. Inside sixty metres nothing moves by a thousandth; past it
+// the distance is carried by the three betas below, which is where the colour
+// of it is.
+export const FOG_LOW_CAP = 0.13;
+
+// THE DISTANCE, PER CHANNEL: Rayleigh, on the same shape as the haze.
+//
+// R6 §4.4 published 0.0011 / 0.0019 / 0.0023, fitted on the reference's middle
+// crest with nothing under it. Under the capped haze the same measured triple
+// of air fractions there — 0.25 red, 0.44 green, 0.62 blue — asks for these,
+// which land on R6's own red and green to three digits. The ratio blue over red
+// is 2.4; pure Rayleigh would be 3.3, and the reference reads 2.5.
+export const AIR_BETA = [0.001105, 0.001904, 0.002611];
+
+// THE FAR END OF THE COLOUR, and it is PALER THAN THE SKY.
+//
+// R6 §2.3 reads the reference's most distant hills at 149 / 187 / 213 — L* 77,
+// chroma 19, ten levels above the plateau the sky itself keeps between four and
+// fourteen degrees. This is the radiance that develops to those three numbers
+// through the same chain the frame develops everything through, solved rather
+// than chosen, and it agrees with them to a tenth of a level.
+export const AIR_PALE = [0.198800, 0.603064, 1.196391];
+
+// AND HOW FAR IT TAKES TO GET THERE. R6's own D2: the colour is a third of the
+// way from the near blue to the pale veil at three hundred metres and nine
+// tenths of the way by sixteen hundred, which is where its four hill planes are.
+export const AIR_TURN_METRES = 700;
+
 // The pale air the stone and the rocks hand back where they are seen almost
 // edge on. Solved off the brightest stretch of the reference's path, which is
 // the brightest thing in the lower half of the frame.
@@ -110,26 +147,122 @@ export const LOW_SKY = [0.22, 0.40, 0.63];
 // bake, where it would silently become part of the light.
 export const GROUND_EXPOSURE = 1.25;
 
-// Shared by every surface that has to sit in the same air. Distance fog alone
-// puts as much haze on a hilltop as on the grass at its foot; the reference
-// pools it low and thins it with height, which is what the second term does.
+// THE AIR IS TWO TERMS AND THE SECOND IS PER CHANNEL, and both halves of that
+// sentence are a measurement.
+//
+// WHAT WAS HERE BEFORE. One gaussian in (distance x density x the height
+// integral), one colour, the same fraction on all three channels. It was fitted
+// by E-LUCE2 on four windows of the reference's own meadow inside sixty metres
+// and it is right there: 0.053 / 0.128 / 0.133 / 0.049 of air, inside the band
+// the campaign measured. Past that it is an extrapolation, and R6 §2.3 caught
+// it out on the reference's own hills, where three things happen that one
+// colour and one fraction cannot do:
+//
+//   1. THE VEIL IS PALER THAN THE SKY at the far end. The reference's most
+//      distant hills read L* 77 where its sky at eight degrees reads 67. A haze
+//      that fades everything towards the low sky's blue can never get there.
+//   2. THE CHROMA PASSES THROUGH A MAXIMUM: 17 on a near flank, 30 on the middle
+//      crest, 19 on the pale far ones. The first air is BLUE — the in-scatter of
+//      the sky, at hue 256 — and the second is pale. One colour has no maximum.
+//   3. IT IS PER CHANNEL. Against the same near flank, the middle crest is
+//      veiled 0.25 on red and 0.62 on blue: the blue goes out two and a half
+//      times faster than the red, which is what Rayleigh scattering does and
+//      what a single fraction cannot say at any density.
+//
+// SO THERE ARE TWO TERMS, and they are not a refinement of each other: they are
+// two different pieces of atmosphere.
+//
+//   THE LOW HAZE is the aerosol E-LUCE2 fitted. Its density and its scale height
+//   are untouched, in src/core/sky.js where guard-aria watches them, so the walk
+//   inside sixty metres does not move by a thousandth. What it takes is a
+//   CEILING. A grey term that goes on growing puts 0.35 of red on a hill four
+//   hundred metres out; the reference puts 0.25 there. The ceiling is 0.13,
+//   which is the value the low haze itself reaches a little past the last window
+//   it was fitted on — so the fit is kept exactly where it was measured and
+//   stops exactly where it stopped being measured.
+//
+//   THE DISTANCE is Rayleigh, per channel, towards a colour that TURNS. It has
+//   the same shape as the low haze — a gaussian in (distance x beta x the same
+//   height integral), so a hilltop is still less veiled than the grass at its
+//   foot — and three betas instead of one.
+//
+// WHERE THE THREE BETAS COME FROM. R6 §4.4 published 0.0011 / 0.0019 / 0.0023,
+// read off the reference's middle crest. They are re-derived here rather than
+// copied, for one reason and with one visible consequence: the low haze sits
+// UNDER this term now, and R6's triple was solved without anything under it.
+// Solved so that the two TOGETHER land on R6's own measured fractions — 0.25 red,
+// 0.44 green, 0.62 blue, at four hundred metres, on a crest standing ten metres
+// over the water where the height integral is 0.871 — they come to
+// 0.001105 / 0.001904 / 0.002611. Red and green land on R6's own two numbers to
+// three digits, which is the check that the derivation is the same one; blue
+// comes out a seventh higher, because 0.0023 does not reproduce the 0.62 R6
+// measured even with nothing beneath it.
+//
+// THE ORDER OF THE TWO IS PHYSICS AND NOT TASTE. The distance veils the surface;
+// the low haze veils what comes out of that, because the low haze is the air
+// nearest the eye. Written out, a surface comes back as
+//
+//     colour * (1 - f) * (1 - g)  +  A(d) * f * (1 - g)  +  fog * g
+//
+// with f the per channel distance fraction, g the capped low haze, and A(d) the
+// turning colour. airTerms() hands back the two pieces of that so a program can
+// carry them from a vertex shader if it wants to.
 export const FOG_GLSL = /* glsl */`
   uniform vec3 uFogColour;
   uniform float uFogDensity;
   uniform float uFogHeight;
   uniform float uEyeHeight;
+  uniform vec3 uAirBeta;
+  uniform vec3 uAirNear;
+  uniform vec3 uAirPale;
+  uniform vec2 uAirLaw;
 
   // Mean density along a ray that climbs from the eye to the fragment, for a
   // density that falls exponentially with altitude. The difference of the two
   // exponentials is the closed form of the integral; the limit is taken by hand
   // when the ray is level, where that difference cancels.
-  float fogAmount(float distance, float fragmentHeight) {
+  //
+  // SHARED BY BOTH TERMS, and that is the point of taking it out: the low haze
+  // and the distance stand in the same air, so a hilltop has to be thinner in
+  // both by the same profile or the join between them is a colour.
+  float airMean(float fragmentHeight) {
     float dy = fragmentHeight - uEyeHeight;
     float a = exp(-max(uEyeHeight, 0.0) / uFogHeight);
     float b = exp(-max(fragmentHeight, 0.0) / uFogHeight);
-    float mean = abs(dy) < 0.01 ? a : (a - b) * uFogHeight / dy;
-    float depth = distance * uFogDensity * mean;
+    return abs(dy) < 0.01 ? a : (a - b) * uFogHeight / dy;
+  }
+
+  // The low haze: E-LUCE2's own term, at E-LUCE2's own density, with a ceiling.
+  float fogAmount(float distance, float fragmentHeight) {
+    float depth = distance * uFogDensity * airMean(fragmentHeight);
+    return min(uAirLaw.x, 1.0 - exp(-depth * depth));
+  }
+
+  // The distance, per channel.
+  vec3 airVeil(float distance, float fragmentHeight) {
+    vec3 depth = distance * uAirBeta * airMean(fragmentHeight);
     return 1.0 - exp(-depth * depth);
+  }
+
+  // And the colour it goes out into, from the low sky's blue to the pale veil.
+  vec3 airTint(float distance) {
+    return mix(uAirNear, uAirPale, 1.0 - exp(-distance / uAirLaw.y));
+  }
+
+  // What is kept of the surface and what is added in front of it, per channel.
+  void airTerms(float distance, float fragmentHeight, out vec3 keep, out vec3 add) {
+    vec3 f = airVeil(distance, fragmentHeight);
+    float g = fogAmount(distance, fragmentHeight);
+    keep = (1.0 - f) * (1.0 - g);
+    add = airTint(distance) * f * (1.0 - g) + uFogColour * g;
+  }
+
+  // The whole of it, for the programs that have the fragment's own distance.
+  vec3 throughAir(vec3 colour, float distance, float fragmentHeight) {
+    vec3 keep;
+    vec3 add;
+    airTerms(distance, fragmentHeight, keep, add);
+    return colour * keep + add;
   }
 `;
 
@@ -239,7 +372,7 @@ const TERRAIN_FRAGMENT = /* glsl */`
     vec3 light = bakedLight(terms) * uLightScale;
 
     vec3 colour = albedo * light;
-    colour = mix(colour, uFogColour, fogAmount(vDistance, vHeight));
+    colour = throughAir(colour, vDistance, vHeight);
     gl_FragColor = vec4(colour, 1.0);
   }
 `;
@@ -291,9 +424,17 @@ export function createBakedMaterial({ albedo, light, lightScale }) {
 // swings round. Written down rather than implied.
 const AIR = {
   uFogColour: { value: new Vector3(...FOG_RADIANCE) },
+  uAirPale: { value: new Vector3(...AIR_PALE) },
   uEyeHeight: { value: 1.7 },
 };
 const AIR_PER_SKY = new Vector3(...FOG_RADIANCE).divide(
+  new Vector3().copy(SCENE_LIGHT_UNIFORMS.uSkyLight.value),
+);
+// The pale end of the distance is kept the same way and for the same reason: as
+// a RATIO to the light the sky is handing the ground, so a different hour moves
+// the far veil with the sky instead of leaving it at noon. The near end needs no
+// ratio — it is the ramp itself, read at the door in src/core/sky.js.
+const PALE_PER_SKY = new Vector3(...AIR_PALE).divide(
   new Vector3().copy(SCENE_LIGHT_UNIFORMS.uSkyLight.value),
 );
 
@@ -307,6 +448,7 @@ const AIR_PER_SKY = new Vector3(...FOG_RADIANCE).divide(
 export function setAir(eyeHeight) {
   AIR.uEyeHeight.value = eyeHeight;
   AIR.uFogColour.value.copy(SCENE_LIGHT_UNIFORMS.uSkyLight.value).multiply(AIR_PER_SKY);
+  AIR.uAirPale.value.copy(SCENE_LIGHT_UNIFORMS.uSkyLight.value).multiply(PALE_PER_SKY);
   return AIR;
 }
 
@@ -317,5 +459,17 @@ export function fogUniforms() {
     uFogDensity: { value: HEIGHT_FOG.densityAtGround },
     uFogHeight: { value: HEIGHT_FOG.scaleHeight },
     uEyeHeight: AIR.uEyeHeight,
+    // The three of the distance. `uAirNear` is the SKY'S OWN OBJECT, shared by
+    // reference and never copied, for the reason the sun is: there is one ramp
+    // in this world, and a material holding its own blue is a material still
+    // drawing noon after the preset has moved.
+    uAirBeta: { value: new Vector3(...AIR_BETA) },
+    uAirNear: AIR_NEAR_UNIFORM,
+    uAirPale: AIR.uAirPale,
+    uAirLaw: { value: new Vector2(FOG_LOW_CAP, AIR_TURN_METRES) },
   };
 }
+
+// One object, so that every material's `uAirNear` is the same Vector3 the door
+// in src/core/sky.js writes when a preset arrives.
+const AIR_NEAR_UNIFORM = { value: AIR_NEAR };

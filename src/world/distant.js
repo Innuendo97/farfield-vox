@@ -311,7 +311,7 @@ const LAKE_FRAGMENT = /* glsl */`
 
     float fresnel = 0.02 + 0.98 * pow(1.0 - max(dot(-view, normal), 0.0), 5.0);
     vec3 colour = mix(uShallow, sky, clamp(fresnel + 0.52, 0.0, 1.0));
-    colour = mix(colour, uFogColour, fogAmount(vDistance, vWorld.y));
+    colour = throughAir(colour, vDistance, vWorld.y);
     gl_FragColor = vec4(colour, 1.0);
   }
 `;

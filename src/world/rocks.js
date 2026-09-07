@@ -429,7 +429,7 @@ const FRAGMENT = /* glsl */`
     float fresnel = uF0 + uRim * pow(1.0 - clamp(dot(-view, n), 0.0, 1.0), uRimPower);
     colour += sky * fresnel * (1.0 - moss * 0.6);
 
-    colour = mix(colour, uFogColour, fogAmount(vDistance, vWorld.y));
+    colour = throughAir(colour, vDistance, vWorld.y);
     gl_FragColor = vec4(colour, 1.0);
   }
 `;

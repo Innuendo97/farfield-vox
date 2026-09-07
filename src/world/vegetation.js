@@ -472,7 +472,8 @@ const VERTEX = /* glsl */`
 
   varying vec2 vUv;
   varying vec3 vTint;
-  varying float vFog;
+  varying vec3 vAirKeep;
+  varying vec3 vAirAdd;
 
   uniform sampler2D tLight;
   uniform vec2 uCentre;     // where the ring is centred, in world x and z
@@ -535,7 +536,7 @@ const VERTEX = /* glsl */`
     vec2 cell = vec2(mod(aParams.z, uColumns), floor(aParams.z / uColumns));
     vUv = (cell + uv) * uCellSize;
     vTint = light * aParams.w * zoneAt(world.xz);
-    vFog = fogAmount(length(cameraPosition - world), world.y);
+    airTerms(length(cameraPosition - world), world.y, vAirKeep, vAirAdd);
 
     gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
   }
@@ -546,10 +547,10 @@ const FRAGMENT = /* glsl */`
 
   varying vec2 vUv;
   varying vec3 vTint;
-  varying float vFog;
+  varying vec3 vAirKeep;
+  varying vec3 vAirAdd;
 
   uniform sampler2D tAtlas;
-  uniform vec3 uFogColour;
   uniform float uCutoff;
 
   void main() {
@@ -563,7 +564,7 @@ const FRAGMENT = /* glsl */`
     float edge = (sheet.a - uCutoff) / max(fwidth(sheet.a), 1e-4) + 0.5;
     if (edge <= 0.0) discard;
 
-    vec3 colour = mix(sheet.rgb * vTint, uFogColour, vFog);
+    vec3 colour = sheet.rgb * vTint * vAirKeep + vAirAdd;
     gl_FragColor = vec4(colour, clamp(edge, 0.0, 1.0));
   }
 `;
@@ -2580,7 +2581,8 @@ function flowerVertex(kind) {
   varying vec3 vHalo;
   varying vec3 vSeat;
   varying float vAlpha;
-  varying float vFog;
+  varying vec3 vAirKeep;
+  varying vec3 vAirAdd;
 
   uniform vec3 uPale;
   uniform vec3 uPistil;
@@ -2734,7 +2736,7 @@ function flowerVertex(kind) {
     vAlpha = mix(1.0, uPetalAlpha, petal);
     // THE GROUND'S OWN ZONE, on the tint and not on the lamp: see ZONE_GLSL.
     vTint *= zoneAt(world.xz);
-    vFog = fogAmount(length(cameraPosition - world), world.y);
+    airTerms(length(cameraPosition - world), world.y, vAirKeep, vAirAdd);
 
     gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
   }
@@ -2750,9 +2752,9 @@ function flowerFragment(kind) {
   varying vec3 vHalo;
   varying vec3 vSeat;
   varying float vAlpha;
-  varying float vFog;
+  varying vec3 vAirKeep;
+  varying vec3 vAirAdd;
 
-  uniform vec3 uFogColour;
 
   ${haloGlsl(kind)}
 
@@ -2767,8 +2769,8 @@ function flowerFragment(kind) {
     // AND THE HALO IS AIR OF THE SAME KIND: it is light that left the lamp and
     // came out through the wall, so it is dimmed with the lamp and not washed
     // with the ground.
-    vec3 col = mix(vTint, uFogColour, vFog)
-      + (vEmit + vHalo * haloOf(vSeat)) * (1.0 - vFog);
+    vec3 col = vTint * vAirKeep + vAirAdd
+      + (vEmit + vHalo * haloOf(vSeat)) * vAirKeep;
     gl_FragColor = vec4(col, vAlpha);
   }
 `;
@@ -2859,7 +2861,8 @@ const FAR_VERTEX = /* glsl */`
 
   varying vec3 vTint;
   varying vec3 vEmit;
-  varying float vFog;
+  varying vec3 vAirKeep;
+  varying vec3 vAirAdd;
 
   uniform vec3 uPale;
   uniform vec3 uPistil;
@@ -2987,7 +2990,7 @@ const FAR_VERTEX = /* glsl */`
     // added to the surface rather than drawn as a second pass.
     vTint = head * aLook.y * zoneAt(aFlower.xz);
     vEmit = halo;
-    vFog = fogAmount(length(cameraPosition - aFlower.xyz), aFlower.y);
+    airTerms(length(cameraPosition - aFlower.xyz), aFlower.y, vAirKeep, vAirAdd);
 
     gl_Position = projectionMatrix * view;
   }
@@ -2998,9 +3001,9 @@ const FAR_FRAGMENT = /* glsl */`
 
   varying vec3 vTint;
   varying vec3 vEmit;
-  varying float vFog;
+  varying vec3 vAirKeep;
+  varying vec3 vAirAdd;
 
-  uniform vec3 uFogColour;
   uniform float uHeadAlpha;
 
   void main() {
@@ -3010,7 +3013,7 @@ const FAR_FRAGMENT = /* glsl */`
     // this family is given exactly that rather than being left opaque: a solid
     // quad where the solids are 96 per cent opaque is a step in the frame at the
     // ring, and the ring is the one number this family was ratified on.
-    vec3 col = mix(vTint, uFogColour, vFog) + vEmit * (1.0 - vFog);
+    vec3 col = vTint * vAirKeep + vAirAdd + vEmit * vAirKeep;
     gl_FragColor = vec4(col, uHeadAlpha);
   }
 `;
