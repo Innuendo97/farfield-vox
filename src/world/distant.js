@@ -112,9 +112,19 @@ const FALLBACK_AIR_GLSL = /* glsl */`
   // The COLOUR is the seat's, scaled: the ratio below is one at the hour these
   // constants were read at, so nothing moves today and everything moves
   // together the moment the sky does.
-  uniform vec3 uAirBeta;
+  //
+  // AND TWO OF THE FOUR ARE NOT DECLARED HERE, WHICH IS AN INCIDENT AND NOT A
+  // STYLE. This fallback was written against a seat whose FOG_GLSL had one
+  // grey term and no per channel air; U-LUCE-4 gave that seat uAirBeta and
+  // uAirPale of its own, and the merge of the two put both declarations in
+  // one program. GLSL calls that a redefinition, the hills and the lake
+  // stopped compiling, and nothing in the distant frame was drawn. The two
+  // names are taken from FOG_GLSL, which is pasted above this in both
+  // programs; airUniforms() below still binds them to THIS unit's own
+  // numbers, so the picture is the one U-CORNICE-1 measured. The real repair
+  // is the door: the seat has the air now, and connecting it is U-CORNICE-2's
+  // residue, not a compile fix's business.
   uniform vec3 uAirDeep;
-  uniform vec3 uAirPale;
   uniform float uAirTurn;
 
   vec3 distantAir(float distance, float height) {

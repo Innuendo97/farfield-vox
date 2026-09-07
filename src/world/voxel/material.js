@@ -49,6 +49,42 @@ import {
 // the plane is compiled from there into here. At uCut.w nought it discards
 // nothing, which is the world that ships.
 import { CAMPO_CUT_GLSL, campoCutUniform } from './campo.js';
+// AND THE LIGHT BY PLACE, WHICH IS THE GROUND'S AND NOT THIS FILE'S. U-ZONE-1
+// painted one picture of how dark each square metre of this world stands --
+// the law of the seats the world publishes times the residual measured off the
+// reference -- and published a SEAT for it: one line of GLSL that turns a point
+// in XZ into the factor its light is multiplied by, and one place the delivered
+// texture is bound. The field and the three programs of ../vegetation.js
+// already read it; the corridor and the cubes did not, which is residues 3 and
+// 4 of E-ZONE1, and a sentiero that stays bright where the meadow beside it has
+// gone dark is two weathers over one square metre.
+//
+// THE IMPORT CLOSES A RING AND IT IS SAFE, WHICH IS WORTH ONE SENTENCE BECAUSE
+// A RING IS NORMALLY A DEFECT. ./campo-material.js imports THIS file for
+// bladeSettings/earthSettings/voxelSettings -- and reads none of them at its own
+// top level, only inside functions -- while this file needs `zoneGlsl` while its
+// shaders are being built. So whichever of the two is entered first, the other
+// finishes evaluating before the first one needs it: ./index.js enters this file
+// first, and the only other door to campo-material.js is ./campo-field.js, which
+// is behind that same index. The seat cannot move here without moving the map,
+// the painter and the field with it.
+import { zoneGlsl, zoneUniforms } from './campo-material.js';
+
+// ESSL1, and the vegetation's own spelling: both programs in this file are
+// `varying`/`texture2D` shaders, so the fetch is named the way they read a
+// sampler. One arithmetic, two spellings, and neither is a copy.
+//
+// AND IT IS ASKED FOR WHEN A MATERIAL IS BUILT AND NOT WHILE THIS FILE IS BEING
+// READ, which is what makes the ring above safe instead of merely lucky. A
+// module in a ring is HALF EVALUATED while the other half runs, so a `const`
+// reached across it at the top level throws — measured, entering
+// campo-material.js first: «Cannot access 'zoneGlsl' before initialization».
+// Nothing enters that way today; a guard or a new layer could tomorrow, and the
+// failure would be at start up and total. Deferring the two shaders to the
+// moment a material is asked for costs one memo and removes the order from the
+// question entirely.
+let zoneSource = null;
+const ZONE_GLSL = () => (zoneSource ??= zoneGlsl('texture2D(tZone, uv)'));
 
 // The material of a cube, and the six things the reference was measured to be
 // made of. Five of them are arithmetic and none of those is a byte on the wire;
@@ -633,7 +669,17 @@ const VERTEX = /* glsl */`
   }
 `;
 
-const FRAGMENT = /* glsl */`
+// The two shaders of this file are built ONCE, on the first material that asks
+// for one, and held: see ZONE_GLSL above for why they are not built while the
+// file is read, and this memo for why the deferral costs nothing. Every material
+// in a family shares one string.
+const built = new Map();
+const fragmentOf = (make) => {
+  if (!built.has(make)) built.set(make, make());
+  return built.get(make);
+};
+
+const FRAGMENT = () => /* glsl */`
   precision highp float;
 
   varying vec3 vLocal;
@@ -697,6 +743,7 @@ const FRAGMENT = /* glsl */`
   // they came from. Exponent ${STONE_SHINE.toFixed(0)}, which is C's own Q2b.
   ${SHEEN_GLSL}
   ${CAMPO_CUT_GLSL}
+  ${ZONE_GLSL()}
   ${FOG_GLSL}
 
   // WHAT A FACE OF THIS FAMILY IS WORTH, AND WHY IT IS A BEND AND NOT A LIFT.
@@ -1004,6 +1051,15 @@ const FRAGMENT = /* glsl */`
       light = mix(light, faceLightOf(matTerms(leaning, sun, shade)), arris);
     }
 
+    // ------------------------------------------------------- and the place
+    // IN XZ, AND AFTER EVERYTHING THAT BENDS THE PAIR. A zone is a fact about
+    // the GROUND and not about a face -- the flank of a cube, its top, and the
+    // head of the flower over it stand in the same weather -- so it multiplies
+    // the light that comes out and never one of the two terms. Same line, same
+    // function and same picture as the field's own (campo-material.js) and the
+    // vegetation's three.
+    light *= zoneAt(vWorld.xz);
+
     vec3 colour = albedo * light;
     colour = throughAir(colour, vDistance, vWorld.y);
     gl_FragColor = vec4(colour, 1.0);
@@ -1053,6 +1109,7 @@ export function voxelMaterial(voxel, settings) {
       uShadeSun: { value: settings.shadeSun },
       uCellRatio: { value: voxel / VOXEL },
       ...campoCutUniform(),
+      ...zoneUniforms(),
       // The sun, the exposure and the two lifts, from the one seat that
       // produces the pair they act on. Shared by reference with the rest of the
       // world, as are the light colours and the air below: a copy here would be
@@ -1064,7 +1121,7 @@ export function voxelMaterial(voxel, settings) {
       ...fogUniforms(),
     },
     vertexShader: VERTEX,
-    fragmentShader: FRAGMENT,
+    fragmentShader: fragmentOf(FRAGMENT),
     fog: false,
   });
 
@@ -1124,6 +1181,52 @@ export function voxelMaterial(voxel, settings) {
 // and it is fifty two rectangles of the disc.
 
 /** The paving's tunables, live, so a sweep costs a redraw and not a rebuild. */
+// THE ONE CONSTANT OF LIGHT THIS CORRIDOR CARRIES OF ITS OWN, AND IT IS A
+// DECISION THAT WAS TAKEN AND NOT A TASTE THAT WAS INDULGED.
+//
+// WHAT STOOD HERE BEFORE, in as many words: «the exposure is the ground's, to
+// the factor ... the two readings this material is gated on -- stone against
+// grass, 1.70 near and 3.41 far -- are RATIOS between this surface and that
+// one, so a second exposure here would move them both without moving anything
+// anybody can see». The last clause has now been measured and it is false. At
+// the fitted camera, with the arrival veil divided out of BOTH pictures, the
+// middle of the corridor develops to L* 47.5 where the reference's own frame
+// has 52.6, and the far stretch to 49.9 against 55.1. Five levels is not
+// nothing anybody can see: it is the difference the committente named as «il
+// selciato e' piu' spento».
+//
+// AND IT IS NOT THE PIGMENT'S TO CLOSE, which is why it lands on the light.
+// STONE_PALE's red stands at 0.900 -- «as red as a surface may be», the ceiling
+// this world puts on a pigment and the one guard-tasselli gates -- and the
+// corridor is still five levels short under it. E-SENT7 measured the lever
+// offline and named the number; U-LUCE-4 then took two and a half of those five
+// levels off again when the sun's own strength fell 21 per cent, and left the
+// residue with an owner. This is that residue closed.
+//
+// THE NUMBER IS MEASURED AND NOT CHOSEN. Swept live in the engine over six
+// settings and read on the frame in the reference's own space
+// (fondazione/luce-5/13-scala.mjs), the middle of the corridor answers:
+//
+//   x1.00  47.5      x1.24  50.3      x1.48  52.6   <- the reference's own 52.6
+//   x1.12  49.1      x1.36  51.4      x1.60  53.5
+//
+// which is E-SENT7's own x1.48, arrived at from the other side.
+//
+// WHAT IT COSTS, WRITTEN DOWN BECAUSE IT IS NOT NOTHING. The stone of this
+// corridor against the grass beside it rises with it, and that pair is a
+// reading the reference publishes. On the frame it was already four times the
+// reference's own -- because THIS WORLD'S MEADOW at that distance is half the
+// level of the reference's, which is U-CAMPO-2's residue and not this file's --
+// and it rises by the factor. A corridor kept five levels dark to hold a ratio
+// that is wrong for another surface's reason would be two defects instead of
+// one.
+//
+// AND THE OFFLINE BENCH READS IT FROM HERE. guard-tasselli weighs this paving
+// through the same chain guard-pietra is weighed on, and a scale the guard could
+// not see would make every level in that guard a reading of a corridor that no
+// longer ships. It imports this constant.
+export const PAVING_LIGHT = 1.48;
+
 export function pavingSettings() {
   return {
     earth: new Vector3(...PATH_EARTH),
@@ -1310,7 +1413,7 @@ export function pavingSettings() {
   };
 }
 
-const PAVING_FRAGMENT = /* glsl */`
+const PAVING_FRAGMENT = () => /* glsl */`
   precision highp float;
 
   varying vec3 vLocal;
@@ -1350,6 +1453,7 @@ const PAVING_FRAGMENT = /* glsl */`
   ${SCENE_LIGHT_GLSL}
   ${FACE_LIGHT_GLSL}
   ${SHEET_GLSL}
+  ${ZONE_GLSL()}
   ${FOG_GLSL}
 
   void main() {
@@ -1532,6 +1636,12 @@ const PAVING_FRAGMENT = /* glsl */`
     // is a solid angle, and the sun term keeps the whole of the contrast.
     terms.y = min(terms.y, 1.0);
     vec3 light = faceLightOf(terms);
+    // AND THE PLACE, which for the corridor is the whole of E-ZONE1's residue 3:
+    // «il sentiero del bersaglio e' scuro dove il prato e' scuro». One line, and
+    // the seat was already published. Not on the pair, for the reason the cubes
+    // give above and for the reason guard-sentiero-luce exists: the beam and the
+    // sky share are what a RELIEF bends, and a zone is neither.
+    light *= zoneAt(vWorld.xz);
 
     vec3 colour = albedo * light;
     colour = throughAir(colour, vDistance, vWorld.y);
@@ -1636,18 +1746,15 @@ export function pavingMaterial(voxel, settings, maps) {
       uReliefShade: { value: settings.reliefShade },
       uReliefWall: { value: settings.reliefWall },
       uReliefMean: { value: settings.reliefMean },
-      // THE EXPOSURE IS THE GROUND'S, TO THE FACTOR, and it is not a copy of a
-      // taste. The corridor stands in the ground's air and is read against the
-      // grass beside it: the two readings this material is gated on -- stone
-      // against grass, 1.70 near and 3.41 far -- are RATIOS between this surface
-      // and that one, so a second exposure here would move them both without
-      // moving anything anybody can see.
-      ...faceLightUniforms(TERRAIN.lightScale * GROUND_EXPOSURE),
+      // THE EXPOSURE IS THE GROUND'S, TIMES PAVING_LIGHT. See that constant
+      // above for the whole of the reason, the number and what it costs.
+      ...faceLightUniforms(TERRAIN.lightScale * GROUND_EXPOSURE * PAVING_LIGHT),
+      ...zoneUniforms(),
       ...SCENE_LIGHT_UNIFORMS,
       ...fogUniforms(),
     },
     vertexShader: VERTEX,
-    fragmentShader: PAVING_FRAGMENT,
+    fragmentShader: fragmentOf(PAVING_FRAGMENT),
     fog: false,
   });
 
