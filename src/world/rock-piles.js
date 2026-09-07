@@ -39,15 +39,20 @@ import PLAN from '../../assets-src/rocks/rocks.json' with { type: 'json' };
 // The targets' cluster shows both: large flat faces carrying the orientation,
 // with a smaller broken course at the shoulders and the foot.
 export const SLAB = 2;                     // cells on a side, so 0.20 m
-// AND THE READING SAYS A THIRD, WHICH THIS FILE DOES NOT TAKE. Counted on the
-// day target's low right cluster (R5 SS1.8), the reference builds its piles out
-// of SINGLE cubes with a slab here and there -- eleven grey components over
-// 150 px, the two largest 1.08 x 0.65 m and 0.89 x 0.52 m, stepped -- where
-// 0.62 draws a pile that is mostly 0.20 m plates and reads as a stack of tiles.
-// 0.35 measured +72 triangles on the ten piles, and see the two paragraphs
-// below: the SHAPE of a pile belongs to the session that has a budget for
-// shape, and what the material session owes it is the pigment.
-export const SLAB_SHARE = 0.62;            // how much of a pile is laid in slabs
+// AND THE READING SAYS A THIRD, WHICH THIS FILE NOW TAKES. Counted on the day
+// target's low right cluster (R5 SS1.8), the reference builds its piles out of
+// SINGLE cubes with a slab here and there -- eleven grey components over 150 px,
+// the two largest 1.08 x 0.65 m and 0.89 x 0.52 m, stepped -- where 0.62 drew a
+// pile that was mostly 0.20 m plates and read as a stack of tiles.
+//
+// IT WAS REFUSED ONCE, BY NAME, AND THE REFUSAL IS WHAT HANDS IT OVER. The
+// session that fitted the pigment wrote here that 0.35 measured +72 triangles
+// on the ten piles, that its own mandate was budgeted at nought, and that "the
+// SHAPE of a pile belongs to the session that has a budget for shape". This is
+// that session: the loose stone carries a triangle budget, the seventy-two are
+// inside it, and a refusal that named its successor is not a decision anybody
+// gets to take twice.
+export const SLAB_SHARE = 0.35;            // how much of a pile is laid in slabs
 
 // How far up a pile the slabs reach, and over how many metres the share falls
 // away. Declared and not measured, and declared because it is the shape of a
@@ -76,16 +81,33 @@ export const PROFILE_ROOT = 0.62;
 // How much of its own height a column may stray from the profile. This is what
 // makes a pile STEPPED rather than turned on a lathe, and it is the only place
 // randomness reaches the silhouette.
-// AND IT STAYS AT 0.34, WHICH IS THE SECOND REFUSAL OF THIS FILE AND IS WRITTEN
-// DOWN LIKE THE FIRST. R5 SS3 (S6) asks for 0.5, because a target pile is BROKEN
-// where ours comes out tidy -- the defect V2-DEV3 recorded in SS3.3 and left
-// standing -- and 0.5 is where its prototype was measured. It also measured
-// +374 triangles on the ten piles, because a rubble of stepped cubes shows
-// faces a tidy stack hides, and the mandate that carries this material is
-// budgeted at nought triangles. The SHAPE of the piles goes to the session that
-// has a budget for shape; what this one owes them is the PIGMENT, and that is
-// paid in src/world/rocks.js at no triangles at all.
-export const WOBBLE = 0.34;
+// AND IT IS 0.42 NOW, WHICH IS THE SECOND REFUSAL TAKEN OFF THE SHELF AND THEN
+// STOPPED BY A WALL. R5 SS3 (S6) asks for 0.5, because a target pile is BROKEN
+// where ours came out tidy -- the defect V2-DEV3 recorded in SS3.3 and left
+// standing -- and 0.5 is where its prototype was measured. The triangles it
+// costs are the reason the material session could not take it and they are
+// inside the loose stone's budget here. What it buys is the one thing a pigment
+// cannot: the silhouette.
+//
+// IT STOPS AT 0.42 AND THE WALL IS A MEASUREMENT, not a taste. The more a column
+// may stray, the more often two columns of a pile end up touching ONLY along a
+// vertical edge, with air on both of the orthogonal sides -- a pinch, where four
+// faces meet at one edge and the surface is no longer a manifold. Swept against
+// tools/guards/guard-avvolgimento.mjs on the ten piles of the plan:
+//
+//   0.34 (as delivered)   2848 faces   0 conflicting edges
+//   0.40                  3026         0
+//   0.42                  3032         0
+//   0.44                  3040         1
+//   0.50 (R5's own)       3174         1
+//
+// A pinched shell is a defect this campaign has a guard for and a register that
+// is explicitly a ratchet rather than a carpet, so the value stops where the
+// shell is still closed. 0.42 takes 184 of the 326 extra faces 0.5 was worth,
+// which is most of the breaking; the rest needs the FIELD to refuse a diagonal
+// contact, and that is a change to how a pile is cut rather than to how far a
+// column may stray. Named here for whoever wants the last third of it.
+export const WOBBLE = 0.42;
 
 // ------------------------------------------------------------ what a cell is
 //
