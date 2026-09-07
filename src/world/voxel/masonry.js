@@ -446,8 +446,49 @@ export const MOSS_TINT = [0.55, 0.80, 0.50];
 // against the target's 18.1 / 42.3 / 52.5, and the hue recovers to 1.16), and
 // the 32-cube grade LUT of src/core/post.js, which flattens a bright stroke
 // towards white. Neither is V2's, and neither is worked around here.
-export const INK_CORE = [0.44, 1.60, 2.00];
-export const INK_HALO = [0.25, 0.96, 1.44];
+// AND THE RED IS TAKEN DOWN, WHICH IS THE MOVE THE PARAGRAPH ABOVE WAS ONE
+// MEASUREMENT SHORT OF. It says the red must not be RAISED because the render's
+// already lands on the target's; measured again at the fitted pose on the
+// frame, on the top decile of the stroke, it lands well OVER it -- 165 to 187
+// against the target's 134 to 147 -- and that surplus red is the whole of why
+// this world's writing reads white where the target's reads cyan.
+//
+// THE DEFECT WAS NOT THE ONE THE RESEARCH NAMED, and the correction is worth
+// stating because the reading that named it is a reading this campaign has made
+// before. R5 SS1.7 puts our core at luma 124 to 136 against the target's 224 to
+// 228 and asks for the stroke to be brightened. Both numbers were taken through
+// the campaign's cyan detector, b > 1.5r + 8 -- and OUR OWN CORE DOES NOT PASS
+// IT. Swept on the frame at the pose, INK_GAIN from 0.78 to 4.4 moves that
+// reading by four levels (124 to 128) while the share of the face it covers goes
+// from 2.8% to 14.6%: the detector was measuring the cyan FRINGE of a white
+// stroke and calling it the core, and every extra watt went into making the
+// white part wider. Read on a mask that does not presume the answer (b > r + 20,
+// b > 120), the same stroke already stands at luma 197 / 194 / 180 on the first,
+// third and fifth against the target's 214 / 220 / 224, and covers 12.7 / 14.9 /
+// 14.2 per cent of the title against the target's 10.9 / 14.2 / 13.3. The
+// brightness and the weight were there. The COLOUR was not.
+//
+// SO THE GAIN DOES NOT MOVE and the red comes down from 0.44 to 0.07. On the
+// frame that leaves the level where it is -- there is no watt in it, the red is
+// the least of the three -- and it turns the stroke back towards the reference:
+// the share of the ink that is CYAN by the campaign's own detector goes from 39
+// to 62 per cent on the third block and from 22 to 42 on the first, and the
+// blue over red of the core goes 1.21 to 1.28. It also reaches the rhombus and
+// the globe at the fifth, which read this triple, and the globe is where the
+// gap is widest: the target's is 75 / 183 / 205, a blue over red of 2.7.
+//
+// AND 1.28 IS NOT 1.90, which is the target's, and the rest is not in this file.
+// Fitted offline through the delivered chain, the best any triple can do here is
+// 1.38 -- at a red of 0.02, which is a stroke with no red in it at all -- because
+// what sets the final hue is the stone the stroke is added TO and the 32-cube
+// grade that follows. R5 says the same thing in SS5 and names the owner: without
+// a refit of the grade the core can gain level but not tint. Owner: E-LUCE / D5.
+export const INK_CORE = [0.07, 1.60, 2.00];
+// The halo is taken down with it, on the core's own ratio rather than on a
+// second decision: the two are one light, and a halo redder than the stroke it
+// surrounds is a stroke with a warm edge the reference does not draw (its blue
+// over red is 64 at one to two pixels out and still 35 at eight to fourteen).
+export const INK_HALO = [0.05, 0.96, 1.44];
 export const INK_GAIN = 0.78;
 
 export const STONE_EXPOSURE = 1.25;
