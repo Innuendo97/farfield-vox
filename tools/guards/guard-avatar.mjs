@@ -1,4 +1,4 @@
-import { reporter, selfTest } from './lib.mjs';
+import { read, reporter, selfTest } from './lib.mjs';
 import {
   AVATAR, EYE_TO_CROWN, RIG, SWITCH, armClear, bodyFade, reachEase, rigMetres, thirdPersonEye,
 } from '../../src/core/avatar.js';
@@ -275,6 +275,23 @@ function paletteAgrees(kind) {
   return null;
 }
 
+/**
+ * How high the layer stands him when he is not walking.
+ *
+ * THE PASSING LATTICE IS THE RIGHT SHAPE AT REST AND THE WRONG RISE. Feet
+ * together and arms down is what a body standing still looks like, but it is a
+ * frame of a WALK and a walk rises through it -- spent whole it leaves him
+ * hovering a cell over the turf for as long as nobody moves. The layer is read
+ * rather than trusted, because the two live one line apart.
+ */
+function restingLift() {
+  const text = read('src/world/layers/v8-avatar.js');
+  const idle = /speed < 0\.15\)\s*\{[\s\S]*?\}/.exec(text);
+  if (!idle) return NaN;
+  const set = /layer\.lift = ([^;]+);/.exec(idle[0]);
+  return set ? Number(set[1]) : NaN;
+}
+
 // --------------------------------------------------------------------- the run
 
 if (process.argv.includes('--self')) {
@@ -487,6 +504,9 @@ report.check(new Set(CYCLE).size <= 6,
 report.check(!LIFT.some((v) => v < 0),
   'no frame of it puts his soles under the ground he is standing on',
   `lift ${LIFT.join(',')} cells`);
+report.check(LIFT[CYCLE.indexOf(1)] !== undefined && restingLift() === 0,
+  'and a body that is not walking stands ON the ground rather than a cell over it',
+  `${restingLift()} cells at rest`);
 report.check(STRIDE_METRES > 0, 'the step is spent in metres', `${STRIDE_METRES} m a cycle`);
 for (const kind of Object.keys(WALKS)) {
   const bad = paletteAgrees(kind);

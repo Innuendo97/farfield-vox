@@ -87,6 +87,8 @@ const layer = {
   /** How far along the stride he is, 0 to 1, and which frame that lands on. */
   phase: 0,
   frame: 1,
+  /** And how many cells he stands up by in it, which is nought when he is not walking. */
+  lift: 0,
 
   plant: {
     needs: [],
@@ -123,6 +125,7 @@ const layer = {
       /** The most a single frame of the step ever draws, which is the contacts'. */
       peak: drawn.peak,
       frame: layer.frame,
+      lift: layer.lift,
       resident: {
         corpi: all.length,
         pose: CYCLE.length,
@@ -147,11 +150,18 @@ const layer = {
     // guard against it is one comparison.
     const speed = STANDING.speed || 0;
     if (speed < 0.15) {
+      // STANDING IS THE PASSING LATTICE WITHOUT THE RISE, and the two have to be
+      // said separately. The passing frame is the right SHAPE for a body at rest
+      // -- feet together, arms down -- but it is a frame of a walk, and a walk
+      // rises through it. Spending it whole leaves him hovering a cell above the
+      // ground for as long as he stands still.
       layer.phase = 0;
       layer.frame = 1;
+      layer.lift = 0;
     } else {
       layer.phase = (layer.phase + (speed * (frame.delta || 0)) / STRIDE_METRES) % 1;
       layer.frame = Math.min(CYCLE.length - 1, Math.floor(layer.phase * CYCLE.length));
+      layer.lift = LIFT[layer.frame];
     }
 
     // THE PALETTE, ONLY WHEN IT MOVED. Writing eight vectors into two materials
@@ -203,7 +213,7 @@ const layer = {
       body.material.uniforms.uPose.value = CYCLE[layer.frame];
       body.mesh.position.set(
         STANDING.x,
-        STANDING.y + LIFT[layer.frame] * (VOXEL / SUBDIVISION),
+        STANDING.y + layer.lift * (VOXEL / SUBDIVISION),
         STANDING.z,
       );
       body.mesh.rotation.y = STANDING.yaw;
