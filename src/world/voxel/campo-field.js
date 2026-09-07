@@ -128,6 +128,9 @@ function makeWindow(shape, job) {
     pending: [],
     arrived: [],
     centre: null,
+    /** Where the window is GOING, while the tiles that make it are still in the
+     * worker: see moveTo and flush (U-CAMPO-2, M2.2). */
+    pendingBounds: null,
     tiles: 0,
     tilesAsked: 0,
     workerMs: 0,
@@ -191,6 +194,11 @@ export function createCampo({
     // could not tell them apart could not be held to (guard-livello3).
     farWorkerMs: 0,
     worstFarWorkerMs: 0,
+    /** How many times the near window's boundaries were carried across on the
+     * landing of the last tile rather than at the crossing (M2.2). */
+    landings: 0,
+    /** And how many times the deadline had to carry them instead. */
+    forced: 0,
     workerMs: 0,
     worstWorkerMs: 0,
     uploadMs: 0,
@@ -241,6 +249,14 @@ export function createCampo({
   // texel carrying the law's flat expectation, which is what the strip used to
   // change into every 6.4 m -- in the same page and the same half hour.
   let farSample = true;
+  // WHETHER THE NEAR WINDOW'S BOUNDARIES WAIT FOR THE LAST TILE (M2.2). On, and
+  // the handle is the bench's arm, as farSample is.
+  let landing = true;
+  // AND THE DEADLINE UNDER IT. Waiting for the tiles is right; waiting for ever
+  // is not a thing a frame loop may do. If a tile is lost -- a worker that died,
+  // a message that never came -- the boundaries go across anyway after this, and
+  // stats.forced says it happened rather than the world quietly staying behind.
+  const LANDING_DEADLINE_MS = 2000;
   // The ring of bearings, and the vec4s the fragment reads it through: the
   // uniform is allocated once and written in place, because this is rewritten
   // four times a second on the thread the walker is on.
@@ -430,6 +446,30 @@ export function createCampo({
         if (message.lowest < w.lowest) { w.lowest = message.lowest; moved = true; }
       }
     }
+    // ------------------------------------------------------ AND THE EXCHANGE.
+    //
+    // THE BOUNDARIES MOVE WHEN THE LAST TILE IS ON THE CARD, AND NOT BEFORE.
+    // The window used to be told where it stood at the CROSSING -- the frame the
+    // walker passed a multiple of 6.4 m -- and the eight slots that came into it
+    // were still holding the row that fell off the back, 51.2 m behind. For the
+    // half second it took the worker to answer, the ray read a stranger; what
+    // that looked like is R8's «una riga di blocchi che si costruisce da sinistra
+    // a destra a mezza distanza». Now the ray goes on reading the FAR window over
+    // that ground until every new tile has landed, and the far window says the
+    // same byte the near one is about to (M2.1): the move became a change of
+    // address, and an address does not have a picture.
+    if (near.pendingBounds) {
+      const done = near.asked.size === 0 && near.arrived.length === 0;
+      const late = performance.now() - near.pendingBounds.at > LANDING_DEADLINE_MS;
+      if (done || late) {
+        const { lo, hi } = near.pendingBounds;
+        material.uniforms.uBounds.value.set(lo.x, lo.z, hi.x, hi.z);
+        near.pendingBounds = null;
+        stats.landings += 1;
+        if (!done) stats.forced += 1;
+      }
+    }
+    if (moved) fitBox();
   }
 
   let thread = null;
@@ -483,10 +523,32 @@ export function createCampo({
     // somebody else: there is nothing to unload, because the new tile writes
     // over exactly the texels the old one owned.
     for (const key of [...w.held.keys()]) if (!keep.has(key)) w.held.delete(key);
+    // NEAREST FIRST (M2.4). They were asked for by ROWS, which is the order the
+    // two loops above happen to walk, and at the door of the world that is what
+    // built the ground in stripes from the far edge of the window towards the
+    // feet -- the one order a walker looking down cannot help but watch. Sixty
+    // four elements sorted once a window is not a cost; walking a step asks for
+    // eight and sorting them is free.
+    const span = w.shape.span;
+    wanted.sort((a, b) => {
+      const ax = (a.cx + 0.5) * span - x;
+      const az = (a.cz + 0.5) * span - z;
+      const bx = (b.cx + 0.5) * span - x;
+      const bz = (b.cz + 0.5) * span - z;
+      return (ax * ax + az * az) - (bx * bx + bz * bz);
+    });
     const lo = { x: p.cx * w.shape.span, z: p.cz * w.shape.span };
     const hi = { x: (p.cx + tiles) * w.shape.span, z: (p.cz + tiles) * w.shape.span };
     const uniform = w === near ? material.uniforms.uBounds : material.uniforms.uFarBounds;
-    uniform.value.set(lo.x, lo.z, hi.x, hi.z);
+    // M2.2: the near window's boundaries are held back until its tiles land --
+    // but only once it HAS tiles, because the first window of all has nothing
+    // behind it to keep reading and would hold the ground back for ever.
+    if (landing && w === near && wanted.length && w.tiles > 0) {
+      w.pendingBounds = { lo, hi, at: performance.now() };
+    } else {
+      uniform.value.set(lo.x, lo.z, hi.x, hi.z);
+      w.pendingBounds = null;
+    }
     if (w === far) mesh.position.set((lo.x + hi.x) / 2, mesh.position.y, (lo.z + hi.z) / 2);
     // THE NEAR TILES FIRST, ALWAYS. A walker who has just been put down is
     // looking at their own feet before they are looking at the ridge, and the
@@ -614,6 +676,16 @@ export function createCampo({
       far.centre = null;
       moveTo(far, 0, 0);
       return farSample;
+    },
+
+    /**
+     * THE BENCH'S ARM FOR M2.2: whether the near window's boundaries wait for
+     * the last tile of the row to land, or go across at the crossing the way
+     * they used to. Turning it off leaves any pending exchange to the deadline.
+     */
+    setLanding(on) {
+      landing = on !== false;
+      return landing;
     },
 
     /** Every tile of both windows is in its picture. */
