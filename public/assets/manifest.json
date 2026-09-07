@@ -86,36 +86,6 @@
       "url": "assets/textures/grass-atlas.ktx2",
       "bytes": 294205,
       "sourceBytes": 319805
-    },
-    {
-      "id": "cloud-sprites",
-      "type": "texture",
-      "role": "cloud",
-      "priority": "high",
-      "scope": "app",
-      "url": "assets/textures/cloud-sprites.ktx2",
-      "bytes": 1098341,
-      "sourceBytes": 2039856
-    },
-    {
-      "id": "cloud-cover",
-      "type": "texture",
-      "role": "coverage",
-      "priority": "high",
-      "scope": "app",
-      "url": "assets/textures/cloud-cover.ktx2",
-      "bytes": 506351,
-      "sourceBytes": 366460
-    },
-    {
-      "id": "cloud-equirect",
-      "type": "texture",
-      "role": "cloud",
-      "priority": "high",
-      "scope": "app",
-      "url": "assets/textures/cloud-equirect.ktx2",
-      "bytes": 113867,
-      "sourceBytes": 225675
     }
   ]
 }
