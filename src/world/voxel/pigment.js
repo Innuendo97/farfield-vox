@@ -112,6 +112,30 @@ export const PIGMENT_SEEDS = {
  * research measured its hue at 116-117 degrees and its chroma at 39.0 in both
  * pictures, and what was wrong with the meadow was the SHAPE of its draw.
  */
+/**
+ * How far under the verge's own earth the ground beneath a thinning mat sits.
+ *
+ * SWEPT LIVE AT THE FITTED POSE, on the bright quota of R1's pp-sx window --
+ * the window that looks straight down the verge, where the mat thins and this
+ * family is 7.2% of the pixels -- with the band's own dark share as the second
+ * reading, because a factor that fixed one window by darkening the whole frame
+ * would be a fit on nothing:
+ *
+ *     k        1.00   0.72   0.55   0.44   0.34   0.26   0.20   bersaglio
+ *     pp-sx      17      8      9     10     12      9      9       6
+ *     banda    56.5   56.5   56.6   56.6   57.5   57.8   57.9    55.8
+ *
+ * 1.00 is the verge's earth unchanged, and it is the arm that measures the
+ * defect this family exists to close: it puts MORE light in that window than
+ * the meadow it replaced. Below 0.34 the window's dark share runs past the
+ * target's 57 to 71 and the band leaves its mark; 0.72 is the best reading of
+ * the first and the equal best of the second, and the sweep is flat enough
+ * between 0.44 and 0.72 that nothing here rests on the second digit.
+ *
+ * IT IS ALSO R1 S6's OWN NUMBER, arrived at from a sweep that did not know it.
+ */
+export const SOIL_LEVEL = 0.72;
+
 export const ALBEDO = {
   meadow: [0.272, 0.452, 0.0],
   // BARE EARTH, SOLVED THROUGH THE CHAIN AND NOT QUOTED FROM THE TARGET.
@@ -201,6 +225,33 @@ export const ALBEDO = {
   //     stalk    0.191 / 0.398 / 0.000    green over red 2.08, level 0.88x
   //     earth    0.696 / 0.423 / 0.119    green over red 0.61
   stalk: [0.191, 0.398, 0.0],
+  // THE GROUND UNDER A THINNING MAT, AND IT IS A THIRD FAMILY BECAUSE THE
+  // MEASUREMENT SAYS IT IS ONE.
+  //
+  // WHY NOT `earth`. The bare earth above is the earth of the VERGE -- ground
+  // the mat has left, standing in the open beside the corridor, where the
+  // target reads it 9.7 L* ABOVE its own grass. Drawing the ground between
+  // thinning blades with that family was tried and measured, and it goes the
+  // wrong way: at the fitted pose it moved R1's pp-sx window from 13% to 17% of
+  // bright family against a target of 6%, because a triple whose green is 0.61
+  // of its red is LIGHTER in luma than the meadow it replaced. Earth beside the
+  // path and earth under the grass are not the same reading and one triple
+  // cannot be both.
+  //
+  // WHAT THE TARGET SAYS THIS ONE IS. R1 1.2 reads the floor of its meadow
+  // windows at RGB 3/15/3, 11/24/2 and 19/41/17 -- L* 4, 7 and 15 -- against
+  // cube tops at L* 44 to 58: the floor is a fifth to a third of the top, and
+  // 2.5 says the reason plainly, <<dove il manto si dirada c'e' TERRA bruna
+  // scura con i cubi sopra>>. It is dark first and brown second.
+  //
+  // AND IT IS DERIVED, NOT QUOTED, for the reason the two families above are:
+  // quoting 3/15/3 would be quoting the target's light and the target's grade
+  // along with its earth. What enters is the bare earth's own HUE -- the family
+  // is the same soil -- taken down to the level the floor is measured at. The
+  // factor is fitted live at the fitted pose over the bright quota of pp-sx and
+  // of the five-to-seven metre band; the sweep and its table are in the verbale
+  // of U-PRATO-2.
+  soil: [0.696 * SOIL_LEVEL, 0.423 * SOIL_LEVEL, 0.119 * SOIL_LEVEL],
 };
 
 /** Per-family overrides. Bare earth does not carry the meadow's hue jitter:
