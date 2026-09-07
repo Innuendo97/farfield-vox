@@ -80,8 +80,28 @@ const DEG = Math.PI / 180;
 // times over, agreeing between the two faces to a few per cent. Divided by
 // those three the stone is the target's stone, and the blue that came off with
 // them was the third of the excess that made it read as sky.
-export const STONE_ALBEDO = [0.276, 0.321, 0.230];
-export const STONE_GAIN = 0.62;
+// AND IT IS GREY NOW, WHICH IS THE CORRECTION AND NOT A TASTE.
+//
+// The triplet above was 0.276 / 0.321 / 0.230 -- green dominant, g over r 1.16
+// -- and it is what made the six read "greenish grey" to the eye that judged
+// them. The target does not: measured through one estimator on the faces this
+// camera can identify (R5 SS1.3), its LIT stone is NEUTRAL. The west flank of 01
+// reads 70 / 76 / 69 in eight bits, hue 142, chroma 5.6; the lit front of 05
+// reads hue 190 at chroma 5.2. A stone whose own pigment is green cannot
+// develop to chroma five under any light, so the green was ours.
+//
+// The level goes with it. Divided down to the triple below the developed face
+// lands inside the target's own band for its orientation -- shadow faces at
+// L* 12 to 16, lit faces at 26 to 32 -- through tools/lighting/render-chain.mjs,
+// which is the chain the guards judge the light with and the one
+// tools/guards/guard-pietra.mjs re-derives this from at every commit.
+//
+// AND THE GAIN COMES DOWN WITH THE TILE. 0.62 was the depth of a modulation
+// whose largest feature was two blocks wide; at 0.10 m and under, the same
+// depth reads as noise on the stone rather than as shape in it. 0.45 is what
+// the sweep behind R5 SS3 (S2) ran at and what the crops were taken with.
+export const STONE_ALBEDO = [0.230, 0.232, 0.215];
+export const STONE_GAIN = 0.45;
 
 // Reflectance of the stone face on, how much of the sky the grazing term
 // carries, and how sharply it is confined to the very edge.
@@ -103,8 +123,31 @@ export const STONE_GAIN = 0.62;
 // power was the CEILING the mandate allows; this is what the fit actually
 // prefers, and on a wall of flat faces the difference between the two is a
 // blue wash over every face turned even slightly away.
-export const STONE_F0 = 0.0057;
-export const STONE_RIM = 0.125;
+// AND BOTH ARE NOUGHT NOW: THIS STONE IS OPAQUE.
+//
+// Not a retreat from the fit above -- a reading that the fit had no way to
+// take. At the framing this world is judged at, the reference shows NO specular
+// on stone at all (C SS1.3, Q2: at rest the two are indistinguishable), and what
+// the term actually buys is measured on the ROCKS, which are the only stone
+// this camera sees from above and at a graze: it carries up to twelve per cent
+// of the sky onto their tops, and that is why the render reads them at hue 122
+// where the target reads 95 -- a beige cap with a blue wash on it. The wall
+// pays the same in kind if less in degree, on every face turned away from the
+// eye.
+//
+// So the whole grazing term is set aside, with its exponent left standing so
+// that the shape of it survives the decision. It is D-R5-4 of the research,
+// answered at its default (A, opaque); if the committente wants the veil back
+// it comes back as a veil that lights when you WALK -- exponent near eighty,
+// F0 0.04 -- and not as a wash that stands on a still frame.
+//
+// The two numbers the fit produced are kept here in the open, because a term
+// deleted without its measurement is a term nobody can put back: F0 0.0057 and
+// RIM 0.125 at power 4 were the best node of a sweep over eight exponents and
+// four gains (12.83 against 12.97 at nought -- one per cent), and the historic
+// 5.9 cost 35.17.
+export const STONE_F0 = 0.0;
+export const STONE_RIM = 0.0;
 export const STONE_RIM_POWER = 4.0;
 export const SKY_BLUR = 3.0;
 
@@ -127,14 +170,38 @@ export const SKY_BLUR = 3.0;
 // widest this can go before a block is drawn at under a third of its
 // neighbour's pigment, which is a hole in a wall and not a paler block. What
 // that buys is in the verbale beside what it does not.
-export const STONE_TINT = 1.4;
+//
+// AND IT COMES DOWN BY THREE TIMES, WHICH IS THE OTHER HALF OF THE CAMOUFLAGE.
+//
+// The two estimators above ("26 to 33%", "22.2%") counted moss, arris and the
+// halo of the engraving along with the stone, and 1.4 was fitted to them. Run
+// on BOTH images with one estimator that excludes all three (R5 SS1.3), the
+// spread inside a face reads p10-p90 of L* 10 to 17 on the target and 11 to 36
+// on the render: the tint is not sixty per cent short, it is three times over.
+// At 1.4 the multiplier spans 0.30 to 1.70, which is not a paler block beside a
+// darker one -- it is a hole in a wall.
+//
+// 0.45 spans 0.775 to 1.225, and it is the value R5's prototype was measured
+// at: the wall still reads as laid, the course line comes back (the target's
+// own autocorrelation at the course is 0.48 and the render had no peak at all),
+// and the dispersion inside a shadow face lands inside the target's band.
+export const STONE_TINT = 0.45;
 
 // The joint between blocks, as the campaign's own estimator reads it on stone:
 // 0.949 to 0.959 of the face beside it, over two or three pixels. It is the
 // same six per cent over the same one or two pixels the meadow carries, which
 // is the finding — the joint fitted on grass holds on stone without a change.
-export const STONE_JOINT = 0.046;
-export const STONE_JOINT_PIXELS = 1.6;
+//
+// AND IT IS THE STONE'S OWN JOINT NOW AND NOT THE GRASS'S. The finding above
+// held while the tint was three times too wide: with a block drawn anywhere
+// between 0.30 and 1.70 of its neighbour there was nothing for a six per cent
+// line to do. With the tint at 0.45 the joint is what has to carry the lattice,
+// and the target carries it plainly -- the course reads at 12 to 13 px with an
+// autocorrelation of 0.48 on the clean flank of 05, which a line six per cent
+// deep over one and a half pixels does not produce. 0.14 over two pixels is
+// what R5's prototype was measured at and what brought the course peak back.
+export const STONE_JOINT = 0.14;
+export const STONE_JOINT_PIXELS = 2.0;
 
 // And the dressed edge, at the 1.072 to 1.091 four windows of stone measure —
 // the same brightness as the recipe's on grass and a different colour, about
@@ -174,7 +241,19 @@ export const STONE_ARRIS_PIXELS = 2.2;
 // material, so it comes down by this same factor in the same proportion. There
 // is no night seat in this world yet — it is V7's — so this is an implication
 // written down, not a reading taken.
-export const STONE_ARRIS_PIGMENT = 0.70;
+//
+// AND THE SIGN OF IT IS WRONG, WHICH THE SAME ESTIMATOR SAYS WHEN IT IS RUN ON
+// BOTH IMAGES INSTEAD OF ON THE RENDER ALONE. The fit above read 1.244 and
+// 1.163 on the target's two lit fronts -- those are ratios ABOVE one, which is
+// a dressed edge LIGHTER than the flat beside it, and 0.70 draws it darker. The
+// arris of the reference is a fresh break catching the sky on a weathered face,
+// not a shadow: assets-src/monoliths/masonry-spec.json carries it as
+// chamfer.lighten and reads it at 1.07 to 1.09 over four windows of stone.
+//
+// So the pigment stands just above one and the brightness is left to the facet,
+// which is where it belongs: the edge is lit as the geometry it is, and the
+// material only says that a broken face is not a bleached one.
+export const STONE_ARRIS_PIGMENT = 1.05;
 
 // HOW MUCH PALER THE TOP COURSE OF A WALL IS THAN THE STONE UNDER IT, and over
 // how many courses it comes back.
@@ -240,17 +319,60 @@ const MAX_HEAD_RUNS = 8;
 // and the coverage below is what the pooled reading actually is on a lit face.
 // The ratios are then exactly the ratios the targets give, and the level is
 // the level they give, which two multiplied factors cannot both be.
-const MOSS_LIT = 5.5;
-// How far a corner reaches, in courses, and the floor that makes the corner
-// stand nine times the centre rather than a hundred: measured 4.6% within one
-// course of a vertical edge against 0.5% five courses in.
-const MOSS_EDGE_REACH = 0.5;
-const MOSS_EDGE_FLOOR = 0.033;
-const MOSS_EDGE_MEAN = 0.35;
-// Wet at the foot, weathered at the head, thin in the belly: 2.7 / 0.8 / 2.6
-// per cent up a face, which is an end-to-belly ratio near three.
-const MOSS_BELLY = 0.55;
-const MOSS_ENDS = 1.60;
+// AND THE LAW IS RE-READ FACE BY FACE, WHICH MOVED EVERY ONE OF THOSE FOUR.
+//
+// The readings above were pooled over windows of stone. Read instead on the
+// faces this camera can identify, one estimator on both images (R5 SS1.5), the
+// reference says something the pooled numbers could not:
+//
+//   - it is not five and a half times as much on a lit face. The lit west flank
+//     of 01 carries 17.9% and its shadowed front 1.4%, but the SHADOWED east
+//     flank of 04 carries 17.0% and the LIT front of 05 carries 3.7%. What
+//     separates them is not the sun, it is the FOOT and the NARROW FACE.
+//   - it is not bimodal about the belly, it CLIMBS TO THE GROUND. On the west
+//     flank of 01 the tenths from head to foot read 0 / 3 / 5 / 2 / 7 / 14 / 21
+//     / 16 / 31 / 71 per cent. That is a colonnade of runs coming down the wall,
+//     not a band at either end.
+//   - the corner term survives, at a third of its old strength: 2.7 / 2.7 / 2.4
+//     / 1.1 / 0.0 per cent at nought to one, one to two, two to three, three to
+//     five and past five courses from a vertical edge, on the front of 01.
+//   - and the PATCH is a sixth of what it was. In the reference the moss sits in
+//     tufts of one to three pixels at the corners of blocks; ours was drawn at
+//     0.42 m, a block and a half, so it arrived as whole blocks painted green.
+//     Measured: 36.0% of the front of 05 against the target's 3.7%, uniform from
+//     head to foot.
+//
+// So the law is written the way the tenths are written: a level, a lit ratio, a
+// foot, a head, a corner, and one term for the narrow flanks that face west,
+// which is where the reference puts its large moss and the only one of the six
+// that is proposed rather than measured (R5 SS3, S3, and the residual is
+// declared there).
+const MOSS_SHADE = 0.30;
+// How far a corner reaches, in courses, and how much it adds at the corner
+// itself: 2.7% within a course of a vertical edge against 0.0% past five.
+const MOSS_EDGE_REACH = 1.2;
+const MOSS_EDGE_GAIN = 0.6;
+// Wet at the foot and weathered at the head, and the foot is six times the
+// middle where the head is not quite twice it.
+const MOSS_FOOT = 5.0;
+const MOSS_FOOT_RISE = 0.45;
+const MOSS_HEAD = 0.8;
+// AND THE NARROW FLANKS THAT FACE WEST, which is the one term of the six that
+// no reading of ours produced: the reference carries 17.9% on the 1.48 m west
+// flank of 01 and 21.9% on the 1.10 m one of 02, both climbing to the foot,
+// against 1 to 4% on every wide front. It is held to faces under about two
+// metres across so that it cannot reach the fronts of 04 and 05, which face
+// west as well and carry 9.5% and 3.7%.
+const MOSS_WEST = 5.0;
+// And which faces count as facing west, as a band on the world normal rather
+// than a threshold: 0.42 of west is the flank of 01, 0.87 is the flank of 02,
+// and both are mossy. A hard cut at 0.7 -- which is where the research put it
+// -- takes 01 out, and 01 is the face the reading was taken on.
+const MOSS_WEST_FROM = 0.15;
+const MOSS_WEST_TO = 0.42;
+// And how far up the wall the flank term reaches: the reference's own tenths on
+// the west flank of 01 are still at 5% three tenths down from the head.
+const MOSS_WEST_RISE = 0.80;
 // How much of a LIT face is moss, pooled, and how coarse a patch of it is in
 // metres. The scale is a block, which is what the crops show — moss sits on
 // blocks and not across them.
@@ -262,8 +384,8 @@ const MOSS_ENDS = 1.60;
 // is written as the number the law is driven by, with the reading it is driven
 // TO stated beside it, because a constant that silently means something other
 // than the measurement beside it is how this law went wrong the first time.
-const MOSS_COVER = 0.33;
-const MOSS_SCALE = 0.42;
+const MOSS_COVER = 0.055;
+const MOSS_SCALE = 0.13;
 // The spread of the patch field about its own middle, sampled two hundred
 // thousand times off the same hash the fragment draws it with. It is here so
 // that a coverage asked for is a coverage got: see the cut in the fragment.
@@ -271,7 +393,14 @@ const MOSS_SPREAD = 0.2144;
 // And what it does to the pigment. Green against the two either side of it,
 // which is the axis the detector itself is written on: min(g-r, g-b) over six
 // codes.
-export const MOSS_TINT = [0.62, 1.30, 0.58];
+//
+// AND IT IS DARKER THAN THE STONE, ON ALL THREE, which is the sign the old
+// triplet had wrong. Sampled beside the stone it grows on (R5 SS1.5), the
+// reference's moss on the west flank of 01 reads 59 / 70 / 58 against 70 / 76 /
+// 69 of the stone next to it: 0.84 / 0.93 / 0.83, L* 27.5 against 31.4. 1.30 on
+// green drew it BRIGHTER, which is a lichen and not moss, and it is half of why
+// the six read greenish at the framing the judgement was made from.
+export const MOSS_TINT = [0.55, 0.80, 0.50];
 
 // The engraved cyan of the reference, from the core of a stroke out to the halo
 // around it, and the light it gives off.
@@ -335,6 +464,39 @@ export const STONE_EXPOSURE = 1.25;
 // stayed with it. So the number is written here, with where it came from, and
 // the file is gone.
 export const STONE_LIGHT_SCALE = 1.5;
+
+// HOW MUCH OF THE SKY A WALL OF THIS STONE ACTUALLY TAKES, and it is the one
+// number here that is about the LIGHT and not about the material.
+//
+// WHAT IT ANSWERS. Read face by face against the day target through one
+// estimator (R5 SS1.3), the reference's shadow faces stand at L* 11.5 to 15.4
+// and its lit ones at 26 to 31, and the ratio between the two on 01 is 4.4 in
+// luminance. Ours reads 2.0. A shadow face receives the sky term alone, so a
+// wall that is too bright in shadow and right in the sun is a wall taking too
+// much sky -- and no albedo can fix that, because albedo divides both faces by
+// the same number and leaves the ratio exactly where it was. The four other
+// numbers in this file move the level; only this one moves the RATIO.
+//
+// WHY IT IS A MATERIAL AND NOT A LIFT. src/world/face-light.js is explicit that
+// producing the pair belongs to the seat and BENDING it belongs to the
+// material -- this file already bends the sun term for the stone's own relief,
+// two dozen lines below. This bends the other term, for a reason of the same
+// kind: a wall stands among grass, and half a hemisphere of what a vertical
+// face of it can see is the meadow rather than the dome. It is NOT uLift, it
+// never touches uLift, and tools/guards/guard-lift.mjs keeps the seat at one
+// with this in the file.
+//
+// WHERE 0.55 COMES FROM. It is the value R5's prototype was measured at, and it
+// is the number carried forward rather than refitted here for a reason that is
+// declared and not hidden: the light this branch draws under is not the light
+// the reading was taken under. See the note over the guard in
+// tools/guards/guard-pietra.mjs, which prints the seat and the air it finds and
+// says what they do to the level.
+//
+// WHAT IT IS NOT ALLOWED TO BE. Greater than one. A material may take less of
+// what the seat hands it; taking MORE is a lift by another name, and that is
+// the shortcut this campaign spent a session removing from the light.
+export const STONE_SKY_SHARE = 0.55;
 
 /**
  * The stone tile as a texture, from bytes the worker has already generated.
@@ -464,14 +626,19 @@ const FRAGMENT = /* glsl */`
   uniform float uTint;
   uniform float uMoss;
   uniform float uMossScale;
-  uniform float uMossLit;
+  uniform float uMossShade;
   uniform float uMossReach;
-  uniform float uMossFloor;
-  uniform float uMossEdgeMean;
-  uniform float uMossBelly;
-  uniform float uMossEnds;
+  uniform float uMossEdgeGain;
+  uniform float uMossFoot;
+  uniform float uMossFootRise;
+  uniform float uMossHead;
+  uniform float uMossWest;
+  uniform float uMossWest0;
+  uniform float uMossWest1;
+  uniform float uMossWestRise;
   uniform float uMossSpread;
   uniform vec3 uMossTint;
+  uniform float uSkyShare;
   uniform float uArris;
   uniform float uArrisPixels;
   uniform float uArrisPigment;
@@ -657,6 +824,14 @@ const FRAGMENT = /* glsl */`
     // business. Producing one is not.
     vec2 terms = faceTerms(n);
     terms.x *= clamp(1.0 - uRelief * (above - pair.g), 0.45, 1.9);
+    // AND THE SKY TERM IS BENT TOO, WHICH IS NEW AND IS THE OTHER HALF OF THE
+    // SAME PERMISSION. The line above takes sun off a face that leans out of the
+    // beam; this takes sky off a face that stands in grass rather than under an
+    // open dome. Both bend a pair this material was GIVEN, neither writes a
+    // second opinion about where the sun is, and uLift is untouched by either --
+    // the seat is still one, and the ratio between a lit face and a shaded one
+    // is the number this moves. See STONE_SKY_SHARE.
+    terms.y *= uSkyShare;
     // AND THE SKY TERM IS LEFT ALONE ON THE DRESSED EDGE, which is a decision
     // and not an omission. A facet leaning at the sky is handed 0.854 by
     // faceTerms against the wall's 0.5 — 1.71x, of sky alone — and this file
@@ -696,9 +871,29 @@ const FRAGMENT = /* glsl */`
       // number nothing measured. Past the last bin the law is flat.
       float edge = min(min(u, span - u) / uRise, 5.0);
       float upFrac = clamp(up / (2.0 * uHalf.y), 0.0, 1.0);
-      float weight = mix(1.0 / uMossLit, 1.0, lit)
-        * (uMossFloor + exp(-edge * uMossReach)) / uMossEdgeMean
-        * mix(uMossBelly, uMossEnds, smoothstep(0.22, 0.46, abs(upFrac - 0.5)));
+      // THE LAW, IN THE ORDER THE TENTHS ARE READ IN. A level for the sun, a
+      // climb to the foot, a little at the head, a corner, and the narrow west
+      // flank. Every factor is one where its condition is absent, so the
+      // coverage asked for is the coverage a plain face in the middle of a wall
+      // gets and the rest are what the reference reads ABOVE that.
+      //
+      // The west term is held to narrow faces by the face's own span, which the
+      // wall already knows: it is 1.10 to 1.48 m on the flanks the reference
+      // mosses and 2.90 to 3.44 on the fronts it does not, and the two do not
+      // overlap. Without that hold it reaches the fronts of 04 and 05, which
+      // face west and carry a twentieth of what their flanks do.
+      float west = smoothstep(uMossWest0, uMossWest1, -n.x) * smoothstep(2.6, 1.4, span);
+      // AND THE FLANK TERM IS ADDED TO THE SUN TERM AND NOT MULTIPLIED INTO IT,
+      // which is the one place this law disagrees with itself on purpose. The
+      // sun ratio says a shaded face carries less; the east flank of 04 is
+      // shaded and carries 17.0% -- more than any lit front in the picture. A
+      // flank that runs with water carries moss whether or not the sun reaches
+      // it, so it stands beside the sun's own term rather than under it, and
+      // the two agree again on a wide front, where the flank term is nought.
+      float weight = (1.0 + uMossFoot * smoothstep(uMossFootRise, 0.0, upFrac)
+                          + uMossHead * smoothstep(0.90, 1.0, upFrac))
+        * (1.0 + uMossEdgeGain * exp(-edge * uMossReach))
+        * (mix(uMossShade, 1.0, lit) + uMossWest * west * smoothstep(uMossWestRise, 0.0, upFrac));
       vec2 spot = vec2(u, up) / uMossScale;
       vec2 base = floor(spot);
       vec2 t = spot - base;
@@ -885,13 +1080,18 @@ export function createMasonry(entry, tile, ready = null, engraved = true) {
       uPaleCourses: { value: STONE_PALE_COURSES },
       uMoss: { value: MOSS_COVER },
       uMossScale: { value: MOSS_SCALE },
-      uMossLit: { value: MOSS_LIT },
+      uMossShade: { value: MOSS_SHADE },
       uMossReach: { value: MOSS_EDGE_REACH },
-      uMossFloor: { value: MOSS_EDGE_FLOOR },
-      uMossEdgeMean: { value: MOSS_EDGE_MEAN },
-      uMossBelly: { value: MOSS_BELLY },
-      uMossEnds: { value: MOSS_ENDS },
+      uMossEdgeGain: { value: MOSS_EDGE_GAIN },
+      uMossFoot: { value: MOSS_FOOT },
+      uMossFootRise: { value: MOSS_FOOT_RISE },
+      uMossHead: { value: MOSS_HEAD },
+      uMossWest: { value: MOSS_WEST },
+      uMossWest0: { value: MOSS_WEST_FROM },
+      uMossWest1: { value: MOSS_WEST_TO },
+      uMossWestRise: { value: MOSS_WEST_RISE },
       uMossSpread: { value: MOSS_SPREAD },
+      uSkyShare: { value: STONE_SKY_SHARE },
       uMossTint: { value: new Vector3(...MOSS_TINT) },
       uRelief: { value: 2.2 },
       uF0: { value: STONE_F0 },
