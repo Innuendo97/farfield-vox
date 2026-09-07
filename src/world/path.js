@@ -241,7 +241,23 @@ export const TUNING = {
     // Share of blocks left whole, cut into four, cut into nine.
     cuts: [0.30, 0.22, 0.48],
     // Share of the PIECES that are bare ground rather than stone, per cut.
-    bare: [0.02, 0.06, 0.09],
+    //
+    // AND IT IS THE FLOOR OF THE THINNING AND NOT A TRIM, WHICH IS THE READING
+    // THAT MOVED IT. What stood here -- 2 / 6 / 9 per cent -- was E-V3d's, and
+    // E-V3d was counting the share of pieces that read as BARE on a paving whose
+    // stone was supposed to be nearly continuous. Read against the reference at
+    // the fitted camera it is not: the target carries 45 to 65 per cent of EARTH
+    // in the middle of its own corridor, at every one of the three stretches
+    // (R3 §1.6, fondazione/lav/dirad.py) -- «le pietre sono posate nella terra,
+    // non un lastricato continuo». A corridor that is nine tenths stone in its
+    // core cannot thin into anything, because there is nothing between the
+    // stones for the thinning to reach: it can only stop.
+    //
+    // SO THE TWO TUNINGS CARRY THE TWO CORES THE REFERENCE READS. The far
+    // stretch keeps the more solid paving (65 to 71 per cent of stone at 0.6 m
+    // inside its kerb) and the near apron the looser one (48 to 55), which is
+    // the same direction the row above already had and a great deal more of it.
+    bare: [0.26, 0.31, 0.36],
     // What a joint's width is multiplied by.
     gape: 1.0,
     // The warm shift, in (r-b)/(r+b), against this stretch's own zero.
@@ -252,7 +268,7 @@ export const TUNING = {
   // The near apron: the same slabs, smaller, with more earth between and over.
   apron: {
     cuts: [0.10, 0.26, 0.64],
-    bare: [0.05, 0.12, 0.17],
+    bare: [0.41, 0.47, 0.52],
     gape: 1.05,
     // THE WARM, AND IT IS THE PIGMENT'S ROTATION AND NOT THE MEASUREMENT.
     //
@@ -353,7 +369,25 @@ function fbm2(x, z) {
 // pieces whose boundary is true joint for at least two thirds of itself). The
 // pieces of this paving are a hand across, not a stride, and at that size the
 // joints alone carry most of the forty per cent that is not stone.
-export const BLOCK = 0.40;
+//
+// AND IT HALVES, BECAUSE A HAND IS SMALLER THAN THIS FILE MADE IT. Read on the
+// day target at the fitted camera as connected pieces of the corridor's own
+// surface -- the same counter on both pictures, fondazione/lav/tasselli.py --
+// the reference answers an equivalent diameter of 3.4 / 6.4 / 37.7 cm at the
+// deciles over the mid stretch and 7.2 / 10.0 / 27.4 over the far one, and this
+// paving answered 4.7 / 7.6 / 40.1 and 5.8 / 9.7 / 48.4. The median is half a
+// centimetre out at the middle and the whole distribution is a third too coarse
+// at the far end, where a piece is what tells a paving of tiles from a floor of
+// slabs. A block of 0.40 m cut in one, four and nine gives pieces of 40, 20 and
+// 13 cm before the joints eat into them; at 0.20 it gives 20, 10 and 6.7, which
+// is the hand the reference actually lays.
+//
+// THE PRICE IS IN THE MAPS AND NOT IN THE FRAME. Twice as many pieces to the
+// metre is twice as much joint to draw, and the ruler and the tone are stored
+// per texel: R3 measured +382 kB over the pair for exactly this change and no
+// milliseconds at all, because the fragment reads the same three maps whatever
+// is written on them.
+export const BLOCK = 0.20;
 // How far the edges of a piece wander off the lattice, as a fraction of the
 // block. Three scales, and each answers for one of the numbers the shapes are
 // fitted on.
@@ -384,8 +418,19 @@ export const WARP = [0.22, 0.160];
 // one's for the same area, and 24% of extra boundary has to be put in at a
 // wavelength the blur leaves alone. Five and a half centimetres is the shortest
 // one that does.
-export const FRAY = [0.055, 7.5];
-export const TATTER = [0.040, 15.0];
+//
+// AND THE TWO WAVELENGTHS ARE HELD IN METRES WHILE THE BLOCK HALVES, which is
+// the one thing about the block that does not scale with it. The lobe and the
+// burr are lengths OF A PIECE -- an edge bent over its own length, a
+// re-entrancy a fraction of the piece across -- and they follow the block by
+// construction. These two are lengths of the MAP: 5.5 cm is the shortest ripple
+// the 2.4 cm blur every shape reading is taken through leaves alone, and 2.7 cm
+// is the finest the strip's 7.8 mm texel can carry. Neither of those two numbers
+// knows how big a piece is, so the second figure of each pair -- which is a
+// frequency in units of one over the block -- halves with the block to leave the
+// wavelength where it was measured.
+export const FRAY = [0.055, 3.75];
+export const TATTER = [0.040, 7.5];
 // Where the lattice's own origin sits, so a seat read back out of it can be
 // brought home.
 export const SHIFT = [3.13, 8.71];
@@ -473,10 +518,30 @@ export const CRACK = { share: 0.05, width: 0.0045, wander: 0.16 };
 // THE SHARE IS THE THING THAT MOVES, and it moves with the LATERAL POSITION
 // rather than with a distance from an edge, because the corridor's own edge
 // wobbles and a share tied to it would wobble with it.
+//
+// AND IT IS MEASURED FROM THE KERB THAT IS SEEN, WHICH IS THE WHOLE OF WHY THE
+// CURVE ABOVE NEVER ARRIVED IN A PICTURE.
+//
+// The window used to be a fraction of the nominal half width, and a fraction of
+// a half width is a distance that changes with the northing: 1.05 m of ground at
+// z = 4 under the law U-SENT-4 shipped, 0.62 m under the law U-SENT-6 measured,
+// and both of them ANCHORED AT THE CENTRELINE rather than at the edge. What the
+// eye compares the thinning to is not the middle of the path: it is the line
+// where the paving stops being paving, and that line stands at the far side of
+// the bare band beside the stone (KERB below). Anchored there, the same window
+// draws the same fall at every northing, which is what the reference does --
+// the target's profile against ITS own kerb is one curve over all three
+// stretches (R3 §1.6).
+//
+// THE NUMBERS ARE THE REFERENCE'S OWN, READ AGAINST ITS OWN KERB. Over the mid
+// and far stretches the share of the corridor's surface that reads as stone runs
+// 45 to 65 per cent at 0.60 m inside the kerb, 25 to 35 at 0.20 m, 10 to 20 at
+// the kerb itself and under 8 past it (fondazione/lav/dirad.py, the same ruler
+// on both pictures). The two ends below are solved for that curve against the
+// share of bare pieces the tuning stands on, and the guard holds all four bands.
 export const SPREAD = {
-  // Where the thinning begins and where the stone has gone, as a fraction of the
-  // corridor's own nominal half width (pathHalfWidth, which is smooth; pathEdge
-  // is the one with the noise in it and is deliberately not read here).
+  // Where the thinning begins and where the stone has gone, in METRES from the
+  // visible kerb: negative inside the paving, positive out on the brown.
   //
   // PAST ONE, WHICH IS THE POINT. `to` is beyond the nominal edge, so the last
   // stone does not fall on the last column of the corridor: a few pieces surface
@@ -503,8 +568,8 @@ export const SPREAD = {
   // PALE STONE inside it and not the corridor, and it is the number this window
   // now carries: the share of stone crosses a half at (from + to)/2 = 0.70 of
   // the half width, which at z = 4 is 1.14 m of stone core, eleven voxels.
-  from: 0.05,
-  to: 1.35,
+  from: -0.48,
+  to: 0.14,
   // How much of the thinning survives past the last stone of the run. Nought
   // would leave a ghost of the paving's composition in the ground where the
   // paving has ended; it fades with pathRun for the same reason the mat's own
@@ -524,6 +589,23 @@ export const SPREAD = {
   // cent of the 13 the reference asks for.
   dim: 0.42,
 };
+
+// HOW FAR PAST THE STONE THE VISIBLE KERB STANDS, in metres.
+//
+// THE BAND OF BARE EARTH BESIDE THE PAVING, AND IT IS ONE NUMBER HELD IN TWO
+// PLACES BECAUSE NEITHER FILE MAY IMPORT THE OTHER. U-SENT-6 measured that the
+// kerb the eye finds is not the last column of stone: it is the far side of the
+// band where no blade of the mat stands (MANTO.verge.bare in
+// src/world/voxel/worldgen.js), because a blade at the pose this campaign is
+// judged from covers three to four times its own footprint and the ruler meets
+// green at the first column that carries one. The mat's file owns the band; this
+// file has to know where it ends, because the thinning of the stone is measured
+// from there and because the paving's own family reaches to it.
+//
+// A GUARD HOLDS THE TWO TOGETHER (guard-tasselli), which is the only honest way
+// to write one number twice: worldgen imports terrain-field and this file
+// imports terrain-field, and an import either way round would close a ring.
+export const KERB = 0.10;
 
 // HOW FAR A PIECE STANDS PROUD OF THE CORRIDOR'S FLOOR, in metres.
 //
@@ -577,7 +659,19 @@ export const RELIEF = {
   // over a pixel and a groove that took four fifths of BOTH terms drew a black
   // line round every piece. Four tenths of the light at the floor of a slot one
   // centimetre deep is the ambient a groove that shape actually loses.
-  wall: 0.60,
+  //
+  // AND IT RISES TO ONE, WHICH IS THE CEILING AND NOT A FIT. What the reference
+  // draws round each of its pieces is a dark ring of +4.9 L* at the mid stretch
+  // and +5.4 at the far one; this paving drew +3.7 and +1.9 (R3 §1.5,
+  // fondazione/lav/tasselli.py). The two terms that draw that ring are this one
+  // and the pigment of the slot above it, and this one is the half that is a
+  // SHADOW: a groove a centimetre deep between two pieces a hand across sees
+  // very little of either the beam or the sky, and one -- all of both terms at
+  // the floor of the slot, nothing at its lip -- is the most a solid angle can
+  // be asked for. Past one the frame would subtract light from a surface, which
+  // is why the sky term is clamped where it is read (../voxel/material.js).
+  // What it is worth is in the verbale, measured on the frame and not here.
+  wall: 1.00,
   // AND THE MEAN THE TERM ABOVE TAKES, SO IT CANNOT MOVE THE LEVEL.
   //
   // This is the grain's own doctrine, and it is not tidiness: the level of this
@@ -596,7 +690,13 @@ export const RELIEF = {
   // JOINT_LIP), so the mean of it is a third of what a mask reports. The painter
   // takes it the same way the fragment writes it and refuses the tile if this
   // literal has drifted from the map it describes.
-  mean: 0.0326,
+  //
+  // AND IT RISES WITH THE BLOCK HALVING AND THE FAMILY REACHING THE BARE BAND,
+  // which is the whole reason the painter refuses a stale one: twice as many
+  // pieces to the metre is twice as much slot for the term to live in, and the
+  // surface the mean is taken over is now the paving family's own reach and not
+  // the corridor alone. Re-taken by the painter over the map it actually wrote.
+  mean: 0.0460,
 };
 
 /**
@@ -622,10 +722,28 @@ function pieceLift(id, bare) {
  * be throwing away the reading that the apron carries more earth than the reach.
  */
 function bareShare(base, x, z) {
-  const q = lateral(x, z);
-  if (q === null) return base;
-  const out = smoothstep(SPREAD.from, SPREAD.to, q) * pathRun(z) * SPREAD.fade;
+  const d = kerbGap(x, z);
+  if (d === null) return base;
+  const out = smoothstep(SPREAD.from, SPREAD.to, d) * pathRun(z) * SPREAD.fade;
   return base + (1 - base) * out;
+}
+
+/**
+ * How far a point stands from the VISIBLE kerb, in metres: negative inside the
+ * paving, nought at the kerb, positive out on the brown. Null where there is no
+ * corridor.
+ *
+ * THE NOMINAL HALF WIDTH AND NOT pathEdge, and the reason has not changed since
+ * the window was a fraction: pathEdge carries the wobble, and a thinning tied to
+ * a wandering edge wanders with it -- the share of stone would step up and down
+ * along the run at the wobble's own three metres, which is a ripple in the
+ * paving and not a kerb. The wobble belongs to where the last COLUMN falls; the
+ * thinning is a property of the surface.
+ */
+function kerbGap(x, z) {
+  const half = pathHalfWidth(z);
+  if (!(half > 0)) return null;
+  return Math.abs(pathOffset(x, z)) - (half + KERB);
 }
 
 /**
@@ -1116,7 +1234,41 @@ export function grainUv(x, z) {
 // unit does not own -- the paving is fitted against the meadow beside it and two
 // gates are ratios between them. The EARTH is not that wall: it is the pigment
 // of the soil between the stones, and it was authored a third too bright.
-export const EARTH = [0.1800, 0.1606, 0.1441];
+//
+// AND ALL THREE OF THEM MOVE HERE, WHICH IS THE WALL OF E-LUCE7 REOPENED WITH A
+// BERSAGLIO INSTEAD OF WITH A PREFERENCE.
+//
+// What the wall said was this: the level of this stone was fitted against the
+// meadow beside it, two of the gates this chapter is weighed on are RATIOS
+// between the two, and a session that raised the stone because it looked dark
+// would move a gate without moving anything anybody asked for. That was the
+// right rule and it is why the level stood still through U-SENT-2 and U-SENT-4.
+// What it never had was a NUMBER on the far side of it, and R3 measured one:
+// read on the day target at the fitted camera, piece by piece over the mid
+// stretch, the reference's stone stands at L* 56.3 with a spread of 3.5 between
+// pieces and a chroma of 31.7 at hue 80 -- a warm beige -- and its earth at 42.4
+// with a chroma of 29.3; this paving answered L* 49.6 / C* 22.6 and L* 32.5 /
+// C* 21.6 on the same instrument in the same frame. Ten levels of stone and ten
+// of earth, and a hue that is grey-olive where the reference is beige.
+//
+// SO THE THREE PIGMENTS BELOW ARE SOLVED AGAINST THAT READING AND NOT CHOSEN.
+// The bench is fondazione/lav/u7-livelli.mjs: the pigment through
+// src/world/face-light.js's own two terms on an upward normal, through the
+// material's own warmth, through AgX and through the delivery's LUT -- the same
+// chain tools/lighting/render-chain.mjs gives guard-pietra -- read back as L*,
+// C* and hue. Validated before it was believed: on the frame this world shipped
+// BEFORE the fit, the bench answers stone L* 50.9 / C* 24.9 against the 49.6 /
+// 22.6 the frame measures and earth L* 36.4 against 32.5, which is a level and a
+// half on the stone and four on the earth, the earth's own gap being the slots
+// the frame counts as earth and the bench does not.
+//
+// WHAT IS NOT MOVED, AND IT IS THE HALF OF THE WALL THAT STILL STANDS: not one
+// constant of the LIGHT. The seal is untouched, the exposure is untouched, and
+// the ratios two gates read between this surface and the meadow are moved only
+// by what a PIGMENT of this surface is allowed to move. What that costs those
+// gates is measured in the verbale and put to the coordinator rather than
+// decided here.
+export const EARTH = [0.3150, 0.2483, 0.1635];
 // AND THE EARTH IS NOT ONE EARTH ACROSS THE CORRIDOR, WHICH IS THE MEASUREMENT
 // THE «STACCO NETTO» IS.
 //
@@ -1152,8 +1304,18 @@ export const EARTH = [0.1800, 0.1606, 0.1441];
 // carried here is the part a pigment can honestly claim -- a quarter of it --
 // and the rest is named rather than baked into a brown.
 export const EARTH_DAMP = { level: 0.875, cool: 0.055 };
-export const STONE = [0.242, 0.315, 0.313];
-export const STONE_PALE = [0.418, 0.436, 0.428];
+// The two ends of the stone's own ramp, and they are the pair the whole identity
+// between one piece and the next is a step along.
+//
+// BEIGE AND NOT GREY-OLIVE, WHICH IS A CHROMATICITY AND A LEVEL AT ONCE. The
+// pair that stood here was a measurement of the same stone off the same
+// reference and it was taken on the LEVEL alone; read as a hue it answers 90 to
+// 106 degrees at a chroma of 20, and the reference reads 80 at 31. Through the
+// bench above the pair below develops to L* 57.8 / 59.1 / 62.1 at the tenth,
+// fiftieth and ninetieth of the pieces this law lays over the mid stretch, at
+// C* 30.7 and hue 80.
+export const STONE = [0.491, 0.440, 0.327];
+export const STONE_PALE = [0.900, 0.747, 0.460];
 // What a slot takes out of the pigment, at its lip and at its trough.
 //
 // TWO NUMBERS AND NOT ONE, because the joint is not one tone across its own
@@ -1166,7 +1328,16 @@ export const STONE_PALE = [0.418, 0.436, 0.428];
 // stone it separates; putting the darkening on the terms would make a joint a
 // function of the hour and would reach the one pair of numbers every guard in
 // this world is weighed on.
-export const JOINT_DARK = [0.18, 0.21];
+//
+// AND THE PAIR DEEPENS WITH THE STONE THAT STANDS EITHER SIDE OF IT. The
+// reference's joints run 9 to 10 levels of L* under its own stone and so did
+// ours -- the relative darkness was already right and R3 says so -- but the
+// stone has just risen by nine levels, and a share taken off a brighter pigment
+// has to be a bigger share to arrive at the same distance below it. Measured on
+// the bench above: at 0.18 / 0.21 the slot under the new stone develops to L*
+// 53.9, six levels under its own piece where the reference is ten; at 0.25 /
+// 0.40 it develops to 49.9, which is nine and a half.
+export const JOINT_DARK = [0.25, 0.40];
 // How deep into the slot the darkening is fully in, in metres, and where the lip
 // gives way to the trough on the way. The two bands are the reading's own:
 // within a centimetre of stone, and more than two from any.
