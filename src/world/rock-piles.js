@@ -4,6 +4,9 @@ import { groundHeightAt } from './contracts.js';
 // under plain node as well as through the bundler, and node refuses a JSON
 // import without it. src/world/contracts.js reads its own seat the same way.
 import PLAN from '../../assets-src/rocks/rocks.json' with { type: 'json' };
+// Where the fountain stands, asked of the seat that decides it: the pool and
+// the basin that holds it cannot be two opinions about one circle.
+import { FOUNTAIN } from './monoliths.js';
 
 // THE ROCKS, AS PILES OF CUBES. The arithmetic half, with nothing a browser
 // owns in it.
@@ -155,6 +158,101 @@ export const ROCK_PILES = PLAN.rocks.map((rock) => ({
   height: rock.height,
   seed: rock.seed,
 }));
+
+// ------------------------------------------------- the loose stone's own law
+//
+// WHY THE RUINS AND THE BASIN ARE CUT FROM HERE AND DRAWN OVER THERE.
+//
+// Everything from this line to `looseStoneSolids` below was private to
+// src/world/loose-stone.js, which is the mesh half: it turns the two laws into
+// cubes with a pigment on them. What made the split necessary is that a SECOND
+// reader appeared -- the camera, which has to know what a lens may not pass
+// through -- and the plan alone cannot tell it: the cut rounds a 0.57 m piece up
+// to three cells of 0.20 and a 0.32 m piece up to two, so a box built from the
+// plan's own width and height is 30 mm narrower than the stone in one place and
+// 80 mm shorter than it in another, and a box short of the stone is a hole.
+//
+// AND IT HAD TO COME HERE RATHER THAN STAY THERE, which is a fact about node and
+// not a preference. The camera's list is published by src/world/contracts.js,
+// which every measuring tool imports under plain node; contracts.js importing
+// the MESH file closes a ring -- rocks -> rock-piles -> contracts -> loose-stone
+// -> rocks -- whose top level cannot be evaluated in either order, and guard-fiori
+// died on it. This file reaches nothing that comes back round, which is the same
+// property that made it the arithmetic half of the piles.
+//
+// NOTHING BELOW IS NEW. It is U-PIETRA-2's law, moved, with the drawing left
+// where the drawing was.
+
+/**
+ * The loose stone's own draw: one sine, folded.
+ *
+ * NOT stoneHash above, and they must not be merged. That one is the PILES', it
+ * is hashed on three integers of the world lattice and every cube of scree in
+ * this world is placed by it; this is the ruins' and the basin's, it takes
+ * seeds and indices, and the two were fitted against different pictures. One
+ * name for both would be a change to where every stone in the meadow lies.
+ */
+export const looseHash = (a, b, c) => {
+  const x = Math.sin(a * 12.9898 + b * 78.233 + c * 37.719) * 43758.5453;
+  return x - Math.floor(x);
+};
+
+// --------------------------------------------------------- the ruins' law
+//
+// A ruin is a STEPPED STACK of dressed cubes and not a heap: the target's are
+// "blocchi squadrati pallidi ... in 1-2 corsi" with hard terraces, which is the
+// whole of what separates them from the scree the piles beside them draw. So
+// the columns of a ruin are quantised to whole courses and the outline is a
+// rectangle eaten in from its corners, rather than the profile-and-wobble a
+// pile is built from.
+// THE BLOCK OF A RUIN IS THE SLAB OF THIS WORLD, 0.20 m, and the number was
+// argued the other way first and measured back. R5 SS7 names a 0.35 m cell, but
+// it names it for the OTHER of the two things it offers -- pieces of masonry
+// generated like the stair -- and the pieces here are the second offer, the
+// loose stones in the same grass as the scree. What that grass actually holds,
+// read at SS1.8 on the day target's own clusters, is "pile a gradoni di cubi da
+// UN voxel, con lastre 2x rare": the ruins are the size of the rocks beside
+// them and it is the SQUARENESS and the pallor that separate them, not the
+// grain. Built at 0.35 the same stack came out with two courses in it and no
+// terrace at all, which is a plate and not a ruin.
+export const RUIN_CELL = 2 * VOXEL;
+export const BASIN_CELL = 2 * VOXEL;
+// THE MOSS ON A RUIN IS A TUFT ON TOP OF A BLOCK AND NOT A BLOCK PAINTED GREEN.
+//
+// The first cut of this file recoloured whole cubes, and at 0.35 m a whole cube
+// of moss is a third of a metre of green on the face the walker sees -- which is
+// the very reading R5 SS1.5 names as the defect on the walls: "nel target il
+// muschio sta nei CIUFFI di 1-3 px agli angoli dei blocchi e nelle colature al
+// piede, non in chiazze di blocchi". So a tuft is a SMALL cube standing on the
+// lid of a block, one or two voxels, exactly the thing the heads of the six
+// carry -- one law for moss that is geometry, in both places it appears.
+export const RUIN_MOSS_SHARE = 0.34;           // how many exposed lids grow a tuft
+export const RUIN_TUFT = VOXEL;                // and how big one is
+// How far in from the middle a column has fallen by the time it reaches the
+// rim. 1.0 would be a pyramid with no top; this leaves the terraces the target
+// steps its own stacks down in.
+const RUIN_TAPER = 0.60;
+
+// ---------------------------------------------------------- the basin's law
+//
+// The fountain of the fifth stands in a ring of pale stone and the target draws
+// it plainly: a basin 1.61 m across holding a mirror of water 1.22 m across
+// (R5 SS1.10, measured by V2-DEV5 in the same reading the globe's own metres
+// come from). The ring is what makes the water READ: our meadow is a field of
+// grass cubes and a disc of light lying in it at 0.20 m is a disc of light
+// nobody can see the edge of — which is what this branch drew before this file.
+//
+// Its outer radius is the target's, its inner radius is the water's, and both
+// are read from src/world/monoliths.js rather than restated, because the pool
+// and the basin that holds it cannot be two opinions about one circle.
+// AND IT IS A RIM AND NOT A TUB. One course, one block thick, with a second
+// course on about a third of the ring so the lip is broken rather than turned:
+// the water this basin holds stands at 0.20 m over the grass (POOL_LIFT, V2-DEV5's
+// own reading) and a rim two courses tall all the way round puts that water at
+// the bottom of a well the walker cannot see into. What the target draws is a
+// lip the water comes up to, not a wall it hides behind.
+const BASIN_COURSES = 1;
+const BASIN_SECOND = 0.35;
 
 // ---------------------------------------------------------------- THE RUINS
 //
@@ -538,6 +636,315 @@ export function meshPile(rock, foot = footOf(rock)) {
   }
 
   return { positions, normals, indices, quads, faces, origin, cap };
+}
+
+/**
+ * Where one ruin's columns stand and how many courses high each one is.
+ *
+ * PULLED OUT OF THE CUT SO THAT THE CUT IS NOT THE ONLY READER. A camera has to
+ * know what a lens may not pass through, and a box drawn round a ruin from the
+ * PLAN's own width and height is a second opinion about where the stone is: the
+ * cut rounds a 0.57 m piece UP to three cells of 0.20 and a 0.32 m piece up to
+ * two, so the plan is 30 mm narrower than the stone in one place and 80 mm
+ * shorter than it in another -- and a box short of the stone is a hole a lens
+ * goes through. So the shape is answered once and both of them read it. Nothing
+ * here is new: it is the head of the loop that was already below, moved up.
+ */
+export function ruinColumns(plan) {
+  const foot = Math.floor(groundHeightAt(plan.x, plan.z) / VOXEL) * VOXEL;
+  const across = Math.max(1, Math.round(plan.width / RUIN_CELL));
+  const deep = Math.max(1, Math.round(plan.depth / RUIN_CELL));
+  const tall = Math.max(1, Math.round(plan.height / RUIN_CELL));
+  const columns = [];
+  for (let i = 0; i < across; i++) {
+    for (let k = 0; k < deep; k++) {
+      // How far this column stands from the middle of the piece, nought at the
+      // centre and one at a corner. The stack steps DOWN from the middle out,
+      // which is the shape the target's stacks have.
+      const u = across === 1 ? 0 : Math.abs((i + 0.5) / across - 0.5) * 2;
+      const v = deep === 1 ? 0 : Math.abs((k + 0.5) / deep - 0.5) * 2;
+      const out0 = Math.max(u, v);
+      const wobble = looseHash(plan.seed, i * 31 + k, 1) - 0.5;
+      columns.push({
+        i,
+        k,
+        courses: Math.round(tall * (1 - RUIN_TAPER * out0) + wobble),
+        x: plan.x + (i - (across - 1) / 2) * RUIN_CELL,
+        z: plan.z + (k - (deep - 1) / 2) * RUIN_CELL,
+      });
+    }
+  }
+  return { foot, across, deep, tall, columns };
+}
+
+/**
+ * Where the basin's blocks lie and how many courses each column carries.
+ *
+ * Same reason as the ruins': the ring is laid on the world's lattice and eaten
+ * out of an annulus, so nothing outside this file can say where its stone is
+ * without saying it a second time.
+ */
+export function basinCells() {
+  if (!FOUNTAIN) return null;
+  const foot = Math.floor(groundHeightAt(FOUNTAIN.x, FOUNTAIN.z) / VOXEL) * VOXEL;
+  const outer = FOUNTAIN.basinDiameter / 2;
+  const inner = FOUNTAIN.poolDiameter / 2;
+  // Laid on the world's own lattice rather than swept round a circle, so the
+  // rim is a ring of CUBES the way the target's is and not a turned bowl.
+  const reach = Math.ceil(outer / BASIN_CELL);
+  const cells = [];
+  for (let i = -reach; i <= reach; i++) {
+    for (let k = -reach; k <= reach; k++) {
+      const x = (i + 0.5) * BASIN_CELL;
+      const z = (k + 0.5) * BASIN_CELL;
+      const r = Math.hypot(x, z);
+      if (r > outer || r < inner) continue;
+      cells.push({
+        i,
+        k,
+        x: FOUNTAIN.x + x,
+        z: FOUNTAIN.z + z,
+        courses: BASIN_COURSES + (looseHash(97, i * 31 + k, 17) < BASIN_SECOND ? 1 : 0),
+      });
+    }
+  }
+  return { foot, cells };
+}
+
+// --------------------------------------------- what a lens may not pass through
+//
+// THE LOOSE STONE WAS NOT IN THE CAMERA'S LIST AT ALL. src/world/contracts.js
+// published the six blocks and the rocks and nothing else, so the two ruins the
+// target puts in the near grass -- one of them 1.20 m across and 0.80 m tall --
+// and the whole ring of the fountain were stone a lens could swing straight
+// through. They are all under a metre, and under a metre is exactly where the
+// arm ends up when the look goes down.
+//
+// A RUIN IS ONE BOX AND THE BASIN IS SEVERAL. A stepped stack is a rectangle
+// with its corners eaten in, and a rectangle round the whole of it over-claims
+// by a course at the corners -- nothing a lens can be stopped by, since the
+// tallest ruin's own crown stands 0.80 m over the turf. The basin is not a
+// rectangle at all: it is an ANNULUS, and one box over it would claim the mirror
+// of water in the middle, which is a place a walker is meant to be able to put
+// the lens. So the ring is merged into runs along one axis of the lattice it is
+// laid on, one box a run, which is exact.
+
+/**
+ * Every loose stone in this world as a box a camera may not enter.
+ *
+ * `{ name, x, z, halfWidth, halfDepth, rotationY, y0, y1 }` -- the shape
+ * src/world/contracts.js publishes and src/core/avatar.js tests a segment
+ * against.
+ *
+ * THE TUFTS ARE IN, AND THEY ARE WHY THE TOP IS IN METRES RATHER THAN COURSES.
+ * A tuft of moss is one voxel standing on the lid of the column it grew on,
+ * inside that column's own footprint but 0.10 m above its crown -- so a box cut
+ * to whole courses leaves the moss of the tallest column outside it. It costs a
+ * tenth of a metre on a stack that a lens can never reach anyway, and it buys a
+ * guard with no exception in it: every vertex of this mesh from the ruins on is
+ * inside a box, and guard-avatar asserts exactly that with no allowance made.
+ *
+ * THE TURF ON THE HEADS OF THE SIX IS THE ONE THING LEFT OUT, and it is left out
+ * by the same arithmetic rather than by hand: it is laid first, so the count of
+ * its cubes is where the guard starts reading. Those lids stand five to thirteen
+ * metres up, well inside the block's own box for every approach a walker has.
+ */
+export function looseStoneSolids() {
+  const out = [];
+  for (const plan of RUINS) {
+    const { foot, columns } = ruinColumns(plan);
+    let xLo = Infinity;
+    let xHi = -Infinity;
+    let zLo = Infinity;
+    let zHi = -Infinity;
+    let top = 0;
+    for (const c of columns) {
+      if (c.courses <= 0) continue;
+      if (c.x - RUIN_CELL / 2 < xLo) xLo = c.x - RUIN_CELL / 2;
+      if (c.x + RUIN_CELL / 2 > xHi) xHi = c.x + RUIN_CELL / 2;
+      if (c.z - RUIN_CELL / 2 < zLo) zLo = c.z - RUIN_CELL / 2;
+      if (c.z + RUIN_CELL / 2 > zHi) zHi = c.z + RUIN_CELL / 2;
+      // The same draw the cut makes, off the same three numbers, so the box and
+      // the cubes cannot disagree about whether this column grew a tuft.
+      const tuft = looseHash(plan.seed, c.i * 31 + c.k, 3) < RUIN_MOSS_SHARE ? RUIN_TUFT : 0;
+      const crown = c.courses * RUIN_CELL + tuft;
+      if (crown > top) top = crown;
+    }
+    if (top === 0) continue;
+    out.push({
+      name: plan.name,
+      x: (xLo + xHi) / 2,
+      z: (zLo + zHi) / 2,
+      halfWidth: (xHi - xLo) / 2,
+      halfDepth: (zHi - zLo) / 2,
+      rotationY: 0,
+      y0: foot,
+      y1: foot + top,
+    });
+  }
+
+  const ring = basinCells();
+  if (ring) {
+    const rows = new Map();
+    for (const c of ring.cells) {
+      const row = rows.get(c.k) || [];
+      row.push(c);
+      rows.set(c.k, row);
+    }
+    for (const [, row] of [...rows].sort((a, b) => a[0] - b[0])) {
+      row.sort((a, b) => a.i - b.i);
+      let run = null;
+      const close = () => {
+        if (!run) return;
+        out.push({
+          name: `vasca ${run.k},${run.i0}`,
+          x: (run.xLo + run.xHi) / 2,
+          z: run.z,
+          halfWidth: (run.xHi - run.xLo) / 2,
+          halfDepth: BASIN_CELL / 2,
+          rotationY: 0,
+          y0: ring.foot,
+          y1: ring.foot + run.courses * BASIN_CELL,
+        });
+        run = null;
+      };
+      for (const c of row) {
+        // A run is broken by a gap in the lattice or by a change of height: a
+        // box has one top, and merging two heights would claim the taller of
+        // them over the shorter block.
+        if (run && (c.i !== run.i + 1 || c.courses !== run.courses)) close();
+        if (!run) {
+          run = {
+            k: c.k,
+            i0: c.i,
+            i: c.i,
+            z: c.z,
+            courses: c.courses,
+            xLo: c.x - BASIN_CELL / 2,
+            xHi: c.x + BASIN_CELL / 2,
+          };
+        } else {
+          run.i = c.i;
+          run.xHi = c.x + BASIN_CELL / 2;
+        }
+      }
+      close();
+    }
+  }
+  return out;
+}
+
+// ------------------------------------------------ what a lens may not pass through
+//
+// THE BOX ROUND A PILE, AND THE END OF THE SECOND OPINION ABOUT WHERE A ROCK IS.
+//
+// There were two lists. src/world/layout.js published `rockSeats()` — the rock
+// PLAN, filtered — and src/world/contracts.js built the camera's boxes out of
+// it, taking their vertical extent from the plan's own `y` and `meshHeight`.
+// Those two fields belong to the SMOOTH ROCK MESH V8 used to draw, cut against a
+// meadow that has been rewritten twice since, and this branch does not draw that
+// mesh: it cuts the piles above, on the ground contract, on this world's own
+// lattice. So the camera was guarding boxes that no longer stood where the stone
+// does, and the arithmetic says how far off by name:
+//
+//   pile           the plan's box       the stone as cut     what the lens got
+//   rock-w1        0.541 .. 1.027 m     0.000 .. 0.400 m     NOTHING: the box
+//                                                            and the stone do
+//                                                            not touch
+//   rock-e1        0.367 .. 0.996       0.000 .. 0.500       133 mm of 500
+//   rock-w2        0.342 .. 0.914       0.000 .. 0.500       158 mm of 500
+//   rock-sw       -0.507 .. 0.293       0.000 .. 0.700       293 mm of 700
+//   rock-se-big   -0.456 .. 0.344       0.000 .. 0.700       344 mm of 700
+//
+// and four of the ten piles — se-round, se-small, n1, n2 — had no box at all,
+// because the plan's 0.45 m filter is the WALKER's rule about what he may step
+// over and was never a statement about what a lens may enter.
+//
+// SO THE CAMERA READS THE STONE. Not the plan: the cells the mesher actually
+// fills, asked of pileField above, which is the one law that says what a pile is.
+// A box built from that cannot drift from the stone, because it is measured off
+// the same array the triangles come out of, and guard-avatar checks the
+// containment cell by cell rather than taking this comment's word for it.
+//
+// IT IS THE BOUNDING BOX AND NOT A SQUARE INSIDE THE ROUND, and that reverses
+// the rule the old seat carried, on a number. The old rule kept the box at 0.72
+// of the radius so that the lens was not stopped in the air beside a rounded
+// stone; the corners of a bounding box over a domed pile are empty by up to
+// 0.23 m. But NO PILE CAN EVER SHORTEN THIS ARM: the tallest of the ten stands
+// 0.70 m over its foot, the camera's own floor is the ground plus 0.25 m
+// (GROUND_CLEARANCE in src/core/avatar.js), and the rig carries the lens 1.583 m
+// above the walker's feet — so the segment this box is tested against passes a
+// clear metre and a half over the highest stone in the list, at every pitch the
+// arm survives. The corner over-claim costs nothing that can be photographed;
+// the hole it replaces was 400 mm of stone with no box on it. The piles are in
+// the list because the list is what the world is made of, and because a guard
+// that walks a ring round every box has to be given every box.
+//
+// AND THE WALKER IS NOT TOUCHED. ROCK_BLOCKERS above is his, on his own 0.45 m
+// threshold and his own 0.72 of the radius, both ratified with the piles; that
+// square is up to 132 mm narrower than the stone this measures, which is a
+// residue reported to whoever owns the scree and not a thing to change here
+// while a camera is being fixed.
+
+/** The boxes, built on first ask and kept: ten fields is not free twice. */
+const PILE_BOXES = new Map();
+
+/**
+ * Where one pile really stands, as a box in world metres.
+ *
+ * `{ name, x, z, halfWidth, halfDepth, rotationY, y0, y1 }` — the shape
+ * src/world/contracts.js publishes and src/core/avatar.js tests a segment
+ * against.
+ */
+export function pileBox(rock) {
+  const held = PILE_BOXES.get(rock.name);
+  if (held) return held;
+  const foot = footOf(rock);
+  const field = pileField(rock, foot);
+  const { cells, wide, tall, at, origin } = field;
+  let i0 = Infinity; let i1 = -Infinity;
+  let k0 = Infinity; let k1 = -Infinity;
+  let j0 = Infinity; let j1 = -Infinity;
+  for (let j = 0; j < tall; j++) {
+    for (let k = 0; k < wide; k++) {
+      for (let i = 0; i < wide; i++) {
+        if (cells[at(i, j, k)] === 255) continue;
+        if (i < i0) i0 = i; if (i > i1) i1 = i;
+        if (k < k0) k0 = k; if (k > k1) k1 = k;
+        if (j < j0) j0 = j; if (j > j1) j1 = j;
+      }
+    }
+  }
+  // A pile with nothing in it is not a thing a lens can enter. It cannot happen
+  // — columnCells keeps at least the middle — but a box with infinities in it
+  // would be, so it is answered rather than assumed.
+  if (i1 < i0) return null;
+  const xLo = (origin.x + i0) * VOXEL;
+  const xHi = (origin.x + i1 + 1) * VOXEL;
+  const zLo = (origin.z + k0) * VOXEL;
+  const zHi = (origin.z + k1 + 1) * VOXEL;
+  const box = {
+    name: rock.name,
+    x: (xLo + xHi) / 2,
+    z: (zLo + zHi) / 2,
+    halfWidth: (xHi - xLo) / 2,
+    halfDepth: (zHi - zLo) / 2,
+    rotationY: 0,
+    y0: (origin.y + j0) * VOXEL,
+    y1: (origin.y + j1 + 1) * VOXEL,
+  };
+  PILE_BOXES.set(rock.name, box);
+  return box;
+}
+
+/** Every pile as a box, in the order the plan lists them. */
+export function pileSolids(piles = ROCK_PILES) {
+  const out = [];
+  for (const rock of piles) {
+    const box = pileBox(rock);
+    if (box) out.push(box);
+  }
+  return out;
 }
 
 /**

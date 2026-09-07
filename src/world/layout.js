@@ -1,5 +1,3 @@
-import ROCK_PLAN from '../../assets-src/rocks/rocks.json' with { type: 'json' };
-
 // Hub layout, in metres.
 //
 // Coordinate system: origin is the centre of the hub, +Y is up, north is -Z.
@@ -151,23 +149,24 @@ export const PATH = {
 
 // ---------------------------------------------------------------- the rocks
 //
-// WHERE THE LOOSE STONE STANDS, AND HOW BIG A BOX IT IS, PUBLISHED ONCE. Two
-// things need it and they must not disagree: the walker, who may not walk
-// through a boulder, and the third person camera, which may not swing through
-// one. src/world/rocks.js builds the walker's footprints from this and
-// src/world/contracts.js builds the camera's boxes from it, so a stone cannot be
-// solid to a body and hollow to its lens. The seats themselves are the rock
-// plan's -- this is the LAYOUT's reading of it and not a second copy.
+// THEY ARE NOT SEATED HERE ANY MORE, AND THAT IS THE WHOLE OF THE ENTRY.
+//
+// What stood here was `rockSeats()` and `ROCK_SQUARE`: the rock plan filtered at
+// 0.45 m, which src/world/contracts.js turned into the camera's boxes using the
+// plan's own `y` and `meshHeight`. It was written as one source with two
+// readers, and it had stopped being one: those two fields are the SMOOTH ROCK
+// MESH V8 used to draw, sampled against a meadow that has been rewritten twice,
+// and what this branch actually cuts is voxel PILES on the ground contract
+// (src/world/rock-piles.js). Measured against the stone as cut, the boxes this
+// file was handing out missed it by up to 627 mm and in one case -- rock-w1, box
+// 0.541 .. 1.027 m over stone that runs 0.000 .. 0.400 -- did not overlap it at
+// all, while four of the ten piles had no box because the 0.45 m line is the
+// WALKER's rule about what he may step over.
+//
+// A LAYOUT MAY NOT HOLD A SECOND OPINION ABOUT A MESH. Where a rock stands is
+// the plan's (assets-src/rocks/rocks.json), and how much room it takes up is a
+// question only the file that cuts it can answer -- so both readers now ask
+// there: `pileSolids()` for the lens, `ROCK_BLOCKERS` for the body, off one
+// plan, in one file. Nothing in this world imports a rock seat from the layout
+// any more, which is why the name is gone rather than deprecated.
 
-/** How much of a rock's radius its box is allowed to be. */
-export const ROCK_SQUARE = 0.72;
-
-/**
- * The rocks solid enough that passing through one would be a hole in the world.
- *
- * A SQUARE INSIDE THE ROUND: a box that reached the full radius would stop a
- * body -- or a camera -- in the air beside the stone.
- */
-export function rockSeats() {
-  return ROCK_PLAN.rocks.filter((rock) => rock.radius >= 0.45);
-}

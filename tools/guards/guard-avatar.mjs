@@ -1,10 +1,24 @@
-import { read, reporter, selfTest } from './lib.mjs';
+import { Quaternion, Vector3 } from 'three';
+import { read, readJson, reporter, selfTest } from './lib.mjs';
 import {
-  AVATAR, EYE_TO_CROWN, RIG, SWITCH, armClear, bodyFade, reachEase, rigMetres, thirdPersonEye,
+  AVATAR, EYE_TO_CROWN, GROUND_CLEARANCE, RIG, SWITCH, armFraction, armClear, bodyFade,
+  reachEase, rigMetres, thirdPersonEye,
 } from '../../src/core/avatar.js';
-import { POSE_TARGET_TERZA, POSE_VOX_DAY } from '../../src/core/poses.js';
-import { EYE_HEIGHT } from '../../src/world/layout.js';
+import { POSES, POSE_TARGET, POSE_TARGET_TERZA, POSE_VOX_DAY } from '../../src/core/poses.js';
+import {
+  AREA_CENTER, AREA_HARD_RADIUS, AREA_SOFT_RADIUS, EYE_HEIGHT,
+} from '../../src/world/layout.js';
 import { cameraSolids, groundHeightAt } from '../../src/world/contracts.js';
+import {
+  ROCK_PILES, RUINS, footOf, looseStoneSolids, pileField, pileSolids,
+} from '../../src/world/rock-piles.js';
+import { createLooseStone } from '../../src/world/loose-stone.js';
+import { stoneSpecs } from '../../src/world/stone.js';
+import { hillAt } from '../../assets-src/distant/cornice.mjs';
+import MASONRY from '../../assets-src/monoliths/masonry-spec.json' with { type: 'json' };
+import ROCK_PLAN from '../../assets-src/rocks/rocks.json' with { type: 'json' };
+import { Player } from '../../src/core/player.js';
+import { createDevPose } from '../../src/dev/pose.js';
 import { VOXEL } from '../../src/world/voxel/pure.js';
 import {
   CELLS, CYCLE, LIFT, PAINTS, STRIDE_METRES, SUBDIVISION, WALKS, bounds, paletteAt,
@@ -44,6 +58,24 @@ import {
 // blocks and each of the rocks is 1,728 placements, and it takes milliseconds,
 // which is the argument for doing it exhaustively instead of at three poses
 // somebody chose.
+//
+// AND THE LIST IS NOW CHECKED AGAINST THE STONE, WHICH IS THE HALF THAT WAS
+// MISSING. Everything above asks whether the CAMERA respects the list of solids;
+// none of it asks whether the LIST is the world. It was not: the boxes came off
+// the rock plan's `y` and `meshHeight`, which belong to a mesh this branch does
+// not draw, and one of them stood entirely in the air over the stone it named
+// (E-INT-V8). So the first section below walks every cell the pile mesher fills
+// and every vertex the loose stone mesh carries, and asks each one whether the
+// camera's list contains it. That is exact and it is not an opinion: the cells
+// come out of pileField and the vertices out of createLooseStone, which are the
+// two functions the triangles themselves come out of.
+//
+// AND THE WALKER IS TAKEN TO THE RIM. The ring above is the middle of the hub;
+// what U-CORNICE-1 put outside it is a plateau that FALLS at 35 m and hills of
+// real cubes beyond that, so the other worst case for a five metre boom is a
+// walker standing on the edge of the world with his back to the drop. That one
+// is swept too, at every bearing and at seven aims, against the field's own
+// ground contract and against the hills' own law.
 
 const DEG = Math.PI / 180;
 const FRAME = { width: 1672, height: 941 };
@@ -180,6 +212,51 @@ function cellPixels(pose = POSE_VOX_DAY, feet = FEET) {
   return (a.py - b.py) * (VOXEL / SUBDIVISION);
 }
 
+// ------------------------------------------------------------ the imposed pose
+//
+// THE ONE THING THIS GUARD COULD NOT ASK BEFORE: what does the camera actually
+// READ after a pose is imposed on it. Every measurement in this campaign and
+// every plate the committente is shown is taken at a pose set from outside the
+// page, and until U-AVATAR-2 there were two doors to it that disagreed by five
+// metres in third person -- so the plates of U-LUCE-4 were of a camera nobody
+// had asked for (E-LUCE5). The fix is a single seat, src/dev/pose.js, and a fix
+// nothing measures is a fix that comes undone.
+//
+// SO THE SEAT IS RUN, NOT READ. The walker is the page's own Player, the pose is
+// the page's own POSE_TARGET, and the camera is a real quaternion: what comes
+// back is the six numbers a screenshot would have been taken at. A text scan
+// would have told us the file says 'prima' somewhere, which is not the same
+// question.
+
+/** A camera with nothing in it but the three things a pose writes. */
+function benchCamera() {
+  return {
+    position: new Vector3(),
+    quaternion: new Quaternion(),
+    fov: 0,
+    projections: 0,
+    updateProjectionMatrix() { this.projections++; },
+  };
+}
+
+/**
+ * The seat, driven once, from whichever person the walker was standing in.
+ *
+ * @param {string} from  the person to start in, so that 'always first' is a
+ *                       claim about the door and not about the initial state
+ */
+function imposed(pose, from = 'terza') {
+  const player = new Player();
+  const camera = benchCamera();
+  let dismissed = 0;
+  const seat = createDevPose({ player, camera, veil: { dismiss() { dismissed++; } } });
+  player.placePerson(from);
+  const read = seat.place(pose);
+  return {
+    read, dismissed, person: player.person, camera,
+  };
+}
+
 // ------------------------------------------------------ the camera against the stone
 
 /** Is a point inside a box, allowing it to come within `pad` of the surface? */
@@ -193,6 +270,105 @@ function inside(p, b, pad = 0) {
   return Math.abs(lx) < b.halfWidth - pad
     && Math.abs(lz) < b.halfDepth - pad
     && p.y > b.y0 - pad && p.y < b.y1 + pad;
+}
+
+// ----------------------------------------------- the list against the stone
+//
+// EVERY CELL AND EVERY VERTEX, ASKED OF THE LIST. Not a sample and not a shape
+// argument: the piles hand back the field of cells the mesher walks, the loose
+// stone hands back the buffer the triangles are drawn from, and each corner of
+// each of them is asked whether the camera's list contains it. A box that has
+// drifted off its stone by a millimetre answers no.
+
+/**
+ * Is a point inside a box, corners counted as in?
+ *
+ * THE SLACK IS THE BUFFER'S AND NOT A TOLERANCE ON THE ANSWER. A cell of the
+ * lattice is asked in doubles and closes exactly; a vertex of the loose stone
+ * comes back out of a Float32Array, where 4.29 is 4.2899999618530273, so a
+ * corner that lies ON a face of its own box reads half a micron outside it. A
+ * tenth of a millimetre absorbs that and nothing else: the holes this section
+ * exists to catch are four hundred millimetres deep.
+ */
+function within(p, b, slack = 1e-9) {
+  const s = Math.sin(b.rotationY);
+  const c = Math.cos(b.rotationY);
+  const dx = p.x - b.x;
+  const dz = p.z - b.z;
+  const lx = dx * c - dz * s;
+  const lz = dx * s + dz * c;
+  return Math.abs(lx) <= b.halfWidth + slack && Math.abs(lz) <= b.halfDepth + slack
+    && p.y >= b.y0 - slack && p.y <= b.y1 + slack;
+}
+
+/** What a Float32 vertex is allowed to be out by, in metres. */
+const BUFFER_SLACK = 1e-4;
+
+/**
+ * How much of the piles the given list of boxes fails to contain.
+ *
+ * Every corner of every solid cell, which for a lattice is the whole of the
+ * question: a box that contains the eight corners of an axis aligned cell
+ * contains the cell.
+ */
+function pilesOutside(boxes) {
+  let cells = 0;
+  let outside = 0;
+  let worst = null;
+  for (const rock of ROCK_PILES) {
+    const foot = footOf(rock);
+    const field = pileField(rock, foot);
+    const { wide, tall, at, origin } = field;
+    for (let j = 0; j < tall; j++) {
+      for (let k = 0; k < wide; k++) {
+        for (let i = 0; i < wide; i++) {
+          if (field.cells[at(i, j, k)] === 255) continue;
+          cells++;
+          for (let corner = 0; corner < 8; corner++) {
+            const q = {
+              x: (origin.x + i + (corner & 1)) * VOXEL,
+              y: (origin.y + j + ((corner >> 1) & 1)) * VOXEL,
+              z: (origin.z + k + ((corner >> 2) & 1)) * VOXEL,
+            };
+            if (boxes.some((b) => within(q, b))) continue;
+            outside++;
+            if (!worst) worst = { rock: rock.name, i, j, k, ...q };
+            break;
+          }
+        }
+      }
+    }
+  }
+  return { cells, outside, worst };
+}
+
+/**
+ * The loose stone the same way, off the buffer the page actually draws.
+ *
+ * THE TURF ON THE SIX IS SKIPPED BY COUNT AND NOT BY GUESS. createLooseStone
+ * lays the heads first, then the ruins, then the basin, and reports how many
+ * cubes went into each; a cube is twenty vertices, so the boundary between the
+ * turf and the rest is arithmetic. The turf is declared out of the camera's list
+ * -- those lids stand five to thirteen metres up, inside the block's own box --
+ * and what is left has to be in it.
+ */
+function looseOutside(boxes) {
+  const built = createLooseStone(stoneSpecs(MASONRY));
+  const position = built.mesh.geometry.attributes.position;
+  const first = built.counts.turf * 20;
+  let checked = 0;
+  let outside = 0;
+  let worst = null;
+  for (let v = first; v < position.count; v++) {
+    const q = { x: position.getX(v), y: position.getY(v), z: position.getZ(v) };
+    checked++;
+    if (boxes.some((b) => within(q, b, BUFFER_SLACK))) continue;
+    outside++;
+    if (!worst) worst = { vertex: v, ...q };
+  }
+  return {
+    checked, outside, worst, turf: first, counts: built.counts,
+  };
 }
 
 /**
@@ -227,6 +403,70 @@ function ring(box, distance, pitch, steps = 16) {
     out.push({ x: eye.x, y: eye.y, z: eye.z, arm: eye.arm, pivot });
   }
   return out;
+}
+
+// -------------------------------------------------------------- the rim
+//
+// THE OTHER WORST CASE FOR A FIVE METRE BOOM. The ring above walks the camera
+// round the furniture in the middle of the hub; this walks the WALKER to the
+// edge of the world and turns him all the way round at every aim the look
+// allows. Two things can go wrong out there and neither is a solid: the plateau
+// FALLS beyond 35 m, so a camera swung outward is over a slope and the ground
+// clamp has to catch it against the field's own contract; and U-CORNICE-1 put
+// hills of real cubes past that, which are not in cameraSolids and never will
+// be -- they are a law and not a list -- so the distance to them is a
+// measurement this guard has to take rather than a fact it may assume.
+
+/** The horizon's own law, read from the spec that ships with it. */
+const CORNICE = readJson('assets-src/distant/cornice.json');
+
+/**
+ * The walker taken to the edge and turned round, at every aim.
+ *
+ * The radii are his own perimeter's: AREA_SOFT_RADIUS is where the recall
+ * begins to curve him back and AREA_HARD_RADIUS is where it stops him, and one
+ * metre past the hard radius is there because a soft stop is asymptotic and a
+ * guard should stand outside the place it is guarding.
+ */
+function rimSweep(bearings = 32, yaws = 16) {
+  const pitches = [0, 30, -30, 60, -60, 85, -85].map((d) => d * DEG);
+  const solids = cameraSolids();
+  const eye = {};
+  let placements = 0;
+  let underground = 0;
+  let inHill = 0;
+  let lowest = Infinity;
+  let nearestHill = Infinity;
+  let deepest = null;
+  for (const radius of [AREA_SOFT_RADIUS, AREA_HARD_RADIUS, AREA_HARD_RADIUS + 1]) {
+    for (let b = 0; b < bearings; b++) {
+      const bearing = (b / bearings) * Math.PI * 2;
+      const x = AREA_CENTER.x + Math.sin(bearing) * radius;
+      const z = AREA_CENTER.z + Math.cos(bearing) * radius;
+      const stance = groundHeightAt(x, z);
+      for (let a = 0; a < yaws; a++) {
+        const yaw = (a / yaws) * Math.PI * 2;
+        for (const pitch of pitches) {
+          thirdPersonEye(eye, { x, z, stance, yaw }, pitch, PITCH_LIMIT, groundHeightAt,
+            AVATAR.height, { reach: 1, solids, eyeHeight: EYE_HEIGHT });
+          placements++;
+          const floor = groundHeightAt(eye.x, eye.z);
+          const margin = eye.y - floor;
+          if (margin < lowest) { lowest = margin; deepest = { x: eye.x, y: eye.y, z: eye.z, floor }; }
+          if (margin < -1e-9) underground++;
+          // The hills: their own surface at the camera's own place, which is the
+          // only honest way to ask whether a lens is inside one.
+          const hill = hillAt(CORNICE, eye.x, eye.z);
+          if (eye.y < hill.y - 1e-9) inHill++;
+          const clear = eye.y - hill.y;
+          if (clear < nearestHill) nearestHill = clear;
+        }
+      }
+    }
+  }
+  return {
+    placements, underground, inHill, lowest, nearestHill, deepest,
+  };
 }
 
 // ------------------------------------------------------------------ the switch
@@ -359,6 +599,139 @@ if (process.argv.includes('--self')) {
       what: 'a body that sinks at a passing frame is caught',
       caught: [0, -1, 0, 1].some((v) => v < 0) && !LIFT.some((v) => v < 0),
     },
+    {
+      // THE DEFECT E-INT-V8 NAMED, INJECTED BACK. These are the boxes this seat
+      // published until U-AVATAR-2: the rock plan filtered at 0.45 m, with the
+      // vertical extent taken from the smooth mesh's own `y` and `meshHeight`.
+      what: "the camera's old boxes, off the rock plan's mesh fields, leave stone outside them",
+      caught: (() => {
+        const old = ROCK_PLAN.rocks
+          .filter((rock) => rock.radius >= 0.45)
+          .map((rock) => ({
+            name: rock.name,
+            x: rock.x,
+            z: rock.z,
+            halfWidth: rock.radius * 0.72,
+            halfDepth: rock.radius * 0.72,
+            rotationY: 0,
+            y0: rock.y,
+            y1: rock.y + (rock.meshHeight ?? rock.height),
+          }));
+        return pilesOutside(old).outside > 0 && pilesOutside(cameraSolids()).outside === 0;
+      })(),
+    },
+    {
+      // And the same mistake in the other file: a ruin boxed from the PLAN's own
+      // width, depth and height rather than from the cut, which rounds up.
+      what: "a ruin boxed from its plan instead of its cut leaves cubes outside it",
+      caught: (() => {
+        const planned = RUINS.map((r) => ({
+          name: r.name,
+          x: r.x,
+          z: r.z,
+          halfWidth: r.width / 2,
+          halfDepth: r.depth / 2,
+          rotationY: 0,
+          y0: 0,
+          y1: r.height,
+        }));
+        return looseOutside(planned).outside > 0
+          && looseOutside(cameraSolids()).outside === 0;
+      })(),
+    },
+    {
+      // The over-claim, which is the mistake the other direction: one box over
+      // the whole ring fills the mirror of water the ring is there to hold.
+      what: 'one box over the whole basin claims the pool, and is caught',
+      caught: (() => {
+        const ring = looseStoneSolids().filter((b) => String(b.name).startsWith('vasca'));
+        if (!ring.length) return false;
+        let x0 = Infinity; let x1 = -Infinity; let z0 = Infinity; let z1 = -Infinity;
+        let mid = { x: 0, z: 0 };
+        for (const b of ring) {
+          x0 = Math.min(x0, b.x - b.halfWidth); x1 = Math.max(x1, b.x + b.halfWidth);
+          z0 = Math.min(z0, b.z - b.halfDepth); z1 = Math.max(z1, b.z + b.halfDepth);
+          mid.x += b.x; mid.z += b.z;
+        }
+        mid = { x: mid.x / ring.length, y: 0.05, z: mid.z / ring.length };
+        const lump = {
+          name: 'vasca intera',
+          x: (x0 + x1) / 2,
+          z: (z0 + z1) / 2,
+          halfWidth: (x1 - x0) / 2,
+          halfDepth: (z1 - z0) / 2,
+          rotationY: 0,
+          y0: 0,
+          y1: 0.4,
+        };
+        return within(mid, lump) && !ring.some((b) => within(mid, b));
+      })(),
+    },
+    {
+      // THE DEFECT E-LUCE5 FOUND IN THE PLATES OF U-LUCE-4, injected back. The
+      // old door set the pose and left the person alone: asked for the day fit
+      // while the walker happened to be in third, it stood the WALKER on the
+      // fitted camera's own spot and swung the lens five metres astern of it.
+      // Every plate taken that way is of a camera nobody asked for.
+      what: 'a pose set without the person leaves the lens five metres off the fit',
+      caught: (() => {
+        const player = new Player();
+        const camera = benchCamera();
+        player.placePerson('terza');
+        player.setPose(POSE_TARGET);
+        camera.fov = POSE_TARGET.fov;
+        player.applyTo(camera);
+        const off = Math.hypot(
+          camera.position.x - POSE_TARGET.position.x,
+          camera.position.y - POSE_TARGET.position.y,
+          camera.position.z - POSE_TARGET.position.z,
+        );
+        return off > 1 && imposed(POSE_TARGET).read.miss.metres <= 0.001;
+      })(),
+    },
+    {
+      what: 'a pose that leaves the arrival veil up is caught',
+      caught: (() => {
+        const player = new Player();
+        const camera = benchCamera();
+        let dismissed = 0;
+        const deaf = createDevPose({ player, camera, veil: null });
+        deaf.place(POSE_TARGET);
+        const heard = createDevPose({
+          player: new Player(), camera: benchCamera(), veil: { dismiss() { dismissed++; } },
+        });
+        heard.place(POSE_TARGET);
+        return dismissed === 1 && imposed(POSE_TARGET).dismissed === 1;
+      })(),
+    },
+    {
+      // D-AVATAR-2 = A, injected: a rigid boom at the steepest look.
+      what: 'a boom that does not shorten with the look swings under the ground',
+      caught: (() => {
+        const rigid = {};
+        const x = AREA_CENTER.x;
+        const z = AREA_CENTER.z + AREA_HARD_RADIUS;
+        const stance = groundHeightAt(x, z);
+        // No limit, so armFraction hands back the whole arm at every aim: the
+        // world as it would be with D-AVATAR-2 answered the other way. And no
+        // ground either, because the clamp is the OTHER guard -- what is being
+        // injected here is the boom, and a boom that has to be rescued by a
+        // floor every time the walker looks up is a boom that drags the camera
+        // along the turf and loses the framing.
+        thirdPersonEye(rigid, { x, z, stance, yaw: 0 }, 80 * DEG, 0, null, AVATAR.height,
+          { reach: 1, solids: [], eyeHeight: EYE_HEIGHT });
+        const kept = {};
+        thirdPersonEye(kept, { x, z, stance, yaw: 0 }, 80 * DEG, PITCH_LIMIT, null,
+          AVATAR.height, { reach: 1, solids: [], eyeHeight: EYE_HEIGHT });
+        return rigid.y < groundHeightAt(rigid.x, rigid.z)
+          && kept.y >= groundHeightAt(kept.x, kept.z) - 1e-9;
+      })(),
+    },
+    {
+      what: 'a pile dropped out of the list is caught',
+      caught: pileSolids(ROCK_PILES.slice(1)).length !== ROCK_PILES.length
+        && pileSolids().length === ROCK_PILES.length,
+    },
   ]);
 }
 
@@ -387,7 +760,21 @@ report.check(Math.abs(EYE_TO_CROWN - (EYE_HEIGHT - AVATAR.height)) < 1e-12,
   `${EYE_TO_CROWN.toFixed(2)} m of crown below the eye`);
 
 // ------------------------------------------------------------------ the framing
+//
+// AND THE RULE'S RESTING AIM IS THE FIT'S OWN, NOT A NUMBER THAT LOOKS LIKE IT.
+// RIG.pitch and RIG.fov are written into src/core/avatar.js as literals, and
+// they are the day fit's -- the offsets above were measured against that camera,
+// so an aim that drifted from it by a tenth of a degree would swing the boom in
+// the one place the whole campaign is judged. Two copies of one number is where
+// this campaign has already lost a pose once (POSE_TARGET, E-SENT6), so the
+// copies are checked rather than trusted.
 const rig = rigMetres(AVATAR.height);
+report.check(RIG.pitch === POSE_VOX_DAY.pitch,
+  "the boom's resting aim is the day fit's aim, to the bit",
+  `${RIG.pitch} deg against the pose's ${POSE_VOX_DAY.pitch}`);
+report.check(RIG.fov === POSE_VOX_DAY.fov,
+  'and third person looks through the same lens the fit solved for',
+  `${RIG.fov} against ${POSE_VOX_DAY.fov}`);
 const placed = {};
 thirdPersonEye(placed, { x: FEET.x, z: FEET.z, stance: 0, yaw: POSE_VOX_DAY.yaw * DEG },
   POSE_VOX_DAY.pitch * DEG, PITCH_LIMIT, null, AVATAR.height,
@@ -431,10 +818,94 @@ for (const kind of Object.keys(WALKS)) {
   }
 }
 
+// ------------------------------------------------------------ the imposed pose
+const shot = imposed(POSE_TARGET);
+report.check(shot.person === 'prima',
+  'the dev pose stands the camera in FIRST person, whichever person it found the walker in',
+  `entered in terza, left in ${shot.person}`);
+report.check(shot.read.miss.metres <= 0.001,
+  'and the camera it leaves behind IS the day fit, to the millimetre',
+  `${(shot.read.miss.metres * 1000).toFixed(4)} mm from `
+  + `${POSE_TARGET.position.x} / ${POSE_TARGET.position.y} / ${POSE_TARGET.position.z}`);
+report.check(shot.read.miss.degrees <= 0.01,
+  'and looks where the fit looks, to a hundredth of a degree',
+  `${shot.read.miss.degrees.toExponential(2)} deg from yaw ${POSE_TARGET.yaw} `
+  + `pitch ${POSE_TARGET.pitch}`);
+report.check(shot.read.fov === POSE_TARGET.fov && shot.camera.projections > 0,
+  'through the lens the fit solved for, with the projection rebuilt for it',
+  `fov ${shot.read.fov}`);
+report.check(shot.dismissed === 1,
+  'and it takes the arrival veil off the frame, which a held clock never would',
+  `veil.dismiss() called ${shot.dismissed} time${shot.dismissed === 1 ? '' : 's'}`);
+let posesOff = 0;
+let worstPose = { name: '-', metres: 0, degrees: 0 };
+for (const name of Object.keys(POSES)) {
+  const one = imposed(POSES[name], 'prima');
+  if (one.read.miss.metres > 0.001 || one.read.miss.degrees > 0.01) posesOff++;
+  if (one.read.miss.metres >= worstPose.metres) {
+    worstPose = { name, metres: one.read.miss.metres, degrees: one.read.miss.degrees };
+  }
+}
+report.check(posesOff === 0,
+  'every pose that has a name lands its camera on its own six numbers',
+  `${Object.keys(POSES).length} poses, worst ${worstPose.name} at `
+  + `${(worstPose.metres * 1000).toFixed(4)} mm and ${worstPose.degrees.toExponential(1)} deg`);
+// AND THERE IS ONE DOOR. A seat only ends an argument while it is the only place
+// the argument can be had, so the page is read for a second placement.
+const mainText = read('src/main.js');
+report.check(/window\.setDevPose = \(asked\) => devPose\.place\(asked\);/.test(mainText)
+  && /if \(code === 'KeyP'\) devPose\.place\(POSE_TARGET\);/.test(mainText)
+  && !/player\.setPose\(/.test(mainText),
+  'the P key and window.setDevPose go through that seat and the page places nothing itself',
+  'one door, in src/dev/pose.js');
+
+// ----------------------------------------------- the list IS the stone
+//
+// The two lists E-INT-V8 named are one list now: the camera reads the piles the
+// mesher cuts and the loose stone the loose stone file cuts, and this is what
+// says so. It is asserted on the geometry and not on the plan, because the plan
+// is what the old boxes were built from and the plan was not wrong -- the boxes
+// were, about a mesh that had moved underneath them.
+const boxes = cameraSolids();
+const piled = pilesOutside(boxes);
+report.check(piled.cells > 0 && piled.outside === 0,
+  'every cell of stone the pile mesher lays is inside a box the camera is stopped by',
+  `${piled.cells} cells, ${piled.outside} outside`
+  + (piled.worst ? ` (${piled.worst.rock} at ${piled.worst.x.toFixed(2)}, `
+    + `${piled.worst.y.toFixed(2)}, ${piled.worst.z.toFixed(2)})` : ''));
+const loose = looseOutside(boxes);
+report.check(loose.checked > 0 && loose.outside === 0,
+  'and every corner of the ruins and of the basin, off the buffer the page draws',
+  `${loose.checked} vertices, ${loose.outside} outside`
+  + (loose.worst ? ` (first at ${loose.worst.x.toFixed(2)}, ${loose.worst.y.toFixed(2)}, `
+    + `${loose.worst.z.toFixed(2)})` : ''));
+report.check(pileSolids().length === ROCK_PILES.length,
+  'no pile is left out of the list, whatever its radius',
+  `${pileSolids().length} boxes for ${ROCK_PILES.length} piles`);
+// AND THE MIRROR OF WATER IS NOT CLAIMED. The basin is an annulus and the one
+// mistake a single box round it would make is to fill the pool with stone, which
+// is where a walker is meant to be able to put the lens.
+const FOUNTAIN_EYE = (() => {
+  const ring = looseStoneSolids().filter((b) => String(b.name).startsWith('vasca'));
+  if (!ring.length) return null;
+  let x = 0;
+  let z = 0;
+  for (const b of ring) { x += b.x; z += b.z; }
+  return { x: x / ring.length, y: 0.05, z: z / ring.length, ring: ring.length };
+})();
+report.check(Boolean(FOUNTAIN_EYE) && !boxes.some((b) => within(FOUNTAIN_EYE, b)),
+  "the middle of the fountain is water and not stone: no box claims it",
+  FOUNTAIN_EYE ? `${FOUNTAIN_EYE.ring} boxes round the rim, none over the pool` : 'no basin');
+report.line(`         ${boxes.length} boxes: 6 blocks, ${pileSolids().length} piles, `
+  + `${looseStoneSolids().length} of loose stone (${loose.counts.ruins} ruin cubes and `
+  + `${loose.counts.basin} of basin; ${loose.counts.turf} cubes of turf on the six heads are `
+  + 'declared out, being lids five to thirteen metres up)');
+
 // ------------------------------------------------------ the camera and the stone
 const solids = cameraSolids();
 let entered = 0;
 let crossed = 0;
+let collapsed = 0;
 let underground = 0;
 let placements = 0;
 let unreachable = 0;
@@ -454,6 +925,15 @@ for (const box of solids) {
         // the camera keeps is the code's margin, and a guard that asserted the
         // margin would be asserting the constant rather than the property.
         if (solids.some((b) => inside(spot, b, 0.01))) entered++;
+        // AND A ZERO ARM IS NOT A CROSSING, WHICH IS A DISTINCTION THIS GUARD
+        // DID NOT USED TO HAVE TO MAKE. A walker standing flush against a block
+        // -- which his own footprints allow, they are the same box -- is inside
+        // the 0.25 m the camera keeps, so the boom retracts the whole way and the
+        // camera IS the eye. Asked of that, armClear answers on a segment of no
+        // length whose single endpoint lies on the face of the block, and says
+        // nought. There is no arm there to pass through anything: the case is
+        // counted and reported rather than called a defect.
+        else if (spot.arm <= 1e-9) collapsed++;
         else if (armClear(spot.pivot, spot, solids, 0) < 1 - 1e-9) crossed++;
         const floor = groundHeightAt(spot.x, spot.z);
         if (spot.y < floor - 0.01) underground++;
@@ -471,7 +951,79 @@ report.check(underground === 0, 'and never under the ground it stands over',
   `${underground} below`);
 report.line(`         sixteen bearings x three distances x three aims round each of `
   + `${solids.length} boxes; shortest arm ${closest.toFixed(2)} m of ${rig.planar.toFixed(2)}; `
-  + `${unreachable} bearings skipped as ground no walker can stand on`);
+  + `${unreachable} bearings skipped as ground no walker can stand on, ${collapsed} with the `
+  + 'boom fully retracted against a face the walker is standing on');
+
+// -------------------------------------------------------------------- the rim
+const rim = rimSweep();
+report.check(rim.underground === 0,
+  'at the edge of the world the camera never goes under the field\'s own ground',
+  `${rim.placements} placements, ${rim.underground} below; the lowest stands `
+  + `${(rim.lowest * 1000).toFixed(0)} mm over the ground beneath it`);
+report.check(rim.inHill === 0,
+  'and never inside the hills that stand beyond it',
+  `${rim.inHill} inside; the closest the lens comes to the horizon\'s own surface is `
+  + `${rim.nearestHill.toFixed(2)} m`);
+report.line(`         three radii (${AREA_SOFT_RADIUS}, ${AREA_HARD_RADIUS}, `
+  + `${AREA_HARD_RADIUS + 1} m from the walker's own centre) x 32 bearings x 16 yaws x 7 aims; `
+  + `the plateau is flat to 35 m and the nearest cube of hill stands 162 m out, `
+  + `which is ${(162 - AREA_HARD_RADIUS - 1 - rigMetres(AVATAR.height).planar).toFixed(0)} m `
+  + 'beyond anything this arm can reach');
+
+// --------------------------------------------------- the arm and the aim
+//
+// D-AVATAR-2 STANDS AT A, ratified: the arm shortens with the look and goes to
+// nothing at the limit, rather than swinging rigidly through the ground and the
+// stair platform. src/core/avatar.js says the guard 'sweeps the whole range and
+// reports clearance at every degree'; until now it did not, so the sentence was
+// a promise. It is a sweep now.
+const sweep = [];
+for (let deg = -85; deg <= 85; deg += 1) {
+  sweep.push({ deg, k: armFraction(deg * DEG, PITCH_LIMIT) });
+}
+const atRest = armFraction(RIG.pitch * DEG, PITCH_LIMIT);
+report.check(Math.abs(atRest - 1) < 1e-12,
+  'the arm is whole at the aim the rule was measured at, and only there',
+  `${atRest.toFixed(6)} at ${RIG.pitch} deg`);
+report.check(Math.abs(armFraction(PITCH_LIMIT, PITCH_LIMIT)) < 1e-12
+  && Math.abs(armFraction(-PITCH_LIMIT, PITCH_LIMIT)) < 1e-12,
+  'and gone at both limits, which is first person and has nothing to collide with',
+  `${(PITCH_LIMIT / DEG).toFixed(0)} deg either way`);
+let notMonotone = 0;
+for (let i = 1; i < sweep.length; i++) {
+  const before = sweep[i - 1];
+  const now = sweep[i];
+  const rising = now.deg <= RIG.pitch;
+  if (rising ? now.k < before.k - 1e-12 : now.k > before.k + 1e-12) notMonotone++;
+}
+report.check(notMonotone === 0,
+  'it comes out to the aim and goes back from it and never turns round on the way',
+  `${sweep.length} degrees, ${notMonotone} reversals`);
+// And the clearance the file's own comment promises, at the one place it is
+// worst: on the rim, where the ground falls away behind the shoulder.
+let sweptUnder = 0;
+let sweptLowest = Infinity;
+{
+  const solids = cameraSolids();
+  const eye = {};
+  const x = AREA_CENTER.x;
+  const z = AREA_CENTER.z + AREA_HARD_RADIUS;
+  const stance = groundHeightAt(x, z);
+  for (const { deg } of sweep) {
+    for (let a = 0; a < 16; a++) {
+      thirdPersonEye(eye, { x, z, stance, yaw: (a / 16) * Math.PI * 2 }, deg * DEG,
+        PITCH_LIMIT, groundHeightAt, AVATAR.height,
+        { reach: 1, solids, eyeHeight: EYE_HEIGHT });
+      const margin = eye.y - groundHeightAt(eye.x, eye.z);
+      if (margin < sweptLowest) sweptLowest = margin;
+      if (margin < -1e-9) sweptUnder++;
+    }
+  }
+}
+report.check(sweptUnder === 0,
+  'and at every degree of it the lens stays over the ground it is swinging across',
+  `${sweep.length * 16} placements, lowest ${(sweptLowest * 1000).toFixed(0)} mm clear `
+  + `(the code keeps ${(GROUND_CLEARANCE * 1000).toFixed(0)})`);
 
 // ------------------------------------------------------------------ the switch
 const run = switchRun();
@@ -517,13 +1069,21 @@ for (const kind of Object.keys(WALKS)) {
 }
 
 // ---------------------------------------------------------------------- notes
+//
+// THE GROUND UNDER HIS FEET, PRINTED WHATEVER IT SAYS. It used to be printed
+// only when it was wrong, which is the shape of note that cannot tell a reader
+// that a defect has been FIXED: E-AVATAR1 recorded a 380 mm hole under the feet
+// the picture draws, on V8's own ground, and the only way to find out whether
+// the foundation had levelled it was to run the guard and notice a silence.
 const dip = groundHeightAt(FEET.x, FEET.z);
-if (Math.abs(dip) > 0.02) {
-  report.note(`this tree's ground stands ${(dip * 1000).toFixed(0)} mm from the plane at the `
-    + `feet the picture draws (${FEET.x}, ${FEET.z}): the framing above is asserted on y = 0, `
-    + 'which is where the blocks, the paving and the verge were measured -- the dip belongs to '
-    + 'the ground session and goes with a rebase, not with the figure');
-}
+report.note(`the ground at the feet the picture draws (${FEET.x}, ${FEET.z}) stands `
+  + `${(dip * 1000).toFixed(0)} mm from the plane the framing is asserted on. E-AVATAR1 `
+  + 'measured -380 mm there on V8\'s own ground; the foundation levelled it'
+  + (Math.abs(dip) > 0.02
+    ? ' -- AND IT IS BACK: the framing above is asserted on y = 0, where the blocks, the '
+      + 'paving and the verge were measured, so a dip this size belongs to the ground session '
+      + 'and goes with a rebase, not with the figure'
+    : ''));
 report.note(`the rule is anchored at the day fit's own aim (${RIG.pitch} deg); the night fit `
   + `sits 0.42 deg away, which is ${(rig.planar * 0.42 * DEG * 1000).toFixed(0)} mm on the arm`);
 

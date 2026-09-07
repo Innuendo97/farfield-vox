@@ -4,9 +4,31 @@ import {
 import { SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS, SKY_GLSL, SKY_UNIFORMS } from '../core/sky.js';
 import { FOG_GLSL, fogUniforms } from './air.js';
 import { faceLightGlsl, faceLightUniforms } from './face-light.js';
-import { groundHeightAt } from './contracts.js';
-import { FOUNTAIN } from './monoliths.js';
-import { RUINS } from './rock-piles.js';
+// THE CUT'S OWN ARITHMETIC, WHICH DOES NOT LIVE HERE ANY MORE.
+//
+// Where a ruin's columns stand, how many courses each carries, where the basin's
+// blocks lie: all of it used to be private to this file, and all of it is also
+// what a CAMERA has to know, because a box drawn round a ruin from the plan's own
+// width and height is 30 mm narrower than the stone in one place and 80 mm
+// shorter than it in another. Two readers, so one seat -- and the seat is the
+// arithmetic half, src/world/rock-piles.js, which is where the ruins' PLAN
+// already lived and which nothing on the page's side of the world imports. It
+// is asked for HERE through ./contracts.js, which is the door between the
+// sessions and re-exports it: this file used to read the ground and the fountain
+// from that door for a ruin's foot and the basin's two radii, and it reads the
+// whole law from the same place now.
+//
+// IT IS THERE AND NOT HERE FOR A SECOND REASON, AND IT IS A HARD ONE. This file
+// reaches the page: three.js, the sky, the air, the rocks' own pigment. The
+// camera's list is published by src/world/contracts.js, which every measuring
+// tool in this campaign imports under plain node -- and contracts.js importing
+// THIS file closes a ring (rocks -> rock-piles -> contracts -> loose-stone ->
+// rocks) that node cannot evaluate: guard-fiori died on it. The arithmetic half
+// imports nothing that comes back round, which is what makes it the seat.
+import {
+  BASIN_CELL, RUIN_CELL, RUIN_MOSS_SHARE, RUIN_TUFT, RUINS, basinCells, looseHash as hash,
+  ruinColumns,
+} from './contracts.js';
 import { ROCK_ALBEDO } from './rocks.js';
 import {
   MOSS_TINT, STONE_ALBEDO, STONE_ARRIS_PIGMENT, STONE_EXPOSURE, STONE_LIGHT_SCALE, STONE_SKY_SHARE,
@@ -112,68 +134,6 @@ const TURF_CORNER_REACH = 0.35;
 const TURF_BASE = 2 * VOXEL;
 const TURF_WIDE = 0.35;                 // and a third of them are one voxel wider
 const TURF_TALL = 0.30;                 // and a third one voxel taller
-
-// --------------------------------------------------------- the ruins' law
-//
-// A ruin is a STEPPED STACK of dressed cubes and not a heap: the target's are
-// "blocchi squadrati pallidi ... in 1-2 corsi" with hard terraces, which is the
-// whole of what separates them from the scree the piles beside them draw. So
-// the columns of a ruin are quantised to whole courses and the outline is a
-// rectangle eaten in from its corners, rather than the profile-and-wobble a
-// pile is built from.
-// THE BLOCK OF A RUIN IS THE SLAB OF THIS WORLD, 0.20 m, and the number was
-// argued the other way first and measured back. R5 SS7 names a 0.35 m cell, but
-// it names it for the OTHER of the two things it offers -- pieces of masonry
-// generated like the stair -- and the pieces here are the second offer, the
-// loose stones in the same grass as the scree. What that grass actually holds,
-// read at SS1.8 on the day target's own clusters, is "pile a gradoni di cubi da
-// UN voxel, con lastre 2x rare": the ruins are the size of the rocks beside
-// them and it is the SQUARENESS and the pallor that separate them, not the
-// grain. Built at 0.35 the same stack came out with two courses in it and no
-// terrace at all, which is a plate and not a ruin.
-const RUIN_CELL = 2 * VOXEL;
-const BASIN_CELL = 2 * VOXEL;
-// THE MOSS ON A RUIN IS A TUFT ON TOP OF A BLOCK AND NOT A BLOCK PAINTED GREEN.
-//
-// The first cut of this file recoloured whole cubes, and at 0.35 m a whole cube
-// of moss is a third of a metre of green on the face the walker sees -- which is
-// the very reading R5 SS1.5 names as the defect on the walls: "nel target il
-// muschio sta nei CIUFFI di 1-3 px agli angoli dei blocchi e nelle colature al
-// piede, non in chiazze di blocchi". So a tuft is a SMALL cube standing on the
-// lid of a block, one or two voxels, exactly the thing the heads of the six
-// carry -- one law for moss that is geometry, in both places it appears.
-const RUIN_MOSS_SHARE = 0.34;           // how many exposed lids grow a tuft
-const RUIN_TUFT = VOXEL;                // and how big one is
-// How far in from the middle a column has fallen by the time it reaches the
-// rim. 1.0 would be a pyramid with no top; this leaves the terraces the target
-// steps its own stacks down in.
-const RUIN_TAPER = 0.60;
-
-// ---------------------------------------------------------- the basin's law
-//
-// The fountain of the fifth stands in a ring of pale stone and the target draws
-// it plainly: a basin 1.61 m across holding a mirror of water 1.22 m across
-// (R5 SS1.10, measured by V2-DEV5 in the same reading the globe's own metres
-// come from). The ring is what makes the water READ: our meadow is a field of
-// grass cubes and a disc of light lying in it at 0.20 m is a disc of light
-// nobody can see the edge of — which is what this branch drew before this file.
-//
-// Its outer radius is the target's, its inner radius is the water's, and both
-// are read from src/world/monoliths.js rather than restated, because the pool
-// and the basin that holds it cannot be two opinions about one circle.
-// AND IT IS A RIM AND NOT A TUB. One course, one block thick, with a second
-// course on about a third of the ring so the lip is broken rather than turned:
-// the water this basin holds stands at 0.20 m over the grass (POOL_LIFT, V2-DEV5's
-// own reading) and a rim two courses tall all the way round puts that water at
-// the bottom of a well the walker cannot see into. What the target draws is a
-// lip the water comes up to, not a wall it hides behind.
-const BASIN_COURSES = 1;
-const BASIN_SECOND = 0.35;
-
-const hash = (a, b, c) => {
-  const x = Math.sin(a * 12.9898 + b * 78.233 + c * 37.719) * 43758.5453;
-  return x - Math.floor(x);
-};
 
 // ------------------------------------------------------------- the material
 //
@@ -377,69 +337,41 @@ function turfOn(out, spec) {
 
 /** One ruin: a stepped stack of dressed cubes, quantised to whole courses. */
 function ruin(out, plan) {
-  const foot = Math.floor(groundHeightAt(plan.x, plan.z) / VOXEL) * VOXEL;
-  const across = Math.max(1, Math.round(plan.width / RUIN_CELL));
-  const deep = Math.max(1, Math.round(plan.depth / RUIN_CELL));
-  const tall = Math.max(1, Math.round(plan.height / RUIN_CELL));
-  for (let i = 0; i < across; i++) {
-    for (let k = 0; k < deep; k++) {
-      // How far this column stands from the middle of the piece, nought at the
-      // centre and one at a corner. The stack steps DOWN from the middle out,
-      // which is the shape the target's stacks have.
-      const u = across === 1 ? 0 : Math.abs((i + 0.5) / across - 0.5) * 2;
-      const v = deep === 1 ? 0 : Math.abs((k + 0.5) / deep - 0.5) * 2;
-      const out0 = Math.max(u, v);
-      const wobble = hash(plan.seed, i * 31 + k, 1) - 0.5;
-      const courses = Math.round(tall * (1 - RUIN_TAPER * out0) + wobble);
-      const cx = plan.x + (i - (across - 1) / 2) * RUIN_CELL;
-      const cz = plan.z + (k - (deep - 1) / 2) * RUIN_CELL;
-      for (let j = 0; j < courses; j++) {
-        const t = 0.86 + 0.28 * hash(plan.seed, i * 31 + k, 9 + j);
-        cube(out, cx, foot + j * RUIN_CELL, cz, RUIN_CELL, RUIN_CELL, RUIN_CELL,
-          [RUIN_ALBEDO[0] * t, RUIN_ALBEDO[1] * t, RUIN_ALBEDO[2] * t]);
-      }
-      // And the tuft on the lid this column ends at, set back from the middle so
-      // it sits over an EDGE of the block the way the target's do.
-      if (courses > 0 && hash(plan.seed, i * 31 + k, 3) < RUIN_MOSS_SHARE) {
-        const g = 0.86 + 0.28 * hash(plan.seed, i * 31 + k, 7);
-        const off = (RUIN_CELL - RUIN_TUFT) / 2;
-        cube(out,
-          cx + off * (hash(plan.seed, i * 31 + k, 11) < 0.5 ? -1 : 1),
-          foot + courses * RUIN_CELL,
-          cz + off * (hash(plan.seed, i * 31 + k, 13) < 0.5 ? -1 : 1),
-          RUIN_TUFT, RUIN_TUFT, RUIN_TUFT,
-          [RUIN_MOSS_ALBEDO[0] * g, RUIN_MOSS_ALBEDO[1] * g, RUIN_MOSS_ALBEDO[2] * g]);
-      }
+  const { foot, columns } = ruinColumns(plan);
+  for (const { i, k, courses, x: cx, z: cz } of columns) {
+    for (let j = 0; j < courses; j++) {
+      const t = 0.86 + 0.28 * hash(plan.seed, i * 31 + k, 9 + j);
+      cube(out, cx, foot + j * RUIN_CELL, cz, RUIN_CELL, RUIN_CELL, RUIN_CELL,
+        [RUIN_ALBEDO[0] * t, RUIN_ALBEDO[1] * t, RUIN_ALBEDO[2] * t]);
+    }
+    // And the tuft on the lid this column ends at, set back from the middle so
+    // it sits over an EDGE of the block the way the target's do.
+    if (courses > 0 && hash(plan.seed, i * 31 + k, 3) < RUIN_MOSS_SHARE) {
+      const g = 0.86 + 0.28 * hash(plan.seed, i * 31 + k, 7);
+      const off = (RUIN_CELL - RUIN_TUFT) / 2;
+      cube(out,
+        cx + off * (hash(plan.seed, i * 31 + k, 11) < 0.5 ? -1 : 1),
+        foot + courses * RUIN_CELL,
+        cz + off * (hash(plan.seed, i * 31 + k, 13) < 0.5 ? -1 : 1),
+        RUIN_TUFT, RUIN_TUFT, RUIN_TUFT,
+        [RUIN_MOSS_ALBEDO[0] * g, RUIN_MOSS_ALBEDO[1] * g, RUIN_MOSS_ALBEDO[2] * g]);
     }
   }
 }
 
 /** The ring of pale stone the fountain of the fifth stands in. */
 function basin(out) {
-  if (!FOUNTAIN) return 0;
-  const foot = Math.floor(groundHeightAt(FOUNTAIN.x, FOUNTAIN.z) / VOXEL) * VOXEL;
-  const outer = FOUNTAIN.basinDiameter / 2;
-  const inner = FOUNTAIN.poolDiameter / 2;
+  const ring = basinCells();
+  if (!ring) return 0;
   let placed = 0;
-  // Laid on the world's own lattice rather than swept round a circle, so the
-  // rim is a ring of CUBES the way the target's is and not a turned bowl.
-  const reach = Math.ceil(outer / BASIN_CELL);
-  for (let i = -reach; i <= reach; i++) {
-    for (let k = -reach; k <= reach; k++) {
-      const x = (i + 0.5) * BASIN_CELL;
-      const z = (k + 0.5) * BASIN_CELL;
-      const r = Math.hypot(x, z);
-      if (r > outer || r < inner) continue;
-      const courses = BASIN_COURSES
-        + (hash(97, i * 31 + k, 17) < BASIN_SECOND ? 1 : 0);
-      for (let j = 0; j < courses; j++) {
-        const t = 0.88 + 0.24 * hash(97, i * 31 + k, j);
-        cube(out, FOUNTAIN.x + x, foot + j * BASIN_CELL, FOUNTAIN.z + z,
-          BASIN_CELL, BASIN_CELL, BASIN_CELL,
-          [RUIN_ALBEDO[0] * t, RUIN_ALBEDO[1] * t, RUIN_ALBEDO[2] * t]);
-      }
-      placed += 1;
+  for (const cell of ring.cells) {
+    for (let j = 0; j < cell.courses; j++) {
+      const t = 0.88 + 0.24 * hash(97, cell.i * 31 + cell.k, j);
+      cube(out, cell.x, ring.foot + j * BASIN_CELL, cell.z,
+        BASIN_CELL, BASIN_CELL, BASIN_CELL,
+        [RUIN_ALBEDO[0] * t, RUIN_ALBEDO[1] * t, RUIN_ALBEDO[2] * t]);
     }
+    placed += 1;
   }
   return placed;
 }

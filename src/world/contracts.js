@@ -1,6 +1,13 @@
 import { stairHeightAt as stairRunHeight } from './stairs.js';
 import { flowerField } from './vegetation.js';
-import { MONOLITHS, PLATFORM, ROCK_SQUARE, rockSeats } from './layout.js';
+import { MONOLITHS, PLATFORM } from './layout.js';
+// WHERE THE STONE OF THE MEADOW REALLY IS. Not the rock plan and not a filter of
+// it: the piles as the mesher cuts them and the loose stone as the file that cuts
+// it lays it out. One import, because there is one arithmetic half. See the note
+// over cameraSolids below for what the two lists this replaces disagreed about,
+// in metres.
+import { looseStoneSolids, pileSolids } from './rock-piles.js';
+
 import {
   BASE_STEP, MATERIAL, NO_COLUMN, VOXEL, clearColumn, columnSpec, createColumns,
   matAt, setFlank, setTop, topAt,
@@ -638,6 +645,23 @@ export function flowerLightPoints() {
 // which is where the ceiling comes from and what guard-cornice holds.
 export { ridgeSeats as ridgeLampSeats } from './distant.js';
 
+// AND THE LOOSE STONE'S OWN LAW, THROUGH THE SAME DOOR AND FOR THE SAME REASON.
+//
+// Where a ruin's columns stand and where the basin's blocks lie is arithmetic,
+// and it lives with the rest of the arithmetic in src/world/rock-piles.js
+// (U-AVATAR-2 moved it out of the mesh, because the CAMERA is a second reader of
+// it and a box built from a plan instead of a cut is 80 mm short of the stone).
+// src/world/loose-stone.js, which cuts the cubes, reads it here rather than
+// reaching past this file -- and that is not tidiness, it is the load order:
+// this door imports src/world/vegetation.js, which imports the rocks, which
+// import the piles, so a mesh that entered by the arithmetic half would find the
+// piles half built. Every measuring tool in this campaign imports this file
+// under plain node, and it has to be enterable from either end.
+export {
+  BASIN_CELL, RUIN_CELL, RUIN_MOSS_SHARE, RUIN_TUFT, RUINS,
+  basinCells, looseHash, ruinColumns,
+} from './rock-piles.js';
+
 // Built on FIRST ASK and kept, for the reason the ground's grid above is: it is
 // tens of thousands of lattice draws over the whole disc, the answer does not
 // change, and the night may ask for it more than once.
@@ -653,11 +677,31 @@ let flowers = null;
 // metre arm is at head height in the middle of the hub, and until it existed a
 // walker with his back to a block put the lens inside the masonry.
 //
-// TWO LISTS, ONE SOURCE. src/world/rocks.js builds the walker's footprints from
-// the same rock seats this file publishes, so a stone cannot be solid to a body
-// and hollow to its camera. What this adds is the vertical extent, which is the
-// whole of the difference: a rock knee high is not in the way of an eye at a
-// metre and a half, and a block thirteen metres tall is in the way of anything.
+// ONE LIST, AND IT USED NOT TO BE. This seat published the six blocks and a set
+// of boxes built out of `rockSeats()` in src/world/layout.js -- the rock PLAN,
+// filtered at 0.45 m, with its vertical extent taken from the plan's `y` and
+// `meshHeight`. Those two fields belong to the smooth rock MESH V8 used to draw
+// and to a meadow that has been rewritten twice since; this world draws voxel
+// PILES, cut on the ground contract, and the two had drifted apart:
+//
+//   rock-w1   the box stood 0.541 .. 1.027 m and the stone 0.000 .. 0.400 --
+//             they did not touch at all, so the whole of that rock was open to
+//             a lens and the box guarded nothing but air
+//   rock-e1   133 mm of 500 in common; rock-w2 158 of 500; rock-sw 293 of 700
+//   and four of the ten piles had no box whatever, because 0.45 m is the
+//   WALKER's rule about what he may step over and never was a statement about
+//   what a lens may enter
+//
+// So the camera reads the STONE now: `pileSolids()` measures each box off the
+// same cell field the triangles come out of, and `looseStoneSolids()` does the
+// same for the ruins and the fountain's basin, which were not in this list at
+// all. guard-avatar checks the containment cell by cell rather than taking any
+// of this on trust.
+//
+// THE WALKER'S OWN FOOTPRINTS ARE NOT TOUCHED. ROCK_BLOCKERS in
+// src/world/rock-piles.js is his, on his own threshold and his own square inside
+// the round; that square is up to 132 mm narrower than the stone this measures,
+// which is a residue reported to whoever owns the scree.
 //
 // THE PLATFORM AND THE STAIR RUN ARE DELIBERATELY ABSENT. builtHeightAt above
 // already carries both, and the camera's own floor is set from it before this
@@ -667,17 +711,18 @@ let flowers = null;
 /**
  * Every box a camera may not pass through, in world metres.
  *
- * { x, z, halfWidth, halfDepth, rotationY (radians), y0, y1 }
+ * { name, x, z, halfWidth, halfDepth, rotationY (radians), y0, y1 }
  *
- * A SQUARE INSIDE THE ROUND, for the rocks, at the same 0.72 of the radius the
- * walker's own footprints use: a box that reached the full radius would stop the
- * camera in the air beside the stone.
+ * THE BLOCKS ARE THE ONLY THING ASSEMBLED HERE, because a monolith is a box in
+ * the plan and there is nothing to measure: the plan IS the mesh. Everything
+ * else is asked of the file that cuts it.
  */
 export function cameraSolids() {
   const out = [];
   for (const m of MONOLITHS) {
     const [w, h, d] = m.size;
     out.push({
+      name: `monolite ${m.id}`,
       x: m.position.x,
       z: m.position.z,
       halfWidth: w / 2,
@@ -687,20 +732,7 @@ export function cameraSolids() {
       y1: m.baseY + h,
     });
   }
-  for (const rock of rockSeats()) {
-    out.push({
-      x: rock.x,
-      z: rock.z,
-      halfWidth: rock.radius * ROCK_SQUARE,
-      halfDepth: rock.radius * ROCK_SQUARE,
-      rotationY: 0,
-      // A rock is BURIED: `y` is where its mesh origin sits, which is under the
-      // turf, and `meshHeight` is the whole of it. The two of them together are
-      // the only pair in the plan that bound the stone the camera can hit --
-      // `height` is how much of it shows, which is a different question.
-      y0: rock.y,
-      y1: rock.y + (rock.meshHeight ?? rock.height),
-    });
-  }
+  out.push(...pileSolids());
+  out.push(...looseStoneSolids());
   return out;
 }
