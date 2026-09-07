@@ -86,6 +86,50 @@ export function tiersOf(text) {
   return found;
 }
 
+/**
+ * The ground's own buffer, as post.js asks the driver for it.
+ *
+ * THE SECOND BUFFER THE WORLD IS DRAWN INTO, and since U-CAMPO-3 the only other
+ * one. The ray marched ground is two thirds of this frame and its cost tracks
+ * its own pixel count to within a point -- measured over the resolution sweep:
+ * at scale 0.75 the frame draws 56.3 % of the pixels and the field costs 55.2 %
+ * of what it cost -- so it is drawn into a target of a fraction of a side and
+ * put back at the frame's own pixel.
+ */
+export function campoBufferOf(text) {
+  const open = text.indexOf('function allocateCampo() {');
+  if (open < 0) return null;
+  const body = text.slice(open, text.indexOf('\n  }', open));
+  return {
+    format: (/format: ([A-Za-z0-9]+)/.exec(body) || [])[1] ?? null,
+    type: (/type: ([A-Za-z0-9]+)/.exec(body) || [])[1] ?? null,
+    nearest: /minFilter: NearestFilter/.test(body) && /magFilter: NearestFilter/.test(body),
+    // AND IT IS CLEARED TO NOTHING. three's own clear alpha is ONE whenever the
+    // canvas is opaque, so a target left to the default arrives with every texel
+    // already claiming to be ground -- and the recomposition, reading a coverage
+    // of one where no ray found anything, paints the whole sky black. That is
+    // not a hypothetical: it is what the first frame this pass ever drew did.
+    clearedToNothing: /gl\.setClearAlpha\(0\);\s*\n\s*gl\.setRenderTarget\(campoTarget\);/.test(text),
+  };
+}
+
+/** What each tier asks the ground's pixel to be, as a fraction of a side. */
+export function campoScalesOf(text) {
+  const open = text.indexOf('export const TIERS = [');
+  if (open < 0) return [];
+  const body = text.slice(open, text.indexOf('\n];', open));
+  const found = [];
+  const entry = /id:\s*'([a-z]+)'[\s\S]*?campoScale:\s*([\d.]+)/g;
+  for (let m = entry.exec(body); m; m = entry.exec(body)) {
+    found.push({ id: m[1], campoScale: Number(m[2]) });
+  }
+  return found;
+}
+
+/** Bytes of colour per pixel OF THE FRAME that a buffer of this shape costs. */
+export const bytesPerFramePixel = (bytes, scale, samples) => bytes * scale * scale
+  * Math.max(1, samples);
+
 /** Whether the grade still takes the cube's own black off its own answer. */
 export const cubeIsAnchored = (text) => /vec3 black = texture2D\(tLut,[\s\S]{0,200}?\(graded - black\) \/ max\(1\.0 - black/.test(text);
 
@@ -202,6 +246,20 @@ if (process.argv.includes('--self')) {
       caught: carries('RGBA16F', ladder, TOLERANCE).every((r) => r.ok),
     },
     {
+      what: "the ground's buffer stripped of its fourth channel is caught",
+      caught: campoBufferOf(postText.replace('format: RGBAFormat,\n      type: HalfFloatType,',
+        'format: RGBFormat,\n      type: HalfFloatType,')).format !== 'RGBAFormat',
+    },
+    {
+      what: 'and left to the clear alpha three gives an opaque canvas',
+      caught: !campoBufferOf(postText.replace('gl.setClearAlpha(0);', '')).clearedToNothing,
+    },
+    {
+      what: 'a tier that stopped stating the ground\'s pixel is caught',
+      caught: campoScalesOf(qualityText.replace(/ *campoScale: [\d.]+,[^\n]*\n/, ''))
+        .length !== tiersOf(qualityText).length,
+    },
+    {
       what: 'an anchor taken back out of the grade is caught',
       caught: !cubeIsAnchored(postText.replace(
         'return clamp((graded - black) / max(1.0 - black, vec3(1e-4)), 0.0, 1.0);',
@@ -266,6 +324,60 @@ for (const tier of tiers) {
   const known = formats.find((f) => f.name === tier.sceneFormat);
   report.check(Boolean(known) && known.shipped && known.highDynamicRange,
     `and that pixel is one ${POST} ships`, known ? `${known.bytes} bytes` : 'not in the table');
+}
+
+// ------------------------------------------------- AND THE GROUND'S OWN BUFFER
+//
+// EVERYTHING ABOVE APPLIES TO IT, PLUS ONE THING THAT DOES NOT APPLY TO THE
+// SCENE BUFFER AT ALL: it needs a FOURTH CHANNEL, and the reason is the very
+// decision this file defends about the scene's own pixel.
+//
+// The field marches sub pixel rays and already computes what share of them
+// found ground -- that is what would make the rim of the ridge against the sky
+// a fraction rather than a step. It has never been spent, and the reason is
+// three lines up this file: R11F_G11F_B10F has NO ALPHA, so the value goes
+// nowhere the instant it is written and a pixel half covered by the ridge is
+// drawn as though it were covered whole. On a buffer of a quarter of the pixels
+// eight bytes of half float over a HALF of a side is two bytes per pixel of the
+// frame, against the scene buffer's eight -- four bytes of packed float times
+// the two samples it resolves. So the fourth channel is not a cost here, it is
+// change from the pixels that were given back.
+//
+// AND THE COUNT HAS TO CARRY THE SAMPLES, which is where this guard first went
+// wrong about its own subject: written without them it said four against four
+// and a half and called the ground's buffer the dearer of the two. The scene
+// buffer is multisampled and the ground's is deliberately not -- four samples
+// on it were measured at 508 pixels of 1 668 480 (0.03 %) for a fifth of the
+// pass, because every edge anybody can see in the meadow is decided by the ray
+// marcher in the fragment and a coverage mask knows nothing about it.
+const campo = campoBufferOf(postText);
+const campoScales = campoScalesOf(read(QUALITY));
+report.check(Boolean(campo), `${POST} states a buffer for the ground`);
+if (campo) {
+  report.check(campo.format === 'RGBAFormat' && campo.type === 'HalfFloatType',
+    "the ground's own buffer has the fourth channel the scene's has not",
+    'RGBA16F, which is where the coverage lives');
+  report.check(!formats.find((f) => f.name === 'R11F_G11F_B10F' && f.shipped)?.name
+    || /R11F_G11F_B10F[\s\S]{0,900}?no alpha/.test(postText),
+    'and the shipped scene pixel still has none, which is the reason for the line above');
+  report.check(campo.nearest,
+    'it is sampled at the texel: the recomposition does its own weighing, and a '
+    + 'bilinear tap underneath would be a second filter nobody asked for');
+  report.check(campo.clearedToNothing,
+    'and it is cleared to NOTHING, against three\'s own opaque default of one');
+}
+report.check(campoScales.length === tiers.length,
+  'every tier states what pixel the ground is marched at',
+  campoScales.map((t) => `${t.id} ${t.campoScale}`).join(', '));
+for (const tier of campoScales) {
+  const want = WRITTEN[tier.id];
+  const shape = formats.find((f) => f.name === (want || {}).sceneFormat);
+  if (!shape) continue;
+  const scene = bytesPerFramePixel(shape.bytes, 1, want.samples);
+  const earth = bytesPerFramePixel(8, tier.campoScale, 0);
+  report.check(earth < scene,
+    `and at the tier ${tier.id} it costs less of the frame than the scene's own pixel does`,
+    `${earth.toFixed(1)} bytes per frame pixel against ${scene.toFixed(1)}`);
 }
 
 // ------------------------------------------------ the two directions, in light
