@@ -198,10 +198,112 @@ for (const tier of TIERS) {
     `${third.toFixed(2)} m: oltre, la finestra scatta di 6,4 m e l'anello salterebbe con lei`);
 }
 
+// ------------------------------- 6. IL CAMMINO, LA ROTAZIONE E IL FERMO
+//
+// LE RICEVUTE DEL CONGELATORE, che e' lo strumento di R8 §1 promosso a banco di
+// questa unita' (fondazione/campo2/): lo stato del mondo si CONGELA mentre la
+// camera fa il passo, cosi' che la differenza fra due scatti alla stessa posa
+// sia solo cio' che quella sorgente ha cambiato — zero parallasse.
+//
+// E OGNI NUMERO PORTA IL PROPRIO PAVIMENTO, che e' la cosa che R8 non poteva
+// sapere e questa unita' ha misurato: DUE SCATTI DI FILA SENZA SCIOGLIERE NULLA
+// non danno zero su questa scheda. Muovono lo 0,037 % del quadro oltre tre
+// livelli e lo 0,011 % oltre otto, quasi tutto nella banda dell'orizzonte, e
+// ogni tanto — in modo intermittente, con l'orologio del mondo fermo e le nuvole
+// ferme a uTime 0 — salgono all'1-2 %. Non e' del campo: e' del compositore, e
+// sta scritto qui perche' una ricevuta «0,000 %» che questo banco non puo'
+// produrre sarebbe una promessa e non una misura. Cio' che si tiene e' che la
+// sorgente cambi MENO del proprio pavimento, o poco piu'.
+//
+// E LA MISURA CHE DECIDE E' LA LINEA E NON IL CONTO. Etichettando le componenti
+// 8-connesse su un campo sparso, la percolazione le fonde: il braccio nullo al
+// salto ha 488 componenti e la piu' grande vale un terzo dei pixel caldi, il
+// braccio spedito ne ha 528 e la piu' grande ne vale il 41 % — stessa forma,
+// meta' roba. Un'erosione di un pixel separa i due come li separa l'occhio: un
+// ANELLO e' spesso e sopravvive, la GRANA e' fatta di granelli e sparisce.
+const WALK = {
+  strumento: 'fondazione/campo2/b-cammino.mjs, an-cammino.mjs, an-linea.mjs',
+  dove: '8 m della linea di R8 dalla posa vox-giorno, 32 passi di 0,25 m, tier alto',
+  // il pavimento dello strumento: due scatti, nulla sciolto
+  pavimento: { over3: 0.037, over8: 0.011, linea: 0.007 },
+  // per passo di 0,25 m, che a un lag di 300 ms e' un cammino di circa 0,8 m/s
+  passoPrima: 1.461,
+  passoDopo: 1.177,
+  saltoPrima: 5.800,     // il piu' grande cambio in UN passo
+  saltoDopo: 1.939,
+  lineaPrima: 0.381,     // la piu' grande COSA SOLA, dopo l'erosione
+  lineaDopo: 0.293,
+  sodoPrima: 1.991,      // e quanto ce n'e' in tutto, di roba coerente
+  sodoDopo: 0.506,
+  // alle mosse della finestra, le due che cadono negli 8 m
+  finestraPrima: [0.648, 0.882],   // componente connessa piu' grande
+  finestraDopo: [0.015, 0.090],
+  // fermo e rotazione: quanto il campo cambia OLTRE il pavimento dello strumento
+  fermoOltre: 0.324,
+  rotazioneOltre: 0.139,
+  // e la banda a fermo, dopo il lag: i due centri sono un punto solo
+  bandaAFermo: 0,
+  // il costo, mediana di tre corse alternate per braccio
+  costoPrima: { p50: 31.19, p95: 33.40 },
+  costoDopo: { p50: 31.44, p95: 33.88 },
+};
+const WALK_CEILING = {
+  passo: 1.5,        // R8 §6: <= 1,5 % al passo = <= 0,2 % per fotogramma a 1 m/s
+  linea: 0.3,        // nessuna COSA SOLA oltre lo 0,3 % del quadro
+  finestra: 0.15,    // la striscia deve sparire dentro il rumore
+  oltre: 0.35,       // a fermo e in rotazione, oltre il pavimento
+  costoP50: 0.5,     // ms sul p50, braccio contro braccio
+};
+
+report.check(WALK.passoDopo <= WALK_CEILING.passo && WALK.passoDopo < WALK.passoPrima,
+  'in cammino lento un passo di 25 cm muove meno quadro di prima',
+  `${WALK.passoDopo} % contro ${WALK.passoPrima} %, soffitto ${WALK_CEILING.passo} % `
+  + `(= ${(WALK.passoDopo / 7.5).toFixed(3)} % per fotogramma a 1 m/s, obiettivo 0,2)`);
+report.check(WALK.saltoDopo < WALK.saltoPrima / 2,
+  'e il piu\' grande cambio in UN passo e\' meno della meta\' di quello che era',
+  `${WALK.saltoDopo} % contro ${WALK.saltoPrima} %: il salto della LOD non c\'e\' piu\'`);
+report.check(WALK.lineaDopo <= WALK_CEILING.linea,
+  'nessuna COSA SOLA piu\' grande di quella si genera in un passo',
+  `${WALK.lineaDopo} % dopo l\'erosione, contro ${WALK.lineaPrima} % prima, `
+  + `soffitto ${WALK_CEILING.linea} %`);
+report.check(WALK.sodoDopo < WALK.sodoPrima / 2,
+  'e di roba coerente, in tutto, ce n\'e\' meno della meta\'',
+  `${WALK.sodoDopo} % contro ${WALK.sodoPrima} %`);
+report.check(Math.max(...WALK.finestraDopo) <= WALK_CEILING.finestra,
+  'alle mosse della finestra non si costruisce piu\' niente a pezzi',
+  `${WALK.finestraDopo.join(' e ')} % contro ${WALK.finestraPrima.join(' e ')} % `
+  + `(pavimento dello strumento ${WALK.pavimento.linea} %)`);
+report.check(WALK.fermoOltre <= WALK_CEILING.oltre && WALK.rotazioneOltre <= WALK_CEILING.oltre,
+  'a fermo e girando la testa il campo non genera nulla oltre il rumore dello strumento',
+  `fermo +${WALK.fermoOltre} %, dodici direzioni +${WALK.rotazioneOltre} % (in sette `
+  + 'delle dodici sia il rumore sia il campo misurano 0,0000 %)');
+report.check(WALK.bandaAFermo === 0,
+  'e a fermo, dopo il lag, i due centri della banda sono UN PUNTO SOLO',
+  'che e\' il perche\' il quadro fermo e\' quello di prima al byte, e non un quasi');
+report.check(WALK.costoDopo.p50 - WALK.costoPrima.p50 <= WALK_CEILING.costoP50,
+  'e tutto questo costa meno di mezzo millisecondo sulla scena',
+  `p50 ${WALK.costoDopo.p50} contro ${WALK.costoPrima.p50} ms = `
+  + `+${(WALK.costoDopo.p50 - WALK.costoPrima.p50).toFixed(2)} ms, mediana di tre corse alternate`);
+report.note(`p95 ${WALK.costoDopo.p95} ms contro ${WALK.costoPrima.p95} del braccio nullo: `
+  + 'il soffitto di R8 e\' 33 al tier alto e NESSUNO DEI DUE bracci lo tiene su questa '
+  + 'macchina, che aveva quattro server altrui in piedi (R8 §8.1). Il numero che questa '
+  + 'unita\' possiede e\' la DIFFERENZA, +0,48 ms sul p95.');
+report.note('LA RAFFICA (R8 §6, guardia 4: nessuno scatto porta piu\' del 40 % del cambio '
+  + 'del passo, con il lag portato a 3000 ms) NON e\' fra queste ricevute: gli scatti di '
+  + 'Playwright costano 1-3 s l\'uno e non risolvono i 300 ms. Cio\' che la sostituisce e\' '
+  + 'la riga della LINEA qui sopra, che misura la stessa cosa sul quadro invece che nel '
+  + 'tempo: se il cambio arrivasse tutto in un fotogramma sarebbe una cosa sola grande.');
+
 if (!injected) report.end();
 
 // --------------------------------------------------------------- il contrario
 const cases = [];
+cases.push({ what: 'una LINEA che si genera in un passo, invece della grana',
+  caught: !(0.9 <= WALK_CEILING.linea) });
+cases.push({ what: 'una striscia della finestra che si costruisce ancora a pezzi',
+  caught: !(0.648 <= WALK_CEILING.finestra) });
+cases.push({ what: "un braccio che costa piu' di mezzo millisecondo sulla scena",
+  caught: !(1.4 <= WALK_CEILING.costoP50) });
 cases.push({ what: 'un tier con una banda troppo stretta per spandersi sui fotogrammi',
   caught: !(TIERS.every((t) => t.groundDetail.lag >= 200) && 100 >= 200) });
 cases.push({ what: 'un tier che porta ancora la vecchia isteresi al posto della banda',
