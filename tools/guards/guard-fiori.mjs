@@ -7,6 +7,8 @@ import { flowerLightPoints, groundHeightAt } from '../../src/world/contracts.js'
 import { columnTop, EMPTY, mantoAt } from '../../src/world/voxel/worldgen.js';
 import { VOXEL } from '../../src/world/voxel/columns.js';
 import { voxelSettings } from '../../src/world/voxel/material.js';
+import { POSE_TARGET } from '../../src/core/poses.js';
+import { faceColour, readLight, renderChain } from '../lighting/render-chain.mjs';
 import { reporter, selfTest } from './lib.mjs';
 
 // THE MEADOW HAS A WHITE FAMILY, IT IS THE TARGET'S WHITE, AND NO WALKER CLIMBS
@@ -183,11 +185,23 @@ report.check(LANT.glowNight > LANT.glowDay * 3,
 
 // ------------------------------------------------- the head, and its light
 //
-// THE HEAD IS THE SIZE THE TARGET DRAWS. Re-derived at the poses as they stand,
-// a head is 8.2 cm and a cyan one 7.3; read again this session through the same
-// camera on the target's own heads, the median comes to 7.0 cm with the blob's
-// own bleed inside it. The band held here is the two readings together.
-report.check(censo.head.min >= 0.045 && censo.head.max <= 0.115,
+// THE HEAD IS THE SIZE THE TARGET DRAWS, AND WHAT THAT SENTENCE MEANS CHANGED
+// UNDER THIS GATE (U-FIORI-7).
+//
+// It used to hold 4.5 to 11.5 cm, which is <<the two readings of the target's
+// own centimetres together>> -- 8.2 from E-ERBA-A and 7.0 from the third
+// reading. Both are still right about the TARGET: probed pixel by pixel, one of
+// its heads at 5.84 m spans 18 px where 10 cm spans 19.15, which is 9.4.
+//
+// What they were never readings of is OUR PICTURE. The same head of ours spans
+// 22 px at the same distance, because this flower is a lantern and carries a
+// skirt of about five pixels -- lamp, halo, bloom -- that does not shrink when
+// the head does. So the band below is the size at which THIS flower draws the
+// target's flower, and the note over HEAD_MIN in src/world/vegetation.js carries
+// the fit. It is deliberately narrow: anything back at seven and a half is the
+// meadow the committente called popcorn, and anything under three is a meadow
+// with no flowers in it.
+report.check(censo.head.min >= 0.030 && censo.head.max <= 0.075,
   'the head is the size the target draws',
   `${(censo.head.min * 100).toFixed(1)} to ${(censo.head.max * 100).toFixed(1)} cm`);
 
@@ -846,18 +860,33 @@ for (const kind of KINDS) {
 // correlation is exact by construction and what is gated is where the two ENDS
 // of the draw land -- and BOTH draws, because a cyan head is a tenth smaller and
 // carries the narrowest stalk in the meadow.
+//
+// AND WITH THE HEAD IT MOVED, WHICH IS THE COORDINATOR'S OWN INSTRUCTION AND IS
+// WHY THIS GATE IS NOW A RATIO. E-DECISIONI15.1 fixed the band as a fifth to
+// three tenths OF A CUBE and the cube is the voxel: 2.0 to 3.0 cm, absolute.
+// U-FIORI-7's mandate says <<stelo in proporzione: E-DECISIONI15 stelo 1/5-3/10
+// del cubo -> RISCALATO CON LA TESTA>>, so the head at 5.2 cm carries a stalk at
+// 1.7 and the absolute band the coordinator wrote in September has gone down
+// with it. What is left of that decision, and what is held here, is the SHAPE:
+// a stalk is a third of its own head, exactly, at both ends of the draw --
+// which is the 2.5 on 7.5 he ratified, written as the ratio it always was.
 const steloDi = (size) => censo.stalk.wide * (size / censo.head.nominal);
 const steloMin = steloDi(censo.head.min * censo.head.cyanScale);
 const steloMax = steloDi(censo.head.max);
-report.check(steloMin >= 0.18 * VOXEL - 1e-9 && steloMax <= 0.30 * VOXEL + 1e-9,
-  'a stalk is a fifth to three tenths of a cube, and follows its own head',
+const terzo = (size) => Math.abs(steloDi(size) - size / 3) < 1e-9;
+report.check(terzo(censo.head.min * censo.head.cyanScale) && terzo(censo.head.max)
+  && terzo(censo.head.nominal),
+  'a stalk is a third of its own head, at both ends of the draw',
   `${(steloMin * 100).toFixed(2)} to ${(steloMax * 100).toFixed(2)} cm on heads of `
   + `${(censo.head.min * censo.head.cyanScale * 100).toFixed(1)} to `
   + `${(censo.head.max * 100).toFixed(1)}`);
-report.check(Math.abs(steloDi(censo.head.nominal) - 0.025) < 1e-9,
-  'and the nominal one is a quarter of a cube exactly',
+report.check(Math.abs(steloDi(censo.head.nominal) - censo.head.nominal / 3) < 1e-9
+  && steloMin >= 0.10 * VOXEL && steloMax <= 0.30 * VOXEL + 1e-9,
+  'and the nominal one is a quarter of its own head, inside the cube it is cut from',
   `${(steloDi(censo.head.nominal) * 100).toFixed(2)} cm on a head of `
-  + `${(censo.head.nominal * 100).toFixed(1)}`);
+  + `${(censo.head.nominal * 100).toFixed(1)}, `
+  + `${(steloMin / VOXEL).toFixed(3)} to ${(steloMax / VOXEL).toFixed(3)} of a voxel `
+  + '(E-DECISIONI15 wrote 0.20 to 0.30 at the old head)');
 report.check(censo.stalk.steps > 1 && censo.stalk.grade > 0,
   'and it steps from foot to crown rather than standing one colour',
   `${censo.stalk.steps} rungs, ${(censo.stalk.grade * 100).toFixed(0)}% between them`);
@@ -988,6 +1017,200 @@ report.check(perM2 > 2.2 && perM2 < 3.4, 'the meadow is sown as thick as it was 
 report.check(bianchi / Math.max(1, ciano) >= 3 && bianchi / Math.max(1, ciano) <= 12,
   'the two colours stand in the measured ratio',
   `${bianchi} white to ${ciano} cyan = ${(bianchi / ciano).toFixed(1)} to 1`);
+
+// =====================================================================
+// THE TARGET'S OWN MEADOW, BY DISTANCE BAND (U-FIORI-7)
+// =====================================================================
+//
+// WHAT THIS SECTION IS FOR AND WHY IT COULD NOT BE WRITTEN BEFORE. Every gate
+// above is about ONE flower -- its pigments, its body, where it stands. What the
+// committente walked away from was not one flower: it was a MEADOW, of the wrong
+// size, in the wrong arrangement, with none of its blue in it. Those are
+// statistics of the whole field at a distance, and they are exactly the four
+// numbers R1 1.5 measured on the target.
+//
+// AND IT RUNS WITHOUT A BROWSER, which is what makes it a gate rather than a
+// session reading. The RULER is the campaign's own -- the fitted camera of R1's
+// 0, focal 1158.7 px on the 1672x941 frame, the pose src/core/poses.js
+// publishes -- so a head of s metres at d metres subtends s * 1158.7 / d pixels,
+// and no screenshot is needed to ask how big it is.
+const EYE = POSE_TARGET.position;
+/** px per metre at one metre: R1's ruler, and the frame it was read on. */
+const FOCALE = 1158.7;
+/**
+ * The silhouette of a cube seen along a unit vector is s*s*(|x|+|y|+|z|), and
+ * the far family draws exactly that as a quad (see FAR_VERTEX). At a walker's
+ * eye the y term is small, so the sum is about the root of two: past the
+ * exchange ring a head covers this much more than its own edge.
+ */
+const QUAD = Math.sqrt(1.41);
+
+const BANDE = [[4.5, 7], [7, 10], [10, 15], [15, 25]];
+const mediana = (a) => (a.length ? a.slice().sort((p, q) => p - q)[Math.floor(a.length / 2)] : NaN);
+const lontano = (f) => Math.hypot(f.x - EYE.x, f.z - EYE.z);
+
+/**
+ * THE TABLE THIS DELIVERY DRAWS, AND WHERE IT COMES FROM.
+ *
+ * These are the widths in pixels the GEOMETRY subtends per band at the fitted
+ * pose. They are locked rather than derived from the target for one reason that
+ * is stated plainly: what the target's finder measures on the frame is the
+ * geometry PLUS this flower's skirt -- lamp, halo, bloom -- and the skirt is
+ * neither this gate's to predict nor this unit's to move. Measured on the two
+ * frames this session, the same window, the same instrument:
+ *
+ *   band        target frame   ours before   ours after   geometry after
+ *   6.1 m         13 px          18 px         14 px        10.2 px
+ *   13.1 m         4 px           9 px          6 px         5.4 px
+ *   20.7 m         5 px           6 px          4 px         3.4 px
+ *
+ * The near and far bands land on the target; the middle one is 60 per cent over,
+ * and the reason is written in the verbale rather than hidden here: at thirteen
+ * metres the target's own 9 cm head reads 4 px because only its lit face clears
+ * the finder's threshold, and ours is a quad of one flat colour that clears it
+ * whole. That is the far family's stand-in, not its size, and it is a residue.
+ */
+const TAGLIA_PX = { '4.5-7': 10.17, '7-10': 7.88, '10-15': 5.37, '15-25': 3.41 };
+const TAGLIA_TOLL = 0.10;
+/**
+ * And how thick, per band. It is the SOWING that is gated -- the density map,
+ * the path and the stone are what make a band differ from FLOWER_PER_M2 -- so
+ * the band is a fifth either way of the constant, which catches a band gone
+ * empty or a band twice sown without gating the shape of the disc.
+ */
+const DENSITA_TOLL = 0.15;
+
+for (const [lo, hi] of BANDE) {
+  const nome = `${lo}-${hi}`;
+  const sel = campo.filter((f) => { const d = lontano(f); return d >= lo && d < hi; });
+  const px = sel.map((f) => {
+    const d = lontano(f);
+    return f.size * (d > censo.reach.ring ? QUAD : 1) * FOCALE / d;
+  });
+  const larghezza = mediana(px);
+  const atteso = TAGLIA_PX[nome];
+  report.check(Math.abs(larghezza / atteso - 1) <= TAGLIA_TOLL,
+    `at ${nome} m a head is the width this delivery draws`,
+    `${larghezza.toFixed(2)} px against ${atteso.toFixed(2)}, `
+    + `${((larghezza / atteso - 1) * 100).toFixed(1)}%`);
+  // THE AREA IS THE RING'S OWN AND NOT A RING'S, because the outer band runs off
+  // the meadow: an annulus of twenty-five metres round an eye standing at z =
+  // 14.2 reaches thirty-nine metres from the centre of a disc that ends at
+  // thirty-five, and dividing by the whole annulus reported a sixth of the band
+  // missing when what was missing was ground. Sampled rather than integrated --
+  // the intersection of two circles has a closed form and this has a path and
+  // five footprints of masonry in it as well, so a count on a fixed grid is both
+  // shorter and the same arithmetic the sowing itself is asked with.
+  let dentro = 0;
+  let tutti = 0;
+  const passo = 0.25;
+  for (let d = lo; d < hi; d += passo) {
+    for (let a = 0; a < 360; a += 2) {
+      const x = EYE.x + d * Math.cos(a * Math.PI / 180);
+      const z = EYE.z + d * Math.sin(a * Math.PI / 180);
+      const peso = d;
+      tutti += peso;
+      if (x * x + z * z <= censo.reach.disc * censo.reach.disc) dentro += peso;
+    }
+  }
+  const area = Math.PI * (hi * hi - lo * lo) * (dentro / tutti);
+  const perBanda = sel.length / area;
+  report.check(Math.abs(perBanda / censo.sowing.perSquareMetre - 1) <= DENSITA_TOLL,
+    `and there are as many of them at ${nome} m as anywhere else`,
+    `${perBanda.toFixed(3)} a square metre against the census's `
+    + `${censo.sowing.perSquareMetre.toFixed(1)}`);
+}
+
+// THE GROUPS, ON THE PLANE AND NOT ON THE PICTURE.
+//
+// Clark-Evans is the mean nearest neighbour over what a scatter of the same
+// density would give: one is a scatter, under one is clumped, over one is a
+// lattice. R1 1.5 reads 0.64 on the target and 0.97 on the meadow that shipped.
+//
+// WHAT IS ASKED HERE IS THE PLANE'S OWN, AND THE DIFFERENCE MATTERS. R1 measures
+// it in PIXELS, on components a finder found, and a big head breaks into two or
+// three of them -- so half of what that instrument calls a near neighbour is the
+// same flower twice. The plane cannot do that: a head is one point, the metric
+// is the one the textbook defines, and the edge is corrected the way Donnelly
+// corrects it (a ring of radius twelve metres round the fitted eye loses
+// neighbours off its rim, and without the correction that alone reads 1.05 as
+// 1.12). The two agree on this meadow to a hundredth -- 0.636 on the plane
+// against R1's 0.64 on the target's frame -- and it is the plane that is gated.
+const VICINO = 12;
+const vicini = campo.filter((f) => lontano(f) <= VICINO);
+function clarkEvans(punti, raggio) {
+  let somma = 0;
+  for (let i = 0; i < punti.length; i++) {
+    let best = Infinity;
+    for (let j = 0; j < punti.length; j++) {
+      if (i === j) continue;
+      const dx = punti[i].x - punti[j].x;
+      const dz = punti[i].z - punti[j].z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < best) best = d2;
+    }
+    somma += Math.sqrt(best);
+  }
+  const n = punti.length;
+  const densita = n / (Math.PI * raggio * raggio);
+  const perimetro = 2 * Math.PI * raggio;
+  const atteso = 0.5 / Math.sqrt(densita) + (0.0514 + 0.041 / Math.sqrt(n)) * perimetro / n;
+  return { R: (somma / n) / atteso, vicino: somma / n, atteso };
+}
+const gruppi = clarkEvans(vicini, VICINO);
+report.check(gruppi.R >= 0.55 && gruppi.R <= 0.75,
+  'the meadow is sown in groups, at the target\'s own Clark-Evans',
+  `R = ${gruppi.R.toFixed(3)} over ${vicini.length} heads inside ${VICINO} m `
+  + `(nearest ${(gruppi.vicino * 100).toFixed(1)} cm against a scatter's `
+  + `${(gruppi.atteso * 100).toFixed(1)}); the target reads 0.64`);
+
+// AND ONE HEAD IN SIX IS BLUE, WHEREVER THE WALKER IS STANDING.
+//
+// Two things are gated and they are not the same thing. The SHARE is R1's 15 per
+// cent and the coordinator's twelve-to-eighteen; measured on the frame with a
+// finder that does not ask for brightness, the target reads 0.16 in its lit
+// middle window and 0.25 in its near one. The REACH is the other half, and it is
+// the half that made the delivered picture read one per cent blue against the
+// target's fifteen: the blues were trimmed at eight metres, which is where the
+// census stopped resolving them and not where the meadow stops being blue.
+const quotaBlu = ciano / Math.max(1, campo.length);
+report.check(quotaBlu >= 0.12 && quotaBlu <= 0.18,
+  'one head in six is blue',
+  `${(quotaBlu * 100).toFixed(1)}% of ${campo.length}, against the target's 15`);
+report.check(censo.cyan.reach >= censo.reach.far,
+  'and a blue head carries as far as a white one',
+  `blues to ${censo.cyan.reach} m, whites to ${censo.reach.far}`);
+
+// THE WHITE HEAD'S OWN LEVEL, THROUGH THE DELIVERED CHAIN.
+//
+// The target's white head, probed face by face at 5.84 m on the fitted frame:
+// its LID reads L* 67.6 with a croma of 12.9 and its side L* 50.7 / 13.0. The
+// lid is the face to hold, because it is the one face of a head whose normal is
+// the same in both pictures whatever the sun is doing -- <<la testa bianca del
+// bersaglio e' bianca e brillante>> (E-FIORI5, and E-LUCE4's note of method: the
+// veil is off both frames).
+//
+// It is asked of tools/lighting/render-chain.mjs -- the seat, AgX and the
+// delivered grade cube, the road guard-prato and guard-scala take -- so it can
+// be asked at every commit. What is NOT in that chain is this flower's own
+// halo, its petal alpha and the bloom that follows them: the chain answers for
+// the PIGMENT under the light, which is the half this file owns.
+const luce = readLight();
+const composite = await renderChain();
+const lab = (rgb) => {
+  const lin = rgb.map((v) => { const u = v / 255; return u <= 0.04045 ? u / 12.92 : ((u + 0.055) / 1.055) ** 2.4; });
+  const f = (t) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+  const X = (0.4124 * lin[0] + 0.3576 * lin[1] + 0.1805 * lin[2]) / 0.95047;
+  const Y = 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
+  const Z = (0.0193 * lin[0] + 0.1192 * lin[1] + 0.9505 * lin[2]) / 1.08883;
+  return { L: 116 * f(Y) - 16, C: Math.hypot(500 * (f(X) - f(Y)), 200 * (f(Y) - f(Z))) };
+};
+const BERSAGLIO_LID = { L: 67.6, C: 12.9 };
+const lid = lab(composite(faceColour([0, 1, 0], luce, [pale.x, pale.y, pale.z])));
+report.check(Math.abs(lid.L - BERSAGLIO_LID.L) <= 5,
+  'the white head\'s lid is the level the target\'s white head is',
+  `L* ${lid.L.toFixed(1)} against ${BERSAGLIO_LID.L}, croma ${lid.C.toFixed(1)} `
+  + `against ${BERSAGLIO_LID.C}`);
 
 // -------------------------------------------------------- the contract
 //
@@ -1233,10 +1456,12 @@ if (process.argv.includes('--self')) {
       caught: !(3 === 4 && 4 === 4 && 4 === 4) },
     { what: 'a shell panel emitted as a triangle, which cannot be a lid band',
       caught: !([{ corners: [0, 1, 2] }].every((f) => f.corners.length === 4)) },
-    { what: 'a stalk still at the half-cube width the committente asked to narrow',
-      caught: !(0.5 * VOXEL >= 0.18 * VOXEL - 1e-9 && 0.5 * VOXEL <= 0.30 * VOXEL + 1e-9) },
+    { what: 'a stalk that stopped following its own head, at a literal 2.5 cm',
+      caught: !(Math.abs(0.025 - censo.head.nominal / 3) < 1e-9) },
+    { what: 'a stalk half its own head thick, which is the band E-DECISIONI15 narrowed',
+      caught: !(Math.abs(censo.head.nominal / 2 - censo.head.nominal / 3) < 1e-9) },
     { what: 'a stalk a whole cube thick',
-      caught: !(VOXEL >= 0.18 * VOXEL - 1e-9 && VOXEL <= 0.30 * VOXEL + 1e-9) },
+      caught: !(VOXEL >= 0.10 * VOXEL && VOXEL <= 0.30 * VOXEL + 1e-9) },
     { what: 'a stalk standing one flat colour from foot to crown',
       caught: !(1 > 1 && 0 > 0) },
     { what: 'a head opened past the law that allows it',
@@ -1244,7 +1469,31 @@ if (process.argv.includes('--self')) {
     { what: 'every head in the meadow drawn open',
       caught: !(Math.abs(1.0 - censo.head.openShare) < 0.02) },
     { what: 'a head at fourteen centimetres',
-      caught: !(0.14 >= 0.045 && 0.14 <= 0.115) },
+      caught: !(0.14 >= 0.030 && 0.14 <= 0.075) },
+    // U-FIORI-7: the meadow the committente walked away from, injected head by
+    // head. Every one of these passed every gate this file had before that turn.
+    { what: 'the head back at the seven and a half centimetres of E-FIORI5',
+      caught: !(0.060 >= 0.030 && 0.090 <= 0.075) },
+    { what: 'a head at two centimetres, which is a meadow with no flowers in it',
+      caught: !(0.015 >= 0.030 && 0.025 <= 0.075) },
+    { what: 'a band of the meadow drawn a third too big',
+      caught: !(Math.abs((TAGLIA_PX['7-10'] * 1.33) / TAGLIA_PX['7-10'] - 1) <= TAGLIA_TOLL) },
+    { what: 'a band of the meadow gone empty',
+      caught: !(Math.abs(0.4 / censo.sowing.perSquareMetre - 1) <= DENSITA_TOLL) },
+    { what: 'a band sown twice as thick as the rest',
+      caught: !(Math.abs(6.0 / censo.sowing.perSquareMetre - 1) <= DENSITA_TOLL) },
+    { what: 'a sowing that went back to a scatter with no groups in it',
+      caught: !(1.0 >= 0.55 && 1.0 <= 0.75) },
+    { what: 'a sowing heaped into piles, which is not grouping either',
+      caught: !(0.30 >= 0.55 && 0.30 <= 0.75) },
+    { what: 'the one per cent of blue the delivered picture showed',
+      caught: !(0.01 >= 0.12 && 0.01 <= 0.18) },
+    { what: 'a meadow a third of it blue',
+      caught: !(0.33 >= 0.12 && 0.33 <= 0.18) },
+    { what: 'the blues trimmed at eight metres again, where the census stopped seeing them',
+      caught: !(8.0 >= censo.reach.far) },
+    { what: 'a white head ten levels under the target\'s own lid',
+      caught: !(Math.abs((BERSAGLIO_LID.L - 10) - BERSAGLIO_LID.L) <= 5) },
     { what: 'a head taking the whole of the world\'s ladder',
       caught: !(1 > 0.05 && 1 < 0.95) },
     { what: 'a head standing a hand above its own column',
