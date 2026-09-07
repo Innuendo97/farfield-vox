@@ -286,5 +286,98 @@
     "blockOn05": [506, 512],
     "allSix": [4801, 5002],
     "source": "SESSIONI-VOX.md, chapter V2, residue 2"
+  },
+  "palette": {
+    "why": [
+      "WHAT THE REFERENCE'S OWN STONE READS, FACE BY FACE, AND IT IS A SEAT RATHER",
+      "THAN A NOTE. Everything above this key describes the SHAPE of the wall -- the",
+      "course, the block, the joint, the chamfer, the head. Nothing described its",
+      "COLOUR, so every session that fitted the pigment fitted it against a number",
+      "kept in its own tools, and three of those numbers disagreed by a factor of",
+      "three without anybody being able to see that they did.",
+      "",
+      "THE INSTRUMENT, so that a reading taken again is taken the same way. Each",
+      "face of each block is PROJECTED from the fitted camera (POSE_VOX_DAY) using",
+      "the placement and turn of src/world/layout.js and the head of heads.perBlock",
+      "-- targetHead on the target, builtHead on a render -- and kept when its",
+      "normal faces the eye; the polygon is eroded by five pixels. Inside it the",
+      "engraved ink is masked out (b > 1.5r + 8, g > 90, b > 120, dilated four",
+      "pixels) and so is the moss (min(g-r, g-b) > 6, the campaign's own detector),",
+      "and what is left is stone. L, C and h are CIELAB medians of that stone under",
+      "D65; L_p10 and L_p90 are its spread INSIDE one face, which is what the eye",
+      "calls camouflage when it is wide. The moss is the same detector counted",
+      "rather than masked, by tenths of the face's height from head to foot.",
+      "",
+      "READ ON THE DAY TARGET ONLY (E-DECISIONI2), by R5 on 2026-09-07, with the",
+      "instrument at fondazione/r5/misura2.py. The whole reading and its limits are",
+      "in per-il-committente/ricerca/2026-09-07-R5-pietra.md; these are here because",
+      "a guard has to be able to ask for them, and three of them are worth saying",
+      "in words:",
+      "",
+      "  - the shadowed faces are all ONE stone under one sky: L* 11.5 to 15.4 at",
+      "    h 227 to 236, and the block at 31 m is no lighter than the block at 21 m,",
+      "    which means the reference's air does not lift its stone over that span.",
+      "  - the lit faces are NEUTRAL: chroma 5 to 6 at h 134 to 190. A pigment that",
+      "    is itself green cannot develop to that.",
+      "  - the last tenth of every face is grass and not stone, and the moss figures",
+      "    of that tenth say so: 69 to 88 per cent on four of them.",
+      "",
+      "AND THE REFERENCE IS NOT CONSISTENT WITH ONE SUN, which is stated here rather",
+      "than smoothed away: 04-front and 05-front both look south-west, and the",
+      "target has one in shadow at 19.1 and the other in sun at 26.3. Whoever fits",
+      "the pigment against this table will miss two faces by ten levels whatever",
+      "they do, and the miss is the reference's rather than theirs."
+    ],
+    "measuredBy": {
+      "session": "R5", "date": "2026-09-07", "camera": "POSE_VOX_DAY",
+      "space": "CIELAB D65, medians over the projected face",
+      "source": "per-il-committente/ricerca/2026-09-07-R5-pietra.md, sections 1.3 to 1.5"
+    },
+    "perFace": {      "01-front": { "sunTerm": -0.659, "L": 13.0, "C": 9.8, "h": 231, "L_p10": 10.0, "L_p90": 17.1, "moss%": 1.4,
+        "mossTenths": [0.5, 0.2, 1.1, 0.0, 0.0, 0.0, 0.0, 0.0, 3.1, 9.1], "pxPerMetre": 53.5 },
+      "01-left": { "sunTerm": 0.177, "L": 31.4, "C": 5.6, "h": 142, "L_p10": 16.3, "L_p90": 42.6, "moss%": 17.9,
+        "mossTenths": [0.1, 2.9, 5.5, 2.4, 6.7, 14.1, 21.2, 16.2, 31.4, 70.6], "pxPerMetre": 41.8 },
+      "02-front": { "sunTerm": -0.433, "L": 15.3, "C": 11.1, "h": 227, "L_p10": 12.6, "L_p90": 19.2, "moss%": 3.0,
+        "mossTenths": [3.8, 5.2, 0.9, 0.2, 0.0, 0.3, 0.7, 0.0, 0.2, 16.1], "pxPerMetre": 46.3 },
+      "02-left": { "sunTerm": 0.528, "L": 41.0, "C": 5.8, "h": 134, "L_p10": 31.3, "L_p90": 57.0, "moss%": 21.9,
+        "mossTenths": [0.0, 0.0, 0.0, 2.7, 4.5, 10.5, 36.7, 16.0, 27.1, 88.3], "pxPerMetre": 10.9 },
+      "03-front": { "sunTerm": -0.32, "L": 15.4, "C": 10.6, "h": 233, "L_p10": 12.9, "L_p90": 19.6, "moss%": 1.1,
+        "mossTenths": [1.2, 1.9, 0.7, 0.0, 0.0, 0.1, 0.0, 0.2, 0.5, 4.7], "pxPerMetre": 36.6 },
+      "04-front": { "sunTerm": 0.315, "L": 19.1, "C": 9.6, "h": 220, "L_p10": 14.4, "L_p90": 29.7, "moss%": 9.5,
+        "mossTenths": [1.7, 0.5, 0.5, 0.0, 1.6, 0.0, 0.0, 0.0, 7.1, 69.2], "pxPerMetre": 51.3 },
+      "04-right": { "sunTerm": -0.605, "L": 20.2, "C": 14.2, "h": 240, "L_p10": 14.5, "L_p90": 76.5, "moss%": 17.0,
+        "mossTenths": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.2, 3.9, 28.0, 88.2], "pxPerMetre": 22.8 },
+      "05-front": { "sunTerm": 0.425, "L": 26.3, "C": 5.2, "h": 190, "L_p10": 21.7, "L_p90": 34.9, "moss%": 3.7,
+        "mossTenths": [1.0, 4.7, 1.4, 6.4, 4.9, 0.5, 3.8, 1.0, 2.3, 10.1], "pxPerMetre": 67.3 },
+      "05-right": { "sunTerm": -0.534, "L": 11.5, "C": 9.7, "h": 232, "L_p10": 7.8, "L_p90": 15.9, "moss%": 0.6,
+        "mossTenths": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 5.9], "pxPerMetre": 29.8 }    },
+    "sunOverShadow": {
+      "on": "01, its west flank over its front, in encoded luminance",
+      "target": 4.4,
+      "why": "a shadowed face receives the sky term alone, so this ratio is the share of the sky a wall takes and nothing else in a material moves it"
+    },
+    "block": {
+      "periodMetres": 0.19,
+      "resolvedOn": "03-front, 7 px at 36.6 px/m, autocorrelation 0.34",
+      "coursePeriodPx": 12,
+      "courseResolvedOn": "05-right, autocorrelation 0.48",
+      "why": "the reference resolves its block AND its course; a render whose tile carries a feature larger than a block resolves neither, which is what 'camouflage' means as a measurement"
+    },
+    "moss": {
+      "tintOverStoneBeside": [0.84, 0.93, 0.83],
+      "why": "the moss of the reference is DARKER than the stone it grows on, on all three channels: 59/70/58 against 70/76/69 on the west flank of 01",
+      "byClass": {
+        "shadedFronts": "1.1 to 3.7 per cent",
+        "litFronts": "3.7 to 9.5",
+        "westFlanks": "17.9 on 01 and 21.9 on 02, both climbing to the foot",
+        "eastFlanks": "17.0 on 04 and 0.6 on 05, which no law of ours separates"
+      }
+    },
+    "rocks": {
+      "litFaces": { "L": 50.5, "C": 13.4, "h": 95, "rgb": [130, 124, 104] },
+      "darkFaces": { "L": 12.8, "C": 4.0, "h": 158 },
+      "ruins": { "litL": 53, "h": 89, "blockMetres": [0.3, 0.4], "courses": [1, 2] },
+      "why": "the reference has TWO stones: the wall at L* 31 in the sun, and the rock at L* 50, warm. The low ruins past 05 are the rock and not the wall."
+    }
   }
 }
