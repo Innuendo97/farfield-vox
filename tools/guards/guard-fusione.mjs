@@ -147,7 +147,31 @@ const ALLOCATION_RADIUS = 35;
 // The row is proposed at 191 700, the measured number with a third of a per cent
 // of headroom, by the same rule and with the same authority as the two above it.
 // THE GATE THAT DECIDED IT IS THE FRAME and it is in the verbale of U-SENT-5.
-const ALLOCATION = 191700;
+//
+// AND A FOURTH TIME, AND THIS ONE GOES DOWN. U-SENT-6 refitted the width of the
+// corridor against the reference with the verge VISIBLE and took the mat off the
+// verge (PATH_WIDTH in src/world/terrain-field.js, MANTO.verge in
+// src/world/voxel/worldgen.js), and the disc fell from 191 058 to 184 584
+// triangles at r = 14 m -- 6 474 fewer. Two things pay it and both are the
+// mandate: the corridor is 1.0 m at the waist where the law had 1.7, so there is
+// less paving and less mat giving way along its kerb; and the band beside the
+// stone carries no blade at all, where it used to carry one on 41 columns in a
+// hundred.
+//
+// A CEILING LEFT SEVEN THOUSAND TRIANGLES OVER THE WORLD IS NOT AN ALLOCATION,
+// it is the «ceiling raised until the red went away» this file's own self-test
+// exists to refuse -- and that self-test is what caught it: at 191 700 over a
+// disc of 184 584 the row «the allocation is the measured disc and not a round
+// number over it» goes MISS. So the row is proposed at 185 200, the measured
+// number with a third of a per cent of headroom, by the same rule as the three
+// above it, applied in the direction the measurement went.
+//
+// AND IT IS A PROPOSAL AND NOT A CLAIM ON THE NEXT UNIT. U-SENT-7 has the stone
+// on the verge and the twenty centimetre lattice, and either may cost quads this
+// row has just stopped holding for it. The ritual is the one used here: measure,
+// write the number with its reason, and let the coordinator ratify. Writing the
+// row where the world actually stands is what makes that conversation possible.
+const ALLOCATION = 185200;
 
 /** What §2.9 allocated before D-E2 amended it, kept so the move stays readable. */
 const ALLOCATION_BEFORE = 60000;
@@ -176,7 +200,15 @@ const FOCUS = { x: SPAWN.x, z: SPAWN.z };
 // lattice at an angle shows more of its own flanks -- and the bare earth 1 649
 // against 1 604. The other 1 396 quads are the mat, giving way along a kerb that
 // is longer than it was. U-SENT-5, E-DECISIONI14.
-const AT_TODAY = 191058;
+//
+// AND RE-TAKEN WITH THE WIDTH THE REFERENCE ACTUALLY HAS: 184 584 at r = 14 m,
+// which is 92 292 quads against 95 529. The bare earth of the verges falls with
+// the corridor, 1 649 quads to 1 385; the paving's own walls barely move, 182 to
+// 191, because a narrower corridor is not a shorter one and it is the LENGTH of
+// a flank that shows. The other 2 982 quads are the MAT, and they are the band
+// beside the stone: it carries no blade at all now, where it used to carry one
+// on 41 columns in a hundred. U-SENT-6, R3 S1.
+const AT_TODAY = 184584;
 
 const OWNER = 'V1';
 
