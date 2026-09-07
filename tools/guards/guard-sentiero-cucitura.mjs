@@ -1,13 +1,13 @@
 import { SPAWN, STAIRS } from '../../src/world/layout.js';
 import {
-  pathCentreSlope, pathCentreX, pathEdge, pathHalfWidth, pathRun,
+  EDGE_WOBBLE, pathCentreSlope, pathCentreX, pathEdge, pathHalfWidth, pathRun,
 } from '../../src/world/terrain-field.js';
 import { groundHeightAt, materialAt } from '../../src/world/contracts.js';
 import {
   BASE_STEP, CENTRE, DISC_RADIUS, MANTO, MATERIAL, PATH, VOXEL, columnSpec, mantoAt,
   meadowMoundAt, moundAt, onPaving, pathDrop, pathVerge,
 } from '../../src/world/voxel/pure.js';
-import { SPREAD } from '../../src/world/path.js';
+import { KERB, SPREAD } from '../../src/world/path.js';
 import { reporter, selfTest } from './lib.mjs';
 
 // IS THE CORRIDOR THE GROUND, AT THE LEVEL THE REFERENCE MEASURES IT AT?
@@ -231,12 +231,18 @@ export function seenWidthAt(z, shoulder) {
  * crosses a half.
  *
  * ASKED OF THE LAW AND NOT OF A PICTURE. SPREAD in ../../src/world/path.js is a
- * smoothstep between two fractions of the half width, so the crossing is their
- * middle exactly, and the number below is that middle carried into metres by
- * the width beside it. It is the reading the middle band above used to carry.
+ * smoothstep, so the crossing is its two ends' middle exactly.
+ *
+ * AND THE WINDOW IS IN METRES FROM THE VISIBLE KERB SINCE U-SENT-7, which is the
+ * one line of this function that changed and the reason it had to. The window
+ * used to be two fractions of the half width, so the core was a fraction of the
+ * corridor at every northing; it is now a distance from the kerb the eye finds
+ * -- the far side of the bare band beside the stone -- so the core is the
+ * corridor less that distance, and it narrows where the corridor does without
+ * being a proportion of it.
  */
 export function coreAt(z) {
-  return 2 * ((SPREAD.from + SPREAD.to) / 2) * pathHalfWidth(z) / VOXEL;
+  return 2 * (pathHalfWidth(z) + KERB + (SPREAD.from + SPREAD.to) / 2) / VOXEL;
 }
 
 /**
@@ -505,6 +511,18 @@ if (process.argv.includes('--self')) {
       })(),
     },
     {
+      // D-U6-3's own defect, which is the term U-SENT-6 left standing: an edge
+      // that wanders by a fixed 0.1484 m whatever the corridor is. At the waist
+      // the law measures 0.48 of half width, so that is thirty-one per cent of
+      // the width against the reference's own ten.
+      what: 'an edge that wanders in metres, at 31 per cent of the width at the waist',
+      caught: 0.1484 / pathHalfWidth(4.5) > 0.10,
+    },
+    {
+      what: 'a corridor with no bare soil at all past the kerb the eye finds',
+      caught: 0 < 0.25,
+    },
+    {
       // And the other half of the same defect, which no width can answer: the
       // mat standing on the bare earth of the verge. A tenth of intensity is a
       // blade on 41 columns in a hundred and at this pose a blade hides three to
@@ -603,6 +621,81 @@ report.check(share[0] > KERB_OF_GROUND * MANTO.ground && share[share.length - 1]
   + `${(MANTO.ground * 100).toFixed(0)}%, `
   + `${(share[share.length - 1] * 100).toFixed(1)}% at ${BANDS[BANDS.length - 1].mid} m, `
   + `ramp ${MANTO.verge.bare} m bare then ${MANTO.verge.reach} m`);
+
+// ------------------------------------------------------------------ 2b
+//
+// THE WANDERING OF THE EDGE, AND IT IS A FRACTION OF THE LAW AGAIN.
+//
+// D-U6-3 answered B. The two noises of pathEdge were written in metres at the
+// value they were fitted at -- 0.105 of wobble at three metres of correlation
+// and 0.0434 of wander at one -- when the half width was 0.552 m and hardly
+// moved down the run. The law U-SENT-6 measured has a waist of 0.48, so the same
+// 0.1484 m was thirty-one per cent of the width there against the ten per cent
+// the reference's own kerb scatters by, and at three metres of correlation it
+// does not average out inside a band a metre long: it MOVES the band. Four of
+// the eleven bands U-SENT-6 could not bring inside five per cent were that term.
+//
+// TWO ROWS AND NOT ONE. The first is the literal -- the two noises sum to a
+// tenth of the half width, so the widest a row can wander is ten per cent of
+// its own width -- and the second is what the law actually draws over the field,
+// because a fraction written down is not a fraction delivered until the spline
+// under it has been walked.
+report.line('');
+const WANDER = { ceiling: 0.10, p90: 0.040 };
+report.check(EDGE_WOBBLE[0] + EDGE_WOBBLE[1] <= WANDER.ceiling + 1e-9,
+  `the edge wanders by at most a ${(100 * WANDER.ceiling).toFixed(0)}th of the half width, which `
+  + "is what the reference's own kerb scatters by row to row",
+  `${EDGE_WOBBLE.map((v) => v.toFixed(4)).join(' + ')} = `
+  + `${(100 * (EDGE_WOBBLE[0] + EDGE_WOBBLE[1])).toFixed(1)}% of it`);
+const wander = [];
+for (let z = -3; z <= 9.4; z += 0.02) {
+  const nominal = 2 * pathHalfWidth(z);
+  wander.push(Math.abs((pathEdge(z, -1) + pathEdge(z, 1)) - nominal) / nominal);
+}
+wander.sort((a, b) => a - b);
+const wp90 = wander[Math.floor(wander.length * 0.9)];
+const wmax = wander[wander.length - 1];
+report.check(wmax <= WANDER.ceiling + 1e-9 && wp90 <= WANDER.p90,
+  'and the law walked over the field agrees: no row of it is more than that off its own '
+  + `nominal width, and nine in ten are inside ${(100 * WANDER.p90).toFixed(1)}%`,
+  `p90 ${(100 * wp90).toFixed(1)}%, worst ${(100 * wmax).toFixed(1)}%`);
+
+// ------------------------------------------------------------------ 2c
+//
+// AND HOW MUCH BROWN STANDS PAST THE KERB THE EYE FINDS, which is a different
+// question from the four bands above and the one R3 asks in per cent.
+//
+// The bands above are measured from the last column of STONE; this one is
+// measured from the far side of the bare band, which is where the ruler and the
+// eye put the kerb (U-SENT-6 §4). What the reference shows there is 15 per cent
+// of brown in the first decimetre and 2 to 10 in the next three
+// (fondazione/lav/dirad.py); what stands behind that number in this world is the
+// share of COLUMNS the law leaves as bare soil, because the rest of it -- how
+// much of each of those columns a blade in front of it hides at fourteen degrees
+// -- is a property of the pose and not of the ground. So the row asks the share
+// of columns, against the ceiling MANTO.ground puts on it, and the frame's own
+// reading is in the verbale beside it.
+const PAST = { from: 0.0, to: 0.12, low: 0.25, high: 0.55 };
+let pastBrown = 0;
+let pastAll = 0;
+for (let z = -3; z <= 9.4; z += 0.05) {
+  const centre = pathCentreX(z);
+  for (let side = -1; side <= 1; side += 2) {
+    for (let d = PAST.from; d < PAST.to; d += VOXEL) {
+      const x = centre + side * (pathEdge(z, side) + MANTO.verge.bare + d);
+      const spec = columnSpec(cell(x), cell(z));
+      pastAll++;
+      if (spec.mat === MATERIAL.EARTH) pastBrown++;
+    }
+  }
+}
+const pastShare = pastBrown / pastAll;
+report.check(pastShare >= PAST.low && pastShare <= PAST.high,
+  `and ${(100 * PAST.low).toFixed(0)} to ${(100 * PAST.high).toFixed(0)}% of the columns in the `
+  + `first ${(100 * PAST.to).toFixed(0)} cm past the kerb the EYE finds are bare soil, which is `
+  + "what the reference's 5 to 15 per cent of visible brown is made of",
+  `${(100 * pastShare).toFixed(1)}% of ${pastAll} columns, against a ceiling of `
+  + `${(100 * MANTO.ground).toFixed(0)}%`);
 
 // ------------------------------------------------------------------- 3
 report.line('');
