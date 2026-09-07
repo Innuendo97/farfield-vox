@@ -149,6 +149,31 @@ export const POSE_VOX_NIGHT = {
   fov: 44.462,
 };
 
+// THE SAME FRAMING FROM THE OTHER SIDE OF IT: the walker standing where the day
+// picture draws him, with the camera on his boom rather than on a tripod.
+//
+// WHY IT IS A SECOND POSE AND NOT A FLAG ON THE FIRST. A pose places the WALKER,
+// and in first person the walker IS the camera while in third he is five metres
+// in front of it. POSE_VOX_DAY stands the camera where the fit put it; this
+// stands the FIGURE where the picture draws him -- his sole row back-projected
+// onto the plane the blocks stand on -- and lets the rule in src/core/avatar.js
+// carry the camera the rest of the way. It arrives at POSE_VOX_DAY to within a
+// tenth of a millimetre, which is the check that the two are one framing and not
+// two.
+//
+// ITS ALTITUDE IS EYE_HEIGHT ON PURPOSE, and that is not the fitted altitude: it
+// is the sentence "stand a walker here", which is what setPose reads it as. The
+// altitude the fit solved for is the CAMERA's, and in third person the camera is
+// not where the walker is.
+export const POSE_TARGET_TERZA = {
+  name: 'target-terza',
+  // Where the day picture's soles land on y = 0, read through its own camera.
+  position: { x: -0.26, y: EYE_HEIGHT, z: 9.27 },
+  yaw: POSE_VOX_DAY.yaw,
+  pitch: POSE_VOX_DAY.pitch,
+  fov: POSE_VOX_DAY.fov,
+};
+
 /**
  * Every pose that has a name, by that name.
  *
@@ -159,7 +184,7 @@ export const POSE_VOX_NIGHT = {
  */
 export const POSES = Object.fromEntries([
   POSE_TARGET, POSE_SPAWN, POSE_STEEP_60, POSE_HAND_15, POSE_PEAK_85, POSE_RIM_BACK,
-  POSE_VOX_DAY, POSE_VOX_NIGHT,
+  POSE_VOX_DAY, POSE_VOX_NIGHT, POSE_TARGET_TERZA,
 ].map((pose) => [pose.name, pose]));
 
 export const DEFAULT_FOV = POSE_TARGET.fov;
