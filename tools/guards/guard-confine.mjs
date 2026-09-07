@@ -30,14 +30,23 @@ import { read, reporter, selfTest } from './lib.mjs';
 //   2. THE FALL IS WALKABLE. Every riser between the plateau and the water is
 //      inside the body's own step, so a walker can go down to the shore and is
 //      stopped by the WATER and not by a wall.
-//   3. AND THE RIDGE IS NOT. Its risers are over that step, which is the other
-//      half of the same sentence: the walker is stopped by the ground.
-//   4. THE RIDGE CLOSES THE HORIZON at the sides and behind the spawn, measured
-//      as an ELEVATION from the eye at the pose the campaign is judged at: on
-//      those bearings the skyline is ground and not sky.
-//   5. AND IT IS NOT A CIRCUMFERENCE. Both the height of the crown and the
-//      radius it stands at have to move with the bearing, or the boundary is
-//      the very ring E-DECISIONI13 forbids, wearing terraces.
+//   3. AND IT IS WALKABLE ALL THE WAY ROUND, so the water is what stops him on
+//      every bearing there is. That is the first clause of the same sentence,
+//      and it is TRUE OF MORE OF THE WORLD THAN IT USED TO BE: this leg once
+//      asked the opposite of the ridge's own bearings -- that the terraces
+//      there were too tall to climb -- and there is no ridge now.
+//   4. AND THE WALL IS GONE, MEASURED. E-DECISIONI21, D7 = A: the crest at
+//      ninety-six metres falls and hills stand beyond the water instead. What
+//      that has to mean at the judging eye is that NOTHING the boundary draws
+//      stands over the horizontal any more, on any of the three hundred and
+//      sixty bearings -- where it used to close five to seven degrees of them
+//      on eighty-five. The horizon belongs to src/world/distant.js now, and
+//      guard-cornice is what holds it there.
+//   5. AND THE LAW OF THE RIDGE IS STILL HERE, AT NOUGHT. `crestRise` answers
+//      exactly nothing everywhere, and the dial that makes it do so is a
+//      HEIGHT -- so the self test can raise it and watch the whole ridge come
+//      back, crown, sway, radius and all, which is what proves the thing that
+//      fell was turned off rather than quietly broken.
 //   6. THE WHOLE WORLD FITS IN THE BYTE THE PICTURE HOLDS IT IN. The field
 //      keeps a ground in one biased byte of voxels; the day the ridge is raised
 //      past what that holds, the crown would go FLAT and nothing else would
@@ -76,10 +85,14 @@ const injected = process.argv.includes('--inject');
 const STEP = TUNING.ground.maxM;
 
 if (injected) {
-  // The self test's own hand: a ridge twice as tall as the one that ships. It
-  // is the defect the byte leg exists for -- nothing about the picture would
-  // look broken, the crown would simply stop climbing.
-  CONFINE.crest.height *= 2.4;
+  // THE SELF TEST'S OWN HAND, AND IT HAD TO CHANGE WITH THE DIAL. It used to be
+  // `CONFINE.crest.height *= 2.4` -- a ridge two and a half times the one that
+  // shipped, which is the defect the byte leg exists for, because nothing about
+  // the picture would look broken: the crown would simply stop climbing. With
+  // the dial at nought that multiplication is nought, and a self test that
+  // injects nothing catches nothing while reporting that it did. So the defect
+  // is now a height, and it is the one the byte cannot hold.
+  CONFINE.crest.height = 26.4;
 }
 
 // --------------------------------------------------------------------------
@@ -130,8 +143,7 @@ function worstRiser(deg, from, to) {
   return { worst, at };
 }
 
-// TOWARD THE WATER, which is north: the lake's own bearings, where the gate
-// holds the ridge down and the ground does nothing but fall.
+// TOWARD THE WATER, which is north: the lake's own bearings.
 let worstToWater = 0;
 for (let deg = -12; deg <= 12; deg += 1) {
   const r = worstRiser((deg + 360) % 360, PLATEAU, 100);
@@ -141,27 +153,47 @@ report.check(worstToWater <= STEP + 1e-9,
   'a body can walk the fall to the water: no riser on it is over its own step',
   `worst riser ${(worstToWater * 100).toFixed(0)} cm against a step of ${(STEP * 100).toFixed(0)}`);
 
-// AND ON THE RIDGE, where the walker has to be STOPPED by the ground.
-let ridgeStops = 0;
-let ridgeBearings = 0;
-let worstRidge = 0;
-for (let deg = 60; deg <= 300; deg += 5) {
-  ridgeBearings += 1;
-  const r = worstRiser(deg, CONFINE.crest.foot, CONFINE.crest.peak);
-  if (r.worst > STEP) ridgeStops += 1;
-  if (r.worst > worstRidge) worstRidge = r.worst;
+// AND ON EVERY OTHER BEARING TOO, WHICH IS NEW.
+//
+// The water used to be reachable on forty-one bearings out of three hundred and
+// sixty and a hillside stood on the rest. With the crest gone the lake is all
+// the way round at a hundred and ten metres and the fall is the whole of the
+// ground everywhere, so «il camminatore si ferma dove comincia l'ACQUA» is now
+// true of the whole compass rather than of the gap the reference happens to
+// look through. That is a bigger promise than the old leg made, and it is
+// cheaper to keep: nothing out here climbs.
+let walkableBearings = 0;
+let worstAnywhere = 0;
+let worstAt = 0;
+for (let deg = 0; deg < 360; deg += 1) {
+  const r = worstRiser(deg, PLATEAU, 108);
+  if (r.worst <= STEP + 1e-9) walkableBearings += 1;
+  if (r.worst > worstAnywhere) { worstAnywhere = r.worst; worstAt = deg; }
 }
-report.check(ridgeStops === ridgeBearings,
-  'and the ridge stops him: every one of its bearings carries a riser over the step',
-  `${ridgeStops} of ${ridgeBearings} bearings, worst ${(worstRidge * 100).toFixed(0)} cm`);
+report.check(walkableBearings === 360,
+  'and so can he on every other bearing: the water is what stops him, all the way round',
+  walkableBearings === 360
+    ? `360 bearings, worst riser anywhere ${(worstAnywhere * 100).toFixed(0)} cm`
+    : `${walkableBearings} of 360; worst ${(worstAnywhere * 100).toFixed(0)} cm at ${worstAt} deg`);
 
 // --------------------------------------------------------------------------
-// 4. THE RIDGE CLOSES THE HORIZON, AS AN ELEVATION FROM THE EYE.
+// 4. AND THE WALL IS GONE, WHICH IS A MEASUREMENT AND NOT AN ASSERTION.
 //
-// «le creste terrazzate a chiudere l'orizzonte ai lati e dietro lo spawn». What
-// that means at a pose is that the SKYLINE on those bearings is ground: the
-// highest thing the eye sees along the bearing stands above the horizontal, so
-// there is no band of sky between the meadow and the far hills.
+// This leg used to read the other way: «le creste terrazzate a chiudere
+// l'orizzonte ai lati e dietro lo spawn» was E-DECISIONI13's own clause, and
+// what shipped for it was a smooth green hump at ninety-six metres that closed
+// five to seven degrees of the frame on eighty-five bearings out of a hundred
+// and eight -- one material, risers all alike, chroma four and a half against
+// the reference's seventeen. E-OCCHIO1 called it a wall and R6 measured it as
+// one. E-DECISIONI21 answered D7 with A and it falls.
+//
+// The clause is still kept, by somebody else: the hills of
+// src/world/distant.js close the horizon between four and ten degrees all the
+// way round, fitted per direction, and guard-cornice is what holds them to it.
+// What is asked HERE is the other half -- that this file has genuinely stopped
+// drawing a horizon of its own, and does not merely draw a shorter one. So the
+// skyline of the boundary ALONE, from the eye the campaign judges at, must lie
+// under the horizontal on every bearing there is.
 // --------------------------------------------------------------------------
 const EYE = { x: POSE_VOX_DAY.position.x, y: POSE_VOX_DAY.position.y, z: POSE_VOX_DAY.position.z };
 
@@ -180,24 +212,39 @@ function skyline(deg) {
   return best;
 }
 
-let closed = 0;
-let openBearings = 0;
-let lowest = 90;
-for (let deg = 0; deg < 360; deg += 3) {
-  const away = Math.min(deg, 360 - deg);
+let overTheEye = 0;
+let highestLine = -90;
+let highestAt = 0;
+for (let deg = 0; deg < 360; deg += 1) {
   const line = skyline(deg);
-  if (away < CONFINE.crest.gateTo) { openBearings += 1; continue; }
-  if (line > 0) closed += 1;
-  if (line < lowest) lowest = line;
+  if (line > 0) overTheEye += 1;
+  if (line > highestLine) { highestLine = line; highestAt = deg; }
 }
-const shouldClose = Math.round(360 / 3) - openBearings;
-report.check(closed === shouldClose,
-  'the ridge closes the horizon on every bearing outside the lake gate',
-  `${closed} of ${shouldClose} bearings stand over the eye, lowest `
-  + `${lowest.toFixed(2)} degrees; ${openBearings} bearings are left open to the water`);
+report.check(injected ? overTheEye > 0 : overTheEye === 0,
+  injected
+    ? 'raised, the wall comes back and closes the horizon again'
+    : 'the boundary draws no horizon of its own: nothing it lays stands over the eye',
+  `${overTheEye} of 360 bearings stand over the eye; the highest line the boundary `
+  + `draws is ${highestLine.toFixed(2)} degrees, at ${highestAt}`);
 
 // --------------------------------------------------------------------------
-// 5. AND IT IS NOT A CIRCUMFERENCE.
+// 5. AND THE LAW OF THE RIDGE IS STILL HERE, AT NOUGHT.
+//
+// TURNED OFF AND NOT TORN OUT, and the difference is worth a leg of its own.
+//
+// The crown is counted from the PLATEAU while the ridge grows out of the BASIN,
+// so `crestRise` adds back the four and three quarter metres the fall has
+// already dropped by the time it reaches the peak. With the dial at nought and
+// nothing else changed, that expression does not answer nought: it answers a
+// FIVE-METRE DOME on every bearing outside the gate -- the wall at half height,
+// wearing the same four-voxel riser, with the dial reading zero and nobody the
+// wiser. So the law carries a line saying that a crown of nothing is no ridge,
+// and this asks that the line holds at every point of the world.
+//
+// And when the self test raises the dial, this leg becomes the one it replaced
+// and asks the ridge that comes back to be no circumference -- crown and radius
+// both moving with the bearing, «NESSUNA circonferenza visibile». That is what
+// proves the thing that fell was switched off and not quietly broken.
 // --------------------------------------------------------------------------
 const crowns = [];
 for (let deg = 0; deg < 360; deg += 2) {
@@ -214,12 +261,17 @@ const ridge = crowns.filter((c) => Math.min(c.deg, 360 - c.deg) >= CONFINE.crest
 const hs = ridge.map((c) => c.height);
 const rs = ridge.map((c) => c.radius);
 const spread = (a) => (Math.max(...a) - Math.min(...a)) / (a.reduce((s, v) => s + v, 0) / a.length);
-report.check(spread(hs) > 0.15 && spread(rs) > 0.05,
-  'the crown is not a circle: its height and its radius both move with the bearing',
-  `height ${(spread(hs) * 100).toFixed(0)}% of its own mean over the ridge, `
-  + `radius ${(spread(rs) * 100).toFixed(0)}%; crown `
-  + `${Math.min(...hs).toFixed(1)} to ${Math.max(...hs).toFixed(1)} m at `
-  + `${Math.min(...rs)} to ${Math.max(...rs)} m`);
+const standing = crowns.filter((c) => c.height !== 0).length;
+report.check(injected ? (spread(hs) > 0.15 && spread(rs) > 0.05) : standing === 0,
+  injected
+    ? 'and the crown that comes back is not a circle: height and radius both move with it'
+    : 'and the crest answers nothing everywhere, rather than the dome a bare nought would leave',
+  injected
+    ? `height ${(spread(hs) * 100).toFixed(0)}% of its own mean over the ridge, `
+      + `radius ${(spread(rs) * 100).toFixed(0)}%; crown `
+      + `${Math.min(...hs).toFixed(1)} to ${Math.max(...hs).toFixed(1)} m at `
+      + `${Math.min(...rs)} to ${Math.max(...rs)} m`
+    : `crest.height = ${CONFINE.crest.height}; 180 bearings x 150 m of law all answer 0`);
 
 // --------------------------------------------------------------------------
 // 6. THE WHOLE WORLD FITS IN THE BYTE THE PICTURE HOLDS IT IN.
@@ -296,30 +348,66 @@ report.check(basinOff === 0 && basinProfile(20) === 0,
 // the former, and it asks it of the number alone, which is why it holds
 // everywhere and not only where somebody looked.
 //
-// The second walks it out, on THE BEARINGS THE RIDGE STANDS ASIDE FOR. Those
-// are `gateFrom` and inwards, where the gate is shut on the crest and the
-// ground does nothing but fall -- the bearings the lake is on, and the ones
-// E-DECISIONI13's «si ferma dove comincia l'acqua» is about. Further out the
-// crest wades in, the ground climbs back over the level and meets it a second
-// time on a riser of FOUR voxels, and that is not a shore and not a defect: it
-// is leg 3, where the walker is stopped by a hillside on purpose.
+// The second walks it out, ON EVERY BEARING THERE IS. It used to be only the
+// forty-one the ridge stood aside for: further out the crest waded in, the
+// ground climbed back over the level and met it a second time on a riser of
+// four voxels, which is not a shore and was not a defect. With the crest gone
+// the lake is all the way round at a hundred and ten metres, so the sweep is
+// too, and «il camminatore si ferma dove comincia l'ACQUA» is now a fact about
+// the whole compass rather than about the gap the reference looks through.
 // --------------------------------------------------------------------------
 const WATER = waterLevel();
 const RISER = CONFINE.riser * VOXEL;
 
-/** Every `y:` the sheets of standing water are laid at, as written in source. */
+/**
+ * Every height the standing water is laid at, as WRITTEN in the source.
+ *
+ * IT USED TO LOOK FOR `const LAKES = [`, AND THERE IS NO SUCH LIST NOW. The
+ * water was rectangles read off the framing, and this walked the block
+ * collecting each one's `y:`. R6-06 showed what that looks like from the rim --
+ * their corners are visible as edges in the water, because each lay at the
+ * basin's depth at its OWN radius -- and a basin holds one lake. It is a disc.
+ *
+ * THE QUESTION IS UNCHANGED, and it is the reason this leg reads a file instead
+ * of a number. The defect E-DECISIONI19 named was not a wrong height, it was an
+ * UNTIED one: `y: 0.30`, fitted by V5 when everything past the disc was a flat
+ * shell, which nothing anywhere could notice had been left four and a half
+ * metres in the air the day the ground dropped out from under it. A guard that
+ * checked the NUMBER would go green again the moment somebody typed -4.74 into
+ * that file by hand, and drift the next time the basin was refit. So what is
+ * asked is that every height the water is laid at is SPELLED as the boundary's
+ * own answer, which cannot be typed wrong.
+ */
 function sheetHeights(text) {
+  const found = [];
+  for (const m of text.matchAll(/\blake\.position\.y\s*=\s*([^;\n]+);/g)) {
+    found.push(m[1].trim());
+  }
   const open = text.indexOf('const LAKES = [');
-  if (open < 0) return [];
-  const body = text.slice(open, text.indexOf('];', open));
-  return [...body.matchAll(/\by:\s*([^,}\n]+)/g)].map((m) => m[1].trim());
+  if (open >= 0) {
+    const body = text.slice(open, text.indexOf('];', open));
+    for (const m of body.matchAll(/\by:\s*([^,}\n]+)/g)) found.push(m[1].trim());
+  }
+  return found;
 }
-const heightsAsWritten = sheetHeights(read('src/world/distant.js'));
-const readsTheBoundary = (hs) => hs.length > 0 && hs.every((h) => h === 'waterLevel()');
+const distantSource = read('src/world/distant.js');
+const heightsAsWritten = sheetHeights(distantSource);
+// One name for the level, however the file spells the local it keeps it in;
+// what may not appear is a literal.
+const BOUNDARY_NAMES = new Set(['waterLevel()', 'WATER']);
+const readsTheBoundary = (hs) => hs.length > 0 && hs.every((h) => BOUNDARY_NAMES.has(h));
 report.check(readsTheBoundary(heightsAsWritten),
   'the standing water takes its level from the boundary and carries no number of its own',
-  `${heightsAsWritten.length} sheets, laid at `
+  `${heightsAsWritten.length} sheet${heightsAsWritten.length === 1 ? '' : 's'}, laid at `
   + `${[...new Set(heightsAsWritten)].join(' and ')} = ${WATER.toFixed(4)} m`);
+
+// AND THERE IS ONE OF THEM (E-DECISIONI21, and R6 §4.5). Sheets at three radii
+// of one basin stand at three heights and show their corners; one disc cannot.
+const hasRectangles = (text) => /const LAKES = \[/.test(text);
+report.check(!hasRectangles(distantSource) && heightsAsWritten.length === 1,
+  'and it is one sheet: a basin holds one lake, and one lake has no corners in it',
+  hasRectangles(distantSource) ? 'the rectangles are back'
+    : `${heightsAsWritten.length} disc at ${WATER.toFixed(4)} m`);
 
 // AND THE LEVEL ITSELF LIES INSIDE A RISER, which is a fact about one number
 // and therefore true on every bearing there is.
@@ -358,12 +446,17 @@ function shore(deg, level) {
   return null;
 }
 
-// The bearings the ridge stands aside for -- `gate()` is nought at gateFrom and
-// inwards, so crestRise is exactly zero there and the fall is the whole of the
-// ground. Read from the dial rather than written, so that moving the gate moves
-// the sweep with it.
+// EVERY BEARING THERE IS, WHICH IS THE OTHER THING D7 CHANGED.
+//
+// This used to be the forty-one bearings the ridge stood aside for -- `gate()`
+// is nought at gateFrom and inwards -- because on all the rest the crest waded
+// in, the ground climbed back over the level and met it a SECOND time on a
+// riser of four voxels, which is not a shore. There is no crest, so there is no
+// second meeting: the fall is the whole of the ground on the whole compass and
+// the shore is a shore everywhere. Sweeping the old forty-one now would be
+// looking at an eighth of the water and calling it the lake.
 const OPEN = [];
-for (let d = -CONFINE.crest.gateFrom; d <= CONFINE.crest.gateFrom; d += 1) OPEN.push(d);
+for (let d = 0; d < 360; d += 1) OPEN.push(d);
 
 function shoreFaults(level) {
   const bad = [];
@@ -418,8 +511,16 @@ if (process.argv.includes('--self')) {
       caught: !readsTheBoundary(['waterLevel()', '0.30']),
     },
     {
-      what: 'and two that read the boundary are not called a defect',
-      caught: readsTheBoundary(['waterLevel()', 'waterLevel()']),
+      what: 'and one that reads the boundary is not called a defect',
+      caught: readsTheBoundary(['waterLevel()']),
+    },
+    {
+      what: 'the rectangles coming back, corners and all',
+      caught: hasRectangles('const LAKES = [{ x: -37, y: waterLevel() }];'),
+    },
+    {
+      what: 'and one disc is not mistaken for them',
+      caught: !hasRectangles(distantSource),
     },
     {
       what: 'the level V5 fitted before the world had a basin (+0.30 m)',
@@ -445,6 +546,7 @@ if (process.argv.includes('--self')) {
 }
 
 report.end(`the plateau is ${PLATEAU} m; the fall reaches `
-  + `${(deepest * VOXEL).toFixed(1)} m and the ridge ${(highest * VOXEL).toFixed(1)} m over it, `
-  + `both inside ${REACH} m of far window, and the water lies at `
-  + `${WATER.toFixed(4)} m in it`);
+  + `${(deepest * VOXEL).toFixed(1)} m and the boundary climbs `
+  + `${(highest * VOXEL).toFixed(1)} m over it -- the crest fell (E-DECISIONI21, D7 = A) and `
+  + `the horizon is guard-cornice's now -- all inside ${REACH} m of far window, with the water `
+  + `at ${WATER.toFixed(4)} m in it and reachable on all 360 bearings`);

@@ -616,10 +616,27 @@ export function flowerLightPoints() {
   return flowers;
 }
 
-// The seats a lamp could take along the distant ridges arrive with the
-// cornice session: V5 wires `ridgeLampSeats` here on its own branch, the way
-// the path wired the ground's one hole, and it reaches this file at
-// integration. Until then the name is only a promise written down.
+// THE SEATS A LAMP COULD TAKE ALONG THE DISTANT RIDGES. Candidates, not lit.
+//
+// E-V5a ratified this name and the shape of what it hands back; E-V5j recorded
+// that the seat itself never arrived, so for two sessions the paragraph that
+// stood here was a promise, and V7's own contracts.js carries the matching one.
+// It arrives now, with the hills.
+//
+// THE SPLIT IS THE ONE `flowerLightPoints` IS WRITTEN ON, and it is the whole
+// reason there is a contract rather than a shared literal: whoever builds the
+// ground knows where a lamp CAN stand, and whoever owns the night decides which
+// of those seats burn. SEATS are offered by the ground, POINTS answer lit. The
+// length of this array is not the number of lamps.
+//
+// AND A SEAT IS A TREAD NOW, WHICH IT WAS NOT. It used to be a height on a
+// painted quad -- «una panca, non un punto nell'aria» is what the briefing
+// asked for and what a flat ring could not give. The ridges are cubes since
+// E-DECISIONI21, so a seat is the top face of a real terrace, on the nearest
+// ring, under the rock line: the night census found fifty-seven warm points on
+// two flanks of the night target and every one of them below the green line,
+// which is where the ceiling comes from and what guard-cornice holds.
+export { ridgeSeats as ridgeLampSeats } from './distant.js';
 
 // Built on FIRST ASK and kept, for the reason the ground's grid above is: it is
 // tens of thousands of lattice draws over the whole disc, the answer does not

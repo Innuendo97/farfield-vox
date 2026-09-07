@@ -1,553 +1,371 @@
 import {
-  BufferAttribute, BufferGeometry, Color, DoubleSide, InstancedMesh, Matrix4,
-  Mesh, PlaneGeometry, Quaternion, ShaderMaterial, Vector3, Vector4,
+  BufferAttribute, BufferGeometry, CircleGeometry, Group, Mesh, ShaderMaterial, Vector3,
 } from 'three';
-import {
-  SKY_GLSL, SKY_REFLECTION, SKY_REFLECTION_GLSL, SKY_UNIFORMS,
-} from '../core/sky.js';
-import { smoothstep } from './terrain-field.js';
-import { fogUniforms, FOG_GLSL, FOG_RADIANCE } from './air.js';
-// The edge of the world states where the ground is, and the water is a level in
-// it: see LAKES below for why the height is asked for rather than written.
+import { SKY_GLSL, SKY_REFLECTION, SKY_REFLECTION_GLSL, SKY_UNIFORMS } from '../core/sky.js';
+import * as AIR from './air.js';
+import { FOG_GLSL, FOG_RADIANCE, fogUniforms } from './air.js';
 import { waterLevel } from './voxel/confine.js';
+import SPEC from '../../assets-src/distant/cornice.json' with { type: 'json' };
+import { ladders, ridgeLampSeats } from '../../assets-src/distant/cornice.mjs';
+import { buildHills, palette } from './distant-mesh.js';
 
-// Everything past the meadow: the standing water, the ring of hills, and the
-// giants that are not in the reference framing.
+// EVERYTHING PAST THE WATER: HILLS OF CUBES, AND ONE LAKE.
 //
-// None of it is lit. The aerial perspective the reference shows is measured off
-// the image itself, because at these distances the haze is not a correction on
-// top of the colour, it is most of the colour. A hill twelve hundred metres
-// away is very nearly just sky.
+// ===========================================================================
+// WHAT THIS FILE STOPPED BEING.
 //
-// WHAT EACH SURFACE SHARES WITH THE AIR IS ITS COLOUR, AND ITS OWN SHARE OF IT.
+// It was three painted rings at 150, 260 and 420 metres, a floor under them
+// from 100 to 760, rectangles of standing water, six giant slabs, and grey
+// spires standing on the rings as a declared placeholder. Behind all of it, and
+// in FRONT of most of it, src/world/voxel/confine.js put a smooth green ridge
+// eleven metres high at ninety-six -- so what the walker actually saw was
+// spires over a wall.
 //
-// Until now this was the only thing in the world that knew nothing about the
-// haze at all: its colours were constants, so any refit of the air — and the
-// obligation to have a night sky guarantees one — would move the meadow's
-// horizon and leave the ridges standing where noon left them, with a line
-// between them. That is fixed here, and it is fixed by handing every distant
-// vertex the fraction of pure air its measured colour contains, so that the
-// air's colour arrives at the ridges in exactly the proportion each of them is
-// made of it. The foot of the furthest ring is the air, entirely: it and the
-// meadow's horizon are now literally one colour, so no refit can open a band
-// between them.
+// R6 measured that against the reference and the verdict is its §0: the
+// reference has no wall, no line and no city. It has HILLS -- three and four
+// planes of them stacked behind one another, from 3.7 to 9.5 degrees at the
+// sides -- and in the gap where the lake is it does not close at all: water to
+// the far shore, then hills at two to seven. E-DECISIONI21 answered D7 with A:
+// the crest at ninety-six metres and the giants FALL, and there are hills all
+// the way round beyond the water.
 //
-// WHAT IT DOES NOT TAKE IS THE DISTANCE TERM, and that is measured rather than
-// preferred. The height fog of src/world/air.js, at the density the meadow is
-// calibrated at, is 93 per cent at the crest of the nearest ring and saturated
-// at every vertex behind it (s2-dev5/VERBALE.md, passo 3). Evaluating it here
-// would replace three rings — a lit green band, a blue one behind it, and a
-// last one barely separated from the sky, which is what the reference shows —
-// with one flat sheet of haze. So the fraction is baked and the colour is live:
-// the ridges keep the aerial perspective that was read off the reference, and
-// they follow the air wherever it goes.
+// So there is ONE law now (assets-src/distant/cornice.mjs), fitted per
+// direction against the traced skyline (assets-src/distant/cornice.json), built
+// here into a static greedy mesh of real cubes that grow with their distance,
+// and ONE disc of water at the level the boundary already states. The crest,
+// the rectangles, the floor, the giants and the spires are gone.
+//
+// ===========================================================================
+// WHY A HUNDRED AND FIFTY THOUSAND TRIANGLES COST LESS THAN FOUR THOUSAND DID.
+//
+// That is the surprising half, and both halves of it were measured.
+//
+//   1. THE FIELD PAID FOR THE WALL IN PIXELS. E-PERF5 established that the
+//      meadow's cost is the number of PIXELS OF GROUND it marches and not the
+//      arithmetic per pixel: the card here is bound by bandwidth, not by ALU.
+//      The crest at ninety-six metres filled five to seven degrees of the frame
+//      with marched ground on eighty-five bearings out of a hundred and eight.
+//      Taking it away gives the rays of the horizon band somewhere to stop, and
+//      R6 measured the meadow two to four milliseconds cheaper without it.
+//
+//   2. MOST OF A HILL IS NEVER SEEN AND IS NEVER BUILT. The eye stands between
+//      1.3 and about 4 m up, inside a plateau 35 m across, and everything here
+//      is at least seventy metres away. From there a tread more than five
+//      metres up is seen from UNDERNEATH -- it is a back face -- and a flank
+//      whose normal points away from the middle of the world never turns toward
+//      the eye at all. Dropping both takes the mesh from 632 thousand quads to
+//      a hundred thousand WITHOUT CHANGING A PIXEL; the beds and the sectors
+//      take it to seventy-five.
+//
+// The budget §2.9 was written as «≤ 20.000 tri, ≤ 6 draw» for painted quads.
+// This keeps it in milliseconds and in delivered bytes and breaks it in
+// triangles. R6 §7 proposes the amendment -- milliseconds, draws, card bytes
+// and delivered bytes instead of triangles, because the card spends in pixels.
+// It is declared in the verbale under REGOLA R4 rather than quietly taking
+// another session's margin, and guard-cornice holds the amended numbers.
+//
+// ===========================================================================
+// THE AIR IS READ FROM ITS SEAT AND IS NOT OWNED HERE.
+//
+// src/world/air.js is frozen and is the coordinator's. What this file binds is
+// that seat's own LIVE COLOUR, so that an hour -- or a refit -- moves the hills
+// and the meadow together and no band can open between them, which is the one
+// thing the join has never been allowed to get wrong.
+//
+// WHAT THE SEAT DOES NOT YET CARRY IS A DISTANCE TERM, and R6 §3.3 measured why
+// that matters out here: `fogAmount` is 0.68 at 185 m, 0.90 at 260 and 0.997 at
+// 420, so evaluating it on these hills would flatten all four planes into one
+// sheet by three hundred metres, where the reference still holds structure at
+// nine hundred. And the reference's air is PER CHANNEL -- blue veils two and a
+// half times faster than red -- and turns colour with distance, from the blue
+// of the low sky to a pale veil that is LIGHTER than the sky itself.
+//
+// That law is U-CORNICE-3's to write, D-R6-4 is the committente's to answer,
+// and both belong in air.js. So this file does two things and says which is
+// which: it READS the seat for the colour, and it carries R6's measurement of
+// the per-channel shape as a DECLARED FALLBACK, wired through one `if` so that
+// the day air.js publishes `DISTANT_AIR_GLSL` the fallback stops being used and
+// can be deleted without touching anything else here.
 
-const DEG = Math.PI / 180;
+// The spec is checked where it is cut -- ./distant-mesh.js does it before a
+// single cell is asked for, and that is the file both the page and the worker
+// reach it through, so asking twice here would be a second opinion about the
+// same numbers.
+const WATER = waterLevel();
 
-// The colour of the distance, as radiance.
-//
-// Every number here was solved rather than chosen: tools/terrain/probe.mjs
-// takes a measured rectangle of the reference and inverts the whole composite
-// — the AgX curve, the vignette at that point of the frame, the grade — to find
-// the radiance a flat surface has to carry for the finished frame to land on
-// that colour. These surfaces are unlit and unfogged, so the tint is the answer
-// and nothing downstream is allowed to alter it.
-//
-// What the solve says about the reference is the point of the whole ring: the
-// near hills are green and the far ones are blue. Not a green tinted by
-// distance fog into blue at draw time, which flattens the ridges into one sheet
-// of haze, but three rings each carrying its own colour, and inside each ring a
-// slow alternation between a sunlit flank and a shaded one. That alternation is
-// what gives the reference its valleys.
-//
-// Measured against haze-left and haze-right in assets-src/terrain/palette.json.
-const NEAR_LIT = new Vector3(0.098, 0.180, 0.163);
-const NEAR_SHADE = new Vector3(0.056, 0.116, 0.121);
-// Against hill-left-lit and hill-right-lit.
-const MID_LIT = new Vector3(0.150, 0.262, 0.288);
-const MID_SHADE = new Vector3(0.056, 0.120, 0.162);
-// Against hill-left-far and hill-right-far.
-const FAR_LIT = new Vector3(0.135, 0.252, 0.382);
-const FAR_SHADE = new Vector3(0.088, 0.176, 0.293);
-// What is left when there is nothing but air, and what the foot of the furthest
-// ridge stands in.
-//
-// It used to be a fourth measured constant of its own — 0.203, 0.379, 0.643,
-// solved off the one column of the reference that is clear sky from the ridge
-// line down to the horizon. It is not a constant any more, and that is the
-// reconciliation the analysis asked for: the meadow arrives at the horizon
-// carrying FOG_RADIANCE and this stood seventeen per cent above it, which is a
-// step in level and in tint at exactly the line where the two meet. Air is air.
-// The sentinel below means "all of it": whatever the ground's air is, at this
-// hour, is what the foot of the furthest ridge stands in.
-const HAZE = null;
+// -------------------------------------------------------------- the air door
 
-// There used to be a ring of air under the ridge line as well, seven hundred
-// metres out and seven degrees tall. It was not a piece of landscape: the old
-// bake stopped being a picture of the sky five and a half degrees above the
-// horizon and turned into the flat green filling its lower hemisphere, and
-// straight ahead, where the reference shows pale air down to the horizon and no
-// hills, that green was a wash across the middle of the framing. The ring was
-// what covered it. The sky is a sky down to the horizon and past it now, and
-// measured at the framing pose the ring costs what it used to save: the three
-// horizon crops read five, three and a tenth and three and three tenths of a
-// unit of colour against the reference with it, and one and nine tenths, one
-// and one and a tenth without. So it is gone, and what is behind it is the sky.
-// The giants stand a quarter of a kilometre out and further, in the same air as
-// the last ridge and behind more of it. They were carrying more light than the
-// sky they are seen against, which made them white slabs; they are now a shade
-// under the air itself, which is what leaves them as silhouettes.
-const GIANT = new Vector3(0.108, 0.205, 0.352);
+const SEAT_HAS_DISTANT_AIR = typeof AIR.DISTANT_AIR_GLSL === 'string';
 
-// The most of itself a measured colour may be air.
-//
-// Past this the split stops being a reading and starts being a division by
-// almost nothing: at nine tenths, a tenth of a level of error in the measured
-// colour becomes a level in what is left when the air is taken out of it.
-const AIR_CAP = 0.9;
+const FOG_LITERAL = FOG_RADIANCE.map((c) => c.toFixed(4)).join(', ');
 
-/**
- * A measured distant colour, split into what is air and what is not.
- *
- * Returned already multiplied out — the part that is not air is carried as it
- * will be added, not as the colour it would be on its own — so that the whole
- * thing stays linear: the ridges lerp between these along their gradients, and
- * `mix` of two splits has to be the split of the `mix` or the gradient is not
- * the gradient that was measured.
- *
- * The share is the largest one the colour can carry with nothing left over
- * going negative, which is as close to the true optical depth as a single
- * photograph allows anyone to get: the law says a hill at a hundred and fifty
- * metres is ninety three per cent air, and the reference's near hills are
- * plainly greener than that, so the bound is what is honest here and the gap
- * between the two is written down rather than split the difference with.
- *
- * @param {?Vector3} colour  the measured radiance, or null for pure air
- * @returns {Vector4} xyz what is not air, w how much of it is
- */
-function splitAir(colour) {
-  if (colour === null) return new Vector4(0, 0, 0, 1);
-  let share = AIR_CAP;
-  for (let c = 0; c < 3; c++) {
-    share = Math.min(share, colour.getComponent(c) / FOG_RADIANCE[c]);
+const FALLBACK_AIR_GLSL = /* glsl */`
+  // NOT THE SEAT'S, AND SAYING SO IS THE POINT OF THE NAME.
+  //
+  // R6 §2.3 measured the reference's own air per channel -- a quarter of it on
+  // red where blue is at nearly two thirds, on the middle crest at four hundred
+  // metres -- and a colour that turns from the low sky's blue to a pale veil at
+  // L* 77, ten above the sky it stands against. This is that measurement, in
+  // the same gaussian form the meadow's fog already has, held here until air.js
+  // states it for the whole world.
+  //
+  // The COLOUR is the seat's, scaled: the ratio below is one at the hour these
+  // constants were read at, so nothing moves today and everything moves
+  // together the moment the sky does.
+  uniform vec3 uAirBeta;
+  uniform vec3 uAirDeep;
+  uniform vec3 uAirPale;
+  uniform float uAirTurn;
+
+  vec3 distantAir(float distance, float height) {
+    vec3 depth = uAirBeta * distance;
+    return 1.0 - exp(-depth * depth);
   }
-  share = Math.max(0, share);
-  return new Vector4(
-    colour.x - share * FOG_RADIANCE[0],
-    colour.y - share * FOG_RADIANCE[1],
-    colour.z - share * FOG_RADIANCE[2],
-    share,
-  );
-}
 
-// The reference keeps the middle of its horizon clear and puts its hills at the
-// two edges of the frame, where they climb to about six degrees. A ring of even
-// height cannot do both: it either draws a bar across the middle of the framing
-// or it never rises at the sides. So the profile is gated on the bearing, low
-// towards north and full on the flanks, and the gate carries on round the back
-// where nothing in this pose can see it.
-const GATE_MIN = 0.30;
-const GATE_FROM = 10;
-const GATE_TO = 42;
-
-// The instanced branch is not optional. Three declares instanceMatrix for a
-// shader material only when the object it is drawing is an InstancedMesh, and a
-// vertex shader that ignores it collapses every instance onto the origin: the
-// six giants came out as one unit box standing on the path in the middle of the
-// reference framing, which is the last place any of them may appear.
-const UNLIT_VERTEX = /* glsl */`
-  attribute vec4 tint;   // xyz what is not air, w how much of it is
-  varying vec4 vTint;
-  void main() {
-    vTint = tint;
-    vec4 local = vec4(position, 1.0);
-    #ifdef USE_INSTANCING
-      local = instanceMatrix * local;
-    #endif
-    gl_Position = projectionMatrix * modelViewMatrix * local;
+  vec3 distantAirColour(float distance) {
+    vec3 measured = mix(uAirDeep, uAirPale, 1.0 - exp(-distance / uAirTurn));
+    return measured * (uFogColour / vec3(${FOG_LITERAL}));
   }
 `;
 
-const UNLIT_FRAGMENT = /* glsl */`
-  precision highp float;
-  varying vec4 vTint;
-  uniform vec3 uFogColour;
-  void main() {
-    // One multiply and add: the part of this surface that is not air, plus the
-    // air's own colour in the proportion this surface is made of it.
-    gl_FragColor = vec4(vTint.rgb + uFogColour * vTint.w, 1.0);
-  }
-`;
+const AIR_GLSL = SEAT_HAS_DISTANT_AIR ? AIR.DISTANT_AIR_GLSL : FALLBACK_AIR_GLSL;
 
-/**
- * A ring of hills, as a single strip.
- *
- * The silhouette is the only thing that carries at this distance, so the
- * geometry is a skirt: a closed run of quads whose top edge is a noise profile
- * and whose bottom edge is buried under the meadow. Modelling the far side of a
- * hill that is never visible would cost triangles for nothing.
- */
-function buildRidge({
-  radius, height, segments, seed, lit, shade, foot, jitter = 0.35,
-}) {
-  const positions = [];
-  const tints = [];
-  const indices = [];
-
-  const wave = (k, frequency, phase) => Math.sin(k * frequency + phase + seed);
-  const push = (x, y, z, colour) => {
-    positions.push(x, y, z);
-    tints.push(colour.x, colour.y, colour.z, colour.w);
+function airUniforms() {
+  const seat = fogUniforms();
+  if (SEAT_HAS_DISTANT_AIR) return { ...seat, ...AIR.distantAirUniforms() };
+  return {
+    ...seat,
+    uAirBeta: { value: new Vector3(...SPEC.air.beta) },
+    uAirDeep: { value: new Vector3(...SPEC.air.deep) },
+    uAirPale: { value: new Vector3(...SPEC.air.pale) },
+    uAirTurn: { value: SPEC.air.turn },
   };
-
-  const crest = new Vector4();
-  const base = new Vector4();
-
-  for (let k = 0; k <= segments; k++) {
-    const t = k / segments;
-    const angle = t * Math.PI * 2;
-    // Signed bearing from north, which is where the reference framing looks.
-    const bearing = Math.abs(((t * 360 + 180) % 360) - 180);
-    const gate = GATE_MIN + (1 - GATE_MIN) * smoothstep(GATE_FROM, GATE_TO, bearing);
-
-    // Several turns of different length, so no two hills along the ring are the
-    // same and the profile never repeats inside one view.
-    const profile = 0.55
-      + 0.26 * wave(k, 0.21, 0.0)
-      + 0.17 * wave(k, 0.53, 1.7)
-      + 0.11 * wave(k, 1.31, 4.2)
-      + 0.07 * wave(k, 2.87, 0.6);
-    const top = height * Math.max(0.18, profile) * gate;
-    const reach = radius * (1 + jitter * 0.12 * wave(k, 0.37, 2.9));
-    const x = Math.sin(angle) * reach;
-    const z = -Math.cos(angle) * reach;
-
-    // Which flank of the ring the light is on. Slower than the profile, so a
-    // whole hill is lit or shaded rather than one alternating with the next.
-    const sun = 0.5 + 0.5 * wave(k, 0.09, 1.1);
-    crest.copy(shade).lerp(lit, sun);
-    // The foot of a hill sits in more air than its crest and reads hazier, and
-    // it is also where the ring behind shows through the valleys.
-    base.copy(crest).lerp(foot, 0.55);
-
-    // Three rows, not two. The strip used to run straight from six metres below
-    // the meadow to the crest, so the haze anchored down there covered most of
-    // the band that is actually visible and every ridge came out pale grey. The
-    // middle row pins the foot colour at ground level: below it the strip is
-    // buried, above it the gradient has only the hill to cross.
-    push(x, -6, z, base);
-    push(x, 0, z, base);
-    push(x, top, z, crest);
-  }
-
-  for (let k = 0; k < segments; k++) {
-    const a = k * 3;
-    const b = (k + 1) * 3;
-    for (let row = 0; row < 2; row++) {
-      indices.push(a + row, a + row + 1, b + row + 1);
-      indices.push(a + row, b + row + 1, b + row);
-    }
-  }
-
-  const geometry = new BufferGeometry();
-  geometry.setAttribute('position', new BufferAttribute(new Float32Array(positions), 3));
-  geometry.setAttribute('tint', new BufferAttribute(new Float32Array(tints), 4));
-  geometry.setIndex(indices);
-  geometry.computeBoundingSphere();
-  return geometry;
 }
 
-function ridgeMaterial() {
-  return new ShaderMaterial({
-    // Only the colour of the air, not its density: the density is baked into
-    // the fourth channel of every vertex, for the reason at the top of the file.
-    uniforms: { uFogColour: fogUniforms().uFogColour },
-    vertexShader: UNLIT_VERTEX,
-    fragmentShader: UNLIT_FRAGMENT,
-    side: DoubleSide,
-    fog: false,
-    depthWrite: true,
-  });
-}
+// ------------------------------------------------------------- the two shaders
 
-// Standing water in the middle distance. The reference shows two sheets in the
-// gaps between the blocks, almost mirror flat and with hardly any contrast:
-// they read as sky lying on the ground, so that is how they are drawn.
-const LAKE_VERTEX = /* glsl */`
-  varying vec3 vWorld;
+// A FACE CARRIES AN INDEX AND NOT A COLOUR, and that is the difference between
+// ten megabytes of card and five and a half. There are exactly SIX colours in
+// the whole range of hills -- grass and rock, each on a top, a lit flank and a
+// shaded one -- so one byte a vertex says which, against twelve for a radiance.
+// Nothing is quantised, because six is how many there are; and the palette
+// stays a uniform, which is what lets U-CORNICE-2 refit the matter without
+// rebuilding a single vertex of the geometry.
+const HILL_VERTEX = /* glsl */`
+  attribute float shade;
+  uniform vec3 uPalette[6];
+  varying vec3 vColour;
   varying float vDistance;
+  varying float vHeight;
+  void main() {
+    vColour = uPalette[int(shade + 0.5)];
+    vec4 world = modelMatrix * vec4(position, 1.0);
+    vDistance = distance(cameraPosition, world.xyz);
+    vHeight = world.y;
+    gl_Position = projectionMatrix * viewMatrix * world;
+  }
+`;
+
+const HILL_FRAGMENT = /* glsl */`
+  precision highp float;
+  varying vec3 vColour;
+  varying float vDistance;
+  varying float vHeight;
+  ${FOG_GLSL}
+  ${AIR_GLSL}
+  void main() {
+    gl_FragColor = vec4(mix(vColour, distantAirColour(vDistance),
+      distantAir(vDistance, vHeight)), 1.0);
+  }
+`;
+
+// THE LAKE IS ONE DISC AND ITS LEVEL IS ASKED FOR, NEVER WRITTEN.
+//
+// Rectangles used to lie here, each at the depth of the basin at its own
+// radius, and from the rim of the plateau their corners showed as edges in the
+// water (R6-06). A basin holds ONE lake: the surface is `waterLevel()`, which
+// is `basinProfile` at the radius the two arms of the reference's own water
+// were read at, so a refit of the fall carries the water with it and cannot
+// leave it hanging.
+//
+// AND THE SHORE IS STILL FOUND AND NOT DRAWN. E-CONF1 put it wherever the
+// meadow's terraces come up through this level, decided by the depth buffer
+// between two pieces of arithmetic that both answer basinProfile. Nothing here
+// changes that, and the hills join it the same way: their feet are AT the
+// basin, so they wade in, and there is no line where they meet it either.
+const LAKE_VERTEX = /* glsl */`
+  varying float vDistance;
+  varying float vHeight;
+  varying vec3 vWorld;
   void main() {
     vec4 world = modelMatrix * vec4(position, 1.0);
     vWorld = world.xyz;
-    vDistance = length(cameraPosition - world.xyz);
+    vDistance = distance(cameraPosition, world.xyz);
+    vHeight = world.y;
     gl_Position = projectionMatrix * viewMatrix * world;
   }
 `;
 
 const LAKE_FRAGMENT = /* glsl */`
   precision highp float;
-  varying vec3 vWorld;
   varying float vDistance;
-
-  uniform vec3 uShallow;
-
+  varying float vHeight;
+  varying vec3 vWorld;
+  uniform vec3 uWater;
+  uniform float uSkyShare;
   ${SKY_GLSL}
   ${SKY_REFLECTION_GLSL}
   ${FOG_GLSL}
-
+  ${AIR_GLSL}
   void main() {
     vec3 view = normalize(vWorld - cameraPosition);
-    // Almost flat: a very slight tilt is enough to break the reflection into
-    // the soft horizontal bands the reference shows.
+    // Almost flat: enough tilt to break the reflection into the soft horizontal
+    // bands the reference shows, and not enough to be a wave.
     vec3 normal = normalize(vec3(
       sin(vWorld.x * 0.19) * 0.012, 1.0, cos(vWorld.z * 0.23) * 0.012));
-    vec3 reflected = reflect(view, normal);
-
-    // Whatever the sky holds in that direction, with no floor under it: these
-    // sheets are seen at a hundred metres and reflect the air a degree or two
-    // above the horizon, which the sky the world is drawn against now carries
-    // for real.
-    vec3 sky = skyReflection(reflected);
-
-    float fresnel = 0.02 + 0.98 * pow(1.0 - max(dot(-view, normal), 0.0), 5.0);
-    vec3 colour = mix(uShallow, sky, clamp(fresnel + 0.52, 0.0, 1.0));
-    colour = throughAir(colour, vDistance, vWorld.y);
-    gl_FragColor = vec4(colour, 1.0);
+    vec3 sky = skyReflection(reflect(view, normal));
+    // NOT A MIRROR, AND THE SHARE IS MEASURED. R6 §2.5 read the reference's
+    // water at L* 53, chroma 28 to 34, hue 203 to 214 -- a teal, darker than
+    // the sky at four degrees and much warmer than it, with no cloud legible in
+    // it at all. E-V5d said the same thing from the other side. So the sky is a
+    // share of this surface and never the whole of it.
+    vec3 colour = mix(uWater, sky, uSkyShare);
+    gl_FragColor = vec4(mix(colour, distantAirColour(vDistance),
+      distantAir(vDistance, vHeight)), 1.0);
   }
 `;
 
-// Where the reference puts the water.
-//
-// Read off the framing rather than placed: the two sheets show up at columns
-// 424 to 516 and 944 to 1000, between rows 566 and 590, and a row of the
-// framing is a distance for a surface lying flat thirty centimetres above the
-// meadow. Those rows put the near edge of each sheet between sixty and eighty
-// metres out and carry the far edge past a hundred and fifty, which is a great
-// deal further than the sheets used to be: at forty five metres they sat behind
-// the westmost blocks and never appeared in the framing at all.
-//
-// The far half of each sheet is almost entirely fog by the time it is drawn,
-// which is where the very low contrast of the reference comes from. It is not
-// applied as a separate effect.
-//
-// ===========================================================================
-// AND THE HEIGHT IS NO LONGER ONE OF THOSE READINGS (E-DECISIONI19).
-//
-// The paragraph above is still true of WHERE each sheet lies on the plane, and
-// it is the reason those four numbers are untouched. It stopped being true of
-// how HIGH it lies the day the world grew a basin. Thirty centimetres over the
-// meadow was fitted when everything past the disc was a flat shell, and against
-// E-DECISIONI13's ground it is a lake floating four and a half metres over its
-// own bed -- and worse than floating, because a sheet ABOVE the meadow's own
-// floor covers the whole fall: at the rim of the plateau the terraces from
-// thirty five metres to the shore were not merely wrong, they were not visible
-// at all, and the world read as a meadow that stopped at a line.
-//
-// «Abbassare l'acqua alla conca» is the committente's answer, and the height is
-// now READ from the boundary rather than written here: waterLevel() is
-// basinProfile's own answer at the radius the two arms of water were fitted
-// through. There is no literal to drift. Two consequences worth saying out
-// loud, because both are improvements this file did not have to make:
-//
-//   -- THE NEAR EDGE OF THE WATER IS NO LONGER A RECTANGLE'S. It is wherever
-//      the terraces rise through the level, found by the depth buffer. The
-//      rectangles are now bigger than the lake in every direction that matters,
-//      which is what they should always have been: their job is to say where
-//      water is ALLOWED, and the ground says where it ends.
-//   -- THE SHEET IS DEEPER THE FURTHER OUT IT GOES, which is what a flat lake
-//      in a cone is. The old sheet was a constant thirty centimetres of nothing
-//      over a floor that never moved.
-//
-// WHAT MOVED WITH IT. Everything anchored to the old height, which is one
-// thing: the fog. LAKE_FRAGMENT hands fogAmount the fragment's own world y, so
-// the haze on the water follows the surface down by construction and there is
-// no second number to change. The reflection is a direction and knows no
-// height; the shore was never drawn.
-const LAKES = [
-  { x: -37, z: -104, width: 74, depth: 108, y: waterLevel() },
-  { x: 14, z: -108, width: 58, depth: 116, y: waterLevel() },
-];
-
-function hexToLinear(hex) {
-  const colour = new Color(hex);
-  colour.convertSRGBToLinear();
-  return new Vector3(colour.r, colour.g, colour.b);
-}
-
-// The giants of the vision.
-//
-// Bearings are measured from north, which is where the reference framing looks.
-// The horizontal field of view at the reference pose is a little over seventy
-// degrees, so nothing inside about forty degrees of north may carry one of
-// these: at that pose the frame has to stay exactly as the reference shows it,
-// and the giants are only found by turning round.
-const GIANTS = [
-  { bearing: 58, distance: 240, width: 26, height: 96, depth: 14 },
-  { bearing: 104, distance: 380, width: 34, height: 150, depth: 18 },
-  { bearing: 152, distance: 300, width: 22, height: 110, depth: 12 },
-  { bearing: 212, distance: 520, width: 44, height: 210, depth: 22 },
-  { bearing: 268, distance: 340, width: 28, height: 128, depth: 16 },
-  { bearing: 308, distance: 450, width: 30, height: 165, depth: 15 },
-];
-
-// Half the horizontal field of view at the reference pose, plus a margin. Any
-// giant inside this of north would appear in a frame that must not have one.
-const FRAME_HALF_ANGLE = 44;
-
-function buildGiants() {
-  const geometry = new BufferGeometry().copy(
-    new PlaneGeometry(1, 1).toNonIndexed(),
-  );
-  // A slab, not a plane: it has to read as a block from any bearing the walker
-  // can reach, and six quads is still one draw call for all of them.
-  const box = new BufferGeometry();
-  const half = 0.5;
-  const corners = [
-    [-half, 0, half], [half, 0, half], [half, 1, half], [-half, 1, half],
-    [half, 0, -half], [-half, 0, -half], [-half, 1, -half], [half, 1, -half],
-  ];
-  const quads = [[0, 1, 2, 3], [4, 5, 6, 7], [1, 4, 7, 2], [5, 0, 3, 6], [3, 2, 7, 6]];
-  const positions = [];
-  const tints = [];
-  const giantAir = splitAir(GIANT);
-  const pureAir = splitAir(HAZE);
-  const blended = new Vector4();
-  for (const quad of quads) {
-    for (const index of [0, 1, 2, 0, 2, 3]) {
-      const corner = corners[quad[index]];
-      positions.push(corner[0], corner[1], corner[2]);
-      // Baked haze: the foot of a giant is further into the air than its head,
-      // so it goes bluer downwards, not upwards. Both ends are splits now, and
-      // the blend between them is a blend of splits, which is why the split is
-      // carried multiplied out.
-      const t = 1 - corner[1] * 0.42;
-      blended.copy(giantAir).lerp(pureAir, t * 0.5);
-      tints.push(blended.x, blended.y, blended.z, blended.w);
-    }
-  }
-  box.setAttribute('position', new BufferAttribute(new Float32Array(positions), 3));
-  box.setAttribute('tint', new BufferAttribute(new Float32Array(tints), 4));
-  box.computeBoundingSphere();
-  geometry.dispose();
-
-  const mesh = new InstancedMesh(box, ridgeMaterial(), GIANTS.length);
-  const matrix = new Matrix4();
-  const quaternion = new Quaternion();
-  const scale = new Vector3();
-  const position = new Vector3();
-
-  GIANTS.forEach((giant, index) => {
-    const angle = giant.bearing * DEG;
-    position.set(
-      Math.sin(angle) * giant.distance,
-      -2,
-      -Math.cos(angle) * giant.distance,
-    );
-    // Turned a few degrees off the bearing, so they are never a row of parallel
-    // slabs the way a generated ring would be.
-    quaternion.setFromAxisAngle(new Vector3(0, 1, 0), angle + (index % 3 - 1) * 0.22);
-    scale.set(giant.width, giant.height, giant.depth);
-    mesh.setMatrixAt(index, matrix.compose(position, quaternion, scale));
-  });
-  mesh.instanceMatrix.needsUpdate = true;
-  mesh.name = 'giants';
-  mesh.frustumCulled = false;
-  return mesh;
-}
-
-/** Bearings that would put a giant inside the reference framing. */
-export function giantsInFrame() {
-  return GIANTS.filter((g) => {
-    const bearing = ((g.bearing + 180) % 360) - 180;
-    return Math.abs(bearing) < FRAME_HALF_ANGLE;
-  });
-}
+// ---------------------------------------------------------------- the delivery
 
 /**
- * Builds the water, the hills and the giants.
- * @param {object} assets  sky texture; everything else is generated
+ * The hills, the water, and what the two of them cost.
+ *
+ * @returns {{meshes: object[], api: object}}
  */
 export function createDistance() {
-  const meshes = [];
+  const hills = new Group();
+  hills.name = 'colline';
 
-  // Three rings, each further and hazier than the one in front of it. The
-  // reference has no more than that: a lit green band, a blue one behind it,
-  // and a last one barely separated from the sky.
-  const ridges = [
-    // Heights are still held down, but by the row the crest reaches rather than
-    // by flattening the ring. At the flanks, where the reference has its hills,
-    // these three climb to about four and three quarters, five and a third and
-    // six degrees: the top of the furthest lands two rows under the lowest hill
-    // in the reference, and everything above that stays pure sky, which is the
-    // one part of the frame already known to be right.
-    {
-      radius: 150,
-      height: 14,
-      segments: 132,
-      seed: 0.0,
-      lit: splitAir(NEAR_LIT),
-      shade: splitAir(NEAR_SHADE),
-      foot: splitAir(MID_LIT),
+  const material = new ShaderMaterial({
+    uniforms: {
+      ...airUniforms(),
+      uPalette: { value: palette().map((c) => new Vector3(...c)) },
     },
-    {
-      radius: 260,
-      height: 26,
-      segments: 108,
-      seed: 2.4,
-      lit: splitAir(MID_LIT),
-      shade: splitAir(MID_SHADE),
-      foot: splitAir(FAR_LIT),
+    vertexShader: HILL_VERTEX,
+    fragmentShader: HILL_FRAGMENT,
+    fog: false,
+  });
+
+  // Past the last ring, so the water always meets the sky and never the ground
+  // behind the hills: the disc is the horizon on the bearings the gap opens on.
+  const reach = SPEC.rings.frontiers[SPEC.rings.frontiers.length - 1] + 150;
+  const disc = new CircleGeometry(reach, 96);
+  disc.rotateX(-Math.PI / 2);
+  const lake = new Mesh(disc, new ShaderMaterial({
+    uniforms: {
+      ...airUniforms(),
+      ...SKY_UNIFORMS,
+      ...SKY_REFLECTION,
+      uWater: { value: new Vector3(...SPEC.palette.water) },
+      uSkyShare: { value: SPEC.palette.skyShare },
     },
-    {
-      radius: 420,
-      height: 46,
-      segments: 96,
-      seed: 5.1,
-      lit: splitAir(FAR_LIT),
-      shade: splitAir(FAR_SHADE),
-      foot: splitAir(HAZE),
-    },
-  ];
-  // Everything out here is opaque and depth tested, so the order it is drawn in
-  // is the order the depth buffer decides. What it may not do is share a render
-  // order with the sky: the sky is drawn with the depth test off, so that it can
-  // be laid down first without a far plane, and anything queued alongside it is
-  // liable to be painted over. It sits at minus one; the distances sit at zero
-  // with the rest of the world, and the ridges and the meadow then resolve
-  // against each other by depth alone.
-  for (const spec of ridges) {
-    const ridge = new Mesh(buildRidge(spec), ridgeMaterial());
-    ridge.name = `ridge-${spec.radius}`;
-    ridge.frustumCulled = false;
-    meshes.push(ridge);
+    vertexShader: LAKE_VERTEX,
+    fragmentShader: LAKE_FRAGMENT,
+    fog: false,
+  }));
+  lake.name = 'lago';
+  lake.position.y = WATER;
+  lake.frustumCulled = false;
+
+  const stats = {
+    quads: 0,
+    triangles: 0,
+    bytes: disc.attributes.position.array.byteLength,
+    buildMs: null,
+    wedges: 0,
+    perRing: [],
+    air: SEAT_HAS_DISTANT_AIR ? 'air.js' : 'R6 fallback, declared',
+    where: 'pending',
+  };
+
+  /** Hang one wedge's arrays on the scene, exactly as they arrived. */
+  const hang = (wedge) => {
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', new BufferAttribute(wedge.position, 3));
+    geometry.setAttribute('shade', new BufferAttribute(wedge.shade, 1));
+    geometry.setIndex(new BufferAttribute(wedge.index, 1));
+    geometry.computeBoundingSphere();
+    const mesh = new Mesh(geometry, material);
+    mesh.name = 'collina-settore';
+    mesh.frustumCulled = true;
+    hills.add(mesh);
+  };
+
+  const receive = (built) => {
+    for (const wedge of built.wedges) if (wedge) hang(wedge);
+    const bytes = stats.bytes + built.stats.bytes;
+    Object.assign(stats, built.stats);
+    stats.bytes = bytes;
+    stats.wedges = hills.children.length;
+  };
+
+  // THE CUTTING GOES OFF THE THREAD THE WALKER IS ON, and the fallback under it
+  // is not a convenience either.
+  //
+  // Three seconds, measured -- and measured as a DEAD TAB rather than as a slow
+  // frame: the first harness that tried to photograph this world was handed a
+  // crashed page. E-CONF1 spent a whole unit bringing the first frame down to
+  // about 1.1 s by moving exactly this class of arithmetic onto a worker, and
+  // this is that move for that reason. The buffers come back TRANSFERRED, so
+  // the answer does not land as a second three-second task on the thread it was
+  // taken off.
+  //
+  // AND IT FALLS BACK TO THIS THREAD RATHER THAN TO NOTHING. Under plain node
+  // -- which is where the guards and the benches read these numbers -- there is
+  // no Worker at all, and a horizon that existed only inside a browser would be
+  // a horizon no guard could ever check.
+  if (typeof Worker === 'function') {
+    stats.where = 'worker';
+    const worker = new Worker(new URL('./distant-worker.js', import.meta.url), { type: 'module' });
+    worker.onmessage = (event) => {
+      receive(event.data);
+      worker.terminate();
+    };
+  } else {
+    stats.where = 'this thread: no Worker here';
+    receive(buildHills());
   }
 
-  // Nothing to wait for: the sky these sheets reflect is evaluated, not
-  // delivered.
-  let water = null;
-  {
-    water = new ShaderMaterial({
-      uniforms: {
-        ...SKY_UNIFORMS,
-        ...SKY_REFLECTION,
-        uShallow: { value: hexToLinear('#3d4f57') },
-        ...fogUniforms(),
-      },
-      vertexShader: LAKE_VERTEX,
-      fragmentShader: LAKE_FRAGMENT,
-      fog: false,
-    });
-    for (const lake of LAKES) {
-      const mesh = new Mesh(new PlaneGeometry(lake.width, lake.depth), water);
-      mesh.rotation.x = -Math.PI / 2;
-      mesh.position.set(lake.x, lake.y, lake.z);
-      mesh.name = 'lake';
-      meshes.push(mesh);
-    }
-  }
-
-  meshes.push(buildGiants());
   return {
-    meshes,
+    meshes: [hills, lake],
+    api: {
+      stats,
+      /** How many wedges the card is handed at this moment. */
+      drawn() {
+        return hills.children.filter((m) => m.visible).length + (lake.visible ? 1 : 0);
+      },
+      setVisible(on) { hills.visible = on; lake.visible = on; },
+      /** Whether the hills have arrived from the thread that cuts them. */
+      ready() { return hills.children.length > 0; },
+      hills,
+      lake,
+    },
   };
 }
+
+// THE CONTRACT V7 IS OWED, ANSWERED BY THE LAW AND FORWARDED FROM HERE.
+//
+// E-V5a ratified the name and V7 has carried a promissory comment for it ever
+// since; E-V5j recorded that the seat in src/world/contracts.js never arrived.
+// It arrives now. The answer comes from the law rather than from this file
+// because the law is what knows where a terrace is, and this is the door
+// contracts.js re-exports, so V7 never reaches into another session's module.
+//
+// AND A SEAT IS A TREAD NOW. It used to be a height on a painted quad, which is
+// what «una panca, non un punto nell'aria» was reaching for when there was
+// nothing out there to sit on. There is now.
+export function ridgeSeats() {
+  return ridgeLampSeats(SPEC, ladders(SPEC));
+}
+
+export { SPEC as CORNICE };
