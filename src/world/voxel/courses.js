@@ -203,11 +203,35 @@ function crackAt(u, v) {
  */
 export function stoneTileData(side = 512) {
   const data = new Uint8Array(side * side * 2);
+  // AND EVERY OCTAVE OF IT IS SMALLER THAN A BLOCK, which is a correction and
+  // the whole of what made this wall read as camouflage.
+  //
+  // The tile used to open at 4 cells over its 1.6 m, which is 0.40 m: TWO
+  // BLOCKS. Forty-four per cent of the amplitude sat there, so the largest
+  // thing on the surface was a patch that walked across the joint between two
+  // blocks and joined them into one shape. Measured on the day target and on
+  // the render through one estimator (R5 SS1.4): the target's horizontal period
+  // on 03 is 7 px = 0.19 m, exactly the block, and the render's is 17 px =
+  // 0.46 m -- 2.4 times over, and it is the tile that is being read as the
+  // block rather than the lattice. The same reading says the course line
+  // DISAPPEARS in the render (no autocorrelation peak where the target has one
+  // at 0.48) because a patch that spans two blocks covers the line between
+  // their courses.
+  //
+  // So the octaves now open at 0.10 m -- half a block -- and run down to
+  // 0.025 m, which is the grain the reference shows INSIDE a block (C SS1.3:
+  // 1.51 px at the framing this world is fitted to). Nothing on this surface is
+  // allowed to be as large as the thing the surface is made of.
+  //
+  // WHAT IT COSTS: nothing. It is the same loop over the same 512 squared, one
+  // octave shorter, generated in the worker where it always was. The wall's own
+  // modulation of ROW brightness -- the courses, the arris, the pale top -- was
+  // already at or above the target's (4.32% against 3.25%), so what this takes
+  // away is chatter inside a block and not contrast between courses.
   const octaves = [
-    { cells: 4, gain: 0.42 },
-    { cells: 11, gain: 0.26 },
-    { cells: 27, gain: 0.17 },
-    { cells: 64, gain: 0.10 },
+    { cells: 16, gain: 0.50 },
+    { cells: 32, gain: 0.30 },
+    { cells: 64, gain: 0.20 },
   ];
   let weight = 0;
   for (const o of octaves) weight += o.gain;
