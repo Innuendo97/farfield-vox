@@ -71,48 +71,79 @@ export const NEUTRAL_LIFT = [1, 1];
 // because the sky term IS the share above; nothing new is measured, sampled or
 // stored to get it, and no attribute is added to a vertex.
 //
-// AND ITS COLOUR IS THE MEADOW'S, WHICH IS A MEASUREMENT AND NOT A TASTE. Four
-// candidate grounds were solved against the whole table of families at once,
-// each at its OWN best strength, judged on the LARGEST relative error: this
-// world's meadow 4.20 per cent, meadow and earth mixed four to one 5.02, the
-// bare earth 8.62, neutral grey 17.56. A grey bounce is four times worse than a
-// green one, and the target is what says so — the shadows of the reference are
-// not blue because the sky is blue, they are the colour of the grass under
-// them. That solve is not repeated here: what moved between it and this seal is
-// the STRENGTH of the light, not the colour of the ground.
+// AND ITS COLOUR IS THE GROUND'S, WHICH IS A MEASUREMENT AND NOT A TASTE — AND
+// THE GROUND OF THIS WORLD IS NOT PURE GRASS.
 //
-// THE STRENGTH IS THE WORLD'S CROWDING, AND IT IS FITTED UNDER THIS SEAL. One
-// would be the whole of an unoccluded plane of that albedo; 0.235 is what
-// lands, and it lands because a flank in this world sees cubes, blades and its
-// own neighbours where the ideal plane sees ground. It is the minimax and the
-// minimax is well conditioned: at 0.235 two readings of the ladder taken on
-// different parts of the target go to par with each other and with the hue, at
-// 3.1, 3.5 and 1.3 per cent —
+// The solve is the same one the first fit ran and it is run again here, because
+// the seal it was run under has moved and because the target now publishes
+// something it did not publish then: the level, the chroma and the HUE of its
+// own shadowed faces, face by face — the nine projected faces of the six blocks
+// in assets-src/monoliths/masonry-spec.json `palette`, and the dark faces of its
+// foreground rocks. Four candidate grounds, each at its OWN best strength,
+// judged on the largest error in units of each reading's own error bar:
 //
-//     k        0.200   0.225   0.235   0.245   0.260
-//     ladder   0.3248  0.3347  0.3385  0.3423  0.3479
-//     hue       211.4   207.3   205.7   204.1   201.7
+//     ground                        albedo                 strength   worst
+//     this world's meadow           0.2632 0.4374 0.0000     0.203     2.22
+//     meadow and earth, four to one 0.3453 0.4318 0.0230     0.217     1.62
+//     meadow and earth, two to one  0.4000 0.4281 0.0384     0.229     1.78
+//     the bare earth                0.6736 0.4094 0.1152     0.207     3.19
+//     neutral grey                  0.3500 0.3500 0.3500     0.349     7.19
 //
-// and the whole band from 0.22 to 0.26 is inside five per cent, so nothing here
-// rests on the third digit.
+// THE PURE MEADOW WON THE FIRST TIME AND LOSES NOW, and the reason is a defect
+// this file used to have BY CONSTRUCTION. The meadow's pigment carries a blue of
+// EXACTLY NOUGHT — that is what src/world/voxel/pigment.js measures, and it is
+// honest there, because the tone curve mixes channels and supplies the blue a
+// green pixel needs. But a BOUNCE is not a pixel: it is light, and a ground that
+// returns no blue at all leaves every face the sun does not reach lit by a blue
+// sky plus a return with no blue in it, which comes out GREEN whatever anybody
+// fits afterwards. U-PIETRA-2 measured exactly that on the flanks of the loose
+// stones — L* 16.6 at chroma 14.3, where the target reads a near neutral
+// [31 · 37 · 33] — and named this constant. With the four to one mix the same
+// flank comes back at chroma 8.8, and nothing else moves more than a bar.
 //
-// WHY IT IS NOT THE 0.215 THE SAME SOLVE FOUND BEFORE. That was fitted under
-// the old seal; this world re-baked its sky irradiance against the ramp the
-// renderer actually draws (R −75.85%, G −48.93%, B −28.12%), which took the sky
-// term down and the shadows with it. A bounce is a FRACTION OF THE LIGHT, so
-// when the light moves the fraction is refitted or it is a number describing a
-// day nobody ships — which is exactly what happened the first time this term
-// was carried across a seal instead of refitted under it.
+// The mix is not a preference either. The ground a flank in this world actually
+// sees is meadow AND the earth under a thin mat: U-PRATO-2 put `SOIL_LEVEL`
+// under the sparse mantle and separated the soil family, and the earth is where
+// the blue comes from — 0.1152 of it, measured by the same census, in
+// src/world/voxel/pigment.js.
 //
-// IT IS A LITERAL AND IT DOES NOT FOLLOW THE PIGMENT. The triple is the meadow
-// albedo AS MEASURED THE DAY THIS WAS FITTED — src/world/voxel/pigment.js still
-// reads the same three characters — copied deliberately and not referenced: the
-// pigment is a FIELD now, two octaves over the world's own XZ, and a light that
-// moved by itself when a material was refitted would be a light nobody could
-// fit against. If the meadow's albedo moves, this is refitted on purpose,
-// against the target, by whoever owns the light.
-export const BOUNCE_SHARE = 0.235;
-export const BOUNCE_GROUND = [0.272, 0.452, 0.000];
+// THE STRENGTH IS THE WORLD'S CROWDING, AND IT BARELY MOVED. One would be the
+// whole of an unoccluded plane of that albedo; what lands is a flat basin,
+// because a flank in this world sees cubes, blades and its own neighbours where
+// the ideal plane sees ground. The worst error in error bars, against the
+// shadowed faces of the target:
+//
+//     k       0.217  0.225  0.230  0.235  0.240  0.245  0.250  0.260
+//     worst    1.62   1.71   1.76   1.82   1.90   1.99   2.09   2.29
+//
+// The free minimum is at 0.217 and the whole band to 0.245 is inside two bars,
+// so nothing here rests on the third digit — and what picks 0.240 inside that
+// band is a GATE and not a preference: the wall's own sun over shadow on block
+// 01, which the target reads at 4.4 and guard-pietra holds between 4.0 and 4.8.
+// That ratio is the one reading a shadowed face and a lit face share, so it is
+// the tightest thing this constant touches: 4.92 at 0.217, 4.60 at 0.240, 4.36
+// at 0.260. The choice is the leximin INSIDE the gate, and the gate is the
+// target's.
+//
+// WHY THE 0.235 THE SAME SOLVE FOUND BEFORE IS NO LONGER THE SAME NUMBER. That
+// was fitted under the previous seal, against a pure meadow with no blue in it.
+// U-LUCE-4 moved the sun (azimuth 280 to 274, elevation 47 to 51), both
+// strengths with it, and the colour above. A bounce is a FRACTION OF THE LIGHT,
+// so when the light moves the fraction is refitted or it is a number describing
+// a day nobody ships — which is what happened the first time this term was
+// carried across a seal instead of refitted under it. That it lands two per
+// cent from where it was is the answer and not the assumption: the fit was run
+// again, and this is where it came out.
+//
+// IT IS A LITERAL AND IT DOES NOT FOLLOW THE PIGMENT. The triple is the mix AS
+// MEASURED THE DAY THIS WAS FITTED — src/world/voxel/pigment.js still hands back
+// the two ends of it — copied deliberately and not referenced: the pigment is a
+// FIELD now, two octaves over the world's own XZ, and a light that moved by
+// itself when a material was refitted would be a light nobody could fit against.
+// If either albedo moves, this is refitted on purpose, against the target, by
+// whoever owns the light.
+export const BOUNCE_SHARE = 0.240;
+export const BOUNCE_GROUND = [0.3453, 0.4318, 0.0230];
 export const GROUND_BOUNCE = BOUNCE_GROUND.map((v) => v * BOUNCE_SHARE);
 
 // WHY THE SUN IS AN OPTION AND NOTHING ELSE IS. A uniform may be declared once
