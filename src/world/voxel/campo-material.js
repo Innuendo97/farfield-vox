@@ -6,13 +6,46 @@ import { FACE_LIGHT_GLSL, faceLightUniforms } from '../face-light.js';
 import { FOG_GLSL, GROUND_EXPOSURE, fogUniforms } from '../air.js';
 import TERRAIN from '../../../assets-src/terrain/terrain.json' with { type: 'json' };
 import { EARTH, MANTO, SUN_STEPS } from './worldgen.js';
-import { PIGMENT_GLSL, pigmentUniforms, refreshPigment } from './pigment.js';
+import { ALBEDO, PIGMENT_GLSL, pigmentUniforms, refreshPigment } from './pigment.js';
 import { SHEET_GLSL, sheetArray, sheetUniforms } from './sheet.js';
 import { bladeSettings, earthSettings, voxelSettings } from './material.js';
 import {
   CAMPO, CAMPO_BEARINGS, CAMPO_BIAS, CAMPO_BLADE_CEIL, CAMPO_CUT_GLSL, CAMPO_FAR,
   CAMPO_FAR_SHIFT, CAMPO_LOOK_MAX, CAMPO_LOOK_SHIFT, CAMPO_RUNG, campoCutUniform,
 } from './campo.js';
+
+/**
+ * THE WELL'S OWN LADDER, AND IT IS A SECOND MEASUREMENT AND NOT A SECOND COPY.
+ *
+ * bladeSettings().base is E-ERBA-A 1.6's own reading -- the fall at the foot of
+ * ONE blade, 16% at nought and home by seven centimetres -- and R1 S2 is
+ * explicit that it stays that: <<la caduta alla base di E-ERBA-A 1.6 resta per
+ * la faccia di un filo isolato; il POZZO e' la stessa scala con base (0,85,
+ * 0,50)>>. They are two quantities. One is how much sky a blade's own foot
+ * loses to the blade above it; the other is how much sky THE GROUND BETWEEN THE
+ * BLADES loses to the mat standing on it, which is most of a hemisphere.
+ *
+ * SO IT LIVES HERE AND NOT IN bladeSettings(), and that is what keeps one light
+ * in this world rather than two. The greedy mat (./material.js) draws blades and
+ * draws the ground under them through a DIFFERENT material; it has no well and
+ * never had one, so a pair for the well cannot disagree with it. Blades are left
+ * reading the one pair both paths share, so a blade the field draws and a blade
+ * the mesher draws are still lit by the same arithmetic -- which is the property
+ * ../face-light.js exists to hold and the one a second copy would break.
+ *
+ * FITTED HERE, ON THIS TIP, AND NOT CARRIED ACROSS. Swept live at the fitted
+ * pose over x in 0.40-0.85 and y in 0.50-0.62, judged on the level ratio of the
+ * three families in R1's pp-dx window -- dark over light, which is scale free
+ * and so is the one reading of this window the zones do not contaminate:
+ *
+ *     spedito (nessun pozzo sul suolo)   0.266      x 0.70, y 0.50   0.249
+ *     x 0.40, y 0.50                     0.259      x 0.85, y 0.62   0.249
+ *     x 0.55, y 0.50                     0.254      x 0.85, y 0.50   0.244
+ *
+ * against the target's 0.240. It is R1's own pair, and it arrives at the target
+ * from a sweep that did not know the answer.
+ */
+export const CAMPO_WELL = [0.85, 0.50];
 
 // THE FIELD'S OWN MATERIAL: ONE BOX, ONE FRAGMENT A PIXEL, AND THE WORLD
 // REBUILT BY A RAY INSTEAD OF BY A VERTEX.
@@ -172,6 +205,8 @@ const FRAGMENT = /* glsl */`
 
   // The families' own numbers, read out of the settings objects of
   // ./material.js and never written again here.
+  uniform vec2 uWell;
+  uniform vec3 uAlbedoSoil;
   uniform vec3 uAlbedoEarth;
   uniform float uHueEarth;
   uniform vec2 uSheetLayerEarth;
@@ -623,6 +658,10 @@ const FRAGMENT = /* glsl */`
     float span = uCell * exp2(float(hit.level));
     float groundY = groundYOf(hit.tex);
     bool onTop = abs(hit.n.y) > 0.5;
+    // HOW MUCH MAT STANDS ON THIS COLUMN, in cells, read off the same fetch that
+    // carried the height. It is asked here because two things want it: which
+    // family the ground draws where the mat thins, and how deep the well goes.
+    float matRung = bladeSubOf(hit.tex) * uBladeUnit / uCell;
 
     // ------------------------------------------------- WHICH FAMILY A FACE IS
     // A BLADE IS THE MAT'S FAMILY WHATEVER IT STANDS ON, which is the one thing
@@ -640,10 +679,31 @@ const FRAGMENT = /* glsl */`
     // is baked into bits six and seven because it is a question about the PATH
     // and not about this column's height. The top cube of such a wall keeps the
     // meadow's own flank, which is E-DECISIONI8.3 read as geometry.
+    //
+    // AND WHERE THE MAT THINS, THE GROUND IS EARTH AND NOT A GREEN PLANE
+    // (R1 S6, and §2.5 for the measurement). Inside the verge of the corridor
+    // MANTO.verge leaves a third to two thirds of the columns without a blade,
+    // and what showed there was the TOP OF THE COLUMN: flat, level, meadow
+    // green, at the full sun and the full sky. The reference never shows that
+    // plane -- 0.4 to 0.8% of its frame against ours -- because where its mat
+    // thins there is brown earth with cubes standing on it. Probed at the
+    // fitted pose the bare column is 7.2% of R1's pp-sx window and 10.6% of the
+    // whole five-to-seven metre band, and it carries 23.7% of that band's
+    // bright family: it is the second largest single source of the light quota
+    // after the mat's own skin.
+    //
+    // IT IS THE FAMILY THAT MOVES AND NOT A NEW COLOUR. The bare earth of the
+    // verge is already solved through the chain (ALBEDO.earth, and the note over
+    // it for why it is solved and not quoted); what this says is only that the
+    // ground under a thinning mat is that family rather than the meadow's, at
+    // the FLOOR of the tint band, which is R1 S6's own prescription and is the
+    // darkest the field is allowed to draw without inventing a pigment.
     bool earth = false;
+    bool thinMat = false;
     if (!hit.blade) {
       if (onTop) {
-        earth = family == 1;
+        thinMat = family == 0 && matRung < 0.5;
+        earth = family == 1 || thinMat;
       } else if ((packed & 32) != 0) {
         vec4 across = cellAt(hit.cell + ivec2(int(hit.n.x), int(hit.n.z)),
                              hit.level, hit.near);
@@ -687,8 +747,9 @@ const FRAGMENT = /* glsl */`
     // texel), so the LEVEL of the colour is the store's own answer, to a byte.
     // What is left in the fragment is the hue, which rides the slow octave and
     // is a second field rather than a second sampling of this one.
-    float tint = uTintFloor + hit.tex.a * (uTintCeil - uTintFloor);
-    vec3 albedo = (earth ? uAlbedoEarth : uAlbedo) * tint
+    float tint = thinMat ? uTintFloor
+      : uTintFloor + hit.tex.a * (uTintCeil - uTintFloor);
+    vec3 albedo = (thinMat ? uAlbedoSoil : earth ? uAlbedoEarth : uAlbedo) * tint
       * pigHueOf(column.x, column.y, earth ? uHueEarth : uHue);
 
     // ------------------------------------------------------------- the grain
@@ -726,13 +787,59 @@ const FRAGMENT = /* glsl */`
     float sunLine = (uHorizon > 0.5 && insideNear(hit.p.xz) && under.b > 0.0)
       ? sunLineAt(fine, floorSubOf(under)) * uBladeUnit : -1e4;
     float lightY = min(hit.p.y, canopy);
-    float shadeSun = hit.blade ? uShadeSun : 1.0;
+    // THE WELL IS BETWEEN THE CUBES, AND WHAT STANDS BETWEEN THEM IS GROUND.
+    //
+    // WHAT WAS WRONG, MEASURED ON THIS TIP AND NOT INHERITED. Both halves of the
+    // mat's own light -- the sun a blade keeps under its own line (uShadeSun)
+    // and the ladder it falls down (uBase) -- were gated on hit.blade. So a
+    // BLADE was shaded by the mat and the GROUND STANDING IN THE MAT was not:
+    // it took the full sun and the full sky, the brightest thing this material
+    // draws, in the one place the target is darkest. Probed at the fitted pose
+    // over R1's own pp-dx window that ground is 29% of the pixels and 27% of
+    // the bright family; over the whole five-to-seven metre band it is 56% of
+    // it. It is not the floor of a column seen from above -- at this pose that
+    // face is 0.0% of the frame, the mat covers it -- it is the SIDE of the
+    // ground the blades stand on, three to five cells under the canopy.
+    //
+    // AND IT IS WHY THE LADDER COULD NOT BE FITTED FROM OUTSIDE. Swept live over
+    // its whole range, including the ceiling, the three literals moved pp-dx by
+    // one level and no quota at all: 62% of that window stands at rung nought
+    // where pow(base.y, 0) is one and the ladder is arithmetically absent, and
+    // everything the gate let through was already in the dark family. R1 S2
+    // measured the pozzo worth 49/16/35 -> 60/34/6 on a frame made of 20 cm
+    // PLATES, whose flanks were tall; U-CAMPO-1's ring draws real 5 cm blades
+    // at this distance now, and a blade has no tall flank. The mechanism had to
+    // be re-derived, not re-tuned.
+    //
+    // WHAT IT COSTS: nothing is fetched. canopy is topYOf(), the ground plus the
+    // blade standing on it, so the rung a face is already counting IS its depth
+    // under the mat; bladeSubOf() of the same texel is how much mat there is.
+    //
+    // AND THE MAT ONLY SHADES AS DEEP AS THE MAT IS TALL. Without that line the
+    // ladder reaches down a cut bank -- the side of a mound, the halo round a
+    // boulder, every terrace of the boundary -- and blackens ground no grass is
+    // standing over. Capped at the mat's own height the same arithmetic says the
+    // physical thing: a face loses the sky the grass above it takes, and there
+    // is no more grass than there is.
+    bool inMat = hit.blade || matRung > 0.5;
+    float shadeSun = inMat ? uShadeSun : 1.0;
     float lit = 1.0 - smoothstep(0.0, uCell * 0.25, sunLine - lightY);
     float sun = shadeSun + (1.0 - shadeSun) * lit;
-    vec2 base = hit.blade ? uBase : vec2(0.0, 1.0);
-    float rung = floor(max(0.0, canopy - hit.p.y) / uCell);
+    // A BLADE KEEPS ITS FOOT'S FALL; THE GROUND IN THE MAT TAKES THE WELL.
+    // Two readings of two different things, and the note over CAMPO_WELL for
+    // why keeping them apart is what stops this material from disagreeing with
+    // the mesher's about what a blade is.
+    vec2 base = !inMat ? vec2(0.0, 1.0) : (hit.blade ? uBase : uWell);
+    float rung = min(floor(max(0.0, canopy - hit.p.y) / uCell), floor(matRung));
     float sky = 1.0 - base.x * (1.0 - pow(base.y, rung));
-    float bounce = hit.blade ? uBounce : 0.0;
+    // AND THE BOUNCE FALLS DOWN THE SAME LADDER (R1 S2). uBounce says a flank
+    // sees lit meadow where the hemisphere below it would have been; a flank at
+    // the bottom of a well sees the well. Scaling it by the sky that face kept
+    // is that statement, made once, for one multiply. face-light.js takes the
+    // other side of it by construction -- less sky claimed is more ground
+    // returned -- which is what keeps the bottom of the well off nought, and is
+    // why the well's LEVEL rises while its quota falls.
+    float bounce = hit.blade ? uBounce * sky : 0.0;
     vec3 light = faceLightOf(matTerms(hit.n, sun, sky, bounce));
 
     // ------------------------------------------------- THE ASPECT, CONSERVED
@@ -1145,6 +1252,8 @@ export function campoMaterial({
       uArrisLean: { value: blade.arrisLean },
       uBounce: { value: blade.bounce },
       uBase: { value: blade.base },
+      uWell: { value: new Vector2(...CAMPO_WELL) },
+      uAlbedoSoil: { value: new Vector3(...ALBEDO.soil) },
       uShadeSun: { value: blade.shadeSun },
       uEarthMinStep: { value: EARTH.minStep },
       uEarthToEye: { value: EARTH.toEye ? 1 : 0 },
