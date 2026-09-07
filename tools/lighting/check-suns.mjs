@@ -72,7 +72,14 @@ const SEAT_VEC = sunVector(SEAT.elevation, SEAT.azimuth);
 // it: an id in sun-waivers.json that is not here is a typo, and a typo in a
 // waiver is a hole in the guard wearing a waiver's clothes.
 const CONSUMERS = [
-  'assets-src/clouds/clouds.json',
+  // assets-src/clouds/clouds.json e' USCITO DA QUI, e il modo in cui e' uscito
+  // e' quello dei sassi: non perche' il consumatore si sia messo d'accordo col
+  // seggio -- un manifesto di un atlante cotto sotto un altro sole non puo' --
+  // ma perche' IL CONSUMATORE NON C'E' PIU'. Le placche fotografiche e la loro
+  // tavola sono state ritirate con la sede che le leggeva (U-NUV-1): il tempo
+  // e' un campo di densita' voxelizzato al caricamento, e prende il sole dal
+  // seggio come ogni altra faccia di questo mondo. La riga e' in `paid` di
+  // tools/lighting/sun-waivers.json.
   'assets-src/clouds/plates.json',
   'tools/clouds/cloud-pieces.mjs',
   'assets-src/terrain/terrain.json',
@@ -230,18 +237,10 @@ for (const path of []) {
   check(/sun_angles\(/.test(source), `${path} reads the seat`);
 }
 
-// The weather. The clouds are relit from the same direction the ground is, and
-// their bake arc was solved to contain it (tools/clouds/check-arc.mjs).
-checkAngles('assets-src/clouds/clouds.json', 'the cloud field carries the seat',
-  read('assets-src/clouds/clouds.json').sun.elevation,
-  read('assets-src/clouds/clouds.json').sun.azimuth,
-  'assets-src/clouds/clouds.json sun');
-{
-  const clouds = read('assets-src/clouds/clouds.json').sun;
-  const off = angleBetween(SEAT_VEC, clouds.vector);
-  checkOff('assets-src/clouds/clouds.json', off <= TOLERANCE, 'and its vector too',
-    `${off.toFixed(4)} deg`);
-}
+// The weather. Nothing to ask any more: the cloud field carries no sun of its
+// own, because it carries no picture. Its faces are lit here, in the frame,
+// off SKY_UNIFORMS.uSunDir -- the seat itself, shared by reference -- so the
+// question this block used to ask cannot come apart from its answer.
 checkAngles('tools/clouds/cloud-pieces.mjs', 'the cloud piece generator carries the seat',
   PROD_SUN.el, PROD_SUN.az, 'tools/clouds/cloud-pieces.mjs PROD_SUN');
 {

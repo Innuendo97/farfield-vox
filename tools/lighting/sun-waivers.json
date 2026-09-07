@@ -25,11 +25,6 @@
   },
   "waivers": [
     {
-      "consumer": "assets-src/clouds/clouds.json",
-      "owner": "V6",
-      "note": "scheduled for replacement: the cloud field is re-authored with the silhouette atlas"
-    },
-    {
       "consumer": "assets-src/clouds/plates.json",
       "owner": "V6",
       "note": "scheduled for replacement: the plate roster is re-shot at the new seat"
@@ -57,6 +52,16 @@
     "Written down rather than merely removed. A roster that only ever shortens",
     "silently is a roster in which nobody can tell a debt that was paid from one",
     "that was quietly dropped, and this file's own rule is that every line of it is",
-    "a debt."
+    "a debt.",
+    "",
+    "assets-src/clouds/clouds.json [V6], 2026-09-07. The note said 'scheduled for",
+    "replacement: the cloud field is re-authored with the silhouette atlas', and what",
+    "happened instead is better: there is no atlas. U-NUV-1 replaced the hundred and",
+    "twenty-three photographic plates with cumuli of real cubes, generated at load",
+    "from a roster in assets-src/sky/sky.json and lit off SKY_UNIFORMS.uSunDir --",
+    "the seat itself, shared by reference with the ground and the stone. So the",
+    "manifest that carried elevation 34 / azimuth -9.5 is gone with the tiles it",
+    "described, and the weather cannot disagree with the sun again: it has no sun of",
+    "its own to disagree with."
   ]
 }

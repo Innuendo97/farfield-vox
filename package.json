@@ -20,7 +20,7 @@
     "sky:zones": "node tools/grade/check-sky-zones.mjs",
     "grade:fit": "node tools/grade/fit-lut.mjs",
     "grade:compare": "node tools/grade/compare.mjs",
-    "grade:check": "node tools/grade/check-png.mjs assets-src/clouds/cloud-sprites.png assets-src/clouds/cloud-equirect.png public/assets/grade-lut.png"
+    "grade:check": "node tools/grade/check-png.mjs public/assets/grade-lut.png"
   },
   "dependencies": {
     "three": "^0.185.1"

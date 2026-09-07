@@ -209,20 +209,31 @@ export function populations(root) {
       },
     },
     {
-      name: 'nuvole', owner: 'V6', grid: 48, billboard: true,
-      where: 'clouds.js: le quad e il side del materiale',
+      name: 'nuvole', owner: 'V6', grid: 48,
+      where: 'cloud-field.js: il campo di densita, il mesher greedy e le facce',
       async build() {
-        const clouds = await load('src/world/clouds.js');
-        // The atlas is a download and there is no browser here, but the FIELD is
-        // arithmetic: placements, quads and material are all decided before a
-        // texel is read, so a stand-in changes none of the three counts.
-        const built = clouds.createClouds({
-          clouds: { isTexture: true, image: { width: 1, height: 1 } },
+        // L'ARITMETICA E BASTA. Il tempo non e' piu' un atlante disegnato su
+        // quad: e' un campo di densita' voxelizzato e fuso da un mesher greedy,
+        // e src/world/cloud-field.js non importa three.js apposta, cosi' questo
+        // banco costruisce lo STESSO cielo che vede la pagina invece di una
+        // somiglianza. Il materiale non c'e' perche' non serve: quel che qui si
+        // misura e' l'avvolgimento delle facce, e una faccia e' una faccia.
+        const field = await load('src/world/cloud-field.js');
+        const sky = await json('assets-src/sky/sky.json');
+        const built = field.buildCloudField(sky.clouds.masses, {
+          cubeDeg: sky.clouds.cubeDeg,
+          shape: { ...field.SHAPE, ...(sky.clouds.shape || {}) },
+          eye: sky.clouds.read.eye,
         });
-        return built.meshes.map((mesh, i) => ({
-          suffix: String(i), mesh: fromMesh(mesh),
-          material: mesh.material, side: sideOf(mesh.material), billboard: true,
-        }));
+        return [{
+          suffix: 'campo',
+          mesh: {
+            positions: built.positions,
+            normals: built.normals,
+            indices: built.index,
+          },
+          side: 'FrontSide',
+        }];
       },
     },
   ];

@@ -1,30 +1,5 @@
 {
   "owner": "V6",
-  "note": "The weather. UASTC and never ETC1S on any of it: a block codec cannot hold a block that is part cloud and part nothing.",
-  "assets": [
-    {
-      "id": "cloud-sprites",
-      "type": "texture",
-      "role": "cloud",
-      "source": "clouds/cloud-sprites.png",
-      "priority": "high",
-      "note": "the weather the dome no longer carries: pieces of the reference's own cloud, cut in the tangent plane of the bearing each one stands at. High rather than critical because the first walkable frame is the ground, the blocks and the sky behind them, and a sky that gains its weather a moment later is a sky that gained something"
-    },
-    {
-      "id": "cloud-cover",
-      "type": "texture",
-      "role": "coverage",
-      "source": "clouds/cloud-cover.png",
-      "priority": "high",
-      "note": "the silhouette of the same weather, on its own and never through a block codec: a codec cannot hold a block that is part cloud and part nothing, and every texel of clear sky it lifts above nought is a square of false cloud the frame blends over open blue"
-    },
-    {
-      "id": "cloud-equirect",
-      "type": "texture",
-      "role": "cloud",
-      "source": "clouds/cloud-equirect.png",
-      "priority": "high",
-      "note": "the same weather as the sprites, laid down once against direction, for the surfaces that reflect the sky rather than stand in front of it: coarse on purpose, because a rippled sheet a few pixels wide does not resolve a cauliflower, and because it has to cost one tap"
-    }
-  ]
+  "note": "Il tempo. NESSUN ASSET: i cumuli sono un campo di densita' voxelizzato al caricamento dal roster in assets-src/sky/sky.json, e non costano un byte. Le tre placche fotografiche che stavano qui -- cloud-sprites, cloud-cover, cloud-equirect, 2,24 MB di KTX2 -- sono state ritirate con la sede che le leggeva (src/world/clouds.js): una fotografia di cubi tagliata a una scala e messa in piedi a otto e' una fotografia di otto cubi diversi (R4 §1.4). Il frammento resta perche' e' il registro di chi possiede che cosa, e V6 possiede il cielo: il giorno in cui il riflesso sull'acqua torna dal campo voxel (R4 §S7) l'equirect rigenerato si dichiara qui.",
+  "assets": []
 }
