@@ -1,61 +1,47 @@
 {
   "owner": "V2",
-  "note": "The built stone: the stair, the blocks and the rocks. Every one of these is a bake that the masonry generator replaces, so this fragment is expected to empty out rather than grow.",
-  "assets": [
-    {
-      "id": "stairs-albedo",
-      "type": "texture",
-      "role": "albedo",
-      "source": "terrain/stairs-albedo.png",
-      "priority": "critical"
-    },
-    {
-      "id": "stairs-light",
-      "type": "texture",
-      "role": "lightmap",
-      "source": "terrain/stairs-light.png",
-      "priority": "critical"
-    },
-    {
-      "id": "monoliths-scene",
-      "type": "model",
-      "source": "monoliths/monoliths.glb",
-      "priority": "critical"
-    },
-    {
-      "id": "monolith-albedo",
-      "type": "texture",
-      "role": "albedo",
-      "source": "monoliths/stone-albedo.png",
-      "priority": "critical"
-    },
-    {
-      "id": "monolith-relief",
-      "type": "texture",
-      "role": "normal",
-      "source": "monoliths/stone-normal.png",
-      "priority": "critical"
-    },
-    {
-      "id": "monolith-light",
-      "type": "texture",
-      "role": "lightmap",
-      "source": "monoliths/monolith-light.png",
-      "priority": "critical"
-    }
-  ],
+  "note": "The built stone: the stair, the blocks and the rocks. Every one of them was a bake that the masonry generator replaces, and this fragment has finished emptying out: it declares nothing, and it stays because the layer still exists and the record of what it stopped asking for belongs beside it.",
+  "assets": [],
   "retired": [
     "rocks-scene (rocks/rocks.glb) and rock-light (rocks/rock-light.png) were the",
-    "last two assets this layer asked for at any arrival, and they are gone with the",
-    "sources they named. The rocks are piles of cubes on the world's own lattice now,",
+    "first two to go. The rocks are piles of cubes on the world's own lattice now,",
     "generated in src/world/rock-piles.js from the plan the reference camera traced,",
     "and drawn by the stone material the six blocks are drawn by. The layer's `plant`",
     "phase went with them: it had nothing left to build.",
     "",
-    "The six entries above are the same debt one step behind: the blocks and the",
-    "stair no longer read any of them either -- v2-pietra declares `needs: []` at",
-    "dress -- but their sources are still on disk and retiring them is a separate",
-    "act with its own verification. Named here so the next hand knows the fragment",
-    "is not finished emptying."
+    "AND THE SIX THAT WERE NAMED HERE AS THE SAME DEBT ONE STEP BEHIND ARE GONE",
+    "TOO, with the sources they named:",
+    "",
+    "  stairs-albedo     terrain/stairs-albedo.png       126 674 B",
+    "  stairs-light      terrain/stairs-light.png        148 704 B",
+    "  monoliths-scene   monoliths/monoliths.glb         236 552 B",
+    "  monolith-albedo   monoliths/stone-albedo.png      150 697 B",
+    "  monolith-relief   monoliths/stone-normal.png      129 688 B",
+    "  monolith-light    monoliths/monolith-light.png  1 105 045 B",
+    "",
+    "Nothing read any of them. The stair and the platform are masonry-scalinata and",
+    "masonry-piattaforma, cut on the world's lattice and drawn by the same material",
+    "as the blocks; the blocks' own albedo and relief are generated in",
+    "src/world/voxel/masonry.js and never spedited; the two light maps were a Cycles",
+    "bake this world stopped lighting itself with when src/world/face-light.js became",
+    "the one seat. v2-pietra declares `needs: []` at dress, and no source in src/",
+    "names any of the six as a string.",
+    "",
+    "The pictures they were painted from stay reproducible: tools/monoliths/",
+    "paint-stone.mjs still writes stone-albedo.png and stone-normal.png, and",
+    "tools/terrain/paint-stairs.mjs still writes stairs-albedo.png. A tool that can",
+    "make a retired thing again is a record; a source sitting in assets-src that a",
+    "manifest declares is weight on the wire. The two light maps had no tool at all:",
+    "they were baked outside this repository and they are simply gone.",
+    "",
+    "WHAT IS NOT DONE HERE, WITH ITS NUMBER, because a session does not commit a",
+    "delivery (tools/guards/guard-no-delivery.mjs): the manifest under public/assets",
+    "still names all six, 807 579 B of them, and src/core/assets.js fetches every",
+    "critical entry it finds there whatever any layer asks for. So until the delivery",
+    "is rebuilt those bytes are still on the wire. They are not alone in that -- the",
+    "same delivered manifest still names terrain-albedo, terrain-detail, terrain-path,",
+    "terrain-light, rocks-scene and rock-light, which no fragment has declared for",
+    "some time -- and ONE rebuild settles all of them at once. It is the integrator's,",
+    "and it is named here rather than half-done."
   ]
 }
