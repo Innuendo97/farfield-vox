@@ -29,13 +29,61 @@ const LUT_SIZE = 32;
 //
 // `first` is how far the chain is stepped down before the first level is drawn
 // and `levels` is how many times it is halved after that, so the widest tap of
-// the blur reaches first * 2^(levels-1) pixels either way. Half resolution over
-// five levels is what the reference was graded against; quarter over three
-// costs a quarter of the fill and reaches almost as far, at the price of a
-// coarser core to the halo. Which is why it is a tier and not the default.
+// the blur reaches first * 2^(levels-1) pixels either way -- EIGHT, at half
+// resolution over three levels, and that eight is a fitted number.
+//
+// WHAT THE REACH DOES, AND WHY IT IS THE HALO'S ONLY HONEST HANDLE ON THE SKY.
+// The up chain OVERWRITES rather than accumulates -- level i-1 is replaced by
+// the widening of level i, all the way back up -- so what this chain hands the
+// composite is not a core with a skirt: it is ONE blur, and `levels` is its
+// width. A sky that stands over the threshold across half the frame therefore
+// lays its own light that far into every silhouette standing against it, and
+// the stone of the monoliths is exactly such a silhouette.
+//
+// MEASURED (U-LUCE-5, at the fitted pose, arrival veil off both sides, the four
+// shadowed faces of masonry-spec `palette` against the offline bench that
+// guard-pietra and guard-scala believe):
+//
+//   reach   the frame OVER the bench, on the stone in shadow   bloom, ms
+//    32 px           +3.7  +4.9  +4.0  +1.5                      1.28
+//    16 px           +1.9  +2.3  +1.7  +0.5                      0.95
+//     8 px           +1.0  +1.8  +1.2  +0.0                      0.82
+//     4 px           +1.0  +1.8  +1.2  -0.5                      0.76
+//   no bloom at all  +1.0  +1.8  +1.2  -0.5                        --
+//
+// and at the SAME time, standing three metres and a half in front of an
+// engraved face -- where the committente reads the panels and where a stroke is
+// twenty pixels tall instead of three -- what the bloom adds to the stone one,
+// two and three pixels out from a cyan stroke:
+//
+//   reach   1-2 px   2-3 px   3-4 px
+//    32 px    2.4      3.1      2.7
+//     8 px    1.7      1.8      0.7      <- narrower, and still there
+//     4 px    1.1      0.4     -0.4      <- gone
+//
+// EIGHT IS WHERE THE TWO MEET. At eight the stone in shadow is back on the
+// bench (the mandate's window is -1..+2 and the four faces land at +0.0..+1.8),
+// and the writing still has a halo -- a TIGHTER one, which is what E-PIETRA2
+// asked the ink for in the first place. At four the stone gains a level and a
+// half more and the halo stops existing; at sixteen the halo is fatter and the
+// stone is twice as far off the bench.
+//
+// AND THE THRESHOLD IS NOT THE HANDLE, which took a sweep to establish rather
+// than an argument. Swept from 0.72 to 6.0 in the engine, the sky's bleed on
+// the stone and the ink's halo on the panel die TOGETHER, over the same span
+// (both are gone by 3.0, both are half by 2.0): in this world's units the
+// engraved cyan and the drawn sky sit in the SAME band of radiance, so no
+// number that keeps one keeps the other. Only the reach tells them apart, and
+// it tells them apart because a stroke is thin and a sky is not.
+//
+// The quarter tier reaches the SAME eight pixels for a quarter of the fill, at
+// the price of a coarser core to the halo. Which is why it is a tier and not
+// the default -- and why its levels moved with the other's: a tier that reached
+// further than the tier above it would be a different picture, not a cheaper
+// one.
 const BLOOM_TIERS = {
-  half: { first: 2, levels: 5 },
-  quarter: { first: 4, levels: 3 },
+  half: { first: 2, levels: 3 },
+  quarter: { first: 4, levels: 2 },
 };
 
 // Multisampling, in the order it is attempted; the first count the driver
