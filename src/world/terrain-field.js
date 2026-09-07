@@ -616,21 +616,21 @@ const PATH_WIDTH = [
   // -8.0 and -5.5 hold it flat, which is what the reading says it is.
   [-8.0, 0.540],
   [-5.5, 0.540],
-  [-3.0, 0.530],
-  [0.0, 0.500],
-  [2.0, 0.450],
-  [3.0, 0.540],
+  [-3.0, 0.500],
+  [0.0, 0.580],
+  [2.0, 0.440],
+  [3.0, 0.440],
   // The waist. The reference closes to one metre here and this is the band the
   // law used to be widest at.
-  [4.0, 0.480],
-  [5.0, 0.480],
-  [6.0, 0.700],
-  [7.0, 0.680],
-  [8.0, 0.790],
-  [9.0, 0.900],
+  [4.0, 0.510],
+  [5.0, 0.440],
+  [6.0, 0.650],
+  [7.0, 0.660],
+  [8.0, 0.820],
+  [9.0, 0.910],
   // And it holds under the walker's feet, where the reference reads 1.99 m with
   // twenty five whole rows either side of him.
-  [12.0, 0.870],
+  [12.0, 0.900],
 ];
 
 const PATH_WIDTH_CURVE = naturalCubic(PATH_WIDTH);
@@ -653,20 +653,36 @@ export function pathHalfWidth(z) {
  * The centreline is fitted and stays put; only the edges wander, which is what
  * makes them bite into the grass instead of ruling a line across it.
  *
- * AND THE WOBBLE IS IN METRES NOW, WHICH IS THE SAME EDGE AND NOT A NEW ONE.
- * It was nineteen per cent of the half width, fitted when that half width was
- * 0.552 m and barely moved down the run. The width is the reference's own taper
- * now and it runs from ten voxels in the middle of the field to twenty four in
- * the apron: a fraction of it would have made the edge of the apron wander by a
- * quarter of a metre, which is a ragged edge on the corridor's widest stretch
- * and not the one that was measured. So the term is stated in the ground's own
- * units at the value it was fitted at -- 0.19 x 0.552 = 0.105 m -- and through
- * the middle of the field, where it was fitted, it is the function it was to
- * within a millimetre.
+ * AND THE WOBBLE IS A FRACTION OF THE LAW AGAIN, SIZED ON WHAT THE REFERENCE'S
+ * OWN KERB DOES -- which is D-U6-3 answered B, and it is a refit and not a
+ * revert.
+ *
+ * The term was nineteen per cent of a half width of 0.552 m that barely moved
+ * down the run, so U-SENT-4 wrote it in metres at the value it had been fitted
+ * at: 0.105 of wobble at three metres of correlation and 0.0434 of wander at
+ * one. Then U-SENT-6 measured the law the reference actually has, and the waist
+ * of it is a half width of 0.48: the same 0.1484 m is THIRTY-ONE PER CENT of the
+ * width there, against the ten the reference's own kerb scatters by, and at
+ * three metres of correlation it does not average out inside a band a metre long
+ * -- it MOVES the band. Four of the eleven bands U-SENT-6 could not bring inside
+ * five per cent are that term and nothing else (verbale U-SENT-6 §7.1).
+ *
+ * THE SIZE IS THE REFERENCE'S AND THE SHAPE IS UNTOUCHED. Row by row against its
+ * own band median the target's perceived width scatters by 3.4 per cent at the
+ * median and 16.5 at the ninetieth, and 61 per cent of its rows sit inside five
+ * (fondazione/lav/u7-vagare.py). Two independent edges each carrying a fraction
+ * f of the half width scatter a width by 2 f h / 2 h = f at full swing, so f is
+ * the scatter in per cent and it is set at a TENTH. The two noises keep the ratio
+ * they were fitted at -- 0.105 to 0.0434, that is 0.708 to 0.292 of the pair --
+ * and their two correlation lengths are untouched, so what the edge DOES is what
+ * it did and only how far it goes has moved.
  */
+export const EDGE_WOBBLE = [0.0708, 0.0292];
 export function pathEdge(z, side) {
+  const half = pathHalfWidth(z);
   const wobble = snoise(z * 0.33 + (side >= 0 ? 51.7 : 7.3), 3.1);
-  return pathHalfWidth(z) + 0.105 * wobble + 0.0434 * snoise(z * 0.91 + side * 13.0, 8.4);
+  return half * (1 + EDGE_WOBBLE[0] * wobble
+    + EDGE_WOBBLE[1] * snoise(z * 0.91 + side * 13.0, 8.4));
 }
 
 /**
