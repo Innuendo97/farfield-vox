@@ -585,7 +585,53 @@ export const MANTO = {
   //
   // Read against its own plateau the target's ramp is 0.55 at the kerb and 1.00
   // by 1.2-1.5 m, which is the pair of numbers below.
-  verge: { low: 0.10, reach: 1.80 },
+  //
+  // ------------------------------------------------- AND THE ORLO IS NUDE NOW
+  //
+  // THE RAMP ABOVE WAS RIGHT AND ITS FLOOR WAS THE WALL. `low` was a tenth,
+  // which the cover law below turns into a blade on 0.34 + 0.66 x 0.10 = 41 per
+  // cent of the columns of the verge. At the pose the campaign is judged from
+  // the ground is seen at 14 degrees at six metres and 9 at ten, and a blade
+  // three to four centimetres tall hides h x cot(theta) of the ground BEHIND it
+  // -- 0.12 to 0.26 m, three to four times its own five by five centimetre
+  // footprint. Forty one per cent of density therefore READS 78 to 98 per cent
+  // of green (R3 1.3, measured band by band), and the ruler that finds the kerb
+  // at half a share of green finds it at the FIRST column of the verge.
+  //
+  // So the earth of the verge was there and could not be seen, and everything
+  // fitted through it was fitted 0.3 to 0.4 m per side too far in -- the width
+  // of the corridor above all (PATH_WIDTH in ../terrain-field.js, refitted in
+  // the same unit as this line). The A/B is one change and nothing else: take
+  // the blades off the verge and the same ruler on the same frame reads 0.55 m
+  // more corridor at the median.
+  //
+  // WHAT THE REFERENCE SHOWS THERE. Twenty to thirty five centimetres of brown
+  // earth either side of the stone with no blade standing in it, and then a full
+  // cube of grass at the kerb: netto in geometry, soft in material because the
+  // stone has already thinned before it. Not a hard edge of GREEN -- a band of
+  // ground the eye reads as the path's own shoulder.
+  //
+  // SO THE FLOOR IS NOUGHT AND THERE IS A BAND. `low` 0 makes the ramp start
+  // from nothing at the stone's edge; `bare` is how far past that edge no blade
+  // stands at all whatever the ramp says (the one line that reads it is
+  // bladeAtColumn below, where a cover of nought is a cover of nought and not of
+  // `thin`); and `reach` comes in from 1.80 to 1.50 m so the ramp still arrives
+  // at the open meadow at the distance it was fitted to arrive at, measured from
+  // the far side of the band rather than from the stone.
+  //
+  // THE BAND IS TEN CENTIMETRES, WHICH IS ONE COLUMN OF THE WORLD AND TWO OF THE
+  // MAT. It is the smallest band that can exist -- half of it and no column of
+  // blades would fall inside it at all -- and it is what the reading of the
+  // reference asks for once the verge itself (PATH.verge, two to four columns of
+  // earth INSIDE the corridor) is counted with it: two to four columns of earth
+  // in, one more out, is the 0.30 to 0.50 m of shoulder the reference draws.
+  //
+  // WHAT IS NOT HERE: the thinning of the STONE onto that shoulder. The
+  // reference drops from 55-65 per cent of stone to 17-22 in the last 60 cm
+  // before the kerb and puts loose pieces out on the brown; ours is flat to the
+  // kerb. That is a density and a family (SPREAD and onPaving), it is the next
+  // unit's, and nothing here anticipates it.
+  verge: { low: 0, bare: 0.10, reach: 1.50 },
   // How many of the columns still carry a blade where the intensity is nought,
   // and how tall it is there as a share of its own draw. Fitted together against
   // the ramp above, because what the picture shows is the two multiplied.
@@ -630,7 +676,7 @@ export const MANTO = {
   // multiplier on the intensity: at one, a column is earth exactly as often as
   // the mat is thin there. Fitted against the ramp of green above -- the sweep
   // and its table are in the verbale of U-ERBA-1.
-  ground: 0.75,
+  ground: 0.45,
   // ------------------------------------------------- AND HOW WIDE A BLADE IS
   //
   // E-DECISIONI10 G3: «larghezza da 3/4 a 1 voxel completo, altezza variabile».
@@ -917,7 +963,14 @@ export function mantoVerge(x, z) {
   // nothing else. E-SENT3 residuo 1 is what separated them -- see the note
   // there. It is a pure function of the gap to the stone, so where the corridor
   // goes the verge goes with it, in every register it is ever fitted to.
-  const gap = pathEdgeGap(x, z);
+  //
+  // AND THE RAMP STARTS AT THE FAR SIDE OF THE BARE BAND, not at the stone. The
+  // band is where the reference puts brown earth and no blade at all (see
+  // MANTO.verge above); measuring the ramp from the stone would put its first
+  // tenth of intensity inside the band, and a tenth of intensity is the thing
+  // that turned out to be a wall. So the gap the ramp is a function of is the
+  // gap PAST the band, and `reach` is what it is measured over from there.
+  const gap = pathEdgeGap(x, z) - MANTO.verge.bare;
   if (gap >= MANTO.verge.reach) return 1;
   const t = Math.min(1, Math.max(0, gap / MANTO.verge.reach));
   const smooth = t * t * (3 - 2 * t);
@@ -978,7 +1031,20 @@ export function bladeAtColumn(bx, bz, intensity) {
   // by rounding its shortest blades to nothing would take the SHORT ones away
   // first and leave the tall ones standing alone, which is a mat of spikes; the
   // committente asked for «meno fitta e meno alta», which is two things.
-  const cover = MANTO.thin + (1 - MANTO.thin) * intensity;
+  //
+  // AND AT NOUGHT IT IS NOUGHT, WHICH IS THE ONE PLACE THE FLOOR MAY NOT STAND.
+  // `thin` is the share of columns that still carry a blade where the field has
+  // taken the mat as low as it goes, and it is a MEADOW number: the open meadow
+  // never asks for less than a third of its columns, so the floor and the field
+  // never had to be told apart. The bare band beside the corridor asks for less
+  // than that -- it asks for none -- and with `thin` under it a third of its
+  // columns kept a blade, which at fourteen degrees of grazing is three quarters
+  // of the band read as green. So an intensity of exactly nought is not the
+  // bottom of the ramp here, it is the ABSENCE of the mat, and it is written as
+  // a share of nought rather than as a special case somewhere else: everything
+  // that already asks this function -- the mesher, the flowers, mantoAt -- gets
+  // the same answer without knowing why.
+  const cover = intensity > 0 ? MANTO.thin + (1 - MANTO.thin) * intensity : 0;
   if (hash2(bx * 6151 + 401, bz * 769 + 8887) >= cover) return 0;
   const h = bladeHeightAt(bx, bz);
   if (h === 0) return 0;
@@ -1806,7 +1872,13 @@ export function columnSpec(ix, iz, grain = true, radius = DISC_RADIUS, beyond = 
   //    half of the crossing the mat cannot do by itself.
   if (mass === 0 && !underMass(x, z)) {
     const gap = pathEdgeGap(x, z);
-    if (gap >= 0 && gap < MANTO.verge.reach) {
+    // AND THE WINDOW IS THE RAMP'S WHOLE LENGTH, BAND INCLUDED. The ramp starts
+    // at the far side of the bare band now, so it arrives at one at `bare` plus
+    // `reach` and not at `reach`; a window that stopped at the shorter of the
+    // two would cut the last per cent of brown off with a step at a fixed
+    // distance from the kerb, which is the family of defect this whole line
+    // exists to remove.
+    if (gap >= 0 && gap < MANTO.verge.bare + MANTO.verge.reach) {
       // THE SHARE OF EARTH IS WHAT IS MISSING FROM THE INTENSITY, and it has to
       // be written that way round: a threshold on the intensity itself leaves
       // brown standing where the field has already come back to one, which is a
