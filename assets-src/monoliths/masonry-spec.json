@@ -352,7 +352,7 @@
       "05-right": { "sunTerm": -0.534, "L": 11.5, "C": 9.7, "h": 232, "L_p10": 7.8, "L_p90": 15.9, "moss%": 0.6,
         "mossTenths": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 5.9], "pxPerMetre": 29.8 }    },
     "sunOverShadow": {
-      "on": "01, its west flank over its front, in encoded luminance",
+      "on": "01, its west flank over its front, as the ratio of LINEAR luminances behind the two CIELAB medians (31.4 over 13.0 = 4.367); in encoded luminance the same two faces read 2.25, which is not this number",
       "target": 4.4,
       "why": "a shadowed face receives the sky term alone, so this ratio is the share of the sky a wall takes and nothing else in a material moves it"
     },
