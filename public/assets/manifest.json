@@ -5,7 +5,7 @@
     "skyBytes": 4194304,
     "skyNote": "everything a visitor downloads for the sky, whatever its priority: the sum over the shipped entries whose id begins \"cloud-\". Counted here and not in a verbale because a weight nobody builds is a weight that comes back — two and a third megabytes of generated relighting table were streamed and thrown away by every visitor of the plate delivery, and no first-frame budget could see it, because none of it is critical"
   },
-  "criticalBytes": 6146440,
+  "criticalBytes": 1296094,
   "assets": [
     {
       "id": "baketest-scene",
@@ -28,124 +28,14 @@
       "sourceBytes": 8836
     },
     {
-      "id": "terrain-albedo",
-      "type": "texture",
-      "role": "albedo",
-      "priority": "critical",
-      "scope": "app",
-      "url": "assets/textures/terrain-albedo.ktx2",
-      "bytes": 3299416,
-      "sourceBytes": 3252159
-    },
-    {
-      "id": "terrain-detail",
+      "id": "soil-sheets",
       "type": "texture",
       "role": "coverage",
       "priority": "critical",
       "scope": "app",
-      "url": "assets/textures/terrain-detail.ktx2",
-      "bytes": 369947,
-      "sourceBytes": 310998
-    },
-    {
-      "id": "terrain-path",
-      "type": "texture",
-      "role": "coverage",
-      "priority": "critical",
-      "scope": "app",
-      "url": "assets/textures/terrain-path.ktx2",
-      "bytes": 361078,
-      "sourceBytes": 220300
-    },
-    {
-      "id": "terrain-light",
-      "type": "texture",
-      "role": "lightmap",
-      "priority": "critical",
-      "scope": "app",
-      "url": "assets/textures/terrain-light.ktx2",
-      "bytes": 326073,
-      "sourceBytes": 2888148
-    },
-    {
-      "id": "stairs-albedo",
-      "type": "texture",
-      "role": "albedo",
-      "priority": "critical",
-      "scope": "app",
-      "url": "assets/textures/stairs-albedo.ktx2",
-      "bytes": 113086,
-      "sourceBytes": 126674
-    },
-    {
-      "id": "stairs-light",
-      "type": "texture",
-      "role": "lightmap",
-      "priority": "critical",
-      "scope": "app",
-      "url": "assets/textures/stairs-light.ktx2",
-      "bytes": 41485,
-      "sourceBytes": 148704
-    },
-    {
-      "id": "monoliths-scene",
-      "type": "model",
-      "role": null,
-      "priority": "critical",
-      "scope": "app",
-      "url": "assets/models/monoliths-scene.glb",
-      "bytes": 83644,
-      "sourceBytes": 236552
-    },
-    {
-      "id": "monolith-albedo",
-      "type": "texture",
-      "role": "albedo",
-      "priority": "critical",
-      "scope": "app",
-      "url": "assets/textures/monolith-albedo.ktx2",
-      "bytes": 206492,
-      "sourceBytes": 150697
-    },
-    {
-      "id": "monolith-relief",
-      "type": "texture",
-      "role": "normal",
-      "priority": "critical",
-      "scope": "app",
-      "url": "assets/textures/monolith-relief.ktx2",
-      "bytes": 170533,
-      "sourceBytes": 129688
-    },
-    {
-      "id": "monolith-light",
-      "type": "texture",
-      "role": "lightmap",
-      "priority": "critical",
-      "scope": "app",
-      "url": "assets/textures/monolith-light.ktx2",
-      "bytes": 192339,
-      "sourceBytes": 1105045
-    },
-    {
-      "id": "rocks-scene",
-      "type": "model",
-      "role": null,
-      "priority": "high",
-      "scope": "app",
-      "url": "assets/models/rocks-scene.glb",
-      "bytes": 140388,
-      "sourceBytes": 389740
-    },
-    {
-      "id": "rock-light",
-      "type": "texture",
-      "role": "lightmap",
-      "priority": "high",
-      "scope": "app",
-      "url": "assets/textures/rock-light.ktx2",
-      "bytes": 266789,
-      "sourceBytes": 1116026
+      "url": "assets/textures/soil-sheets.ktx2",
+      "bytes": 1247,
+      "sourceBytes": 1930
     },
     {
       "id": "path-joint",
@@ -154,8 +44,8 @@
       "priority": "critical",
       "scope": "app",
       "url": "assets/textures/path-joint.ktx2",
-      "bytes": 630377,
-      "sourceBytes": 384731
+      "bytes": 789863,
+      "sourceBytes": 482074
     },
     {
       "id": "path-tone",
@@ -164,8 +54,8 @@
       "priority": "critical",
       "scope": "app",
       "url": "assets/textures/path-tone.ktx2",
-      "bytes": 130852,
-      "sourceBytes": 66910
+      "bytes": 283866,
+      "sourceBytes": 103509
     },
     {
       "id": "path-grain",
