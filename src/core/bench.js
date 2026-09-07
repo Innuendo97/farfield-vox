@@ -25,10 +25,26 @@ const WARMUP_FRAMES = 30;
 
 const DURATION_MS = 3000;
 
-// How far the eye is carried, in degrees. Half a turn from the framing the
-// world was fitted against: it crosses the five blocks, the water, both lakes
-// and the open meadow, which between them are every kind of surface there is.
-const SWEEP_DEGREES = 180;
+// How far the eye is carried, in degrees. NOUGHT -- the eye is HELD on the
+// framing the world was fitted against, and the calibration measures what is in
+// front of it (D-R8-1, option B, the committente's own).
+//
+// It was half a turn, and the reason was a good one: a sweep crosses the five
+// blocks, the water, both lakes and the open meadow, which between them are
+// every kind of surface there is, so the median it returns is a median of the
+// WORLD. What it cost is the thing R8 caught on the arrival: for three seconds
+// and a warm-up -- 8.3 degrees over 7.3 seconds, measured -- the visitor's own
+// eye is turned by nobody's hand, during the very seconds when the meadow, the
+// flowers and the weather are still arriving. «Tre secondi di sguardo che gira
+// che nessuno ha chiesto». The first thing this world does to a visitor cannot
+// be to take their head.
+//
+// WHAT IT COSTS, DECLARED: fewer surfaces in the sample, so the median is of the
+// arrival framing rather than of the whole world, and the tier it reports is a
+// touch optimistic wherever the arrival framing happens to be cheaper than the
+// mean of the world. It is measured both ways in the verbale rather than
+// guessed at, and the thresholds are left where they are until it is.
+const SWEEP_DEGREES = 0;
 
 // Where the fallback puts its lines, as a multiple of the interval the display
 // is offering. Under a sixth over is a machine keeping up; past three fifths

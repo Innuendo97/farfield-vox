@@ -176,6 +176,7 @@ export {
   campoColumnOf,
   campoDecode,
   campoFarOrigin,
+  campoFarMeets,
   campoFarTile,
   campoGroundByte,
   campoHeights,

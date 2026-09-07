@@ -1,7 +1,7 @@
 import {
   BLADE, BLADES_PER_VOXEL, MANTO, MATERIAL,
   CAMPO, CAMPO_FAR, CAMPO_FAR_RATIO, CAMPO_FAR_SHIFT, CAMPO_LOOK_MAX, VOXEL,
-  campoDecode, campoFarTile, campoTile,
+  campoDecode, campoFarMeets, campoFarOrigin, campoFarTile, campoTile,
   bladeAtColumn, mantoIntensity, slimAtColumn,
 } from '../../src/world/voxel/pure.js';
 import { reporter, selfTest } from './lib.mjs';
@@ -104,6 +104,34 @@ report.check(Math.abs(CAMPO_FAR.cell - CAMPO.cell * CAMPO_FAR_RATIO) < 1e-9,
   'and the two cells are that ratio apart in metres',
   `${CAMPO.cell} m against ${CAMPO_FAR.cell} m`);
 
+// ---------------------------------------- AND ONLY WHERE THE TWO CAN TOUCH.
+//
+// The truth is bought where it is needed and nowhere else: a far tile the near
+// window can never be carried over has nothing beside it to disagree with, and
+// speaking level three costs a tile 34 ms it would spend for nobody. That line
+// is campoFarMeets, and it is asserted from both sides -- it must leave some
+// tiles out (or it is not saving anything) and it must not leave out any the
+// near window could reach (or the seam is back where it was).
+{
+  const origin = campoFarOrigin(CAMPO_FAR);
+  const side = CAMPO_FAR.side / CAMPO_FAR.tile;
+  let meet = 0;
+  for (let j = 0; j < side; j += 1) {
+    for (let i = 0; i < side; i += 1) {
+      if (campoFarMeets(origin.cx + i, origin.cz + j, RADIUS)) meet += 1;
+    }
+  }
+  report.check(meet > 0 && meet < side * side,
+    'only the far tiles the near window can reach are asked for level three',
+    `${meet} of ${side * side}; the other ${side * side - meet} answer the horizon, `
+    + 'where there is no near window to disagree with');
+  const carried = RADIUS + (CAMPO.side * CAMPO.cell) / 2;
+  report.check(carried > RADIUS,
+    'and the line is the plateau plus half the near window, which is how far its edge can go',
+    `${carried.toFixed(1)} m: a plateau of ${RADIUS} m and a window `
+    + `${(CAMPO.side * CAMPO.cell).toFixed(1)} m across`);
+}
+
 const nearTiles = new Map();
 const farTiles = new Map();
 const L3 = CAMPO.tile >> CAMPO_FAR_SHIFT;
@@ -138,6 +166,7 @@ let meadow = 0;
 let level = 0;
 let banked = 0;
 let absent = 0;
+let outside = 0;
 let disagree = 0;
 let worstGround = 0;
 let lookOff = 0;
@@ -151,6 +180,14 @@ while (meadow < CELLS) {
   if (!near.present || near.mat !== 0) continue;
   meadow += 1;
   const far = farAt(gi, gj);
+  // AND IT HAS TO BE A TILE THE WORLD REALLY SAMPLES, or the guard would be
+  // asserting a path nothing takes. Every cell of this sample is well inside
+  // the line; the assertion above says the line exists and this one says the
+  // sample is on the right side of it.
+  if (!campoFarMeets(Math.floor(gi / CAMPO_FAR.tile), Math.floor(gj / CAMPO_FAR.tile), RADIUS)) {
+    outside += 1;
+    continue;
+  }
   // A COLUMN THAT IS THERE FOR ONE WINDOW AND NOT THE OTHER is its own question
   // and not a difference of height: the near cell is there if ANY of its sixty
   // four blades stands on a column, the far one if its CORNER does, and at the
@@ -177,6 +214,9 @@ while (meadow < CELLS) {
   if (off > lookWorst) lookWorst = off;
 }
 
+report.check(outside === 0,
+  'every cell compared stands in a tile the world really does sample',
+  `${outside} of ${meadow} fell outside the line`);
 report.check(level > CELLS / 2, 'most of the sample is level ground the two windows share',
   `${level} of ${meadow} meadow cells stand on it, ${banked} on a bank`);
 report.check(absent * 100 <= meadow * ABSENT_SHARE_MAX,

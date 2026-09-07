@@ -90,7 +90,8 @@ import {
   BLADE, BLADES_PER_VOXEL, CHUNK, MATERIAL, NO_COLUMN, SUB, VOXEL,
 } from './columns.js';
 import {
-  CENTRE, MANTO, bladeAtColumn, chunkColumns, columnSpec, mantoIntensity, slimAtColumn,
+  CENTRE, DISC_RADIUS, MANTO, bladeAtColumn, chunkColumns, columnSpec, mantoIntensity,
+  slimAtColumn,
 } from './worldgen.js';
 import { PIGMENT, pigTint } from './pigment.js';
 
@@ -719,6 +720,43 @@ function campoFarLook(blade, intensity) {
   const q = intensity <= 0 ? 0 : intensity >= 1 ? LOOK_QUANTA - 1
     : Math.round(intensity * (LOOK_QUANTA - 1));
   return lookTable[q * LOOK_HEIGHTS + (blade & CAMPO_BLADE_MASK)];
+}
+
+/**
+ * WHETHER THIS FAR TILE CAN EVER BE UNDER THE NEAR WINDOW.
+ *
+ * ONE TRUTH IS ONLY NEEDED WHERE THE TWO WINDOWS TOUCH, and they can only touch
+ * inside a disc that this world knows the size of. The near window is 51.2 m
+ * across and follows the walker; the walker cannot leave the plateau, which is
+ * `radius` metres of it. So the furthest the near window's own edge can ever be
+ * carried from the middle of the world is the plateau plus half the window, and
+ * beyond that line the far picture is the ONLY picture: nothing is ever drawn
+ * beside it that it could disagree with, and there is no seam to close.
+ *
+ * WHY IT IS WORTH A FUNCTION. Speaking level three costs a far tile 34 ms more
+ * -- a draw of the law at every one of sixteen thousand texels -- and the far
+ * window is sixty four tiles at the door of the world, in front of a veil that
+ * now waits for them (M5). Paid on all sixty four that is five seconds of
+ * worker; paid on the nine that can actually meet the near window it is under
+ * one, and the fifty five that answer the horizon keep the cheap flat
+ * expectation they always had, with nothing to be wrong against.
+ *
+ * The test is against the NEAREST corner of the tile, so a tile that only
+ * clips the disc is sampled: erring outwards costs a tile and erring inwards
+ * would put the seam back.
+ *
+ * @param {number} cx  tile index along x, in tiles of the far picture
+ * @param {number} cz  tile index along z
+ * @param {number} radius  how far the PLATEAU reaches, the layer's own
+ */
+export function campoFarMeets(cx, cz, radius = DISC_RADIUS) {
+  const span = CAMPO_FAR.span;
+  const reach = radius + (CAMPO.side * CAMPO.cell) / 2;
+  const lo = { x: cx * span, z: cz * span };
+  const hi = { x: lo.x + span, z: lo.z + span };
+  const dx = Math.max(lo.x - CENTRE.x, 0, CENTRE.x - hi.x);
+  const dz = Math.max(lo.z - CENTRE.z, 0, CENTRE.z - hi.z);
+  return dx * dx + dz * dz <= reach * reach;
 }
 
 /**

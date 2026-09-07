@@ -3,7 +3,7 @@ import {
 } from './mesher.js';
 import { buildMasonry, stoneTileData } from './courses.js';
 import { MONOLITHS } from '../layout.js';
-import { campoFarTile, campoTile } from './campo.js';
+import { campoFarMeets, campoFarTile, campoTile } from './campo.js';
 
 // Everything this demo builds by arithmetic, built off the thread the walker is
 // on. Three jobs, in the order the picture wants them.
@@ -76,8 +76,12 @@ self.onmessage = (event) => {
       // (U-CAMPO-2, M2.1). It rides on the message rather than on a module
       // constant so a bench can take the arm without a second build; absent, it
       // is ON, because one truth is what ships.
+      // AND ONLY WHERE THE TWO WINDOWS CAN TOUCH. Speaking level three is what
+      // closes the seam, and a far tile that the near window can never reach has
+      // no seam to close: campoFarMeets is the line, and past it the cheap
+      // answer is also the only answer.
       const built = far
-        ? campoFarTile(cx, cz, reach, message.sample !== false)
+        ? campoFarTile(cx, cz, reach, message.sample !== false && campoFarMeets(cx, cz, reach))
         : campoTile(cx, cz, reach);
       self.postMessage({
         kind: message.job,
