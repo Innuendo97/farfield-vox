@@ -103,7 +103,7 @@ const FAMILIES = [
   { id: 'pietre-sciolte', what: 'the loose stones', has: ['uArrisPigment'], lacks: ['uJoint'], owed: 1 },
   { id: 'colline', what: 'the hills of the cornice', has: ['uPalette', 'uAirTurn'], owed: 1 },
   { id: 'lago', what: 'the water of the cornice', has: ['uWater'], owed: 1 },
-  { id: 'nuvole', what: 'the weather', has: ['uAerialOwed'], owed: 1 },
+  { id: 'nuvole', what: 'the weather, cumuli of cubes', has: ['uCloudSun', 'uCloudTerms'], owed: 1 },
   { id: 'manto', what: 'the carpet and the tufts', has: ['tAtlas', 'uCutoff'], owed: 1 },
   { id: 'fiori', what: 'the flower beds, white and blue', has: ['uStalk', 'uHoleOpen'], owed: 2 },
   { id: 'fiori-lontani', what: 'the far flower rim', has: ['uHeadAlpha', 'uRing'], owed: 1 },
