@@ -50,22 +50,39 @@ const TARGET = {
 };
 const TARGET_BOTTOM = (TARGET.meadow.east + TARGET.meadow.west) / 2;
 
-// What the chain has to reproduce before anything it says is worth reading: the
-// meadow under the light this world carried BEFORE the refit, where the render
-// was measured on a live frame. An offline model of a frame that is not checked
-// against a measured frame is a model of itself.
-const BEFORE_THE_REFIT = {
-  light: {
-    elevation: 34,
-    azimuth: -9.5,
-    sunStrength: 0.4123,
-    skyStrength: 0.0758,
-    sunBeam: [1, 0.883163, 0.738496],
-    skyBalance: [0.395334, 0.672855, 1],
-  },
-  top: [121.0, 127.4, 60.1],
-  middle: 0.5470,
-  bottom: 0.2237,
+// WHAT THE CHAIN HAS TO REPRODUCE BEFORE ANYTHING IT SAYS IS WORTH READING, and
+// this block is the second of the two defects E-PERF4 recorded as going through
+// this file's own self test.
+//
+// WHAT WAS HERE. An anchor called BEFORE_THE_REFIT: the meadow under the light
+// this world carried before the third term was fitted, recorded off a LIVE
+// FRAME, with two assertions holding the chain to it. It was right to put it
+// there and it had stopped being true. Run at the tip this unit started from it
+// reproduced the top face at 115.1 / 130.5 / 39.4 against the 121.0 / 127.4 /
+// 60.1 it records, and the bottom rung at 0.2275 against 0.2237 — two defects
+// through, on every run, since before 23d4637.
+//
+// AND IT WAS NOT THE CHAIN THAT DRIFTED. The anchor is a picture of a world
+// whose meadow pigment was ONE TRIPLE; the pigment is a FIELD now, two octaves
+// over the world's own XZ, and this file reads it at the census median. The
+// delivered cube was refitted between then and now as well. An anchor recorded
+// under a chain that no longer exists cannot be reproduced by the chain that
+// does, and keeping it as a failing assertion taught the reader that this suite
+// fails by default — which is how a real defect gets past a suite.
+//
+// SO IT IS RETIRED AND REPLACED, AT TODAY. AT_TODAY is the ladder and the top
+// face under the seal U-LUCE-4 put in force: the sun at azimuth 274, elevation
+// 51, strengths 0.2156 and 0.1257, the ground's return at 0.240 of a meadow
+// mixed four to one with earth. Any change to AgX, to the delivered cube, to the
+// pigment census or to the seat that moves the picture moves these three
+// numbers, and this is the line that says so. It is checked against a measured
+// frame the way the retired one was — the number the session gate reads off the
+// posa P is carried in the note at the foot of this file — so this stays a model
+// of a frame and not a model of itself.
+const AT_TODAY = {
+  top: [100.61, 122.24, 29.84],
+  middle: 0.8942,
+  bottom: 0.3581,
 };
 
 /** Whether a rung lands on the target inside the estimator's own null. */
@@ -74,21 +91,16 @@ export const lands = (rung, target, tolerance = TOLERANCE) => Math.abs(rung - ta
 const composite = await renderChain();
 
 if (process.argv.includes('--self')) {
-  // WITH THE BOUNCE AT NOUGHT, and that is the whole point of the check. This
-  // reproduces a frame that was MEASURED on the world as it stood before the
-  // refit, and that world's light had two terms. Asking it to reproduce that
-  // frame through the third term would be asking the chain to be wrong.
-  const before = orientationLadder(composite, BEFORE_THE_REFIT.light, MEADOW_ALBEDO, [0, 0, 0]);
-  const top = composite(faceColour([0, 1, 0], BEFORE_THE_REFIT.light, MEADOW_ALBEDO, [0, 0, 0]));
+  const light = readLight();
   selfTest('guard-scala', [
     {
-      what: 'the chain reproduces the top face the render was measured at before the refit',
-      caught: top.every((v, c) => Math.abs(v - BEFORE_THE_REFIT.top[c]) < 0.5),
-    },
-    {
-      what: 'and the ladder it was measured at, both rungs',
-      caught: Math.abs(before[1].rung - BEFORE_THE_REFIT.middle) < 5e-4
-        && Math.abs(before[2].rung - BEFORE_THE_REFIT.bottom) < 5e-4,
+      what: 'the chain reproduces the ladder and the top face this world ships now',
+      caught: (() => {
+        const now = orientationLadder(composite, light);
+        return now[0].rgb.every((v, c) => Math.abs(v - AT_TODAY.top[c]) < 0.5)
+          && Math.abs(now[1].rung - AT_TODAY.middle) < 5e-4
+          && Math.abs(now[2].rung - AT_TODAY.bottom) < 5e-4;
+      })(),
     },
     { what: 'a bottom rung 0.06 off the target is caught', caught: !lands(TARGET_BOTTOM + 0.06, TARGET_BOTTOM) },
     { what: 'a bottom rung 0.058 off the target is caught', caught: !lands(TARGET_BOTTOM + 0.058, TARGET_BOTTOM) },
@@ -96,6 +108,22 @@ if (process.argv.includes('--self')) {
     {
       what: 'the tolerance is the measured null and not a round number',
       caught: Math.abs(TOLERANCE - 0.057) < 1e-9,
+    },
+    // AND THE TWO DEFECTS THE GATE IS ACTUALLY FOR, which it had never once been
+    // shown to catch: a suite that only ever moves a number by hand is a suite
+    // on arithmetic and not on the world. Both of these have happened in this
+    // campaign — E-LUCE5 found the third term missing from a consumer, and a
+    // pair of strengths is two fields of one JSON object.
+    {
+      what: 'the return of the ground dropped out of the seat is caught',
+      caught: !lands(orientationLadder(composite, light, MEADOW_ALBEDO, [0, 0, 0])[2].rung,
+        TARGET_BOTTOM),
+    },
+    {
+      what: 'the two strengths of the seat exchanged with each other are caught',
+      caught: !lands(orientationLadder(composite,
+        { ...light, sunStrength: light.skyStrength, skyStrength: light.sunStrength })[2].rung,
+      TARGET_BOTTOM),
     },
   ]);
 }

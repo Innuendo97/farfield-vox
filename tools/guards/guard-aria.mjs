@@ -57,6 +57,84 @@ const SHIPPED = (path) => path.endsWith('.js') && !path.startsWith('src/dev/');
 /** What the fit settled on, and what the suite is here to hold. */
 export const FITTED = { density: 0.0059, scaleHeight: 42 };
 
+// THE SECOND TERM, AND WHY THIS FILE NOW WATCHES TWO.
+//
+// U-LUCE-4 left the two numbers above exactly where E-LUCE2 measured them —
+// four windows of the reference's own meadow inside sixty metres, and the walk
+// does not move by a thousandth — and put the DISTANCE beside them, because
+// R6 §2.3 caught the single grey fraction out on the reference's hills: the far
+// veil there is PALER than the sky, its chroma passes through a maximum, and it
+// is 0.25 on red where it is 0.62 on blue. None of the three is something one
+// colour and one fraction can do at any density.
+//
+// So there are four more numbers, and they are watched here for the reason the
+// first two are: they reach every material that stands in the same air through
+// one door, and a character changed in any of them moves the stone, the rocks,
+// the meadow, the path and the water together and SILENTLY, because haze does
+// not look like a bug.
+//
+//   * THE CEILING on the low haze, 0.13. It is what that term is worth a little
+//     past the last window it was fitted on, so E-LUCE2's fit is kept where it
+//     was measured and stops where it stopped being measured.
+//   * THE THREE BETAS, 0.001105 / 0.001904 / 0.002611, solved so that the two
+//     terms TOGETHER land on the fractions R6 measured at the middle crest —
+//     0.25 / 0.44 / 0.62, four hundred metres out, ten metres over the water.
+//     Red and green come out on R6's own two numbers to three digits.
+//   * THE TURN, 700 m, and the PALE END the colour turns into.
+//
+// AND WHAT THIS GUARD STILL DOES NOT ASSERT: the COLOUR of either end. The near
+// end is the ramp itself, read at twenty degrees by the door in src/core/sky.js;
+// the far end is kept as a ratio to the light the sky hands the ground. Both
+// move with the hour on purpose, and a guard that pinned either would pin the
+// hour. What is pinned is the SHAPE and the ARITHMETIC.
+export const DISTANCE = {
+  lowCap: 0.13,
+  beta: [0.001105, 0.001904, 0.002611],
+  turn: 700,
+  pale: [0.1988, 0.603064, 1.196391],
+};
+
+const DOOR_NUMBER = (text, name) => {
+  const found = new RegExp(`export const ${name} = (-?[0-9.]+);`).exec(text);
+  return found ? Number(found[1]) : null;
+};
+const DOOR_TRIPLE = (text, name) => {
+  const found = new RegExp(`export const ${name} = ..(-?[0-9.]+), (-?[0-9.]+), (-?[0-9.]+).;`)
+    .exec(text);
+  return found ? found.slice(1, 4).map(Number) : null;
+};
+
+/** What the door states about the distance, read as text like everything here. */
+export function doorDistance(text) {
+  return {
+    lowCap: DOOR_NUMBER(text, 'FOG_LOW_CAP'),
+    beta: DOOR_TRIPLE(text, 'AIR_BETA'),
+    turn: DOOR_NUMBER(text, 'AIR_TURN_METRES'),
+    pale: DOOR_TRIPLE(text, 'AIR_PALE'),
+  };
+}
+
+/**
+ * The two terms, walked here in the other language, so that the shape the
+ * fragment computes can be asked a question about without a browser.
+ *
+ * Same arithmetic as FOG_GLSL: one height integral shared by both, the low haze
+ * capped, the distance per channel, and the low haze applied LAST because it is
+ * the air nearest the eye.
+ */
+export function airAt(distance, height, eyeHeight = 1.7, law = DISTANCE,
+  fitted = FITTED) {
+  const dy = height - eyeHeight;
+  const a = Math.exp(-Math.max(eyeHeight, 0) / fitted.scaleHeight);
+  const b = Math.exp(-Math.max(height, 0) / fitted.scaleHeight);
+  const mean = Math.abs(dy) < 0.01 ? a : ((a - b) * fitted.scaleHeight) / dy;
+  const g = Math.min(law.lowCap, 1 - Math.exp(-((distance * fitted.density * mean) ** 2)));
+  return law.beta.map((beta) => {
+    const f = 1 - Math.exp(-((distance * beta * mean) ** 2));
+    return 1 - (1 - f) * (1 - g);
+  });
+}
+
 /** The density the seat states, at the ground. */
 export function seatDensity(text) {
   const found = /^const FOG_DENSITY = ([\d.]+);$/m.exec(text);
@@ -138,6 +216,33 @@ if (process.argv.includes('--self')) {
       what: 'the door as it stands is born from the seat',
       caught: fogInitialisers(DOOR, read(DOOR)).every(bornFromSeat),
     },
+    {
+      what: 'a ceiling taken off the low haze is caught',
+      caught: doorDistance('export const FOG_LOW_CAP = 1.0;').lowCap !== DISTANCE.lowCap,
+    },
+    {
+      what: 'a beta put back to the R6 triple, fitted without the haze under it, is caught',
+      caught: doorDistance('export const AIR_BETA = [0.0011, 0.0019, 0.0023];')
+        .beta.some((v, c) => v !== DISTANCE.beta[c]),
+    },
+    {
+      what: 'the door as it stands carries the four the distance was fitted to',
+      caught: (() => {
+        const d = doorDistance(read(DOOR));
+        return d.lowCap === DISTANCE.lowCap && d.turn === DISTANCE.turn
+          && d.beta.every((v, c) => v === DISTANCE.beta[c])
+          && d.pale.every((v, c) => v === DISTANCE.pale[c]);
+      })(),
+    },
+    {
+      what: 'the two terms reproduce the air the reference puts on its middle crest',
+      caught: airAt(400, 10).every((v, c) => Math.abs(v - [0.25, 0.44, 0.62][c]) < 0.02),
+    },
+    {
+      what: 'and leave the walk of E-LUCE2 where it was measured, inside sixty metres',
+      caught: Math.abs(airAt(60, 1.0)[1] - 0.11) < 0.02
+        && Math.abs(airAt(35, 1.0)[1] - 0.04) < 0.02,
+    },
   ]);
 }
 
@@ -155,6 +260,32 @@ report.check(scaleHeight === FITTED.scaleHeight,
   scaleHeight === null ? 'not found' : `${scaleHeight}`);
 report.check(fogUsesSeat(seatText),
   'the height fog takes its ground density from the seat and not a copy of it');
+
+const door = doorDistance(read(DOOR));
+report.line('');
+report.check(door.lowCap === DISTANCE.lowCap,
+  `${DOOR} caps the low haze at ${DISTANCE.lowCap}, where it was last measured`,
+  door.lowCap === null ? 'not found' : `${door.lowCap}`);
+report.check(door.beta !== null && door.beta.every((v, c) => v === DISTANCE.beta[c]),
+  `and carries the distance per channel at ${DISTANCE.beta.join(' / ')}`,
+  door.beta === null ? 'not found' : door.beta.join(' / '));
+report.check(door.turn === DISTANCE.turn,
+  `and turns from the sky's blue to the pale veil over ${DISTANCE.turn} m`,
+  door.turn === null ? 'not found' : `${door.turn}`);
+report.check(door.pale !== null && door.pale.every((v, c) => v === DISTANCE.pale[c]),
+  'and the pale end develops to the 149/187/213 the reference shows on its far hills',
+  door.pale === null ? 'not found' : door.pale.join(' / '));
+
+const crest = airAt(400, 10);
+const near = [35, 60].map((d) => airAt(d, 1.0)[1]);
+report.line('');
+report.check(crest.every((v, c) => Math.abs(v - [0.25, 0.44, 0.62][c]) < 0.02),
+  'the two together put on the middle crest the air the reference shows there',
+  `${crest.map((v) => v.toFixed(2)).join(' / ')} against 0.25 / 0.44 / 0.62 at 400 m, 10 m up`);
+report.check(Math.abs(near[1] - 0.11) < 0.02 && Math.abs(near[0] - 0.04) < 0.02,
+  'and leave the walk inside sixty metres where E-LUCE2 measured it',
+  `${near[0].toFixed(3)} at 35 m and ${near[1].toFixed(3)} at 60 m, `
+  + 'against 0.04 and 0.11');
 
 const initialisers = walk('src', SHIPPED).flatMap((path) => fogInitialisers(path, read(path)));
 report.line(`  ${initialisers.length} fog uniform${initialisers.length === 1 ? '' : 's'} `

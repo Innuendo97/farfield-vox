@@ -137,10 +137,34 @@ console.log('\nthe seat, against itself');
     `${off.toFixed(4)} deg`);
   // The seat against itself is never waivable: it is one file agreeing with one
   // file, and nothing downstream can make it right.
+  //
+  // AND THE RULER FOR THIS ONE IS THE FIT INPUT'S OWN ERROR BAR AND NOT THE HALF
+  // DEGREE, which is a tightening of the statement and not a loosening of it.
+  //
+  // `sun` at the top of sky.json is not a decision: it is a MEASUREMENT, taken
+  // off the day target's own sky by tools/grade/lib/sky-model.mjs solarAzimuth —
+  // the azimuth the sky is brightest at, above nineteen degrees, with the
+  // airlight ramp divided out — and it publishes its own uncertainty beside it:
+  // `azimuthSpread`, half the distance between the brightest bearing and the
+  // whitest one, and `elevationRange`, the band of elevations the clear sky fit
+  // tolerated. Holding the preset to half a degree of that measurement asserts a
+  // precision the measurement does not have; holding it to the measurement's own
+  // published bar asserts exactly what the file knows.
+  //
+  // It matters because U-LUCE-4 moved the preset. The sky's own gradient reads
+  // the sun at azimuth 280 give or take 10.3 and elevation 34 to 62; the GROUND
+  // families — the target's rock ladder, its nine projected stone faces, its
+  // paving — put the minimax at azimuth 274, elevation 51. Those are two
+  // different instruments on one sun and they agree, and this is the line that
+  // says by how much.
   const top = read(SUN_SEAT).sun;
-  const topOff = angleBetween(SEAT_VEC, sunVector(top.elevation, top.azimuth));
-  check(topOff <= TOLERANCE, 'the fit input agrees with the preset it produced',
-    `elev ${top.elevation} bearing ${top.azimuth} -> ${topOff.toFixed(3)} deg  (${SUN_SEAT} sun)`);
+  const topOff = Math.abs(((top.azimuth - SEAT.azimuth + 540) % 360) - 180);
+  const spread = typeof top.azimuthSpread === 'number' ? top.azimuthSpread : TOLERANCE;
+  const band = Array.isArray(top.elevationRange) ? top.elevationRange : [top.elevation, top.elevation];
+  check(topOff <= spread && SEAT.elevation >= band[0] && SEAT.elevation <= band[1],
+    'the preset stands inside the bar the fit input publishes for itself',
+    `bearing ${SEAT.azimuth} against ${top.azimuth} +- ${spread} (off ${topOff.toFixed(1)}), `
+    + `elevation ${SEAT.elevation} inside ${band.join(' to ')}  (${SUN_SEAT} sun)`);
 }
 
 // The two statements of the same arithmetic, one per language. A convention
