@@ -208,9 +208,55 @@ const ALPHA_CUTOFF = 0.34;
 // is a third bigger than the flower it hangs in. That is the night's number and
 // this is the day's reading of the day target, so the reading stands and the
 // gap goes to the coordinator.
+
+// AND THE HEAD CAME DOWN A FOURTH TIME, BY A THIRD, AND THIS READING IS OF THE
+// FRAME AND NOT OF THE GEOMETRY. That is the whole of the change, and it is why
+// three careful readings of the target's own centimetres never closed the gap
+// the committente keeps seeing.
+//
+// THE THREE READINGS ABOVE ARE NOT WRONG. Probed pixel by pixel on the fitted
+// frame, one target head at 5.84 m spans 18 px across and 19 down where 10 cm
+// spans 19.15: 9.4 cm wide, 6.8 cm tall, squat by 0.72 -- which is E-ERBA-A's
+// 8.2 and this file's HEAD_SQUAT, both of them confirmed rather than moved. The
+// target's head IS about nine centimetres of cube.
+//
+// AND OUR OWN HEAD, AT THE SAME DISTANCE ON THE SAME FRAME, SPANS 22 px: 11.6 cm
+// for a cube whose geometry is at most 9.0. The difference is everything this
+// flower carries and that head does not -- the lamp behind the petals, the halo
+// on the shell (E-DECISIONI15.2, 16.4, 17, all three ratified by the committente)
+// and the bloom that follows them through post -- and it is a skirt of about
+// five pixels which does NOT shrink when the head does. Measured and not argued:
+// with uGlow driven to nought the same window's heads fall from 18 px to 9, and
+// at thirteen metres from twenty-eight found to two.
+//
+// SO WHAT IS FITTED IS THE PICTURE. Read with ONE instrument on both frames --
+// "not green, and brighter than the meadow round it", on R1 1.1's own
+// meadow-only windows -- the median head reads:
+//
+//   window          distance   target      ours at 7.5 cm nominal
+//   pp-dx            6.1 m      6.7 cm      10.0 cm
+//   cm-dx           13.1 m      4.4 cm      10.3 cm
+//   pp-dx, top 7     6.1 m      7.8 cm      10.4 cm
+//
+// A head of h centimetres draws 1.29 h px at 6.1 m and the skirt adds five, so
+// the scale that puts our median on the target's median is (13 - 5) / 12.9 =
+// 0.62, and the scale that puts the seven best-resolved heads on the target's
+// seven is 0.75. What is taken is the middle of that pair, 0.69: it lands the
+// median at 13.9 px against the target's 13.0, inside the ten per cent the
+// guard asks, at both ends of the pair.
+//
+// WHAT IS BEING SAID PLAINLY, BECAUSE THE NUMBER BELOW WILL READ AS A CLAIM
+// ABOUT THE TARGET AND IS NOT ONE. The geometry now stands at 5.2 cm where the
+// target's own cube measures 9.4. It is not a reading of the target's flower: it
+// is the size at which THIS flower, carrying the lantern the committente chose,
+// draws the target's flower. The other way of closing the same gap -- keeping
+// 7.5 and taking the skirt off through HALO_DAY, PETAL_ALPHA or GLOW_DAY -- puts
+// the picture right by undoing three of his decisions, and the mandate of this
+// unit is the opposite of that: his flower, at the target's size. The fork goes
+// to the coordinator with both numbers rather than being settled here.
 /** The head, in metres. Drawn per flower between the two, uniformly. */
-const HEAD_MIN = 0.060;
-const HEAD_MAX = 0.090;
+const HEAD_MIN = 0.042;
+const HEAD_MAX = 0.062;
 /** The size everything below is authored at; a flower scales from it. */
 const HEAD_NOMINAL = (HEAD_MIN + HEAD_MAX) / 2;
 /** And the cyan head is a tenth smaller: 7.3 cm measured against 8.2. */
@@ -246,9 +292,9 @@ const CYAN_SCALE = 0.90;
 // to 4.5 that shipped -- and left the correlation exactly where it was. A THIRD
 // of the head is that band and nothing else in the file has to move:
 //
-//     head 6.0 cm (scale 0.80)   stalk 2.0 cm wide, 6.0 cm tall   1/5 of a cube
-//     head 7.5 cm (scale 1.00)   stalk 2.5 cm wide, 7.5 cm tall   1/4 of a cube
-//     head 9.0 cm (scale 1.20)   stalk 3.0 cm wide, 9.0 cm tall   3/10 of a cube
+//     head 4.2 cm (scale 0.80)   stalk 1.4 cm wide, 4.2 cm tall   1/5 of a cube
+//     head 5.2 cm (scale 1.00)   stalk 1.7 cm wide, 5.2 cm tall   1/4 of a cube
+//     head 6.2 cm (scale 1.20)   stalk 2.1 cm wide, 6.2 cm tall   3/10 of a cube
 //
 // A READING IS BEING OVERRULED AND IT IS SAID SO. E-ERBA-A 4 read the target's
 // own stalk at <<circa META' della larghezza della testa>>, by hand, on two
@@ -256,8 +302,28 @@ const CYAN_SCALE = 0.90;
 // picture is for has walked the render and asked for thinner; a hand reading on
 // two exemplars does not outrank him, and the correlation he asked for in
 // E-DECISIONI9.1 is untouched -- only the band it runs over has narrowed.
+//
+// AND THE WHOLE PLANT WENT DOWN WITH THE HEAD, WHICH IS THE ONE WAY THE TABLE
+// ABOVE COULD MOVE WITHOUT MOVING A DECISION. The committente's band is written
+// as a FRACTION of the cube (a fifth to three tenths, E-DECISIONI15.1) and
+// STALK_WIDE is HEAD_NOMINAL/3, so the width follows the head for nothing and
+// the fraction he ratified is untouched. The HEIGHT is the literal below and it
+// followed by hand, in the same 0.69: what U-FIORI-7 is asked for is <<il fiore
+// che ha disegnato, alla taglia del target>>, and a plant that kept a 7.5 cm
+// stalk under a 5.2 cm head would be a different flower rather than the same one
+// smaller.
+//
+// AND THE READING THAT PAYS FOR IT IS E-ERBA-A 4's, said here rather than in a
+// verbale: it measured the target's stalk <<alta 1-2 fili (6-12 cm)>> and the
+// band this leaves is 4.2 to 6.2. The bottom of his band and the top of ours no
+// longer overlap by much. Two things make that the right way round anyway: the
+// stalk is nearly always BEHIND the mat (the flower is seated on the top of the
+// blade under it, and the mat's median is 12 cm), so what the frame shows of a
+// stalk is the few centimetres between the mat and the head; and the alternative
+// -- a 7.5 cm stalk under a 5.2 cm head -- is the one thing the eye would read
+// as wrong at a metre. It is carried to the coordinator as a fork.
 const STALK_WIDE = HEAD_NOMINAL / 3;
-const STALK_TALL = 0.075;
+const STALK_TALL = 0.052;
 
 // HOW MUCH LOWER THE HEAD IS THAN IT IS WIDE, from the census of nineteen heads.
 //
@@ -285,6 +351,39 @@ const HEAD_SQUAT = 6.3 / 8.2;
 // that seated a small one is unchanged. It is one hash -- the first candidate's
 // own draw, recomputed, which is deterministic -- and no state.
 const COMPANION = 0.55;
+
+// AND THEY STAND ROUND IT, WHICH IS THE HALF OF THAT SENTENCE THAT WAS NEVER
+// BUILT. <<Spesso i fiori grandi sono CIRCONDATI da qualche fiorellino piu'
+// piccolo>>: the note above made the companion smaller and left it where the
+// lattice's own jitter dropped it, anywhere in a cell of 55 cm. So a companion
+// was small and, half the time, half a metre away from what it was a companion
+// of -- which is not what the word says and, measured, is most of why the
+// meadow would not group.
+//
+// THE NUMBER IS FITTED, AND WHAT IT IS FITTED TO IS THE TARGET'S OWN GROUPING.
+// Clark-Evans is the mean nearest neighbour over what a scatter of the same
+// density would give: at 2.73 heads a square metre a scatter gives 30.8 cm, and
+// the target's 0.64 asks for 19.7. The drift alone (GROUP_SCALE) reaches 24.4
+// and stops there whatever scale it is given -- it can empty a clearing but it
+// cannot put two heads closer than the lattice lets them stand. This can: the
+// companion's own draw is spent on an offset round the FIRST candidate's place
+// instead of on the whole cell, so a cell that stands both of them stands a
+// PAIR. Swept, on the plane, over the twelve metres a walker sees:
+//
+//   COMPANION_NEAR   0.36   0.55   0.70   0.85   0.90   0.95   1.00   none
+//   Clark-Evans      0.41   0.51   0.57   0.62   0.64   0.65   0.66   0.80
+//   nearest, p50     8.4    12.3   14.8   16.5   17.1   17.6   18.3   22.9 cm
+//
+// 0.90 is the target's 0.64 to the second decimal, and it reads the same at
+// twenty metres as at twelve (0.647 against 0.636). It is an offset of nine
+// tenths of a cell across, which puts a pair about 17 cm apart: a big head with
+// a small one beside it, which is the sentence at the top of this note.
+//
+// It stays INSIDE the cell all the same -- the draw is clamped -- because both
+// rings walk their lattice on the promise that a candidate never leaves its own
+// cell, and E-CAMPO2 has just measured the far rim to a hundredth of a per cent
+// on that promise.
+const COMPANION_NEAR = 0.90;
 
 // HOW MANY HEADS STAND ON A SQUARE METRE. Two measurements that agree:
 //   - counted by eye, head by head, on a window of open meadow blown up five
@@ -343,6 +442,58 @@ const FLOWER_PER_CELL = 2;
 const FLOWER_SHARE = (FLOWER_PER_M2 * FLOWER_CELL * FLOWER_CELL) / FLOWER_PER_CELL;
 const FLOWER_SEED = 1049;
 
+// AND THE BINOMIAL WAS NOT ENOUGH, WHICH IS WHAT THE COMMITTENTE'S TARGET SAYS
+// AND WHAT MEASURING SAID BACK.
+//
+// The note above is honest about what it built -- <<the clumping is the
+// binomial's rather than a designer's>> -- and the binomial's clumping is, to
+// three decimals, none: asked of the PLANE rather than of the picture, over the
+// twelve metres a walker sees, the sowing that ships has a Clark-Evans of 1.05.
+// One is a scatter with no structure in it at all. The target's, read on its own
+// frame with R1 1.5's finder, is 0.64.
+//
+// WHAT A GROUP IS HERE, AND WHY IT IS A FIELD AND NOT A PARENT. R1's S5 proposes
+// parents at 0.3/m2 with three to six children within 0.4 m, and that is the
+// textbook Neyman-Scott. It cannot be built in THIS lattice without moving
+// something the rest of the file stands on: a child drawn round a parent stands
+// wherever the parent is, and both rings walk their lattice with
+// `offset.d > reach + FLOWER_CELL` -- the promise that a candidate never leaves
+// its own cell by more than one. Widening that promise widens the sweep, the
+// buffers and FAR_SLACK, on the same turn that U-CAMPO-2 measured the far ring's
+// rim to a hundredth of a per cent (E-CAMPO2). So the clumping is put where it
+// costs nothing to walk: in the ACCEPTANCE, not in the position.
+//
+// It is a Cox process. Every candidate stays inside its own cell and draws
+// against a limit multiplied by a slow field, so where the field is high a cell
+// stands both of its candidates and where it is low it stands neither. That is
+// clumps and clearings at the field's own scale, with the positions inside a
+// clump still the lattice's -- and it is one value noise per candidate, on the
+// noise this file already carries.
+//
+// THE TWO NUMBERS. The SCALE is the size of a clump: a metre and a quarter,
+// read off the target as the run of meadow between one drift of heads and the
+// next (noise2 has a period of about one in its own argument, so the multiplier
+// is its reciprocal). The CONTRAST is how empty a clearing gets: the field is a
+// smoothstep between two crossings of the noise, so it saturates at nought and
+// at GROUP_HIGH instead of wandering, and GROUP_HIGH is set to the reciprocal of
+// the field's own mean so that the MEADOW'S DENSITY IS UNTOUCHED -- FLOWER_PER_M2
+// still means what it says, and the guard on it still reads what it read.
+//
+// THE MEAN IS MEASURED AND NOT ASSUMED, and the first attempt shows why. A value
+// noise is not uniform, so a smoothstep placed off centre does not average a
+// half: at 0.38-0.72 it averages 0.425 over the disc, and 2.0 over that field
+// took the meadow from 2.67 heads a square metre to 2.31 -- a thirteen per cent
+// thinning nobody asked for, hidden inside a change about grouping. Centred, the
+// window averages 0.4951 whatever its width (0.60-0.40, 0.65-0.35 and 0.56-0.44
+// all read 0.495 over four hundred thousand points of the disc), so GROUP_HIGH
+// is that reciprocal and the density comes back to 2.72. The guard re-measures
+// it rather than trusting this line.
+const GROUP_SCALE = 1 / 1.25;
+const GROUP_LOW = 0.40;
+const GROUP_TOP = 0.60;
+/** The reciprocal of the field's own mean, so the sowing's density is unmoved. */
+const GROUP_HIGH = 2.020;
+
 
 // HOW FAR THE SECOND FAMILY CARRIES THE MEADOW, AND WHERE IT STOPS.
 //
@@ -372,7 +523,40 @@ const FAR_FADE = 2.5;
 // affordances, and a reading of the target does not get shorter because a
 // laptop is slower: a tier that pulls the exchange in to 4.11 m simply hands
 // this family more of the cyan to carry, and the meadow keeps its composition.
-const CYAN_REACH = 8.0;
+//
+// AND THE READING ABOVE WAS THE CENSUS'S FLOOR AND NOT THE MEADOW'S EDGE, WHICH
+// IS WHY THIS EIGHT IS GONE. <<Past eight metres the census resolves thirteen
+// white heads against a SINGLE cyan>> is a true sentence about a finder, and the
+// inference from it -- that the target's meadow stops being blue at eight metres
+// -- is the mistake the whole of R1 1.5 turns on. A cyan head is DARKER than a
+// white one (the target's blue side reads L* 32 against the white's 51), and
+// every finder in this campaign asks for a bright point: past eight metres the
+// blues do not leave the meadow, they leave the INSTRUMENT.
+//
+// ASKED AGAIN, WITH A FINDER THAT DOES NOT ASK FOR BRIGHTNESS -- "not green, and
+// brighter than the meadow round it", then classified on the head's own brightest
+// pixel so that the aerial perspective is the same for all of them -- the target
+// answers plainly. The share of heads with b - r over thirty:
+//
+//   window        distance   heads   blue
+//   pp-dx           6.1 m      12    0.25
+//   cm-dx          13.1 m      31    0.16
+//   cm-sx          13.1 m      28    0.43
+//   lontano-dx     20.7 m      15    0.40
+//
+// There are blues at every distance the meadow is drawn at, and the histogram of
+// b - r over the four windows is plainly two families (46 heads under nought, 46
+// over twenty, almost nothing between). So the cyan carries as far as the white
+// does and this constant is the far family's own reach.
+//
+// WHAT IT COSTS: nothing in the buffer -- CYAN_FILL below collapses onto the fill
+// the whites already have. THE TWO TRIMS STAY, at the far family's own maximum
+// rather than being deleted: they are what makes this constant a fact about the
+// picture instead of a number in a census, and a gate that read a reach nothing
+// enforced would be exactly the second copy this file refuses everywhere else.
+// What they now cost is one step() a quad in a vertex program and one comparison
+// a candidate in the sweep, and neither ever fires.
+const CYAN_REACH = FAR_REACH_MAX;
 
 // WHAT THE FAR LATTICE IS FILLED WITH, AND WHY IT IS NOT REFILLED AS OFTEN AS
 // THE SOLIDS ARE. The far ring holds five to six times the candidates the solid
@@ -520,12 +704,27 @@ const SWAP_GLSL = /* glsl */`
 // the same value noise the ground's own density uses, at the scale the target's
 // bank measures. The day V1 or V7 give the disc a shadow, this is the one
 // function that has to change and it is written to be that function.
+//
+// AND THE CURVE IS CONFIRMED, ON THE FRAME, BY A FINDER THAT DOES NOT ASK FOR
+// BRIGHTNESS. Classified on each head's own brightest pixel, the target's blue
+// share reads 0.16 in the LIT east middle window and 0.43 in the SHADED west one
+// at the same distance -- which is this law's own sentence, measured a second
+// time by another instrument on another quantity. The shape was never wrong.
+//
+// WHAT WAS WRONG WAS THE LEVEL. The realised share of the disc stood at 0.267
+// against a target the same instrument reads at 0.19 over the two clean windows
+// and R1 1.5 reads at 0.15 over the whole band -- and the picture showed none of
+// it at all, because CYAN_REACH stopped every blue at eight metres. So the two
+// ends stay where they were measured and the BIAS carries the mean: swept on the
+// disc, 2.2 gives 0.267, 3.5 gives 0.19, 4.5 gives 0.159, 6.5 gives 0.132. 4.5
+// lands the realised share at 0.173 over the near eight metres and 0.159 over
+// the whole disc -- inside the twelve-to-eighteen the gate asks, at every radius.
 const CYAN_IN_LIGHT = 0.10;
 const CYAN_IN_SHADE = 0.50;
 /** About fourteen metres, which is the width of the bank the target shows. */
 const SHADE_SCALE = 0.07;
 /** Biased towards the light, so the realised share lands where it is measured. */
-const SHADE_BIAS = 2.2;
+const SHADE_BIAS = 4.5;
 
 // The pigments, and where each one comes from is in the note over FLOWER_PIGMENT.
 const FLOWER_TINT = { min: 0.94, max: 1.06 };
@@ -1700,6 +1899,27 @@ function shadeAt(x, z) {
 }
 
 /**
+ * HOW MANY TIMES ITS OWN SHARE A CANDIDATE STANDS AT, HERE.
+ *
+ * The drift the target's meadow is sown in, as a multiplier on the sowing and
+ * never on a position. See GROUP_SCALE for why it is a field: nought in a
+ * clearing, GROUP_HIGH in a clump, mean one over the disc so that the density
+ * FLOWER_PER_M2 states is the density that is sown.
+ *
+ * IT IS A FACT ABOUT THE GROUND AND NOT ABOUT THE WALKER, which is what
+ * E-CAMPO2 asks of everything the meadow decides: the field is read at the
+ * candidate's own place in the WORLD, so a clump is in the same square metre
+ * whichever way anybody walked into it, and both rings and the contract get the
+ * same answer from the same call.
+ *
+ * @returns {number} nought or more; one on average
+ */
+function clumpAt(x, z) {
+  const n = noise2(x * GROUP_SCALE + 7.31, z * GROUP_SCALE + 44.9);
+  return GROUP_HIGH * smoothstep(GROUP_LOW, GROUP_TOP, n);
+}
+
+/**
  * ONE FLOWER, OR NOTHING, FROM ONE CANDIDATE OF THE LATTICE.
  *
  * THIS IS THE ONLY PLACE A FLOWER IS DECIDED, and that is the whole point of it
@@ -1720,13 +1940,42 @@ function flowerAt(gx, gz, k, height) {
   // reject one the ground would have kept because densityAt is capped at one --
   // so the share IS an upper bound on the limit and testing it first is exact,
   // not an approximation. It takes the ring's refill down by better than half.
+  //
+  // AND THE BOUND WIDENED WITH THE GROUPS, WHICH IS THE ONE PRICE THEY COST AND
+  // IT IS PAID HERE RATHER THAN IN THE REFILL. A clump stands more of its
+  // candidates than the flat share did, so the exact upper bound on the limit is
+  // no longer the share but the share times the field's ceiling -- 0.91 instead
+  // of 0.45, which lets through twice as many candidates as before. What they
+  // meet is NOT densityAt: it is clumpAt, one value noise against densityAt's
+  // thirteen footprints, and it rejects them back to the same count before the
+  // expensive question is asked. So the number of columns and footprints a
+  // refill walks is what it was -- which is what guard-cammino gates -- and what
+  // the groups actually cost is two hashes and a noise on the candidates the old
+  // bound used to throw away for free.
   const roll = hash2(gx * 26699 + k * 7919, gz * 15485863 + FLOWER_SEED * 31);
-  if (roll > FLOWER_SHARE) return null;
+  if (roll > FLOWER_SHARE * GROUP_HIGH) return null;
 
   const r1 = hash2(gx * 73856093 + k * 19349663, gz * 83492791 + FLOWER_SEED);
   const r2 = hash2(gx * 19349663 + FLOWER_SEED, gz * 73856093 + k * 83492791);
-  const x = (gx + r1) * FLOWER_CELL;
-  const z = (gz + r2) * FLOWER_CELL;
+  // AND A COMPANION STANDS BY ITS OWN FLOWER, not merely in the same cell. See
+  // COMPANION_NEAR: the first candidate's place, recomputed from its own two
+  // hashes exactly as COMPANION recomputes its size, with this one's draw spent
+  // on a small offset round it instead of on the whole cell. Clamped, so no
+  // candidate leaves the cell the two rings walk their lattice on.
+  let ux = r1;
+  let uz = r2;
+  if (k > 0) {
+    const f1 = hash2(gx * 73856093, gz * 83492791 + FLOWER_SEED);
+    const f2 = hash2(gx * 19349663 + FLOWER_SEED, gz * 73856093);
+    ux = clamp01(f1 + (r1 - 0.5) * COMPANION_NEAR);
+    uz = clamp01(f2 + (r2 - 0.5) * COMPANION_NEAR);
+  }
+  const x = (gx + ux) * FLOWER_CELL;
+  const z = (gz + uz) * FLOWER_CELL;
+
+  // THE DRIFT, before the ground and after the place: see clumpAt and GROUP_SCALE.
+  const clump = clumpAt(x, z);
+  if (roll > FLOWER_SHARE * clump) return null;
 
   // AND NOT PAST THE MEADOW, WHICH IS THE ONE THING THIS TEST DID NOT DO.
   // E-V1l reported heads standing over the water outside the disc and left it as
@@ -1738,7 +1987,7 @@ function flowerAt(gx, gz, k, height) {
   const dist2 = x * x + z * z;
   if (dist2 > DISC_RADIUS * DISC_RADIUS) return null;
 
-  const limit = densityAt(x, z) * FLOWER_SHARE;
+  const limit = densityAt(x, z) * FLOWER_SHARE * clump;
   if (limit <= 0 || roll > limit) return null;
 
   // AND ON A CUBE, WHICH IS ASKED OF THE STORE AND NOT OF A RADIUS. There are
@@ -1956,7 +2205,17 @@ export function flowerCensus() {
     paleStep: PALE_STEP,
     sowing: { perSquareMetre: FLOWER_PER_M2, cell: FLOWER_CELL,
       perCell: FLOWER_PER_CELL, share: FLOWER_SHARE, seed: FLOWER_SEED },
-    cyan: { inLight: CYAN_IN_LIGHT, inShade: CYAN_IN_SHADE, reach: CYAN_REACH },
+    // THE GROUPS, from the one place that has them: the drift's scale and the
+    // two crossings it saturates between, the ceiling that keeps the density
+    // where FLOWER_PER_M2 puts it, and how near a companion stands to the head
+    // it is a companion of. A gate re-measures every one of these off the field
+    // rather than restating it -- what it needs from here is the LAW, so that a
+    // sowing which stops grouping cannot pass a gate that still holds the old
+    // numbers as literals.
+    groups: { scale: GROUP_SCALE, low: GROUP_LOW, top: GROUP_TOP,
+      high: GROUP_HIGH, companionNear: COMPANION_NEAR, companion: COMPANION },
+    cyan: { inLight: CYAN_IN_LIGHT, inShade: CYAN_IN_SHADE, reach: CYAN_REACH,
+      shadeScale: SHADE_SCALE, shadeBias: SHADE_BIAS },
     reach: { ring: FLOWER_RADIUS, far: FAR_REACH, disc: DISC_RADIUS },
   };
 }
