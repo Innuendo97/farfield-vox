@@ -507,11 +507,13 @@ let freshCostMs = 0;
 let lastTimings = null;
 
 const dev = isDevMode() ? createDevHud(ui) : null;
-// The one seat a pose is imposed through, built where the walker, the lens and
-// the arrival veil are all in scope and nowhere else.
-const devPose = createDevPose({ player, camera, veil });
 const grade = isDevMode() ? createGradePanel(ui, renderer.post) : null;
 if (dev) {
+  // THE ONE SEAT A POSE IS IMPOSED THROUGH, built where the walker, the lens and
+  // the arrival veil are all in scope, and only where a pose can be imposed at
+  // all: both of the things that reach it -- the handle below and the P key --
+  // are behind this flag, so a visitor's page has no reason to build it.
+  const devPose = createDevPose({ player, camera, veil });
   // WHERE TO STAND, FROM OUTSIDE THE PAGE, and only ever in development.
   //
   // Every session of this campaign is judged on pairs of frames taken at the
