@@ -1,5 +1,5 @@
 import { stoneTileData } from '../../src/world/voxel/pure.js';
-import { encodedLum, readLight, renderChain } from '../lighting/render-chain.mjs';
+import { GROUND_BOUNCE, readLight, renderChain } from '../lighting/render-chain.mjs';
 import { sunVector } from '../lighting/sun.mjs';
 import { read, readJson, reporter, selfTest } from './lib.mjs';
 
@@ -30,13 +30,28 @@ import { read, readJson, reporter, selfTest } from './lib.mjs';
 // prints are what those gates are read against.
 //
 // WHAT IT DELIBERATELY DOES NOT GATE: the level a face develops to WITH THE AIR
-// IN IT. The haze is not this material's, and on this branch it is not even the
-// trunk's: the density is read below and printed every run, because between the
-// air at 0.0059 and the air at 0.013 the front of 01 develops to 12.2 or to 22.2
-// without one character of this material changing. A guard that gated the
-// developed level would be gating whoever last touched src/core/sky.js. So what
-// is gated is the BARE face -- pigment against the seat's two terms, before the
-// air -- and the air is printed beside it with what it does.
+// IN IT. The haze is not this material's: the density is read below and printed
+// every run, because between the air at 0.0059 and the air at 0.013 the front of
+// 01 develops to 12.2 or to 22.2 without one character of this material
+// changing. A guard that gated the developed level would be gating whoever last
+// touched src/core/sky.js. So what is gated is the BARE face -- pigment against
+// the seat's terms, before the air -- and the air is printed beside it with what
+// it does.
+//
+// AND THE SEAT'S TERMS ARE THREE, WHICH IS WHAT THIS FILE GOT WRONG.
+// bareFace() below used to write out the sun term and the sky term and stop
+// there. src/world/face-light.js hands every face a THIRD -- the ground of this
+// world, lit by the same two terms on its own upward normal and seen again
+// through the share of the hemisphere below the face -- and the built stone
+// takes it like everything else, through faceLightOf(). A model of the frame
+// that leaves a term of the frame out is not a model of the frame: with it
+// missing, this file read the lit flanks of the six at hue 234 to 243 and
+// called the miss the seat's, when the seat it was describing was a seat this
+// world stopped shipping. With it in, the same faces read 114 to 134 and the
+// blue on them is the AIR's, which is the one thing this guard was already
+// saying it would not gate. The term is READ from the seat (via
+// tools/lighting/render-chain.mjs, which lifts it out of face-light.js as text)
+// and never restated here, for the reason every other number here is read.
 
 const DEG = Math.PI / 180;
 
@@ -65,17 +80,27 @@ export function triple(text, name) {
 /**
  * The colour a stone face develops to before the air, as this material makes it.
  *
- * The bend of the sky term is the material's own and is applied here for the
- * same reason the material is allowed to apply it: src/world/face-light.js
- * produces the pair and lets a material bend one it was given. uLift is touched
- * by neither, and tools/guards/guard-lift.mjs is what keeps that true.
+ * src/world/face-light.js faceLightOf(), in this language, with the stone's own
+ * bend on the pair. The bend of the sky term is the material's own and is
+ * applied here for the same reason the material is allowed to apply it: the
+ * seat produces the pair and lets a material bend one it was given. uLift is
+ * touched by neither, and tools/guards/guard-lift.mjs is what keeps that true.
+ *
+ * THE THIRD TERM IS THE SEAT'S AND IS TAKEN OFF THE BENT PAIR, exactly as the
+ * shader takes it: one minus the sky term is the share of the hemisphere BELOW
+ * the face, so a material that hands itself less sky is handed more of the
+ * ground by construction, and the two cannot be counted twice. That is why a
+ * lower sky share warms these faces instead of only darkening them.
  */
-export function bareFace(normal, light, albedo, scale, skyShare) {
+export function bareFace(normal, light, albedo, scale, skyShare, bounce = GROUND_BOUNCE) {
   const sun = sunVector(light.elevation, light.azimuth);
   const ts = Math.max(normal[0] * sun[0] + normal[1] * sun[1] + normal[2] * sun[2], 0);
   const tk = (0.5 + 0.5 * normal[1]) * skyShare;
+  const gs = Math.max(sun[1], 0);
   return [0, 1, 2].map((c) => albedo[c] * scale
-    * (ts * light.sunBeam[c] * light.sunStrength + tk * light.skyBalance[c] * light.skyStrength));
+    * (ts * light.sunBeam[c] * light.sunStrength + tk * light.skyBalance[c] * light.skyStrength
+      + bounce[c] * (1 - tk) * (gs * light.sunBeam[c] * light.sunStrength
+        + light.skyBalance[c] * light.skyStrength)));
 }
 
 const toLinear = (v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
@@ -91,6 +116,19 @@ export function lch(rgb255) {
   const bb = 200 * (f(y) - f(z));
   return { L: 116 * f(y) - 16, C: Math.hypot(a, bb), h: (Math.atan2(bb, a) / DEG + 360) % 360 };
 }
+
+/**
+ * LINEAR Rec.709 luminance of an encoded triple, and the word linear is the
+ * point. The reference's own 4.4 is the ratio of the LUMINANCES behind two
+ * CIELAB medians -- L* 31.4 over L* 13.0, which is 4.37 -- and the same two
+ * faces of the same picture, weighed on the ENCODED triple, come to 2.25. This
+ * file used to compute the encoded one and hold it against the linear one. Two
+ * quantities that differ by a factor of two are not a tolerance.
+ */
+export const luminance = (rgb255) => {
+  const [r, g, b] = rgb255.map((v) => toLinear(v / 255));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
 
 /** How far a pigment stands from grey: the widest ratio between its channels. */
 export const greyness = (rgb) => Math.max(...rgb) / Math.min(...rgb);
@@ -232,31 +270,75 @@ export function tileFeatureMetres(tile, metresPerTile) {
 // from. Where the reference cannot be reached, the band is what the material
 // CAN do with the reference's own number written beside it, never the reverse.
 const BAND = {
-  // The bare shadowed face: the sky term alone, before any air. The reference
-  // reads 11.5 to 15.4 WITH its own haze in it; under the air the trunk fits
-  // (0.0059) this band develops at the pose to 12.2 to 18.9 measured.
+  // The bare shadowed face: the sky term and the ground's return, before any
+  // air. The reference reads 11.5 to 15.4 WITH its own haze in it (20.2 on the
+  // fifth, 04-right); under the air this world ships (0.0059) the delivered
+  // value of this band develops at the pose to 12.2 to 19.1, measured face by
+  // face on the frame rather than predicted.
   shadowBare: [3.0, 8.0],
   // The lit faces of the reference are neutral: chroma 5 to 6 at hue 134 to
   // 190. A pigment that is itself green cannot develop to that, and this is the
   // leg that would have caught the green one.
+  //
+  // AND IT IS THE WALL THE SKY SHARE IS FITTED AGAINST, which it was not before
+  // the third term went in: the less sky a face is handed the more of the
+  // GROUND it is handed, so the lit chroma climbs as the share falls -- 6.35 at
+  // 0.40, 6.93 at the delivered 0.35, 7.57 at 0.30. Every other reading in this
+  // file wants the share lower and this one is what stops it. The delivered
+  // material stands 0.07 under this number, and that is a boundary rather than
+  // a margin: it is said in src/world/voxel/masonry.js too, over the constant.
   litChroma: 7.0,
   litHue: [60, 200],
   // AND THE PIGMENT ITSELF HAS TO BE GREY, which is a separate leg from the two
-  // above and the one that actually bites. Under this seat the light washes a
-  // green pigment out: the triplet the six were drawn with -- g over r 1.163 --
-  // develops on the west flank of 01 to chroma 5.6 at hue 159, INSIDE the band
-  // the target reads, so a guard on the developed colour alone would have
-  // passed the thing the committente saw. The reference's own lit stone reads
+  // above, and it is separate because THE VERDICT OF THE DEVELOPED COLOUR ON A
+  // GREEN PIGMENT BELONGS TO THE SEAT AND HAS ALREADY CHANGED ONCE. Under the
+  // seat this leg was written for, the triplet the six were drawn with -- g
+  // over r 1.163 -- developed on the west flank of 01 to chroma 5.6 at hue 159,
+  // INSIDE the band the reference reads, so the two legs above would have
+  // passed the thing the committente saw. Under the seat this world ships it
+  // develops to chroma 12.7 at hue 130 and they catch it. Nothing about the
+  // pigment moved between those two sentences. A leg that asks about the
+  // PIGMENT is the one that answers the same way on both days, and it is why
+  // this one is not folded into the colour. The reference's own lit stone reads
   // 70 / 76 / 69, which is 1.10 between its widest pair, and that is the number.
   pigmentGrey: 1.10,
-  // A shadowed face receives the sky term alone, so this is the share of the
-  // sky the material takes and nothing else in a material moves it. The
-  // reference reads 4.4; 4.4 is not reachable under one sun with the faces
-  // where the reference puts them, and 2.6 is where R5's prototype landed.
-  sunOverShadow: [2.6, 3.6],
+  // A shadowed face receives the sky term and the ground's return, so this is
+  // the share of the sky the material takes and nothing else in a material
+  // moves it. IN LINEAR LUMINANCE, which is the space the reference's 4.4 was
+  // read in and not the space this file used to compute in: see luminance()
+  // above, and the two numbers there.
+  //
+  // THIS BAND IS THE REFERENCE'S OWN NUMBER AND NO LONGER A CONSOLATION. It
+  // used to be 2.6 to 3.6 with "4.4 is not reachable" written beside it, and
+  // both halves of that were artefacts of the two corrections above: the
+  // encoded luminance halved the render's side of the comparison, and the
+  // missing third term put the shadow face at the level of a face lit by a
+  // blue sky and nothing else. With the seat modelled as the seat ships and
+  // both sides weighed the same way, the material reaches 4.35 against 4.37.
+  // The band is the reference plus and minus a tenth of itself.
+  sunOverShadow: [4.0, 4.8],
   // What one face's own pigment may spread over, from the tile and the block
-  // tint together. At the constants the camouflage was drawn with it was 4.6.
-  mottle: 3.6,
+  // tint together, on a shadowed face.
+  //
+  // RE-DERIVED, AND NOT LOOSENED. This number is an ABSOLUTE spread in L*, so
+  // it moves when the level of the face it is read on moves -- and the level
+  // moved by 3.8 L* when the third term was put into bareFace() above, with
+  // nothing in the material changing at all. On the two-term model the
+  // delivered material read 1.97 against a band of 3.6; on the seat this world
+  // ships it reads 4.18. The three anchors the new band sits between, all on
+  // this chain and this seat:
+  //
+  //   the delivered material                                      4.18
+  //   the block tint at 1.4 -- the camouflage the committente saw 11.23
+  //   the reference's OWN 01-front, p10 to p90 over its pixels     7.10
+  //
+  // The last of those is a real ceiling and not a preference: the reference's
+  // whole face, with its moss and the halo of its engraving inside it, spreads
+  // 7.1, so a MATERIAL that spreads more than that is drawing holes whatever
+  // else is true. The band is set clear of it, and it separates the delivered
+  // material from the camouflage by 1.4x on one side and 1.9x on the other,
+  // where the old pair separated them by 1.1x and 1.3x.
+  mottle: 6.0,
   // Nothing on the surface may be as large as the thing the surface is made of.
   tileFeature: 0.19,
   // And the lattice still has to cut a block the size the reference resolves.
@@ -336,16 +418,33 @@ if (process.argv.includes('--self')) {
       caught: greyness(green.albedo) > BAND.pigmentGrey,
     },
     {
-      what: 'and it is NOT caught on the developed colour, which is why the leg above exists',
+      // AND THE SEAT'S VERDICT ON IT, WHICH IS NOT THE PIGMENT'S. Under the
+      // seat this world ships the developed colour catches the green triplet as
+      // well -- chroma 12.7 at the delivered share, 7.6 at a share of one --
+      // where under the seat the leg above was written for it developed to
+      // chroma 5.6 at hue 159 and went through. Both facts are stated because
+      // the pair of them is the argument for keeping the two legs apart.
+      what: 'the developed colour catches it too under THIS seat, which it did not under the last',
       caught: (() => {
-        const c = lch(composite(bareFace(flank.normal, light, green.albedo, green.scale, 1)));
-        return !(c.C > BAND.litChroma || c.h < BAND.litHue[0] || c.h > BAND.litHue[1]);
+        const c = lch(composite(bareFace(flank.normal, light, green.albedo, green.scale,
+          material.skyShare)));
+        return c.C > BAND.litChroma || c.h < BAND.litHue[0] || c.h > BAND.litHue[1];
       })(),
     },
     {
       what: 'a wall that takes the whole of the sky is caught by the ratio on 01',
-      caught: (encodedLum(composite(bareFace(flank.normal, light, green.albedo, green.scale, 1)))
-        / encodedLum(composite(bareFace(front.normal, light, green.albedo, green.scale, 1))))
+      caught: (luminance(composite(bareFace(flank.normal, light, green.albedo, green.scale, 1)))
+        / luminance(composite(bareFace(front.normal, light, green.albedo, green.scale, 1))))
+        < BAND.sunOverShadow[0],
+    },
+    {
+      // AND SO IS THE VALUE THIS FILE HELD BEFORE THE REFIT, which is the
+      // injection that says the new band bites rather than accommodates: 0.55
+      // was fitted under a seat with a different sky and no third term, and
+      // under this one it puts the ratio at 3.76 against the reference's 4.37.
+      what: 'the sky share fitted under the other seal is caught by the same leg',
+      caught: (luminance(composite(bareFace(flank.normal, light, material.albedo, material.scale, 0.55)))
+        / luminance(composite(bareFace(front.normal, light, material.albedo, material.scale, 0.55))))
         < BAND.sunOverShadow[0],
     },
     {
@@ -427,7 +526,7 @@ report.check(greyness(material.albedo) <= BAND.pigmentGrey,
 
 const flank = faces.find((f) => f.id === '01' && f.name === 'left');
 const front = faces.find((f) => f.id === '01' && f.name === 'front');
-const lum = (n) => encodedLum(composite(bareFace(n, light, material.albedo, material.scale, material.skyShare)));
+const lum = (n) => luminance(composite(bareFace(n, light, material.albedo, material.scale, material.skyShare)));
 const ratio = lum(flank.normal) / lum(front.normal);
 report.check(ratio >= BAND.sunOverShadow[0] && ratio <= BAND.sunOverShadow[1],
   'the wall takes the share of the sky the ratio on 01 asks for',
@@ -510,6 +609,20 @@ if (Math.abs(density - 0.0059) > 1e-9) {
     + 'where the same material under the trunk\'s air puts it at 12.2 against the target\'s 13.0. '
     + 'A crop of this branch is not a crop of this material.');
 }
+// THE ONE READING THIS MATERIAL CANNOT DELIVER, WITH ITS OWNER NAMED. The leg
+// above is on the BARE face and it is green; the FRAME is not, and saying so
+// here is the whole point of printing a residue instead of widening a band.
+report.note('and on the FRAME at the fitted pose that same ratio reads 2.61, not 4.35: the air puts '
+  + 'a floor under a shadowed face that no share of the sky can take off. Measured, not argued -- '
+  + 'the six repainted BLACK at the same pose still develop to L* 3.3 on 01-front and 7.5 on '
+  + '02-front, which is the haze alone. The two numbers that set that floor belong to the seat '
+  + 'and not to this material: FOG_DENSITY in src/core/sky.js and BOUNCE_SHARE in '
+  + 'src/world/face-light.js. '
+  + 'Owner: E-LUCE');
+report.note('same reading, same owner, on the LIT faces: bare they develop warm (hue 114 to 134 '
+  + 'against 134 to 190 on the reference), and on the frame they come back at 186 to 224. The turn '
+  + 'is the air and the cube, both downstream of this file, and it is the residue R5 recorded as '
+  + 'sky + haze + LUT rather than pigment. Owner: E-LUCE');
 report.note('the target is not consistent with one sun (masonry-spec.json, palette.why): 04-front '
   + 'and 05-front both look south-west and the target has one at 19.1 and the other at 26.3, so '
   + 'two faces miss by ten levels whatever the pigment is');

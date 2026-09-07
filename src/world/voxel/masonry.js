@@ -471,11 +471,12 @@ export const STONE_LIGHT_SCALE = 1.5;
 // WHAT IT ANSWERS. Read face by face against the day target through one
 // estimator (R5 SS1.3), the reference's shadow faces stand at L* 11.5 to 15.4
 // and its lit ones at 26 to 31, and the ratio between the two on 01 is 4.4 in
-// luminance. Ours reads 2.0. A shadow face receives the sky term alone, so a
-// wall that is too bright in shadow and right in the sun is a wall taking too
-// much sky -- and no albedo can fix that, because albedo divides both faces by
-// the same number and leaves the ratio exactly where it was. The four other
-// numbers in this file move the level; only this one moves the RATIO.
+// luminance -- linear, out of CIELAB, which is the space that number lives in.
+// Ours read 2.0 when this constant was one. A shadow face receives the sky term
+// alone, so a wall that is too bright in shadow and right in the sun is a wall
+// taking too much sky -- and no albedo can fix that, because albedo divides
+// both faces by the same number and leaves the ratio exactly where it was. The
+// four other numbers in this file move the level; only this one moves the RATIO.
 //
 // WHY IT IS A MATERIAL AND NOT A LIFT. src/world/face-light.js is explicit that
 // producing the pair belongs to the seat and BENDING it belongs to the
@@ -486,17 +487,43 @@ export const STONE_LIGHT_SCALE = 1.5;
 // never touches uLift, and tools/guards/guard-lift.mjs keeps the seat at one
 // with this in the file.
 //
-// WHERE 0.55 COMES FROM. It is the value R5's prototype was measured at, and it
-// is the number carried forward rather than refitted here for a reason that is
-// declared and not hidden: the light this branch draws under is not the light
-// the reading was taken under. See the note over the guard in
-// tools/guards/guard-pietra.mjs, which prints the seat and the air it finds and
-// says what they do to the level.
+// WHERE 0.35 COMES FROM, AND WHY IT IS NOT 0.55. It is REFITTED, under the seal
+// this world ships, and the refit is the whole of the difference.
+//
+// 0.55 was measured under a different light: a sky balance of 0.395 / 0.673 / 1
+// and a seat of TWO terms. What ships here is a sky balance of 0.133 / 0.478 / 1
+// -- far less red in a shadow -- and a seat of THREE, because
+// src/world/face-light.js now hands every face the ground's return as well
+// (BOUNCE_SHARE, itself fitted under this same seal). Both of those land on a
+// shadow face, which is where this number does all of its work, so a value
+// carried across that seal unchanged is a value describing a day nobody draws.
+// It is the lesson the third term is written under, applied to the number that
+// stands on the other side of it.
+//
+// WHAT IT WAS FITTED AGAINST -- two readings, and they agree:
+//
+//   the ratio on 01, west flank over front, in the LUMINANCE the reference's
+//   own 4.4 was read in (linear Y out of CIELAB, and never the encoded triple:
+//   on the reference those two are 4.37 and 2.25, so the space is not a
+//   detail): 4.35 here against 4.37. At 0.55 it is 3.76.
+//
+//   the hue of the shadow faces, which is what turns as this number turns
+//   because a shadow face is sky and ground return and nothing else. On the
+//   picture at the fitted pose, the four faces the reference calls one stone
+//   under one sky come to a median hue of 230.8 against the reference's own
+//   230.8. At 0.55 they come to 237.0.
+//
+// AND WHERE THE FIT STOPS. Below 0.34 the lit faces go GREEN -- the ground's
+// return is a larger share of a face the less sky that face is given -- and
+// tools/guards/guard-pietra.mjs holds them at chroma 7. The delivered 0.35 sits
+// 0.07 under that cap, which is not slack: it is the wall the fit stands
+// against, and it is written here so the next reader meets it before moving
+// this number rather than after.
 //
 // WHAT IT IS NOT ALLOWED TO BE. Greater than one. A material may take less of
 // what the seat hands it; taking MORE is a lift by another name, and that is
 // the shortcut this campaign spent a session removing from the light.
-export const STONE_SKY_SHARE = 0.55;
+export const STONE_SKY_SHARE = 0.35;
 
 /**
  * The stone tile as a texture, from bytes the worker has already generated.
