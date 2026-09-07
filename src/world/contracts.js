@@ -1,7 +1,7 @@
 import { FIELD, heightAt, pathCoord, pathRun } from './terrain-field.js';
 import { stairHeightAt as stairRunHeight } from './stairs.js';
 import { flowerField } from './vegetation.js';
-import { PLATFORM } from './layout.js';
+import { MONOLITHS, PLATFORM, ROCK_SQUARE, rockSeats } from './layout.js';
 import { pathHoleAt } from './path.js';
 
 // THE CONTRACTS BETWEEN THE SESSIONS, AND THE ONLY DOOR BETWEEN THEM.
@@ -358,3 +358,65 @@ export function flowerLightPoints() {
 // tens of thousands of lattice draws over the whole disc, the answer does not
 // change, and the night may ask for it more than once.
 let flowers = null;
+
+
+// --------------------------------------------------------- what is in the way
+//
+// THE SEVENTH SEAT, AND IT IS THE ONE A THIRD PERSON CAMERA NEEDED. Everything
+// above answers where a surface IS; this answers what a straight line between
+// two points is not allowed to cross. A walker never needed it -- he is always
+// on the floor, and a footprint is enough for him -- but a camera on a five
+// metre arm is at head height in the middle of the hub, and until it existed a
+// walker with his back to a block put the lens inside the masonry.
+//
+// TWO LISTS, ONE SOURCE. src/world/rocks.js builds the walker's footprints from
+// the same rock seats this file publishes, so a stone cannot be solid to a body
+// and hollow to its camera. What this adds is the vertical extent, which is the
+// whole of the difference: a rock knee high is not in the way of an eye at a
+// metre and a half, and a block thirteen metres tall is in the way of anything.
+//
+// THE PLATFORM AND THE STAIR RUN ARE DELIBERATELY ABSENT. builtHeightAt above
+// already carries both, and the camera's own floor is set from it before this
+// list is consulted -- so a boom standing safely above the stone is not stopped
+// by a box drawn round it.
+
+/**
+ * Every box a camera may not pass through, in world metres.
+ *
+ * { x, z, halfWidth, halfDepth, rotationY (radians), y0, y1 }
+ *
+ * A SQUARE INSIDE THE ROUND, for the rocks, at the same 0.72 of the radius the
+ * walker's own footprints use: a box that reached the full radius would stop the
+ * camera in the air beside the stone.
+ */
+export function cameraSolids() {
+  const out = [];
+  for (const m of MONOLITHS) {
+    const [w, h, d] = m.size;
+    out.push({
+      x: m.position.x,
+      z: m.position.z,
+      halfWidth: w / 2,
+      halfDepth: d / 2,
+      rotationY: (m.rotationY * Math.PI) / 180,
+      y0: m.baseY,
+      y1: m.baseY + h,
+    });
+  }
+  for (const rock of rockSeats()) {
+    out.push({
+      x: rock.x,
+      z: rock.z,
+      halfWidth: rock.radius * ROCK_SQUARE,
+      halfDepth: rock.radius * ROCK_SQUARE,
+      rotationY: 0,
+      // A rock is BURIED: `y` is where its mesh origin sits, which is under the
+      // turf, and `meshHeight` is the whole of it. The two of them together are
+      // the only pair in the plan that bound the stone the camera can hit --
+      // `height` is how much of it shows, which is a different question.
+      y0: rock.y,
+      y1: rock.y + (rock.meshHeight ?? rock.height),
+    });
+  }
+  return out;
+}

@@ -1,8 +1,8 @@
 import { Scene } from 'three';
 import { applySky } from '../core/sky.js';
 import { setAir } from './air.js';
-import { builtHeightAt, groundHeightAt as meadowHeightAt } from './contracts.js';
-import { ROCK_BLOCKERS, ROCKS } from './rocks.js';
+import { builtHeightAt, cameraSolids, groundHeightAt as meadowHeightAt } from './contracts.js';
+import { ROCK_BLOCKERS } from './rocks.js';
 import { MONOLITHS, PLATFORM } from './layout.js';
 import { LAYERS, layer, layersAt } from './layers/registry.js';
 
@@ -61,36 +61,13 @@ export function buildHub() {
   // plan, not of whether a download has finished.
   blockers.push(...ROCK_BLOCKERS);
 
-  // WHAT A LENS CANNOT PASS THROUGH, which is the same list with the heights on
+  // WHAT A LENS CANNOT PASS THROUGH, which is the same stone with its height on
   // it. A footprint is enough for a body, which is always on the floor; a third
   // person camera is on a five metre arm at head height and has to know that a
-  // rock is knee high and a block is not. Built here, beside the footprints,
-  // from the same plan and in the same pass -- two lists, one source, so a wall
-  // cannot be solid to a walker and hollow to his camera.
-  //
-  // THE PLATFORM AND THE STAIR RUN ARE NOT IN IT, and that is not an omission:
-  // builtHeightAt already carries both, so the camera's own floor is on top of
-  // them before this list is consulted. Adding them as boxes would stop a boom
-  // that is standing safely above the stone.
-  const solids = [];
-  for (const m of MONOLITHS) {
-    const [w, h, d] = m.size;
-    solids.push({
-      x: m.position.x, z: m.position.z,
-      halfWidth: w / 2, halfDepth: d / 2,
-      rotationY: m.rotationY * DEG,
-      y0: m.baseY, y1: m.baseY + h,
-    });
-  }
-  for (const rock of ROCKS) {
-    if (rock.radius < 0.45) continue;
-    solids.push({
-      x: rock.x, z: rock.z,
-      halfWidth: rock.radius * 0.72, halfDepth: rock.radius * 0.72,
-      rotationY: 0,
-      y0: rock.y - rock.height, y1: rock.y + rock.height,
-    });
-  }
+  // rock is knee high and a block is not. It is not assembled here: two lists
+  // built in two places is two opinions, so it comes from the one seat that
+  // publishes what this world is made of -- see cameraSolids in contracts.js.
+  const solids = cameraSolids();
 
   const arrived = { dress: false, plant: false };
   // What the quality tier has asked for. It is held here rather than pushed

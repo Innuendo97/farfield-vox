@@ -171,13 +171,21 @@ function garmentGlsl(body) {
     const hi = `vec3(${b.x1.toFixed(1)}, ${b.y1.toFixed(1)}, ${b.z1.toFixed(1)})`;
     return `all(greaterThanEqual(c, ${lo})) && all(lessThanEqual(c, ${hi}))`;
   };
-  const tests = body.map((b) => `    if (${box(b)}) g = uPal${b.palette};`).join('\n');
+  // A BOX THAT SWINGS IS WRITTEN OUT ONCE PER FRAME OF THE STEP AND STAMPED WITH
+  // IT, in its own place in the order -- see PAINT_ALL in plan.js. uPose is the
+  // frame being drawn, so exactly one of each triple survives and the list the
+  // fragment effectively walks is that frame's own plan, in that frame's own
+  // order. It is what lets three lattices share one program, and it is exact:
+  // widening the boxes instead would have painted a stripe of skin down her hip
+  // wherever a limb crosses another garment.
+  const stamp = (b) => (b.pose === undefined ? '' : `uPose == ${b.pose} && `);
+  const tests = body.map((b) => `    if (${stamp(b)}${box(b)}) g = uPal${b.palette};`).join('\n');
   // FILLED IS A SEPARATE WALK AND IT RETURNS EARLY. garmentOf has to reach the
   // LAST box that contains the cell, because order is what lets the face be laid
   // into the head; "is anything here at all" does not care which box answers, so
   // the first one ends it. On a solid cell that is a handful of tests rather than
   // thirty, and the cells it is asked about are mostly solid.
-  const filled = body.map((b) => `    if (${box(b)}) return 1.0;`).join('\n');
+  const filled = body.map((b) => `    if (${stamp(b)}${box(b)}) return 1.0;`).join('\n');
   return `${uniforms}
 
   // Generated from src/world/avatar/plan.js, in the plan's own order: a cell
@@ -249,6 +257,7 @@ function fragment(body) {
   uniform float uOverhang;
   uniform float uOverhangCells;
   uniform float uFade;
+  uniform int uPose;
 
   ${SCENE_LIGHT_GLSL}
   ${FACE_LIGHT_GLSL}
@@ -400,6 +409,10 @@ export function avatarMaterial(voxel, settings, body = PAINT_M) {
     // How much of him to draw: written every frame by the layer out of STANDING,
     // and one at every frame that is not a switch.
     uFade: { value: 1 },
+    // Which frame of the step is being drawn. The geometry says it too -- it is
+    // the buffer the mesh is carrying -- but the fragment cannot ask a buffer
+    // which pose it came from, so it is told.
+    uPose: { value: 1 },
     // The sun, the exposure and the lifts, from the one seat that produces the
     // pair they act on. THE EXPOSURE IS THE GROUND'S, INHERITED AND NOT FITTED:
     // he stands on that ground, in that air, under that sun, and the campaign

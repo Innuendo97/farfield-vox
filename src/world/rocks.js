@@ -10,6 +10,7 @@ import {
 } from './air.js';
 import PLAN from '../../assets-src/rocks/rocks.json' with { type: 'json' };
 import BAKE from '../../assets-src/rocks/rocks-bake.json' with { type: 'json' };
+import { ROCK_SQUARE, rockSeats } from './layout.js';
 import PALETTE from '../../assets-src/vegetation/palette.json' with { type: 'json' };
 
 // The rocks.
@@ -40,18 +41,22 @@ export const ROCKS = PLAN.rocks.map((rock) => ({
   height: rock.height,
 }));
 
-/** The ones solid enough that walking through them would be a hole in the world. */
-export const ROCK_BLOCKERS = ROCKS
-  .filter((rock) => rock.radius >= 0.45)
-  .map((rock) => ({
-    x: rock.x,
-    z: rock.z,
-    // A square inside the round: a blocker is a box, and one that reached the
-    // full radius would stop the walker in the air beside the stone.
-    halfWidth: rock.radius * 0.72,
-    halfDepth: rock.radius * 0.72,
-    rotationY: 0,
-  }));
+/**
+ * The ones solid enough that walking through them would be a hole in the world.
+ *
+ * WHICH ONES, AND HOW BIG A BOX, IS NOT DECIDED HERE ANY MORE. A third person
+ * camera has to miss the same stones a body does, and the two lists were about
+ * to be two opinions -- so the seats and the square inside the round are
+ * published once in src/world/layout.js and read from there. What stays here
+ * is what a WALKER needs, which is the footprint without the height.
+ */
+export const ROCK_BLOCKERS = rockSeats().map((rock) => ({
+  x: rock.x,
+  z: rock.z,
+  halfWidth: rock.radius * ROCK_SQUARE,
+  halfDepth: rock.radius * ROCK_SQUARE,
+  rotationY: 0,
+}));
 
 function albedoOf(id) {
   const found = PALETTE.patches.find((patch) => patch.id === id);

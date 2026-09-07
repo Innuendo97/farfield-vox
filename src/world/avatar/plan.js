@@ -283,22 +283,8 @@ export const SWING_CELLS = 3;
 /** Metres of ground covered by one whole four-frame cycle. */
 export const STRIDE_METRES = 1.4;
 
-const off = (v) => ({ lo: v, hi: v });
-const span = (v) => ({ lo: -v, hi: v });
-const REST = { legR: off(0), legL: off(0), armR: off(0), armL: off(0) };
-const shiftZ = (b, d) => ({ ...b, z0: b.z0 + d.lo, z1: b.z1 + d.hi });
-
-/**
- * The same box on both sides of the spine, each side carried its own way along z.
- *
- * The shift is applied AFTER the mirror, so the left limb goes where the pose
- * says it goes rather than where the reflection of the right one would put it --
- * which is the whole of a walk: the two sides are never doing the same thing.
- */
-const swung = (id, x, y, z, dR, dL) => {
-  const right = box(id, x, y, z);
-  return [shiftZ(mirrored(right), dL), shiftZ(right, dR)];
-};
+const REST = { legR: 0, legL: 0, armR: 0, armL: 0 };
+const shiftZ = (b, d) => (d === 0 ? b : { ...b, z0: b.z0 + d, z1: b.z1 + d });
 
 /**
  * The three lattices, and the cycle that spends them.
@@ -315,28 +301,40 @@ export const LIFT = [0, 1, 0, 1];
 /** The pose of each of the three lattices: contact, passing, the other contact. */
 export const STEPS = [
   {
-    legR: off(STRIDE_CELLS), legL: off(-STRIDE_CELLS),
-    armR: off(-SWING_CELLS), armL: off(SWING_CELLS),
+    legR: STRIDE_CELLS, legL: -STRIDE_CELLS,
+    armR: -SWING_CELLS, armL: SWING_CELLS,
   },
   REST,
   {
-    legR: off(-STRIDE_CELLS), legL: off(STRIDE_CELLS),
-    armR: off(SWING_CELLS), armL: off(-SWING_CELLS),
+    legR: -STRIDE_CELLS, legL: STRIDE_CELLS,
+    armR: SWING_CELLS, armL: -SWING_CELLS,
   },
 ];
 
-// AND ONE MORE, WHICH IS NOT A POSE: the union of all of them, used ONLY to
-// generate the palette. The material rebuilds the colour of a cell by walking
-// this list in the fragment, and a body with a lattice per frame would need a
-// program per frame -- three shader compiles and three sets of uniforms for a
-// figure that is one draw. So the moving boxes are widened along z to cover
-// everywhere the step ever puts them, which costs nothing at all: the widened
-// region is the SAME garment in every frame, so a cell the mesh actually has is
-// answered identically, and a cell it does not have is never asked.
-const UNION = {
-  legR: span(STRIDE_CELLS), legL: span(STRIDE_CELLS),
-  armR: span(SWING_CELLS), armL: span(SWING_CELLS),
-};
+// AND ONE MORE READING OF THE SAME LIST, WHICH IS NOT A POSE.
+//
+// The material rebuilds the colour of a cell by walking this plan in the
+// fragment, so three lattices would be three programs -- three compiles, three
+// sets of uniforms and three draws-worth of state for a figure that is one draw.
+// So the palette is generated ONCE from a list that carries all three poses at
+// the same time: every box that swings is written out three times, in its own
+// place in the order, each copy stamped with the pose it belongs to, and the
+// fragment keeps the one whose stamp matches the frame being drawn.
+//
+// WHY NOT SIMPLY WIDEN THE MOVING BOXES ALONG z, which is a third of the tests.
+// Because a limb crosses garments. Her forearm passes over the seat: widened,
+// the arm's box would claim a cell that in that pose belongs to the jeans, and
+// the guard found exactly that -- a stripe of SKIN down her hip in two frames
+// out of four. Stamping is exact where widening is nearly right, and the
+// difference is twenty box tests on a figure that covers a thirtieth of the
+// frame.
+//
+// IN ITS OWN PLACE IN THE ORDER, and that is the part that cannot be moved.
+// A cell belongs to the LAST box that contains it: the pack's side pocket stands
+// over the sleeve because it is written after it. Gathering the moving boxes at
+// the end of the list would turn that round and the sleeve would draw over the
+// pocket.
+const PAINT_ALL = { paint: true };
 
 // ---------------------------------------------------------------- TWO BODIES
 //
@@ -352,6 +350,22 @@ const UNION = {
 // numbers. Reading the two tables side by side IS the specification of the
 // difference, and no third reader has to be trusted to keep them in step.
 export function figure(d, step = REST) {
+  // The same box on both sides of the spine, each side carried its own way along
+  // z. The shift is applied AFTER the mirror, so the left limb goes where the
+  // pose says it goes rather than where the reflection of the right one would put
+  // it -- which is the whole of a walk: the two sides are never doing the same
+  // thing. Under `paint` it writes every pose out at once, stamped.
+  const swung = (id, x, y, z, key) => {
+    const right = box(id, x, y, z);
+    const left = mirrored(right);
+    if (!step.paint) return [shiftZ(left, step[`${key}L`]), shiftZ(right, step[`${key}R`])];
+    const out = [];
+    STEPS.forEach((s, pose) => {
+      out.push({ ...shiftZ(left, s[`${key}L`]), pose });
+      out.push({ ...shiftZ(right, s[`${key}R`]), pose });
+    });
+    return out;
+  };
   return [
     // --------------------------------------------------------------- the legs
     // Rows 33 to 49 of the pictures are two columns of navy with the paving
@@ -365,7 +379,7 @@ export function figure(d, step = REST) {
     // boxes now. The split is at row 13 of the reading, a third of the way up
     // him, which is where a knee is; below it the leg is carried by the step,
     // above it the thigh stays under the seat that closes the two legs.
-    ...swung('jeans', [1, d.leg], [4, 12], [-3, 2], step.legR, step.legL),
+    ...swung('jeans', [1, d.leg], [4, 12], [-3, 2], 'leg'),
     ...pair('jeans', [1, d.leg], [13, 23], [-3, 2]),
     box('jeans', [-1 - d.hip, d.hip], [18, 24], [-3, 2]),
 
@@ -374,7 +388,7 @@ export function figure(d, step = REST) {
     // and longer forward than back. The night picture is the one that says where
     // they stop: by day leather and stone are the same tint and the frame ends at
     // 940 before the sole does.
-    ...swung('scarpe', [1, d.leg], [0, 4], [-6, 2], step.legR, step.legL),
+    ...swung('scarpe', [1, d.leg], [0, 4], [-6, 2], 'leg'),
 
     // ------------------------------------------------------------- the jacket
     // The hem is at cell 32, level with the middle of his hands. Twelve cells
@@ -430,8 +444,8 @@ export function figure(d, step = REST) {
     // whose head is already nine cells across.
     // The two lower plateaus swing from the elbow; the top one is the shoulder's
     // and stays with it.
-    ...swung('giacca', [d.arm, d.arm + 3], [25, 28], [-3, 2], step.armR, step.armL),
-    ...swung('giacca', [d.arm, d.arm + 2], [29, 32], [-3, 2], step.armR, step.armL),
+    ...swung('giacca', [d.arm, d.arm + 3], [25, 28], [-3, 2], 'arm'),
+    ...swung('giacca', [d.arm, d.arm + 2], [29, 32], [-3, 2], 'arm'),
     ...pair('giacca', [d.arm, d.arm + 1], [33, 42], [-3, 2]),
     // The armpit, which nothing outside can see and every arm needs: the one
     // column between the torso's edge and the sleeve's, and without it rows 25,
@@ -440,7 +454,7 @@ export function figure(d, step = REST) {
     // filling it moves no silhouette, because it is inside the outer edge on
     // every row the arm has.
     ...pair('giacca', [d.arm - 1, d.arm - 1], [25, 42], [-3, 2]),
-    ...swung('pelle', [d.arm, d.arm + 2], [21, 24], [-3, 2], step.armR, step.armL),
+    ...swung('pelle', [d.arm, d.arm + 2], [21, 24], [-3, 2], 'arm'),
 
     // ------------------------------------------------------- the neck and head
     // Nine cells of head over two of neck, and the hair reads seven to eight of
@@ -582,11 +596,11 @@ export const WALK_F = STEPS.map((step) => figure(DIM_F, step));
 /**
  * The list the PALETTE is generated from, per body: every pose at once.
  *
- * It is never meshed. See UNION above for why one list has to serve three
- * lattices, and why widening a garment along the axis it swings on is free.
+ * It is never meshed. See PAINT_ALL above for why one list has to serve three
+ * lattices, and why a stamp is the only reading of it that is exact.
  */
-export const PAINT_M = figure(DIM_M, UNION);
-export const PAINT_F = figure(DIM_F, UNION);
+export const PAINT_M = figure(DIM_M, PAINT_ALL);
+export const PAINT_F = figure(DIM_F, PAINT_ALL);
 
 /** The two of them, under the names the personalisation calls them by. */
 export const BODIES = { m: BODY_M, f: BODY_F };
@@ -607,9 +621,12 @@ export const BODY = BODY_M;
  * THE ONE ANSWER, and both readers ask it: the mesher fills the lattice with it
  * and the material's fragment is generated from the same list in the same order.
  */
-export function paletteAt(i, j, k, body = BODY_M) {
+export function paletteAt(i, j, k, body = BODY_M, pose = -1) {
   let found = -1;
   for (const b of body) {
+    // A STAMPED BOX BELONGS TO ONE FRAME OF THE STEP. In a plan that carries no
+    // stamps -- which is every plan that gets meshed -- this test never fires.
+    if (b.pose !== undefined && pose >= 0 && b.pose !== pose) continue;
     if (i < b.x0 || i > b.x1 || j < b.y0 || j > b.y1 || k < b.z0 || k > b.z1) continue;
     found = b.palette;
   }

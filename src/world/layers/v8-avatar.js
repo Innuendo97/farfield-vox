@@ -196,6 +196,11 @@ const layer = {
       // BELOW the ground -- the passing frames lift and the contacts do not --
       // which is what keeps the boots out of the paving they are standing on.
       body.mesh.geometry = body.steps[CYCLE[layer.frame]];
+      // AND THE FRAGMENT IS TOLD WHICH ONE, because the palette is generated for
+      // all three at once and stamped: see PAINT_ALL in plan.js. A geometry that
+      // did not say which pose it was would be painted by whichever frame's boxes
+      // happened to be last in the list.
+      body.material.uniforms.uPose.value = CYCLE[layer.frame];
       body.mesh.position.set(
         STANDING.x,
         STANDING.y + LIFT[layer.frame] * (VOXEL / SUBDIVISION),
