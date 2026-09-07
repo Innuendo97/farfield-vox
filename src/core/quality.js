@@ -138,12 +138,21 @@ export const TIERS = [
     // Priced on the card at the pose the campaign judges on: nine metres costs
     // +3.4 to +4.5 ms over the pixel rule, six +3.9, twelve +8 to +15.
     //
-    // `snap` is the hysteresis, in metres: the centre of the ring stays put
-    // until the walker has left a ball of it, so a step taken and taken back
-    // leaves the frame identical to the byte instead of refining a ring and
-    // coarsening it again. Nought is the arm it is measured against.
-    // See createCampo().setDetail in src/world/voxel/campo-field.js.
-    groundDetail: { near: 9, step: 1.45, snap: 0.75 },  // [V1] the ring, in metres
+    // `lag` is the width of the BAND, in milliseconds: the fragment is handed
+    // where the walker was that long ago and where they are now, and each pixel
+    // picks a point between the two by its own hash, so a front of detail is a
+    // grain as wide as the walker covers in that time rather than a line that
+    // jumps. Standing still, after the lag, the frame is identical to the byte.
+    // It replaces `snap`, the hysteresis in metres, which is what a band has no
+    // need of -- a step taken and taken back moves the grain there and back with
+    // it and changes no cell twice. See createCampo().setDetail in
+    // src/world/voxel/campo-field.js, and the note over lodMode beside it.
+    //
+    // WHY THE SLOWER TIER GETS A WIDER ONE. The band is spread over the frames
+    // that fall inside it: at 30 frames a second 300 ms is nine of them and the
+    // grain is fine, at 18 it is five and it starts to read as steps. The
+    // bottom tier buys back the frames it does not have with a wider band.
+    groundDetail: { near: 9, step: 1.45, lag: 300 },     // [V1] the ring in metres, the band in ms
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
@@ -166,7 +175,7 @@ export const TIERS = [
     // Owners in brackets, so a reader knows whose number this is before
     // touching it. The disc's reach is measured: see the block over TIERS.
     voxelDiscRadius: 14,   // [V1] metres of ten centimetre ground from the centre
-    groundDetail: { near: 9, step: 1.45, snap: 0.75 },  // [V1] the ring, in metres
+    groundDetail: { near: 9, step: 1.45, lag: 300 },     // [V1] the ring in metres, the band in ms
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
@@ -189,7 +198,7 @@ export const TIERS = [
     // Owners in brackets, so a reader knows whose number this is before
     // touching it. The disc's reach is measured: see the block over TIERS.
     voxelDiscRadius: 14,   // [V1] metres of ten centimetre ground from the centre
-    groundDetail: { near: 6, step: 1.75, snap: 0.75 },  // [V1] the ring, in metres
+    groundDetail: { near: 6, step: 1.75, lag: 300 },     // [V1] the ring in metres, the band in ms
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
@@ -205,7 +214,7 @@ export const TIERS = [
     // touching it. TWELVE and not fourteen: the only lever this tier has on the
     // ground is how much of it there is. 119 614 triangles against 151 470.
     voxelDiscRadius: 12,   // [V1] metres of ten centimetre ground from the centre
-    groundDetail: { near: 4.5, step: 2, snap: 1 },      // [V1] the ring, in metres
+    groundDetail: { near: 4.5, step: 2, lag: 400 },      // [V1] the ring in metres, the band in ms
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },

@@ -197,6 +197,8 @@ export function createCampo({
     /** How many times the near window's boundaries were carried across on the
      * landing of the last tile rather than at the crossing (M2.2). */
     landings: 0,
+    /** How many times the centre of the detail jumped, in the arms that jump. */
+    snaps: 0,
     /** And how many times the deadline had to carry them instead. */
     forced: 0,
     workerMs: 0,
@@ -244,6 +246,37 @@ export function createCampo({
   // U-CAMPO-2, not here -- so `snap` is a handle and the tier sets it.
   let lodCentre = null;
   let lodSnap = 0.75;
+  // ------------------------------------------------------------- AND THE BAND.
+  //
+  // The hysteresis above was the right answer to «a step taken and taken back
+  // must not redraw the meadow» (E-CAMPO1), and it cost exactly what the comment
+  // said it would: the change, when it came, came AT ONCE. Measured, that is
+  // 2.5 % of the frame in one frame, on three rings at 9, 13 and 19 m, every
+  // 0.8 m of walking -- one every 0.27 s at three metres a second, in the lower
+  // third of the frame where a walker is looking. It is the first of the three
+  // things the committente saw: «a scatti si generano le cose».
+  //
+  // What replaces it is not a smaller jump or a slower one. It is a BAND: the
+  // fragment is handed two centres -- where the walker was `lodLag` ms ago and
+  // where they are now -- and each pixel reads a point of the segment between
+  // them chosen by its own hash. The front of every ring becomes a band as wide
+  // as the walker covers in that lag, inside which cells change size one at a
+  // time in the order of the hash while the walker advances. The SAME amount of
+  // meadow changes size per metre as a centre with no hysteresis at all; what
+  // goes away is the line, and the jump with it.
+  //
+  // AND STANDING STILL IT IS THE OLD PICTURE TO THE BYTE. The trail runs out
+  // after `lodLag` ms, the two centres become one, and nothing is dithered,
+  // blended or held: guard-stabilita asserts exactly that.
+  let lodMode = 'band';
+  let lodLag = 300;
+  let lodFadeMs = 300;
+  let lodWorld = true;
+  // Where the walker has been, kept just long enough: the head is the oldest
+  // sample still inside the lag and the tail is this frame. It is two or three
+  // entries at a walking pace and it is trimmed in place.
+  const trail = [];
+  let fading = null;
   // WHETHER THE FAR WINDOW SPEAKS LEVEL THREE OF THE NEAR PYRAMID (M2.1). It is
   // ON, and the handle exists so that a bench can take the other arm -- the far
   // texel carrying the law's flat expectation, which is what the strip used to
@@ -606,12 +639,55 @@ export function createCampo({
       // until the walker is more than `lodSnap` metres from it. At snap nought
       // it is simply the walker, which is the arm the hysteresis is measured
       // against.
-      if (!lodCentre) lodCentre = { x: eye.x, z: eye.z };
-      else if (Math.hypot(eye.x - lodCentre.x, eye.z - lodCentre.z) > lodSnap) {
-        lodCentre.x = eye.x;
-        lodCentre.z = eye.z;
+      const now = performance.now();
+      const u = material.uniforms;
+      u.uLodWorld.value = lodWorld ? 1 : 0;
+      if (lodMode === 'band') {
+        // THE TRAIL, AND THE ONE THING IT MUST NOT DO: run dry. The head is kept
+        // until the entry BEHIND it has itself fallen outside the lag, so there
+        // is always one sample at least as old as the lag to interpolate from --
+        // otherwise a frame that arrived late would narrow the band to nothing
+        // and put the line back for one frame, which is the very defect.
+        trail.push({ t: now, x: eye.x, z: eye.z });
+        while (trail.length > 2 && trail[1].t <= now - lodLag) trail.shift();
+        const was = trail[0];
+        u.uLodCentre.value.set(was.x, was.z);
+        u.uLodCentre2.value.set(eye.x, eye.z);
+        u.uLodFade.value = 1;
+        u.uLodMix.value = 1;
+        lodCentre = { x: eye.x, z: eye.z };
+      } else {
+        // The arm the band is measured against, and the two shapes it can take:
+        // `snap` is what shipped, `fade` is R2's S3 -- the same jump, spread
+        // over lodFadeMs by a screen-door between the old centre and the new.
+        u.uLodMix.value = 0;
+        if (trail.length) trail.length = 0;
+        if (!lodCentre) {
+          lodCentre = { x: eye.x, z: eye.z };
+          fading = null;
+          u.uLodFade.value = 0;
+        } else if (!fading
+          && Math.hypot(eye.x - lodCentre.x, eye.z - lodCentre.z) > lodSnap) {
+          stats.snaps += 1;
+          if (lodMode === 'fade' && lodFadeMs > 0) {
+            fading = { at: now, x: eye.x, z: eye.z };
+            u.uLodCentre2.value.set(eye.x, eye.z);
+          } else {
+            lodCentre.x = eye.x;
+            lodCentre.z = eye.z;
+          }
+        }
+        if (fading) {
+          const done = Math.min(1, (now - fading.at) / lodFadeMs);
+          u.uLodFade.value = done;
+          if (done >= 1) {
+            lodCentre = { x: fading.x, z: fading.z };
+            fading = null;
+            u.uLodFade.value = 0;
+          }
+        }
+        u.uLodCentre.value.set(lodCentre.x, lodCentre.z);
       }
-      material.uniforms.uLodCentre.value.set(lodCentre.x, lodCentre.z);
       // AND THE SKY'S OWN BOUND, WHEN THE EYE HAS MOVED ENOUGH TO CHANGE IT.
       // It is four thousand cells of arithmetic; at a quarter of a metre it is
       // asked about four times a second at walking pace, and what it can be
@@ -647,7 +723,7 @@ export function createCampo({
      * plants the centre again on the next frame rather than dragging it, so a
      * measurement taken at one snap is never half of another.
      */
-    setDetail({ near: ringNear, step, snap } = {}) {
+    setDetail({ near: ringNear, step, snap, mode, lag, fadeMs, world } = {}) {
       const u = material.uniforms;
       if (ringNear > 0) u.uLodNear.value = ringNear;
       if (step > 1) u.uLodStep.value = step;
@@ -655,7 +731,49 @@ export function createCampo({
         lodSnap = snap;
         lodCentre = null;
       }
-      return { near: u.uLodNear.value, step: u.uLodStep.value, snap: lodSnap };
+      // THE TIER'S OWN HANDLE IS THE LAG NOW and not the hysteresis: the band
+      // has no hysteresis to set. A mode that changes plants the centre again on
+      // the next frame rather than dragging it across, so a measurement taken in
+      // one mode is never half of another.
+      if (mode) {
+        lodMode = mode;
+        lodCentre = null;
+        fading = null;
+        trail.length = 0;
+        u.uLodFade.value = 0;
+      }
+      if (lag !== undefined && lag !== null && lag >= 0) lodLag = lag;
+      if (fadeMs !== undefined && fadeMs !== null && fadeMs >= 0) lodFadeMs = fadeMs;
+      if (world !== undefined) lodWorld = !!world;
+      return {
+        near: u.uLodNear.value,
+        step: u.uLodStep.value,
+        snap: lodSnap,
+        mode: lodMode,
+        lag: lodLag,
+        fadeMs: lodFadeMs,
+        world: lodWorld,
+      };
+    },
+
+    /** What the band is doing this frame, for a bench and for a guard. */
+    lodState() {
+      const u = material.uniforms;
+      return {
+        mode: lodMode,
+        lag: lodLag,
+        world: lodWorld,
+        centre: [u.uLodCentre.value.x, u.uLodCentre.value.y],
+        centre2: [u.uLodCentre2.value.x, u.uLodCentre2.value.y],
+        fade: u.uLodFade.value,
+        mix: u.uLodMix.value,
+        band: Math.hypot(u.uLodCentre2.value.x - u.uLodCentre.value.x,
+          u.uLodCentre2.value.y - u.uLodCentre.value.y),
+        trail: trail.length,
+        snaps: stats.snaps,
+        landings: stats.landings,
+        forced: stats.forced,
+      };
     },
 
     /**

@@ -75,31 +75,73 @@ const CEILING = {
 const injected = process.argv.includes('--self');
 const report = reporter('guard-stabilita -- il prato sta fermo sotto chi cammina');
 
-// ----------------------------------------------------- 1. L'ISTERESI ESISTE
+// ------------------------------------------------------- 1. LA BANDA ESISTE
+//
+// L'ISTERESI NON C'E' PIU', ed e' una SOSTITUZIONE e non una rimozione. Teneva
+// il centro della LOD fermo finche' il camminatore non aveva lasciato una palla
+// di 0,75 m, e faceva esattamente cio' che il suo stesso commento prometteva: il
+// cambio, quando veniva, veniva TUTTO INSIEME — 2,5 % del quadro in un
+// fotogramma, su tre anelli a 9, 13 e 19 m, ogni 0,8 m di cammino (R8 §2.1 a).
+// Al suo posto c'e' la BANDA: due centri — dov'era il camminatore `lag` ms fa e
+// dov'e' ora — e ogni pixel legge un punto del segmento fra i due secondo il
+// proprio hash, cosi' che il fronte sia largo quanto si cammina in quel tempo e
+// i pixel ci cambino livello uno alla volta invece che tutti insieme.
+//
+// Cio' che l'isteresi prometteva — «mezzo metro avanti e indietro non ridisegna
+// niente» — la banda lo mantiene meglio: la grana va avanti e torna indietro col
+// camminatore e nessuna cella cambia due volte. Cio' che manteneva DAVVERO — «da
+// fermi il quadro e' identico al byte» — resta, ed e' la ricevuta piu' sotto.
 for (const tier of TIERS) {
   const g = tier.groundDetail;
-  report.check(g && typeof g.snap === 'number' && g.snap >= STEP,
-    `il tier ${tier.id} tiene il centro della LOD per almeno mezzo metro`,
-    `snap ${g && g.snap} m contro il passo di ${STEP} m`);
+  report.check(g && typeof g.lag === 'number' && g.lag >= 200,
+    `il tier ${tier.id} spande il fronte della LOD su almeno due decimi di secondo`,
+    `lag ${g && g.lag} ms, che a 1 m/s e' una banda di ${((g && g.lag) / 1000).toFixed(2)} m`);
+  report.check(!(g && 'snap' in g),
+    `e il tier ${tier.id} non porta piu' l'isteresi che la banda ha sostituito`);
 }
 const field = read('src/world/voxel/campo-field.js');
-report.check(/> lodSnap\)/.test(field) && /lodCentre\.x = eye\.x;/.test(field),
-  'il centro si sposta solo quando il camminatore ha lasciato la palla dello snap');
-report.check(/material\.uniforms\.uLodCentre\.value\.set\(lodCentre\.x, lodCentre\.z\)/.test(field),
-  'e quello che il frammento legge e\' il centro tenuto, non l\'occhio');
+report.check(field.includes('trail.push({ t: now, x: eye.x, z: eye.z })'),
+  'il campo tiene la coda delle posizioni da cui la banda e\' misurata');
+report.check(field.includes('u.uLodCentre.value.set(was.x, was.z)')
+  && field.includes('u.uLodCentre2.value.set(eye.x, eye.z)'),
+  'e il frammento riceve i DUE centri: dov\'era il camminatore e dov\'e\' adesso');
+report.check(field.includes('while (trail.length > 2 && trail[1].t <= now - lodLag)'),
+  'la coda non si asciuga mai sotto due campioni',
+  'una coda vuota rimetterebbe la LINEA per un fotogramma, che e\' il difetto stesso');
 report.check(/lodCentre = null;/.test(field.slice(field.indexOf('setDetail('))),
-  'uno snap che cambia ripianta il centro invece di trascinarlo',
-  'una misura presa a uno snap non e\' mai meta\' di un\'altra');
+  'un modo che cambia ripianta il centro invece di trascinarlo',
+  'una misura presa in un modo non e\' mai meta\' di un\'altra');
 
 // ------------------------------------- 2. LA LEGGE NON LEGGE NULLA CHE VARI
 const glsl = read('src/world/voxel/campo-material.js');
 const march = glsl.slice(glsl.indexOf('Hit march('),
   glsl.indexOf('// ------------------------------------------------------------ one shading'));
 const ladder = march.slice(march.indexOf('float jitter'), march.indexOf('int floorLevel'));
-for (const forbidden of ['uTime', 'uFrame', 'gl_FragCoord', 'cameraPosition']) {
+for (const forbidden of ['uTime', 'uFrame', 'cameraPosition']) {
   report.check(!ladder.includes(forbidden),
     `la scala della LOD non legge ${forbidden}`,
     'a camera ferma il prato deve essere identico al byte');
+}
+// E LO SCHERMO SOLO NEL BRACCIO CHE NON SI SPEDISCE. La banda ha bisogno di un
+// hash per pixel, e ce ne sono due: l'INDIRIZZO DEL PIXEL, che e' il piu' a buon
+// mercato che esista ma cammina col vetro e fa strisciare la grana sopra il
+// prato; e la CELLA DI PRATO su cui il raggio atterra, che sta ferma nel mondo
+// mentre il camminatore le passa accanto. Misurati fianco a fianco sulla stessa
+// linea, sono pari al pixel — 1,008 % per passo e 0,66 % di componente l'uno e
+// l'altro — e costano 32,0/34,9 ms contro 33,7/38,5. A parita', il mondo (R8 §6).
+{
+  const onGlass = ladder.split('\n').filter((l) => l.includes('gl_FragCoord'));
+  report.check(onGlass.length === 1,
+    'la scala nomina lo schermo una volta sola, nel ramo che il tier non prende',
+    `${onGlass.length} riga`);
+  report.check(onGlass.every((l) => l.includes('pigHash(gl_FragCoord')),
+    'e quella volta e\' un hash del pixel, non una posizione che entri nella legge');
+  report.check(glsl.includes('uLodWorld: { value: 1 }'),
+    'cio\' che si spedisce e\' la grana attaccata al PRATO e non al vetro');
+  report.check(ladder.includes('floor(grain.x / uCell), floor(grain.y / uCell)'),
+    'la grana del mondo e\' presa alla cella del prato, che e\' ferma sotto chi cammina');
+  report.check(ladder.includes('float toFoot = dir.y < -1e-3'),
+    'e l\'ancora e\' dove il raggio tocca il piano, che non si muove quando si muove la camera');
 }
 report.check(/far2 = max\(far2,/.test(ladder),
   'la scala sale e non scende mai, anche con il centro tenuto indietro',
@@ -160,8 +202,10 @@ if (!injected) report.end();
 
 // --------------------------------------------------------------- il contrario
 const cases = [];
-cases.push({ what: 'un tier senza isteresi, che il mezzo metro attraversa',
-  caught: !(TIERS.every((t) => t.groundDetail.snap >= STEP) && 0.25 >= STEP) });
+cases.push({ what: 'un tier con una banda troppo stretta per spandersi sui fotogrammi',
+  caught: !(TIERS.every((t) => t.groundDetail.lag >= 200) && 100 >= 200) });
+cases.push({ what: 'un tier che porta ancora la vecchia isteresi al posto della banda',
+  caught: 'snap' in { snap: 0.75, lag: 300 } });
 cases.push({ what: 'una scala che legge l\'orologio',
   caught: ['uTime'].some((f) => `${ladder} float k = uTime;`.includes(f)) });
 cases.push({ what: 'una ricevuta a fermo che non e\' zero',
