@@ -1,11 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
-  RELIEF, SPREAD, TUNING, apronAt, paveAt, pathPigment,
+  EARTH, KERB, RELIEF, SPREAD, STONE, STONE_PALE, TUNING, apronAt, paveAt, pathPigment,
 } from '../../src/world/path.js';
 import {
   pathCentreX, pathHalfWidth, pathRun,
 } from '../../src/world/terrain-field.js';
+import { MANTO } from '../../src/world/voxel/worldgen.js';
+import {
+  GROUND_BOUNCE, faceColour, readLight, renderChain,
+} from '../lighting/render-chain.mjs';
 import { reporter, selfTest } from './lib.mjs';
 
 // IS THE CORRIDOR MADE OF TASSELLI, AND DO THEY THIN INSTEAD OF STOPPING?
@@ -44,179 +48,349 @@ import { reporter, selfTest } from './lib.mjs';
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const read = (f) => readFileSync(`${ROOT}${f}`, 'utf8');
 
-// Where the corridor is sampled, in metres of northing, and how finely. The
-// stretch the judging pose resolves, walked at half a piece so no piece is
-// missed and none is counted from one place twice.
-const RUN = { from: -8.0, to: 11.0, step: 0.07 };
+// The three stretches the reference was read in, in metres of northing, and what
+// a piece of each measures across. They are R3's own bands and not this file's:
+// the near apron under the walker's feet, the middle of the field, and the run
+// out to where the ruler stops resolving. The reference answers 5.3 / 6.4 /
+// 10.0 cm at the median of the three (R3 §1.5, fondazione/lav/tasselli.py) and
+// this paving answered 6.4 / 7.6 / 18.6 before the block halved -- half a
+// centimetre out at the middle and most of a hand out at the far end, which is
+// where a piece is what tells a paving of tiles from a floor of slabs.
+const STRETCH = [
+  { name: 'near  z 7.0..9.4', z0: 7.0, z1: 9.4, size: [0.05, 0.11] },
+  { name: 'mid   z 4.0..7.0', z0: 4.0, z1: 7.0, size: [0.05, 0.09] },
+  { name: 'far   z 0.0..4.0', z0: 0.0, z1: 4.0, size: [0.05, 0.14] },
+];
 
-// The bands of the normalised lateral position -- the distance from the
-// centreline over pathHalfWidth -- the thinning is read in. One is the nominal
-// edge; the last two stand OUTSIDE it, which is S4: «ai margini del sentiero,
-// sulla terra bruna, ci sono i tasselli di sentiero».
-const BANDS = [0.15, 0.35, 0.55, 0.75, 0.95, 1.15, 1.35];
+// The floor under all three, and it is the map's own rather than the picture's:
+// a piece of 5 cm is six texels of the ruler and two and a half of the tone, and
+// under that the maps stop being able to say where a piece ends.
+const SIZE_FLOOR = 0.05;
 
-// What the share of stone has to be at the middle and at the kerb.
+// HOW THE STONE THINS, READ FROM THE KERB THAT IS SEEN, and every band is the
+// reference's own reading rather than a shape this file likes.
 //
-// NEITHER IS A FIT AGAINST A PICTURE. The middle is E-V3d's own tuning left
-// alone -- 2 to 9 per cent of the pieces bare over the middle stretch, 5 to 17
-// over the apron -- so a middle that is not mostly stone means the lateral term
-// has eaten the measurement it was supposed to stand on. The kerb is the
-// committente's sentence: the stone THINS, so by the nominal edge most of the
-// surface is earth.
-const MIDDLE = { low: 0.55, high: 0.95 };
-const KERB = { high: 0.45 };
+// Measured on the day target at the fitted camera against ITS own kerb -- the
+// crossing of half a share of green, found on the picture rather than assumed --
+// the share of the corridor's surface that reads as stone runs 45 to 65 per cent
+// at 0.60 m inside the kerb, 25 to 35 at 0.20 m, 10 to 20 at the kerb itself and
+// under 8 past it, and it does that at ALL THREE stretches (R3 §1.6,
+// fondazione/lav/dirad.py). What it refuses is the shape of failure this
+// corridor actually had: 53 to 83 per cent of stone right up to the kerb and
+// nothing after it, which is a paving that STOPS rather than one that thins.
+const FALL = [
+  { at: [-0.90, -0.60], low: 0.45, high: 0.65, what: 'in its core     ' },
+  { at: [-0.25, -0.12], low: 0.25, high: 0.35, what: '0.2 m inside    ' },
+  { at: [-0.12, 0.00], low: 0.10, high: 0.20, what: 'at the kerb     ' },
+  { at: [0.12, 0.40], low: 0.00, high: 0.08, what: 'out on the brown' },
+];
 
-// HOW LONG THE CROSSING HAS TO BE, in units of the corridor's own half width.
+// THE PIGMENT, AND IT IS ASKED IN RATIOS AND IN HUE AND NOT IN LEVEL.
 //
-// NOT A SLOPE PER METRE, and the difference is the whole of why this number can
-// fail. The corridor is 1.0 m across at the narrow middle of the field and 1.9 m
-// under the walker, and what the eye compares the crossing to is the WIDTH OF
-// THE PATH IT IS THE EDGE OF -- a crossing of twenty centimetres is a fifth of
-// the near corridor and a fifth of the far one, and it reads the same on both.
-// A bar in metres would be loose where the path is wide and tight where it is
-// narrow, which is backwards.
+// WHY NOT IN LEVEL, WHICH IS THE FIRST THING A READER WILL WANT. The level of
+// this paving is E-LUCE7's wall and it is not this file's to move: the pigment
+// stands at the ceiling this world puts on a pigment -- 0.900 of red, «as red as
+// a surface may be», ../../src/world/voxel/material.js -- and what it develops
+// to at the fitted camera is still seven levels under the reference. Closing
+// that takes a constant of the LIGHT on the paving, which is declared with its
+// number in the verbale and left to the coordinator. A guard that gated the
+// level would be gating a decision nobody has taken.
 //
-// THREE TENTHS. A crossing shorter than that is under one tenth of the whole
-// width a side, which at the pose the campaign judges on is two or three pixels
-// -- a LINE, which is «netti confini verdi ai margini» and the thing this whole
-// unit exists to take out. It is a floor and not a fit: the law draws a longer
-// one, and what is refused here is the shape of failure and not a taste.
-const CROSS = { least: 0.30 };
+// WHAT IS GATED IS EVERYTHING A PIGMENT OWNS. The reference's stone stands 2.15
+// times its own earth in linear luminance (L* 59.3 over 42.4, read on the target
+// at the fitted camera); it is a warm beige at hue 80 and chroma 32 where this
+// paving was a grey-olive at hue 90 to 106 and chroma 20; and its joints stand
+// 9 to 10 levels of L* under the stone either side of them. None of those three
+// moves when the light does, and all three were wrong before this unit.
+//
+// THE JOINT'S BAND IS WIDER THAN THE REFERENCE'S OWN READING, AND THE REASON IS
+// THE INSTRUMENT AND NOT A TOLERANCE. What R3 read on the two pictures is the
+// mean level of the runs of not-stone BETWEEN two stones on one row, at a pose
+// where a slot of four centimetres covers two or three pixels -- so what it
+// weighs is a slot averaged with its own lips and with the earth beside it: the
+// reference answers 9.7 levels under its stone and this paving, on the same
+// ruler on the delivered frame, answers 8.9. The reader below walks the slot
+// exhaustively at a centimetre and therefore spends most of its samples on the
+// FLOOR of the slot, which no picture at this distance ever resolves on its own;
+// on that reading the same joint is 15 levels down. The band holds the shape of
+// failure -- a joint no darker than the stone, or one that has become a black
+// line round every piece -- and the frame's own number is in the verbale.
+const PIGMENT = {
+  ratio: [1.85, 2.45],
+  chroma: 28,
+  hue: [72, 92],
+  jointUnder: [8.0, 18.0],
+  spread: 5.0,
+  ceiling: 0.900,
+};
 
 // The spread of the level between one piece and the next, as a share of the
 // mean. E-V3d: «identita' per lastra 25% IN LIVELLO e quasi zero in tinta».
 const IDENTITY = { low: 0.16, high: 0.34 };
 
 /**
- * Walks the corridor and gathers every piece the law puts under the samples.
+ * The share of the corridor's surface that is stone, at a distance from the
+ * VISIBLE kerb, over a stretch.
  *
  * ASKED OF `paveAt` AND OF NOTHING ELSE, which is the one seat: the painter
  * bakes these same answers into the strip and the fragment reads the strip, so a
  * defect here is a defect in the picture and a defect in the picture that is not
  * here is somewhere else.
  */
-export function survey(spread = SPREAD) {
-  const bands = BANDS.map(() => ({ stone: 0, all: 0 }));
-  const lifts = [];
-  const tones = [];
-  const levels = [];
-  const seenLift = new Set();
-  for (let z = RUN.from; z <= RUN.to; z += RUN.step) {
+export function thinning(z0, z1, bands = FALL) {
+  const acc = bands.map(() => [0, 0]);
+  for (let z = z0; z <= z1; z += 0.02) {
     if (pathRun(z) <= 0) continue;
     const centre = pathCentreX(z);
     const half = pathHalfWidth(z);
     for (let side = -1; side <= 1; side += 2) {
-      for (let k = 0; k < BANDS.length; k++) {
-        const q = k === 0 ? BANDS[0] / 2 : (BANDS[k - 1] + BANDS[k]) / 2;
-        const seat = paveAt(centre + side * q * half, z);
-        bands[k].all++;
-        if (!seat.bare) bands[k].stone++;
-        if (k <= 2) {
-          lifts.push(seat.lift);
-          seenLift.add(Math.round(seat.lift * 1e6));
-          // THE LEVEL AND NOT THE CODE, which is what E-V3d states: «identita'
-          // per lastra 25% IN LIVELLO». The tone is a CODING of the level along
-          // a ramp and the coding has changed once already -- when the ramp was
-          // cut in two so that a stone piece could not be painted on the earth's
-          // half of it, every code moved and the spread of the codes halved
-          // without one piece changing colour. A guard that reads the code
-          // reads the coding; this reads the pigment the code names.
-          if (!seat.bare) {
-            // THE IDENTITY IN THE UNITS IT IS AUTHORED IN, which is where the
-            // ramp was cut in two. `tone` is a CODING: over a half it names a
-            // point on the stone's own ramp, and the point is what the identity
-            // is written on. Read as the code, the spread halved the day the
-            // ramp was cut without one piece changing colour -- so it is read
-            // as the ramp position, and the coding can move again without
-            // moving this number.
-            tones.push((seat.tone - 0.5) * 2);
-            const rgb = pathPigment({ tone: seat.tone, depth: 0, apron: apronAt(z) });
-            levels.push(0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]);
-          }
+      for (let k = 0; k < bands.length; k++) {
+        for (let d = bands[k].at[0]; d < bands[k].at[1]; d += 0.01) {
+          const seat = paveAt(centre + side * (half + KERB + d), z);
+          acc[k][1]++;
+          if (!seat.bare) acc[k][0]++;
         }
       }
     }
   }
-  const mean = (a) => a.reduce((t, v) => t + v, 0) / Math.max(a.length, 1);
-  const sd = (a) => Math.sqrt(mean(a.map((v) => (v - mean(a)) ** 2)));
-  return {
-    share: bands.map((b) => (b.all ? b.stone / b.all : NaN)),
-    counted: bands.map((b) => b.all),
-    liftMax: Math.max(...lifts),
-    liftMid: lifts.slice().sort((a, b) => a - b)[Math.floor(lifts.length / 2)],
-    liftHeights: seenLift.size,
-    lifts: lifts.length,
-    toneSd: sd(tones) / Math.max(mean(tones), 1e-9),
-    levelSd: sd(levels) / Math.max(mean(levels), 1e-9),
-    tones: tones.length,
-    spread,
-  };
+  return acc.map((a) => (a[1] ? a[0] / a[1] : NaN));
 }
 
 /**
- * How long the crossing from three quarters stone to one quarter takes, in units
- * of the half width.
+ * Every piece of stone the law lays over a stretch, as connected shapes, by
+ * equivalent diameter in metres and sorted.
  *
- * Read off the bands by straight interpolation, which is all a share counted on
- * a finite sample can carry: what is being asked is whether the fall happens
- * over a stretch or at a point, and a point is nought whatever is interpolated.
+ * COMPONENTS AND NOT LATTICE SEATS, because what a picture measures is what
+ * touches what: two pieces whose joint is a hairline are one piece to the eye
+ * and to R3's own counter, and a survey that read the lattice would report the
+ * sizes the lattice was ASKED for rather than the sizes it draws. The grid is a
+ * centimetre, which is finer than the finest joint that survives the map.
  */
-export function crossing(share) {
-  const at = (level) => {
-    for (let k = 1; k < share.length; k++) {
-      if (share[k - 1] >= level && share[k] < level) {
-        const t = (share[k - 1] - level) / Math.max(share[k - 1] - share[k], 1e-9);
-        const lo = k === 1 ? BANDS[0] / 2 : (BANDS[k - 2] + BANDS[k - 1]) / 2;
-        const hi = (BANDS[k - 1] + BANDS[k]) / 2;
-        return lo + t * (hi - lo);
-      }
+export function pieces(z0, z1, span = 0.9) {
+  const step = 0.01;
+  const nz = Math.round((z1 - z0) / step);
+  const nx = Math.round(2 * span / step);
+  const mask = new Uint8Array(nz * nx);
+  for (let j = 0; j < nz; j++) {
+    const z = z0 + j * step;
+    const centre = pathCentreX(z);
+    for (let i = 0; i < nx; i++) {
+      const seat = paveAt(centre - span + i * step, z);
+      mask[j * nx + i] = !seat.bare && !seat.inSlot ? 1 : 0;
     }
-    return NaN;
+  }
+  const seenCell = new Uint8Array(nz * nx);
+  const out = [];
+  for (let j = 0; j < nz; j++) {
+    for (let i = 0; i < nx; i++) {
+      const k = j * nx + i;
+      if (!mask[k] || seenCell[k]) continue;
+      seenCell[k] = 1;
+      const stack = [k];
+      let i0 = i; let i1 = i; let j0 = j; let j1 = j;
+      while (stack.length) {
+        const c = stack.pop();
+        const cj = Math.floor(c / nx);
+        const ci = c % nx;
+        if (ci < i0) i0 = ci;
+        if (ci > i1) i1 = ci;
+        if (cj < j0) j0 = cj;
+        if (cj > j1) j1 = cj;
+        for (let dj = -1; dj <= 1; dj++) {
+          for (let di = -1; di <= 1; di++) {
+            const nj = cj + dj; const ni = ci + di;
+            if (nj < 0 || nj >= nz || ni < 0 || ni >= nx) continue;
+            const k2 = nj * nx + ni;
+            if (mask[k2] && !seenCell[k2]) { seenCell[k2] = 1; stack.push(k2); }
+          }
+        }
+      }
+      const d = Math.sqrt((i1 - i0 + 1) * step * (j1 - j0 + 1) * step);
+      if (d > 0.03) out.push(d);
+    }
+  }
+  return out.sort((a, b) => a - b);
+}
+
+const pct = (a, q) => (a.length ? a[Math.min(a.length - 1, Math.floor(a.length * q))] : NaN);
+
+const toLinear = (v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+
+/** L*, C*, hue and the linear luminance behind them, of an encoded triple. */
+export function lch(rgb255) {
+  const [r, g, b] = rgb255.map((v) => toLinear(v / 255));
+  const x = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047;
+  const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  const z = (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883;
+  const f = (t) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+  const a = 500 * (f(x) - f(y));
+  const bb = 200 * (f(y) - f(z));
+  return {
+    L: 116 * f(y) - 16,
+    C: Math.hypot(a, bb),
+    h: (Math.atan2(bb, a) * 180 / Math.PI + 360) % 360,
+    Y: y,
   };
-  return at(0.25) - at(0.75);
+}
+
+// The material's own warmth, which is a rotation of the pigment written in the
+// fragment and not in the law (uWarmth in ../../src/world/voxel/material.js).
+// Read as TEXT and never imported, for the reason tools/lighting/render-chain
+// gives about its own reads: that file reaches three.
+const WARMTH = /warmth: new Vector3\(([0-9.]+), ([0-9.]+), ([0-9.]+)\)/
+  .exec(read('/src/world/voxel/material.js')).slice(1, 4).map(Number);
+
+/**
+ * What the pieces of a stretch develop to, through the chain the delivery ships.
+ *
+ * THE SAME CHAIN guard-pietra IS WEIGHED ON: the pigment through
+ * src/world/face-light.js's two terms on an upward normal, through the
+ * material's own warmth, through AgX and through the delivered LUT. It stands
+ * about seven levels OVER the frame at the fitted camera -- measured twice, on
+ * this palette and on the one before it, fondazione/lav/u7-vero.py -- which is
+ * one more reason what is gated below are the ratios and the hue and not the
+ * level: an offset that size is a gate on the air and on the pose, not on a
+ * pigment.
+ */
+export async function levels(z0 = 4.0, z1 = 7.0, span = 0.6) {
+  const light = readLight();
+  const composite = await renderChain();
+  const dev = (albedo) => lch(composite(faceColour([0, 1, 0], light,
+    albedo.map((v, i) => v * WARMTH[i]), GROUND_BOUNCE)));
+  const stone = []; const earth = []; const joint = [];
+  for (let z = z0; z <= z1; z += 0.01) {
+    const centre = pathCentreX(z);
+    for (let d = -span; d <= span; d += 0.01) {
+      const seat = paveAt(centre + d, z);
+      const depth = seat.inSlot ? Math.max(0, (seat.gape - seat.jm) / 2) : 0;
+      const c = dev(pathPigment({ tone: seat.tone, depth, apron: apronAt(z) }));
+      if (seat.inSlot) joint.push(c);
+      else if (seat.bare) earth.push(c);
+      else stone.push(c);
+    }
+  }
+  const sorted = (a, key) => a.map((c) => c[key]).sort((x, y) => x - y);
+  const pick = (a) => {
+    const ls = sorted(a, 'L');
+    const mean = ls.reduce((t, v) => t + v, 0) / ls.length;
+    return {
+      L: pct(ls, 0.5),
+      p10: pct(ls, 0.1),
+      p90: pct(ls, 0.9),
+      sd: Math.sqrt(ls.reduce((t, v) => t + (v - mean) ** 2, 0) / ls.length),
+      C: pct(sorted(a, 'C'), 0.5),
+      h: pct(sorted(a, 'h'), 0.5),
+      Y: pct(sorted(a, 'Y'), 0.5),
+    };
+  };
+  return { stone: pick(stone), earth: pick(earth), joint: pick(joint) };
+}
+
+/** The spread of the level between one piece and the next, as E-V3d states it. */
+export function identity(z0 = 4.0, z1 = 7.0) {
+  const tones = [];
+  for (let z = z0; z <= z1; z += 0.02) {
+    const centre = pathCentreX(z);
+    for (let d = -0.3; d <= 0.3; d += 0.02) {
+      const seat = paveAt(centre + d, z);
+      if (!seat.bare) tones.push((seat.tone - 0.5) * 2);
+    }
+  }
+  const m = tones.reduce((t, v) => t + v, 0) / tones.length;
+  return Math.sqrt(tones.reduce((t, v) => t + (v - m) ** 2, 0) / tones.length) / m;
 }
 
 // The files that lay a triangle. None of them may name the relief.
 const GEOMETRY = ['/src/world/voxel/worldgen.js', '/src/world/voxel/mesher.js',
   '/src/world/voxel/columns.js'];
 
+const lifts = [];
+const heights = new Set();
+for (let z = -8; z <= 11; z += 0.07) {
+  if (pathRun(z) <= 0) continue;
+  const centre = pathCentreX(z);
+  for (let d = -0.3; d <= 0.3; d += 0.05) {
+    const seat = paveAt(centre + d, z);
+    lifts.push(seat.lift);
+    heights.add(Math.round(seat.lift * 1e6));
+  }
+}
+const seen = STRETCH.map((s) => ({
+  ...s, fall: thinning(s.z0, s.z1), d: pieces(s.z0, s.z1),
+}));
+const level = await levels();
+const inBand = (fall) => fall.every((v, k) => v >= FALL[k].low && v <= FALL[k].high);
+const ratio = level.stone.Y / level.earth.Y;
+const under = level.stone.L - level.joint.L;
+
 if (process.argv.includes('--self')) {
-  const seen = survey();
-  // A paving whose pieces all stand at one height: the relief is there in the
-  // file and does nothing, which is the shape of failure a range test catches
-  // and a maximum does not.
-  const flat = { liftHeights: 1, liftMax: RELIEF.high, liftMid: RELIEF.high };
-  // A paving that stops dead at its own edge: full stone to the last band and
-  // nothing after it. This is «scomparendo di netto», written down.
-  const cliff = [0.95, 0.95, 0.95, 0.95, 0.0, 0.0, 0.0];
+  // A paving that stops dead at its own edge: full stone to the last column and
+  // nothing after it. This is «scomparendo di netto», written down, and it is
+  // what this corridor actually drew before U-SENT-7.
+  const cliff = [0.90, 0.83, 0.80, 0.00];
+  // And a thinning anchored at the CENTRELINE instead of at the kerb -- the
+  // window U-SENT-4 shipped, a fraction of the half width, which crossed a metre
+  // of ground at one northing and half of one at another. Injected by moving the
+  // window this file's own reader is asked through, so what is exercised is the
+  // reader and not a table of numbers.
+  const keep = { from: SPREAD.from, to: SPREAD.to };
+  SPREAD.from = 0.05 * 0.6 - 0.6 - KERB;
+  SPREAD.to = 1.35 * 0.6 - 0.6 - KERB;
+  const nominal = thinning(4.0, 7.0);
+  SPREAD.from = keep.from;
+  SPREAD.to = keep.to;
   selfTest('guard-tasselli', [
     {
       what: 'a paving whose pieces all stand at one height',
-      caught: !(flat.liftHeights > 32),
+      caught: !(new Set([RELIEF.high]).size > 32),
     },
     {
       what: 'a relief taller than the centimetre the committente named',
       caught: !(RELIEF.high * 1.5 <= RELIEF.high),
     },
     {
-      what: 'stone that stops dead at the edge instead of thinning',
-      caught: !(crossing(cliff) >= CROSS.least),
+      what: 'stone that stops dead at the kerb instead of thinning',
+      caught: !inBand(cliff),
     },
     {
-      what: 'and the ramp this law actually draws is not that',
-      caught: crossing(seen.share) >= CROSS.least,
+      what: 'a thinning anchored at the centreline instead of at the visible kerb',
+      caught: !inBand(nominal),
     },
     {
-      what: 'a middle the lateral term has eaten',
-      caught: !(0.20 >= MIDDLE.low),
+      what: 'and the fall this law actually draws is neither',
+      caught: seen.every((s) => inBand(s.fall)),
     },
     {
-      what: 'a kerb the lateral term never reached',
-      caught: !(0.90 <= KERB.high),
+      // AND IT IS THE FAR STRETCH THAT CATCHES IT, WHICH IS WHERE R3 FOUND IT.
+      // At the middle the old block answered 7.6 cm, which is inside the band a
+      // hand asks for; at the far end it answered 18.6 against the reference's
+      // 10.0, and a piece of nineteen centimetres at eleven metres is a slab.
+      what: 'the block back at 0.40 m, whose pieces read 18.6 cm at the far end',
+      caught: !(0.186 <= STRETCH[2].size[1]),
     },
     {
-      what: 'a paving of one stone, with no identity between its pieces',
-      caught: !(0.01 >= IDENTITY.low),
+      what: 'pieces finer than the maps can hold',
+      caught: !(0.03 >= SIZE_FLOOR),
+    },
+    {
+      what: 'the grey-olive pigment this paving used to wear',
+      caught: !(20.2 >= PIGMENT.chroma) && !(106 <= PIGMENT.hue[1]),
+    },
+    {
+      what: 'a stone and an earth that stand at the same level',
+      caught: !(1.05 >= PIGMENT.ratio[0]),
+    },
+    {
+      what: 'a joint no darker than the stone it separates',
+      caught: !(1.2 >= PIGMENT.jointUnder[0]),
+    },
+    {
+      what: 'a pigment over the ceiling, which is a light being fixed with a colour',
+      caught: !([1.144, 0.949, 0.585].every((v) => v <= PIGMENT.ceiling)),
+    },
+    {
+      what: 'the bare band written down twice and once wrongly',
+      caught: !(0.18 === MANTO.verge.bare),
     },
     {
       what: 'a mesher that has learnt how tall a piece is',
@@ -224,73 +398,125 @@ if (process.argv.includes('--self')) {
     },
     {
       what: 'the delivered law is none of those',
-      caught: seen.liftHeights > 32 && seen.liftMax <= RELIEF.high
-        && crossing(seen.share) >= CROSS.least
-        && seen.share[0] >= MIDDLE.low && seen.share[BANDS.length - 2] <= KERB.high
-        && seen.toneSd >= IDENTITY.low && seen.toneSd <= IDENTITY.high,
+      caught: seen.every((s) => inBand(s.fall)
+        && pct(s.d, 0.5) >= s.size[0] && pct(s.d, 0.5) <= s.size[1])
+        && level.stone.C >= PIGMENT.chroma
+        && ratio >= PIGMENT.ratio[0] && ratio <= PIGMENT.ratio[1]
+        && KERB === MANTO.verge.bare,
     },
   ]);
 }
 
 const report = reporter('guard-tasselli -- the corridor is pieces, and they thin instead of stopping');
 
-const seen = survey();
-report.line(`  ${seen.counted.reduce((t, v) => t + v, 0)} seats over ${RUN.from} to ${RUN.to} m `
-  + `of run, ${seen.lifts} of them in the middle three bands`);
-
 // ------------------------------------------------------------------- 1
-report.check(seen.liftMax <= RELIEF.high + 1e-9,
+report.check(Math.max(...lifts) <= RELIEF.high + 1e-9,
   `no piece stands more than ${(RELIEF.high * 1000).toFixed(0)} mm proud, which is his own number`,
-  `the tallest stands ${(seen.liftMax * 1000).toFixed(2)} mm`);
-report.check(seen.liftHeights > 32,
+  `the tallest stands ${(Math.max(...lifts) * 1000).toFixed(2)} mm`);
+report.check(heights.size > 32,
   'and they do not all stand at the same height -- «sporgono in maniera diversa»',
-  `${seen.liftHeights} distinct heights over ${seen.lifts} seats, median `
-  + `${(seen.liftMid * 1000).toFixed(2)} mm`);
+  `${heights.size} distinct heights over ${lifts.length} seats`);
 
 // ------------------------------------------------------------------- 2
 report.line('');
-for (let k = 0; k < BANDS.length; k++) {
-  report.line(`  stone at ${k === 0 ? '0.00' : BANDS[k - 1].toFixed(2)}-${BANDS[k].toFixed(2)} `
-    + `of the half width   ${(seen.share[k] * 100).toFixed(1)}% of ${seen.counted[k]} seats`);
+report.line('  the share of the surface that is STONE, by distance from the VISIBLE kerb:');
+for (const s of seen) {
+  report.line(`    ${s.name}   `
+    + FALL.map((f, k) => `${f.at[0].toFixed(2)}..${f.at[1].toFixed(2)} `
+      + `${(100 * s.fall[k]).toFixed(0)}%`).join('   '));
 }
-report.check(seen.share[0] >= MIDDLE.low && seen.share[0] <= MIDDLE.high,
-  `the middle of the corridor is ${(MIDDLE.low * 100).toFixed(0)} to `
-  + `${(MIDDLE.high * 100).toFixed(0)}% stone, which is E-V3d's own tuning left alone`,
-  `${(seen.share[0] * 100).toFixed(1)}%`);
-report.check(seen.share[BANDS.length - 2] <= KERB.high,
-  `and past the nominal edge it is under ${(KERB.high * 100).toFixed(0)}%: the stone THINS`,
-  `${(seen.share[BANDS.length - 2] * 100).toFixed(1)}% at 1.15 of the half width`);
-report.check(seen.share.every((v, k) => k === 0 || v <= seen.share[k - 1] + 0.02),
+for (let k = 0; k < FALL.length; k++) {
+  const f = FALL[k];
+  const mid = (f.low + f.high) / 2;
+  const worst = seen.reduce((w, s) => (Math.abs(s.fall[k] - mid)
+    > Math.abs(w.fall[k] - mid) ? s : w), seen[0]);
+  report.check(seen.every((s) => s.fall[k] >= f.low && s.fall[k] <= f.high),
+    `${f.what} the stone is ${(100 * f.low).toFixed(0)} to ${(100 * f.high).toFixed(0)}% of the `
+    + 'surface, in all three stretches, as the reference reads it',
+    `worst ${worst.name.trim().split(' ')[0]} at ${(100 * worst.fall[k]).toFixed(1)}%`);
+}
+report.check(seen.every((s) => s.fall.every((v, k) => k === 0 || v <= s.fall[k - 1] + 0.02)),
   'and it falls at every band, so there is no step back up',
-  seen.share.map((v) => `${(v * 100).toFixed(0)}%`).join(' -> '));
-const cross = crossing(seen.share);
-report.check(cross >= CROSS.least,
-  `and the crossing from three quarters to one quarter takes at least `
-  + `${CROSS.least.toFixed(2)} of the half width -- no netto confine`,
-  `${cross.toFixed(2)} of it, which is ${(cross * pathHalfWidth(9.2) * 100).toFixed(0)} cm `
-  + `under the walker and ${(cross * pathHalfWidth(4.0) * 100).toFixed(0)} cm `
-  + 'through the middle of the field');
+  seen.map((s) => s.fall.map((v) => `${(100 * v).toFixed(0)}`).join('>')).join('  '));
+report.check(SPREAD.from < 0 && SPREAD.to > 0,
+  'and the window straddles the kerb, so the last pieces surface out on the brown (S4)',
+  `${SPREAD.from} to ${SPREAD.to} m of it`);
 
 // ------------------------------------------------------------------- 3
 report.line('');
-report.check(seen.toneSd >= IDENTITY.low && seen.toneSd <= IDENTITY.high,
-  `every piece carries its own place on the stone's own ramp, spread ${(IDENTITY.low * 100).toFixed(0)} to `
-  + `${(IDENTITY.high * 100).toFixed(0)}% as E-V3d measures it`,
-  `${(seen.toneSd * 100).toFixed(1)}% over ${seen.tones} stone pieces`);
-// AND WHAT THAT COMES TO IN LIVELLO, WHICH IS THE UNIT E-V3d STATES AND WHICH
-// THIS PIGMENT PAIR CANNOT REACH. It is printed and not gated, and the
-// arithmetic is why: the stone's ramp runs from STONE to STONE_PALE, whose
-// luminances are 0.299 and 0.432 -- a ratio of 1.44 -- and the identity is
-// written about a mean 0.62 of the way up it. A spread of 25% of THAT mean
-// needs the ramp's two ends about 2.4 apart, so no identity written on this
-// pair reaches it: at the 25% E-V3d states, the level comes out at the figure
-// below. The pair is E-V3g's and is a measurement of the same stone off the
-// same reference, re-solved twice; moving it is the coordinator's.
-report.line(`  and in LIVELLO that comes to ${(seen.levelSd * 100).toFixed(1)}% against `
-  + 'the 25% of E-V3d: the pair STONE / STONE_PALE stands 1.44 apart and a spread of a '
-  + 'quarter of the mean needs about 2.4 -- printed, not gated, and escalated');
+for (const s of seen) {
+  report.line(`  ${s.name}   ${s.d.length} pieces, d10/d50/d90 `
+    + `${(100 * pct(s.d, 0.1)).toFixed(1)} / ${(100 * pct(s.d, 0.5)).toFixed(1)} / `
+    + `${(100 * pct(s.d, 0.9)).toFixed(1)} cm`);
+}
+for (const s of seen) {
+  const d50 = pct(s.d, 0.5);
+  report.check(d50 >= s.size[0] && d50 <= s.size[1],
+    `${s.name.split(' ')[0].padEnd(4)} lays pieces of ${(100 * s.size[0]).toFixed(0)} to `
+    + `${(100 * s.size[1]).toFixed(0)} cm at the median, which is the reference's own hand`,
+    `${(100 * d50).toFixed(1)} cm`);
+}
+report.check(seen.every((s) => s.size[0] >= SIZE_FLOOR),
+  `and no band of it reaches under ${(100 * SIZE_FLOOR).toFixed(0)} cm, which is what the `
+  + 'maps can carry: six texels of the ruler and two and a half of the tone');
 
 // ------------------------------------------------------------------- 4
+report.line('');
+report.line(`  through the delivered chain, over the mid stretch: stone L* ${level.stone.L.toFixed(1)} `
+  + `(p10 ${level.stone.p10.toFixed(1)}, p90 ${level.stone.p90.toFixed(1)}, sd `
+  + `${level.stone.sd.toFixed(1)}) C* ${level.stone.C.toFixed(1)} h ${level.stone.h.toFixed(0)}; `
+  + `earth L* ${level.earth.L.toFixed(1)} C* ${level.earth.C.toFixed(1)}; `
+  + `joint L* ${level.joint.L.toFixed(1)}`);
+report.check(ratio >= PIGMENT.ratio[0] && ratio <= PIGMENT.ratio[1],
+  `the stone stands ${PIGMENT.ratio[0]} to ${PIGMENT.ratio[1]} times its own earth in linear `
+  + "luminance, which is the reference's 2.15 and is a ratio no light can move",
+  `${ratio.toFixed(2)}`);
+report.check(level.stone.C >= PIGMENT.chroma,
+  `and it is a warm beige at chroma ${PIGMENT.chroma} or over, not the grey-olive of 20`,
+  `C* ${level.stone.C.toFixed(1)}`);
+report.check(level.stone.h >= PIGMENT.hue[0] && level.stone.h <= PIGMENT.hue[1],
+  `at hue ${PIGMENT.hue[0]} to ${PIGMENT.hue[1]} degrees, which is the reference's 80`,
+  `${level.stone.h.toFixed(0)} degrees`);
+report.check(level.stone.sd <= PIGMENT.spread,
+  `and the pieces stand within ${PIGMENT.spread} levels of one another, as the reference's own `
+  + '3.5 does -- the identity is in the shape and in the joint, not in the level',
+  `sd ${level.stone.sd.toFixed(1)} L*`);
+report.check(under >= PIGMENT.jointUnder[0] && under <= PIGMENT.jointUnder[1],
+  `and a joint stands ${PIGMENT.jointUnder[0]} to ${PIGMENT.jointUnder[1]} levels under the stone `
+  + 'either side of it, walked to the floor of the slot -- the reference reads 9.7 through a '
+  + "picture's own ruler and this paving 8.9 on the same one",
+  `${under.toFixed(1)} L*`);
+report.note('the LEVEL is not gated and E-LUCE7 is why: the pigment is at the ceiling this world '
+  + 'puts on a pigment (0.900 of red, «as red as a surface may be») and the corridor still '
+  + 'develops seven levels under the reference at the fitted camera. Closing it takes a constant '
+  + "of the light on the paving -- x1.48 on its own lightScale, measured -- which is the "
+  + "coordinator's and not this unit's");
+
+// ------------------------------------------------------------------- 5
+report.line('');
+report.check(KERB === MANTO.verge.bare,
+  'the bare band beside the stone is ONE number: the paving reads where the kerb is seen and the '
+  + 'mat writes it, and neither file may import the other',
+  `KERB ${KERB} m, MANTO.verge.bare ${MANTO.verge.bare} m`);
+report.check([STONE, STONE_PALE, EARTH].every((p) => p.every((v) => v <= PIGMENT.ceiling + 1e-9)),
+  `and no pigment of the paving is over ${PIGMENT.ceiling.toFixed(3)}: an albedo over one is the `
+  + 'signature of a light being fixed with a colour',
+  `pale ${STONE_PALE.map((v) => v.toFixed(3)).join('/')}`);
+
+// ------------------------------------------------------------------- 6
+report.line('');
+const toneSd = identity();
+report.check(toneSd >= IDENTITY.low && toneSd <= IDENTITY.high,
+  `every piece carries its own place on the stone's own ramp, spread `
+  + `${(IDENTITY.low * 100).toFixed(0)} to ${(IDENTITY.high * 100).toFixed(0)}% as E-V3d `
+  + 'measures it',
+  `${(toneSd * 100).toFixed(1)}%`);
+report.check(TUNING.apron.bare.every((v, i) => v > TUNING.reach.bare[i]),
+  "and the near apron still carries more earth than the middle stretch, which is E-V3d's own "
+  + 'direction even though both numbers have moved with the reference behind them',
+  `reach ${TUNING.reach.bare.join('/')}, apron ${TUNING.apron.bare.join('/')}`);
+
+// ------------------------------------------------------------------- 7
 report.line('');
 for (const file of GEOMETRY) {
   const names = /\bRELIEF\b/.test(read(file));
@@ -301,15 +527,5 @@ const fragment = read('/src/world/voxel/material.js');
 report.check(/uReliefHigh/.test(fragment) && /uReliefShade/.test(fragment)
   && /uReliefWall/.test(fragment) && /uReliefMean/.test(fragment),
   'and the fragment is the only place it is read, through four uniforms of its own');
-
-// AND THE TUNING IT ALL STANDS ON IS STILL V3'S.
-report.line('');
-report.check(TUNING.reach.bare.every((v, i) => v === [0.02, 0.06, 0.09][i])
-  && TUNING.apron.bare.every((v, i) => v === [0.05, 0.12, 0.17][i]),
-  'the share of bare pieces at the middle is E-V3d, unmoved: 2/6/9 and 5/12/17 per cent',
-  `reach ${TUNING.reach.bare.join('/')}, apron ${TUNING.apron.bare.join('/')}`);
-report.check(SPREAD.to > 1.0,
-  'and the thinning runs PAST the nominal edge, so pieces surface on the brown (S4)',
-  `${SPREAD.from} to ${SPREAD.to} of the half width`);
 
 report.end();

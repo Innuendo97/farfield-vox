@@ -208,7 +208,18 @@ const FOCUS = { x: SPAWN.x, z: SPAWN.z };
 // a flank that shows. The other 2 982 quads are the MAT, and they are the band
 // beside the stone: it carries no blade at all now, where it used to carry one
 // on 41 columns in a hundred. U-SENT-6, R3 S1.
-const AT_TODAY = 184584;
+//
+// AND RE-TAKEN WITH THE TESSELLATION AND THE EDGE THAT NO LONGER WANDERS:
+// 184 296 at r = 14 m, 92 148 quads. It is 288 triangles LOWER and none of them
+// is a tessella: the pieces of the paving are painted and have never been a
+// triangle (guard-tasselli holds that). What moved is the two things that touch
+// the FOOTPRINT -- the edge of the corridor wanders by a tenth of its own half
+// width instead of by a fixed 0.1484 m, so the bare earth of the verges comes to
+// 1 257 quads against 1 385, and the paving's own walls to 320 against 191,
+// which is the band beside the stone joining the paving's family (`pavedTop` in
+// src/world/voxel/worldgen.js) and showing its flanks at the rim. The
+// allocation is not touched: the disc came in under it. U-SENT-7, R3 S2 and S3.
+const AT_TODAY = 184296;
 
 const OWNER = 'V1';
 
