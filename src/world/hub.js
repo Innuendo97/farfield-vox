@@ -234,6 +234,27 @@ export function buildHub() {
       return stats ? { ...stats, rockTriangles: stone.rockTriangles } : null;
     },
 
+    /**
+     * WHETHER THE GROUND IS ALL THERE, which is the one question the veil has
+     * to ask before it lifts (U-CAMPO-2, M5).
+     *
+     * The meadow is streamed: sixty four tiles of the near window and sixty
+     * four of the far one, one a frame at sixty to a hundred milliseconds
+     * apiece in the worker. The veil used to be a stopwatch started on the
+     * frame the ground first arrived, so on a slow machine it went up over a
+     * floor that was still building itself -- R8 measured «il suolo si
+     * costruisce a vista, per righe, per quattro-sei secondi». What a veil is
+     * for is precisely this, and a veil that does not know when to lift is a
+     * curtain on a timer.
+     *
+     * It answers false and not null before the layer exists, because a world
+     * with no ground in it is the plainest case of the ground not being ready.
+     */
+    groundReady() {
+      const field = soil && soil.campo;
+      return !!(field && typeof field.ready === 'function' && field.ready());
+    },
+
     /** The engraving of one section, once its text has been drawn. */
     setEngraving(id, texture) { stone.setEngraving(id, texture); },
 

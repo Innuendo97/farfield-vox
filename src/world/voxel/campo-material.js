@@ -271,6 +271,32 @@ const FRAGMENT = /* glsl */`
   uniform float uLodNear;
   uniform float uLodStep;
   uniform vec2 uLodCentre;
+  // ------------------------------------------------- AND THE BAND (U-CAMPO-2)
+  //
+  // The centre is TWO points now: uLodCentre is where the walker stood uLodLag
+  // milliseconds ago, uLodCentre2 is where they stand this frame, and every
+  // pixel reads a point of the segment between them chosen by its OWN hash. A
+  // front is then a band as wide as the walker covers in that lag -- 30 cm at a
+  // metre a second -- inside which cells change size ONE AT A TIME, in the order
+  // of the hash, as the walker advances. Not a line that jumps: a grain that
+  // moves. Standing still, after the lag, the two points are one and the frame
+  // is what it always was, to the byte.
+  //
+  // uLodMix nought is the OTHER shape of the same handle, kept because it is
+  // what R2's S3 proposed and what the bench weighs the band against: the centre
+  // still jumps, and uLodFade is how far a screen-door dissolve between the old
+  // point and the new one has got.
+  uniform vec2 uLodCentre2;
+  uniform float uLodFade;
+  uniform float uLodMix;
+  // WHETHER THE GRAIN IS ATTACHED TO THE MEADOW OR TO THE GLASS. On the glass
+  // (nought) the hash is the pixel's own address, which is the cheapest thing
+  // there is and is what R2's dissolve used; walking, it crawls, because the
+  // ground moves under a speckle that does not. On the meadow (one) the hash is
+  // the five centimetre cell of the plateau this pixel's ray lands on, so a
+  // patch of grass keeps its own place in the order for as long as it is in
+  // frame and the band reads as ground rather than as film grain.
+  uniform float uLodWorld;
   uniform float uDither;
   // How hard the statistic of the mat pulls a coarse cell towards the light of
   // the mat it stands for, and how deep under its own canopy that mat sits.
@@ -556,10 +582,30 @@ const FRAGMENT = /* glsl */`
     // it and the crossings are added to it.
     float tRay = tEnter + 1e-4;
 
+    // ---------------------------------------------- WHICH CENTRE THIS PIXEL HAS
+    //
+    // Once, before the loop, because it must be ONE number for the whole ray:
+    // far2 below is a running maximum and the invariant the traversal is written
+    // on -- a level is never given back -- holds only while the point it is
+    // measured from stands still along the ray.
+    //
+    // The anchor for the world-side hash is where the ray meets the plateau's
+    // own level, which is a place on the GROUND and therefore does not move when
+    // the camera does. A ray with no downward slope never reaches it and never
+    // reads ground either, so it falls back on the eye and costs nothing.
+    float toFoot = dir.y < -1e-3 ? -eye.y / dir.y : -1.0;
+    vec2 grain = toFoot > 0.0 ? eye.xz + dir.xz * toFoot : eye.xz;
+    float lodSel = uLodWorld > 0.5
+      ? pigHash(floor(grain.x / uCell), floor(grain.y / uCell))
+      : pigHash(gl_FragCoord.x + 7.0, gl_FragCoord.y + 3.0);
+    vec2 lodC = uLodMix > 0.5
+      ? mix(uLodCentre, uLodCentre2, lodSel * uLodFade)
+      : (lodSel < uLodFade ? uLodCentre2 : uLodCentre);
+
     for (int i = 0; i < 512; i++) {
       if (i >= uSteps) break;
       gSteps = i;
-      vec2 fromWalker = p.xz - uLodCentre;
+      vec2 fromWalker = p.xz - lodC;
       far2 = max(far2, dot(fromWalker, fromWalker));
       // WHICH RUNG THE RAY HAS REACHED. It only ever climbs, so this is one
       // compare a step and one multiply a level, and never a level twice.
@@ -1274,6 +1320,16 @@ export function campoMaterial({
        * never by this file.
        */
       uLodCentre: { value: new Vector2(0, 0) },
+      /**
+       * The other end of the band, the dissolve along it, and which of the two
+       * shapes the handle is in. See the note over the uniforms in the shader;
+       * campo-field.js is the only writer of all four.
+       */
+      uLodCentre2: { value: new Vector2(0, 0) },
+      uLodFade: { value: 0 },
+      uLodMix: { value: 0 },
+      /** And whether the grain of the band is on the meadow (1) or the glass. */
+      uLodWorld: { value: 1 },
       /**
        * How wide the band is where one level of detail gives way to the next,
        * in levels, spread by the pixel's own hash.

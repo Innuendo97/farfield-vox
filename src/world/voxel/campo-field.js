@@ -128,6 +128,9 @@ function makeWindow(shape, job) {
     pending: [],
     arrived: [],
     centre: null,
+    /** Where the window is GOING, while the tiles that make it are still in the
+     * worker: see moveTo and flush (U-CAMPO-2, M2.2). */
+    pendingBounds: null,
     tiles: 0,
     tilesAsked: 0,
     workerMs: 0,
@@ -186,6 +189,18 @@ export function createCampo({
     tiles: 0,
     tilesAsked: 0,
     farTiles: 0,
+    // The far window's own share of the worker, kept apart from the near one's:
+    // M2.1 made a far tile dearer and a near tile not at all, and a budget that
+    // could not tell them apart could not be held to (guard-livello3).
+    farWorkerMs: 0,
+    worstFarWorkerMs: 0,
+    /** How many times the near window's boundaries were carried across on the
+     * landing of the last tile rather than at the crossing (M2.2). */
+    landings: 0,
+    /** How many times the centre of the detail jumped, in the arms that jump. */
+    snaps: 0,
+    /** And how many times the deadline had to carry them instead. */
+    forced: 0,
     workerMs: 0,
     worstWorkerMs: 0,
     uploadMs: 0,
@@ -231,6 +246,50 @@ export function createCampo({
   // U-CAMPO-2, not here -- so `snap` is a handle and the tier sets it.
   let lodCentre = null;
   let lodSnap = 0.75;
+  // ------------------------------------------------------------- AND THE BAND.
+  //
+  // The hysteresis above was the right answer to «a step taken and taken back
+  // must not redraw the meadow» (E-CAMPO1), and it cost exactly what the comment
+  // said it would: the change, when it came, came AT ONCE. Measured, that is
+  // 2.5 % of the frame in one frame, on three rings at 9, 13 and 19 m, every
+  // 0.8 m of walking -- one every 0.27 s at three metres a second, in the lower
+  // third of the frame where a walker is looking. It is the first of the three
+  // things the committente saw: «a scatti si generano le cose».
+  //
+  // What replaces it is not a smaller jump or a slower one. It is a BAND: the
+  // fragment is handed two centres -- where the walker was `lodLag` ms ago and
+  // where they are now -- and each pixel reads a point of the segment between
+  // them chosen by its own hash. The front of every ring becomes a band as wide
+  // as the walker covers in that lag, inside which cells change size one at a
+  // time in the order of the hash while the walker advances. The SAME amount of
+  // meadow changes size per metre as a centre with no hysteresis at all; what
+  // goes away is the line, and the jump with it.
+  //
+  // AND STANDING STILL IT IS THE OLD PICTURE TO THE BYTE. The trail runs out
+  // after `lodLag` ms, the two centres become one, and nothing is dithered,
+  // blended or held: guard-stabilita asserts exactly that.
+  let lodMode = 'band';
+  let lodLag = 300;
+  let lodFadeMs = 300;
+  let lodWorld = true;
+  // Where the walker has been, kept just long enough: the head is the oldest
+  // sample still inside the lag and the tail is this frame. It is two or three
+  // entries at a walking pace and it is trimmed in place.
+  const trail = [];
+  let fading = null;
+  // WHETHER THE FAR WINDOW SPEAKS LEVEL THREE OF THE NEAR PYRAMID (M2.1). It is
+  // ON, and the handle exists so that a bench can take the other arm -- the far
+  // texel carrying the law's flat expectation, which is what the strip used to
+  // change into every 6.4 m -- in the same page and the same half hour.
+  let farSample = true;
+  // WHETHER THE NEAR WINDOW'S BOUNDARIES WAIT FOR THE LAST TILE (M2.2). On, and
+  // the handle is the bench's arm, as farSample is.
+  let landing = true;
+  // AND THE DEADLINE UNDER IT. Waiting for the tiles is right; waiting for ever
+  // is not a thing a frame loop may do. If a tile is lost -- a worker that died,
+  // a message that never came -- the boundaries go across anyway after this, and
+  // stats.forced says it happened rather than the world quietly staying behind.
+  const LANDING_DEADLINE_MS = 2000;
   // The ring of bearings, and the vec4s the fragment reads it through: the
   // uniform is allocated once and written in place, because this is rewritten
   // four times a second on the thread the walker is on.
@@ -355,6 +414,10 @@ export function createCampo({
     stats.workerMs += message.ms;
     if (message.ms > w.worstWorkerMs) w.worstWorkerMs = message.ms;
     if (message.ms > stats.worstWorkerMs) stats.worstWorkerMs = message.ms;
+    if (w === far) {
+      stats.farWorkerMs += message.ms;
+      if (message.ms > stats.worstFarWorkerMs) stats.worstFarWorkerMs = message.ms;
+    }
   }
 
   /**
@@ -416,6 +479,29 @@ export function createCampo({
         if (message.lowest < w.lowest) { w.lowest = message.lowest; moved = true; }
       }
     }
+    // ------------------------------------------------------ AND THE EXCHANGE.
+    //
+    // THE BOUNDARIES MOVE WHEN THE LAST TILE IS ON THE CARD, AND NOT BEFORE.
+    // The window used to be told where it stood at the CROSSING -- the frame the
+    // walker passed a multiple of 6.4 m -- and the eight slots that came into it
+    // were still holding the row that fell off the back, 51.2 m behind. For the
+    // half second it took the worker to answer, the ray read a stranger; what
+    // that looked like is R8's «una riga di blocchi che si costruisce da sinistra
+    // a destra a mezza distanza». Now the ray goes on reading the FAR window over
+    // that ground until every new tile has landed, and the far window says the
+    // same byte the near one is about to (M2.1): the move became a change of
+    // address, and an address does not have a picture.
+    if (near.pendingBounds) {
+      const done = near.asked.size === 0 && near.arrived.length === 0;
+      const late = performance.now() - near.pendingBounds.at > LANDING_DEADLINE_MS;
+      if (done || late) {
+        const { lo, hi } = near.pendingBounds;
+        material.uniforms.uBounds.value.set(lo.x, lo.z, hi.x, hi.z);
+        near.pendingBounds = null;
+        stats.landings += 1;
+        if (!done) stats.forced += 1;
+      }
+    }
     if (moved) fitBox();
   }
 
@@ -426,7 +512,7 @@ export function createCampo({
     for (const c of list) w.asked.add(`${c.cx},${c.cz}`);
     w.tilesAsked += list.length;
     stats.tilesAsked += list.length;
-    if (thread) thread.postMessage({ job: w.job, radius, chunks: list });
+    if (thread) thread.postMessage({ job: w.job, radius, chunks: list, sample: farSample });
     else w.pending.push(...list);
   }
 
@@ -470,10 +556,32 @@ export function createCampo({
     // somebody else: there is nothing to unload, because the new tile writes
     // over exactly the texels the old one owned.
     for (const key of [...w.held.keys()]) if (!keep.has(key)) w.held.delete(key);
+    // NEAREST FIRST (M2.4). They were asked for by ROWS, which is the order the
+    // two loops above happen to walk, and at the door of the world that is what
+    // built the ground in stripes from the far edge of the window towards the
+    // feet -- the one order a walker looking down cannot help but watch. Sixty
+    // four elements sorted once a window is not a cost; walking a step asks for
+    // eight and sorting them is free.
+    const span = w.shape.span;
+    wanted.sort((a, b) => {
+      const ax = (a.cx + 0.5) * span - x;
+      const az = (a.cz + 0.5) * span - z;
+      const bx = (b.cx + 0.5) * span - x;
+      const bz = (b.cz + 0.5) * span - z;
+      return (ax * ax + az * az) - (bx * bx + bz * bz);
+    });
     const lo = { x: p.cx * w.shape.span, z: p.cz * w.shape.span };
     const hi = { x: (p.cx + tiles) * w.shape.span, z: (p.cz + tiles) * w.shape.span };
     const uniform = w === near ? material.uniforms.uBounds : material.uniforms.uFarBounds;
-    uniform.value.set(lo.x, lo.z, hi.x, hi.z);
+    // M2.2: the near window's boundaries are held back until its tiles land --
+    // but only once it HAS tiles, because the first window of all has nothing
+    // behind it to keep reading and would hold the ground back for ever.
+    if (landing && w === near && wanted.length && w.tiles > 0) {
+      w.pendingBounds = { lo, hi, at: performance.now() };
+    } else {
+      uniform.value.set(lo.x, lo.z, hi.x, hi.z);
+      w.pendingBounds = null;
+    }
     if (w === far) mesh.position.set((lo.x + hi.x) / 2, mesh.position.y, (lo.z + hi.z) / 2);
     // THE NEAR TILES FIRST, ALWAYS. A walker who has just been put down is
     // looking at their own feet before they are looking at the ridge, and the
@@ -512,7 +620,7 @@ export function createCampo({
       if (!thread) return;
       for (const w of windows) {
         if (w.pending.length) {
-          thread.postMessage({ job: w.job, radius, chunks: w.pending.splice(0) });
+          thread.postMessage({ job: w.job, radius, chunks: w.pending.splice(0), sample: farSample });
         }
       }
     },
@@ -531,12 +639,55 @@ export function createCampo({
       // until the walker is more than `lodSnap` metres from it. At snap nought
       // it is simply the walker, which is the arm the hysteresis is measured
       // against.
-      if (!lodCentre) lodCentre = { x: eye.x, z: eye.z };
-      else if (Math.hypot(eye.x - lodCentre.x, eye.z - lodCentre.z) > lodSnap) {
-        lodCentre.x = eye.x;
-        lodCentre.z = eye.z;
+      const now = performance.now();
+      const u = material.uniforms;
+      u.uLodWorld.value = lodWorld ? 1 : 0;
+      if (lodMode === 'band') {
+        // THE TRAIL, AND THE ONE THING IT MUST NOT DO: run dry. The head is kept
+        // until the entry BEHIND it has itself fallen outside the lag, so there
+        // is always one sample at least as old as the lag to interpolate from --
+        // otherwise a frame that arrived late would narrow the band to nothing
+        // and put the line back for one frame, which is the very defect.
+        trail.push({ t: now, x: eye.x, z: eye.z });
+        while (trail.length > 2 && trail[1].t <= now - lodLag) trail.shift();
+        const was = trail[0];
+        u.uLodCentre.value.set(was.x, was.z);
+        u.uLodCentre2.value.set(eye.x, eye.z);
+        u.uLodFade.value = 1;
+        u.uLodMix.value = 1;
+        lodCentre = { x: eye.x, z: eye.z };
+      } else {
+        // The arm the band is measured against, and the two shapes it can take:
+        // `snap` is what shipped, `fade` is R2's S3 -- the same jump, spread
+        // over lodFadeMs by a screen-door between the old centre and the new.
+        u.uLodMix.value = 0;
+        if (trail.length) trail.length = 0;
+        if (!lodCentre) {
+          lodCentre = { x: eye.x, z: eye.z };
+          fading = null;
+          u.uLodFade.value = 0;
+        } else if (!fading
+          && Math.hypot(eye.x - lodCentre.x, eye.z - lodCentre.z) > lodSnap) {
+          stats.snaps += 1;
+          if (lodMode === 'fade' && lodFadeMs > 0) {
+            fading = { at: now, x: eye.x, z: eye.z };
+            u.uLodCentre2.value.set(eye.x, eye.z);
+          } else {
+            lodCentre.x = eye.x;
+            lodCentre.z = eye.z;
+          }
+        }
+        if (fading) {
+          const done = Math.min(1, (now - fading.at) / lodFadeMs);
+          u.uLodFade.value = done;
+          if (done >= 1) {
+            lodCentre = { x: fading.x, z: fading.z };
+            fading = null;
+            u.uLodFade.value = 0;
+          }
+        }
+        u.uLodCentre.value.set(lodCentre.x, lodCentre.z);
       }
-      material.uniforms.uLodCentre.value.set(lodCentre.x, lodCentre.z);
       // AND THE SKY'S OWN BOUND, WHEN THE EYE HAS MOVED ENOUGH TO CHANGE IT.
       // It is four thousand cells of arithmetic; at a quarter of a metre it is
       // asked about four times a second at walking pace, and what it can be
@@ -572,7 +723,7 @@ export function createCampo({
      * plants the centre again on the next frame rather than dragging it, so a
      * measurement taken at one snap is never half of another.
      */
-    setDetail({ near: ringNear, step, snap } = {}) {
+    setDetail({ near: ringNear, step, snap, mode, lag, fadeMs, world } = {}) {
       const u = material.uniforms;
       if (ringNear > 0) u.uLodNear.value = ringNear;
       if (step > 1) u.uLodStep.value = step;
@@ -580,7 +731,79 @@ export function createCampo({
         lodSnap = snap;
         lodCentre = null;
       }
-      return { near: u.uLodNear.value, step: u.uLodStep.value, snap: lodSnap };
+      // THE TIER'S OWN HANDLE IS THE LAG NOW and not the hysteresis: the band
+      // has no hysteresis to set. A mode that changes plants the centre again on
+      // the next frame rather than dragging it across, so a measurement taken in
+      // one mode is never half of another.
+      if (mode) {
+        lodMode = mode;
+        lodCentre = null;
+        fading = null;
+        trail.length = 0;
+        u.uLodFade.value = 0;
+      }
+      if (lag !== undefined && lag !== null && lag >= 0) lodLag = lag;
+      if (fadeMs !== undefined && fadeMs !== null && fadeMs >= 0) lodFadeMs = fadeMs;
+      if (world !== undefined) lodWorld = !!world;
+      return {
+        near: u.uLodNear.value,
+        step: u.uLodStep.value,
+        snap: lodSnap,
+        mode: lodMode,
+        lag: lodLag,
+        fadeMs: lodFadeMs,
+        world: lodWorld,
+      };
+    },
+
+    /** What the band is doing this frame, for a bench and for a guard. */
+    lodState() {
+      const u = material.uniforms;
+      return {
+        mode: lodMode,
+        lag: lodLag,
+        world: lodWorld,
+        centre: [u.uLodCentre.value.x, u.uLodCentre.value.y],
+        centre2: [u.uLodCentre2.value.x, u.uLodCentre2.value.y],
+        fade: u.uLodFade.value,
+        mix: u.uLodMix.value,
+        band: Math.hypot(u.uLodCentre2.value.x - u.uLodCentre.value.x,
+          u.uLodCentre2.value.y - u.uLodCentre.value.y),
+        trail: trail.length,
+        snaps: stats.snaps,
+        landings: stats.landings,
+        forced: stats.forced,
+      };
+    },
+
+    /**
+     * THE BENCH'S OWN ARM FOR M2.1: whether the far window speaks level three
+     * of the near pyramid or the law's flat expectation. Refilling all sixty
+     * four far tiles is what taking the arm costs, and it is taken once per
+     * measurement rather than per step, so it is asked for here rather than
+     * being a thing a frame could change.
+     */
+    setFarSample(on) {
+      const want = on !== false;
+      if (want === farSample) return farSample;
+      farSample = want;
+      far.held.clear();
+      far.coarse.clear();
+      far.asked.clear();
+      far.arrived.length = 0;
+      far.centre = null;
+      moveTo(far, 0, 0);
+      return farSample;
+    },
+
+    /**
+     * THE BENCH'S ARM FOR M2.2: whether the near window's boundaries wait for
+     * the last tile of the row to land, or go across at the crossing the way
+     * they used to. Turning it off leaves any pending exchange to the deadline.
+     */
+    setLanding(on) {
+      landing = on !== false;
+      return landing;
     },
 
     /** Every tile of both windows is in its picture. */

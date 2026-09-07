@@ -165,6 +165,51 @@ const onCriticalByte = introBus
   ? (loaded, total) => introBus.report('critical', total ? loaded / total : 1)
   : undefined;
 
+// HOW LONG THE VEIL WILL WAIT FOR THE GROUND BEFORE IT LIFTS ANYWAY.
+//
+// The veil holds the arrival for two seconds and dissolves over two and a half,
+// and it used to start that stopwatch on the frame the ground FIRST arrived --
+// which, on a machine streaming a hundred and twenty eight tiles at sixty to a
+// hundred milliseconds apiece in a worker, is four to six seconds before the
+// ground is all there. R8 watched it happen: «il suolo si costruisce a vista,
+// tessera per tessera e per righe dal fondo». A curtain that goes up on a set
+// still being carried in is worse than a longer curtain.
+//
+// So it waits for hub.groundReady(). The ceiling is what keeps that from being
+// a promise the page cannot keep: a machine slow enough, or a worker wedged
+// badly enough, must still get its world -- late and building itself, which is
+// what happened every time before, rather than never. Six seconds is the wait
+// measured on the machine the campaign judges on, and the verbale records which
+// of the two the delivery took on each visit.
+//
+// NINE SECONDS, AND IT IS A MEASUREMENT AND NOT A ROUND NUMBER. R8 proposed six.
+// Measured here with a 50 ms register from the first byte -- four servers up, a
+// second bench running -- the whole ground stands at 7.1 s on a return visit and
+// 10.0 s on a first one, so six seconds put the curtain up with a second of
+// floor still arriving and the wait bought nothing at all. Nine covers the
+// return visit, which is the one a walker has twice, and leaves the first visit
+// on the ceiling with the horizon already there.
+const VEIL_GROUND_CAP_MS = 9000;
+
+/**
+ * Lifts the veil when the ground is all there, or when the ceiling says so.
+ *
+ * Safe to call more than once: the second caller finds the first already
+ * waiting, and veil.begin() is itself safe to call twice.
+ */
+let veilWaiting = false;
+function beginVeilWhenGround() {
+  if (veilWaiting) return;
+  veilWaiting = true;
+  const from = performance.now();
+  const look = () => {
+    const late = performance.now() - from >= VEIL_GROUND_CAP_MS;
+    if (!hub.groundReady() && !late) { requestAnimationFrame(look); return; }
+    veil.begin(late ? 'a tempo' : 'col suolo intero');
+  };
+  look();
+}
+
 // Who raises the arrival veil. With no scene it goes up where it always went
 // up, on the frame the ground arrives; with the scene it is the scene that
 // raises it, at the end of the waking. The flag is what covers the third case:
@@ -174,7 +219,7 @@ let worldStanding = false;
 
 function raiseVeil() {
   worldStanding = true;
-  if (!introAlive) veil.begin();
+  if (!introAlive) beginVeilWhenGround();
 }
 
 // NOT AWAITED, AND ASKED FOR BEFORE THE RENDERER EXISTS. The world's own load
@@ -222,7 +267,7 @@ if (INTRO) {
           audio.wake(durationMs);
         },
         onAwake: () => {
-          veil.begin();
+          beginVeilWhenGround();
           // AND THE DISPLAY ARRIVES NOW, not four seconds ago behind a night.
           //
           // The greeting, the dial and the command line fade up over the same
@@ -251,7 +296,7 @@ if (INTRO) {
       // The display was held for a scene that never came. It is owed its
       // arrival by whoever asked for the hold, and this is that debt paid.
       hud.arrive();
-      if (worldStanding) veil.begin();
+      if (worldStanding) beginVeilWhenGround();
     });
 }
 

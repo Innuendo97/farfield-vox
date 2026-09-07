@@ -206,6 +206,7 @@ export function createSkyVeil(before) {
   // has no second opinion about it and the element cannot be taken off the page
   // while it is still fading.
   const fadeMs = wantsStill() ? REDUCED_FADE_MS : FADE_MS;
+  let raisedFor = null;
   el.style.setProperty('--veil-fade', `${fadeMs}ms`);
 
   let painted = '';
@@ -277,8 +278,13 @@ export function createSkyVeil(before) {
      * a world in it rather than from the page: what it is holding is the arrival
      * composition, and there is no arrival until there is somewhere to arrive.
      */
-    begin() {
-      if (letGo) return;
+    begin(why = 'col suolo intero') {
+      if (letGo || raisedFor) return;
+      // WHY IT WENT UP WHEN IT DID, kept for the arrival's own guard: the veil
+      // waits for the ground now (U-CAMPO-2, M5) and there is a ceiling under
+      // that wait, so «col suolo intero» and «a tempo» are two different
+      // arrivals and a measurement has to be able to say which one it saw.
+      raisedFor = why;
       // A held clock is a held arrival. The flag exists so that the one instant
       // the reference was measured at can be photographed as many times as a
       // comparison needs, and the shading of that instant is part of it: a veil
@@ -312,5 +318,8 @@ export function createSkyVeil(before) {
       walked = true;
       if (letGo) release();
     },
+
+    /** Whether the veil went up on the whole ground or on the ceiling, and when. */
+    get raisedFor() { return raisedFor; },
   };
 }

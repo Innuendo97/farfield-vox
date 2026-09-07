@@ -86,8 +86,11 @@ report.check(!/uLodGain/.test(glsl.replace(/\/\/[^\n]*/g, '')),
 report.check(/uniform float uLodNear;/.test(glsl) && /uniform float uLodStep;/.test(glsl)
   && /uniform vec2 uLodCentre;/.test(glsl),
   'i tre seggi della legge in metri sono dichiarati', 'uLodNear, uLodStep, uLodCentre');
-report.check(/vec2 fromWalker = p\.xz - uLodCentre;/.test(glsl),
-  'e la distanza e\' presa dal CAMMINATORE sul piano, non dall\'occhio');
+report.check(/vec2 fromWalker = p\.xz - lodC;/.test(glsl)
+  && /mix\(uLodCentre, uLodCentre2, lodSel \* uLodFade\)/.test(glsl),
+  "e la distanza e' presa dal CAMMINATORE sul piano, non dall'occhio",
+  "lodC e' un punto del segmento fra dov'era il camminatore e dov'e' ora: due sedute "
+  + "del camminatore (U-CAMPO-2, la banda), nessuna della camera");
 // E IL RIQUADRO NON ENTRA DALLA PORTA DI SERVIZIO. uPixelScale resta -- il
 // prefiltro della lama, il giunto e lo spigolo sono in PIXEL e devono esserlo,
 // perche' quella e' la scala a cui il sotto-campionamento vive -- ma ogni sua

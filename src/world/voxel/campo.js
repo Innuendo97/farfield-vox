@@ -89,7 +89,10 @@
 import {
   BLADE, BLADES_PER_VOXEL, CHUNK, MATERIAL, NO_COLUMN, SUB, VOXEL,
 } from './columns.js';
-import { CENTRE, MANTO, chunkColumns, columnSpec } from './worldgen.js';
+import {
+  CENTRE, DISC_RADIUS, MANTO, bladeAtColumn, chunkColumns, columnSpec, mantoIntensity,
+  slimAtColumn,
+} from './worldgen.js';
 import { PIGMENT, pigTint } from './pigment.js';
 
 /** How many SUB-steps of a blade one voxel of the world is worth. */
@@ -583,6 +586,179 @@ export const CAMPO_FAR_LOOK = (() => {
   return code < 0 ? 0 : code > CAMPO_LOOK_MAX ? CAMPO_LOOK_MAX : code;
 })();
 
+// The eight by eight blades under one far texel -- CAMPO_FAR_RATIO of them a
+// side, CAMPO_FAR_SHIFT reductions over them, and guard-livello3 asserts those
+// two numbers are still 8 and 3 rather than trusting this comment -- and the
+// pyramid raised over them, kept as module scratch.
+const lookFine = new Uint8Array(64);
+const lookFineCode = new Uint8Array(64);
+const lookCoarse = new Uint8Array(16);
+const lookCoarseCode = new Uint8Array(16);
+
+/**
+ * THE STATISTIC LEVEL THREE OF THE NEAR PYRAMID CARRIES, over one footprint.
+ *
+ * campoReduce climbs a level at a time and what it carries up is not a height
+ * but a DEBT: how far under the plate it draws the children actually lie (see
+ * the note there). This walks those same three reductions over the sixty four
+ * blades one far texel stands on, with the same arithmetic AND THE SAME
+ * QUANTISATION AT EVERY RUNG -- which is not a detail: the flat mean of the
+ * same sixty four deficits disagrees with the pyramid on four cells in five
+ * (measured), because three bits of look are re-rounded twice on the way up.
+ *
+ * IT IS NOT CALLED PER TEXEL. At 64 draws of the law a texel it costs four
+ * times the whole tile, which the far window pays sixty four times at the door
+ * of the world; what is called per texel is the TABLE below, and this is what
+ * fills it.
+ *
+ * @param {number} bx0  the corner blade column of the footprint, along x
+ * @param {number} bz0  the corner blade column, along z
+ * @param {number} intensity  the mat's field there
+ */
+function campoFarLookAt(bx0, bz0, intensity) {
+  for (let j = 0; j < 8; j++) {
+    for (let i = 0; i < 8; i++) {
+      lookFine[j * 8 + i] = bladeAtColumn(bx0 + i, bz0 + j, intensity) & CAMPO_BLADE_MASK;
+      lookFineCode[j * 8 + i] = 0;
+    }
+  }
+  let src = lookFine;
+  let srcCode = lookFineCode;
+  let dst = lookCoarse;
+  let dstCode = lookCoarseCode;
+  for (let size = 4; size >= 1; size >>= 1) {
+    const wide = size * 2;
+    for (let j = 0; j < size; j++) {
+      for (let i = 0; i < size; i++) {
+        // THE FIRST CHILD WINS, because campoReduce ranks on GROUND and takes
+        // the first of a tie -- and over one footprint the ground is one number.
+        const top = src[(j * 2) * wide + (i * 2)];
+        let deficit = 0;
+        for (let dj = 0; dj < 2; dj++) {
+          for (let di = 0; di < 2; di++) {
+            const k = (j * 2 + dj) * wide + (i * 2 + di);
+            deficit += (srcCode[k] / CAMPO_LOOK_MAX) * CAMPO_LOOK_DEPTH
+              + Math.max(0, top - src[k]);
+          }
+        }
+        dst[j * size + i] = top;
+        dstCode[j * size + i] = Math.min(CAMPO_LOOK_MAX,
+          Math.round((deficit / 4) * CAMPO_LOOK_MAX / CAMPO_LOOK_DEPTH));
+      }
+    }
+    const swapV = src; src = dst; dst = swapV;
+    const swapC = srcCode; srcCode = dstCode; dstCode = swapC;
+  }
+  return { code: srcCode[0], top: src[0] };
+}
+
+// How finely the field of intensity is quantised for the table, how many blade
+// heights it is indexed by, and how many footprints of the law each bucket is
+// averaged over.
+const LOOK_QUANTA = 33;
+const LOOK_HEIGHTS = CAMPO_BLADE_MASK + 1;
+const LOOK_FOOTPRINTS = 1500;
+let lookTable = null;
+
+/**
+ * THE DEBT A FOOTPRINT OWES, AS A TABLE OF THE LAW, AND WHY IT IS A TABLE.
+ *
+ * Measured against the near pyramid built for real (guard-livello3), the three
+ * candidates for what a far texel should carry stand like this on the meadow:
+ *
+ *   the law's flat expectation (CAMPO_FAR_LOOK, what shipped)  92.8 % wrong, mean 2.78 of 7
+ *   this table                                                45.7 % wrong, mean 0.83
+ *   the pyramid itself, footprint by footprint                12.3 % wrong, mean 0.23
+ *
+ * and they cost nothing, seven milliseconds a tile, and a hundred and fifty.
+ * A far tile is thirty seven milliseconds and the far window is sixty four of
+ * them at the door of the world, in front of a veil that now waits for them
+ * (M5): the pyramid per texel is ten seconds of worker at the arrival, which is
+ * not a price the arrival can pay for three bits of shading. The table takes
+ * two thirds of the error out for a fifth of a tile.
+ *
+ * WHAT IT IS INDEXED BY is what the debt actually depends on: the corner blade
+ * -- the plate's own height, which is most of it -- and the intensity of the
+ * mat, which sets how tall and how dense the sixty four under it are. What it
+ * throws away is the fluctuation of ONE footprint about the mean of its kind,
+ * and that is the 0.83 against the 0.23.
+ *
+ * IT IS THE LAW AND NOT A SECOND OPINION OF IT: every bucket is filled by
+ * running campoFarLookAt -- the pyramid, the real one -- over footprints of the
+ * world itself, so a sweep that moves MANTO's ladder moves this with it. It is
+ * built once, lazily, in whichever worker asks for the first far tile.
+ */
+function campoFarLookTable() {
+  const sum = new Float64Array(LOOK_QUANTA * LOOK_HEIGHTS);
+  const seen = new Float64Array(LOOK_QUANTA * LOOK_HEIGHTS);
+  for (let q = 0; q < LOOK_QUANTA; q++) {
+    const intensity = q / (LOOK_QUANTA - 1);
+    for (let n = 0; n < LOOK_FOOTPRINTS; n++) {
+      // Footprints spread over the blade lattice by two coprime strides, so the
+      // sample is of the law and not of one corner of it.
+      const at = campoFarLookAt(((n * 137) % 4001) * 8 + 5, ((n * 271) % 3989) * 8 + 11,
+        intensity);
+      sum[q * LOOK_HEIGHTS + at.top] += at.code;
+      seen[q * LOOK_HEIGHTS + at.top] += 1;
+    }
+  }
+  const table = new Uint8Array(LOOK_QUANTA * LOOK_HEIGHTS);
+  for (let k = 0; k < table.length; k++) {
+    table[k] = seen[k] ? Math.round(sum[k] / seen[k]) : 0;
+  }
+  return table;
+}
+
+/**
+ * The look CODE a far texel carries, in the three bits it rides in.
+ *
+ * @param {number} blade  the corner blade, as the texel writes it
+ * @param {number} intensity  the mat's field there
+ */
+function campoFarLook(blade, intensity) {
+  if (!lookTable) lookTable = campoFarLookTable();
+  const q = intensity <= 0 ? 0 : intensity >= 1 ? LOOK_QUANTA - 1
+    : Math.round(intensity * (LOOK_QUANTA - 1));
+  return lookTable[q * LOOK_HEIGHTS + (blade & CAMPO_BLADE_MASK)];
+}
+
+/**
+ * WHETHER THIS FAR TILE CAN EVER BE UNDER THE NEAR WINDOW.
+ *
+ * ONE TRUTH IS ONLY NEEDED WHERE THE TWO WINDOWS TOUCH, and they can only touch
+ * inside a disc that this world knows the size of. The near window is 51.2 m
+ * across and follows the walker; the walker cannot leave the plateau, which is
+ * `radius` metres of it. So the furthest the near window's own edge can ever be
+ * carried from the middle of the world is the plateau plus half the window, and
+ * beyond that line the far picture is the ONLY picture: nothing is ever drawn
+ * beside it that it could disagree with, and there is no seam to close.
+ *
+ * WHY IT IS WORTH A FUNCTION. Speaking level three costs a far tile 34 ms more
+ * -- a draw of the law at every one of sixteen thousand texels -- and the far
+ * window is sixty four tiles at the door of the world, in front of a veil that
+ * now waits for them (M5). Paid on all sixty four that is five seconds of
+ * worker; paid on the nine that can actually meet the near window it is under
+ * one, and the fifty five that answer the horizon keep the cheap flat
+ * expectation they always had, with nothing to be wrong against.
+ *
+ * The test is against the NEAREST corner of the tile, so a tile that only
+ * clips the disc is sampled: erring outwards costs a tile and erring inwards
+ * would put the seam back.
+ *
+ * @param {number} cx  tile index along x, in tiles of the far picture
+ * @param {number} cz  tile index along z
+ * @param {number} radius  how far the PLATEAU reaches, the layer's own
+ */
+export function campoFarMeets(cx, cz, radius = DISC_RADIUS) {
+  const span = CAMPO_FAR.span;
+  const reach = radius + (CAMPO.side * CAMPO.cell) / 2;
+  const lo = { x: cx * span, z: cz * span };
+  const hi = { x: lo.x + span, z: lo.z + span };
+  const dx = Math.max(lo.x - CENTRE.x, 0, CENTRE.x - hi.x);
+  const dz = Math.max(lo.z - CENTRE.z, 0, CENTRE.z - hi.z);
+  return dx * dx + dz * dz <= reach * reach;
+}
+
 /**
  * ONE TILE OF THE FAR PICTURE, OUT OF THE LAW ITSELF, AND THE DIFFERENCE IS
  * DECLARED RATHER THAN HIDDEN.
@@ -602,21 +778,41 @@ export const CAMPO_FAR_LOOK = (() => {
  * sixteenths of away. Sampled at the stride it is sixteen thousand, and the
  * tile costs six milliseconds instead of ninety.
  *
- * AND THE MAT IS THE LAW'S OWN MEAN, not a sample of it: see CAMPO_FAR_BLADE.
+ * AND THE MAT IS NO LONGER THE LAW'S OWN MEAN (U-CAMPO-2, M2.1). It was, and
+ * CAMPO_FAR_BLADE is still what a texel carries when `sample` is off -- the arm
+ * a measurement is taken against. What it cost is the thing R8 measured as «la
+ * striscia che cambia NATURA»: where the near window's edge crossed, a pixel
+ * went from a SAMPLE of the mat (which is what campoReduce carries up: the
+ * blade of the child with the highest ground, first one wins) to the law's flat
+ * EXPECTATION, twenty five levels away, and did it in one frame every 6.4 m.
+ *
+ * ONE TRUTH AT LEVEL THREE. A far texel is 40 cm and a near texel is 5: the far
+ * picture's finest level IS level three of the near pyramid, so it can say
+ * exactly what level three says instead of something defensible about the same
+ * ground. It reads its own footprint's CORNER -- which is the child three
+ * reductions pick out on the plane -- and carries that corner's blade, that
+ * corner's width (slimAtColumn, the law's own door and not a copy of it) and
+ * the debt those sixty four blades owe the plate (campoFarLook). The move of
+ * the window is then a change of ADDRESS and not of picture, which is what M2.2
+ * then makes invisible.
  *
  * @param {number} cx  tile index along x, in tiles of the far picture
  * @param {number} cz  tile index along z
  * @param {number} radius  how far the plateau reaches, the layer's own
+ * @param {boolean} sample  speak level three of the near pyramid (M2.1); false
+ *                          is the pre-U-CAMPO-2 arm, kept for the bench
  */
-export function campoFarTile(cx, cz, radius) {
+export function campoFarTile(cx, cz, radius, sample = true) {
   const started = performance.now();
   const shape = CAMPO_FAR;
   const data = new Uint8Array(shape.tiles.width * shape.tiles.height * 4);
-  // How many world columns one far texel spans, and the column it is read at:
-  // the MIDDLE of its own footprint, so a texel is a sample of the ground it
-  // stands for and not of its corner.
+  // How many world columns one far texel spans, and the column it is read at.
+  // With `sample` it is the CORNER of its own footprint, because the corner is
+  // the column level three of the near pyramid comes down to; without it, the
+  // middle, so that a texel carrying an expectation is a sample of the ground it
+  // stands for and not of its edge.
   const stride = Math.round(shape.cell / VOXEL);
-  const half = stride >> 1;
+  const half = sample ? 0 : stride >> 1;
   const tx0 = cx * shape.tile;
   const tz0 = cz * shape.tile;
   let lowest = 255;
@@ -631,10 +827,30 @@ export function campoFarTile(cx, cz, radius) {
       const code = campoMaterialCode(spec.mat);
       if (code < 0) continue;
       const ground = campoGroundByte(spec.top);
-      data[o] = code === CAMPO_MATERIAL.PATH ? 0
+      let blade = code === CAMPO_MATERIAL.PATH ? 0
         : CAMPO_FAR_BLADE | (CAMPO_FAR_LOOK << CAMPO_LOOK_SHIFT);
+      let slim = 0;
+      if (sample && code !== CAMPO_MATERIAL.PATH) {
+        // THE MAT LAYS ON MEADOW AND ON THE BARE EARTH OF THE VERGE, AND ON
+        // NOTHING ELSE -- layMat's own sentence, asked here of the same law.
+        const lays = spec.mat === MATERIAL.GRASS
+          || (MANTO.onVerge && spec.mat === MATERIAL.EARTH);
+        const bx = ix * BLADES_PER_VOXEL;
+        const bz = iz * BLADES_PER_VOXEL;
+        // The field is asked ONCE and three answers take it, exactly as layMat
+        // asks it once for the blade and its width.
+        const intensity = lays ? mantoIntensity((bx + 0.5) * BLADE, (bz + 0.5) * BLADE) : 0;
+        const h = lays ? cap(bladeAtColumn(bx, bz, intensity)) : 0;
+        slim = h ? campoSlimCode(slimAtColumn(bx, bz, intensity)) : 0;
+        // AND THE DEBT IS ASKED EVEN WHERE THE CORNER IS BARE. A footprint whose
+        // corner carries no blade still hides sixty three that may, and level
+        // three of the near pyramid accumulates them: a texel that answered
+        // nought here would be flat where the near window is not.
+        blade = h | (lays ? campoFarLook(h, intensity) << CAMPO_LOOK_SHIFT : 0);
+      }
+      data[o] = blade;
       data[o + 1] = ground;
-      data[o + 2] = CAMPO_PRESENT | code
+      data[o + 2] = CAMPO_PRESENT | (slim << 2) | code
         | (soilWall(spec.under, spec.depth) ? CAMPO_SOIL_WALL : 0);
       data[o + 3] = campoTintByte(ix, iz);
       if (ground > tallest) tallest = ground;

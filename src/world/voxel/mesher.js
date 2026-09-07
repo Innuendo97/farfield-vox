@@ -78,6 +78,7 @@ export {
   columnCentre, columnSpec, columnTop, earthFacing, framedTally, mantoAt, mantoIntensity,
   mantoVerge,
   meadowMoundAt, moundAt, moundBankAt, moundCutAt, onPaving, pavedTop, pathDrop, pathVerge,
+  slimAtColumn,
 } from './worldgen.js';
 
 // The six orientations, in the order the material reads them: the top first,
