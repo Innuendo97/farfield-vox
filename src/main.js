@@ -14,8 +14,9 @@ import { engrave, loadEngravingFont } from './world/engraving.js';
 import { createInteraction } from './world/interact.js';
 import { MONOLITHS } from './world/layout.js';
 import {
-  DEFAULT_FOV, POSE_SPAWN, POSE_TARGET, POSES,
+  DEFAULT_FOV, POSE_SPAWN, POSE_TARGET, POSE_TARGET_TERZA, POSES,
 } from './core/poses.js';
+import { RIG } from './core/avatar.js';
 import { loadLut } from './core/post.js';
 import { createQuality, forgetStored, needsBenchmark } from './core/quality.js';
 import { createBenchmark, tierOf } from './core/bench.js';
@@ -264,9 +265,14 @@ const renderer = new Renderer().init(canvas);
 const camera = new PerspectiveCamera(DEFAULT_FOV, window.innerWidth / window.innerHeight, 0.1, 1400);
 
 const hub = buildHub();
-const { scene, blockers, groundHeightAt } = hub;
+const { scene, blockers, solids, groundHeightAt } = hub;
 
-const player = new Player().setGroundSampler(groundHeightAt).setBlockers(blockers);
+const player = new Player()
+  .setGroundSampler(groundHeightAt)
+  .setBlockers(blockers)
+  // What the boom cannot swing through. The walker's own footprints are not
+  // enough for it: a camera on a five metre arm meets things a body never does.
+  .setSolids(solids);
 // The body under the eye. A held clock is a held body: ?dev&t0 is the flag that
 // says every frame taken from here is the same instant, and a breathing body
 // would be the one thing in that instant that could not be photographed twice.
@@ -370,12 +376,31 @@ const hud = createHud(ui, {
   // src/world/layers/v8-avatar.js.
   figura: {
     onChoose: (what, id) => {
-      if (what === 'vista') player.setPerson(id);
+      if (what === 'vista') setPerson(id);
       else choose(what, id);
       hud.menu.setFigura(LOOK, player.person);
     },
   },
 });
+/**
+ * The person, and the field of view that belongs to it.
+ *
+ * THE RULE NAMES AN FOV AND SOMETHING HAS TO APPLY IT. RIG.fov is the fitted
+ * framing's own, measured with the rest of the rule; DEFAULT_FOV is the first
+ * person's. On a tree where the two are the same number this changes nothing,
+ * which is the point: it is written where the person changes so that it cannot
+ * be forgotten the next time one of them is refitted.
+ *
+ * ONE DOOR FOR BOTH HANDLES. The menu row and the V key both come through here,
+ * so a walker who uses one and then the other never finds them disagreeing.
+ */
+function setPerson(which) {
+  player.setPerson(which);
+  camera.fov = player.person === 'terza' ? RIG.fov : DEFAULT_FOV;
+  camera.updateProjectionMatrix();
+}
+setPerson(player.person);
+
 const reticle = createReticle(ui);
 hud.menu.setSound(audio.worldChoice, audio.available);
 hud.menu.setMusic(audio.musicChoice, audio.available);
@@ -415,6 +440,15 @@ input.onKey((code, event) => {
     hud.menu.toggle();
   } else if (code === 'Escape' && menuOpen()) {
     hud.menu.setOpen(false);
+  } else if (code === 'KeyV' && !menuOpen()) {
+    // THE ONE KEY THE MENU HAS ALWAYS PROMISED. The row in the controls has read
+    // "V -- passare dalla prima alla terza persona" since the menu was written,
+    // and until now nothing was listening: the door existed, the handle was in
+    // the menu, and the key was not wired to either. It goes through the same
+    // door the menu row goes through, so the two can never disagree about which
+    // person the frame is in.
+    setPerson(player.person === 'terza' ? 'prima' : 'terza');
+    hud.menu.setFigura(LOOK, player.person);
   }
 });
 
@@ -459,8 +493,14 @@ if (dev) {
   };
   input.onKey((code) => {
     if (code === 'KeyP') {
-      player.setPose(POSE_TARGET);
-      camera.fov = POSE_TARGET.fov;
+      // THE REFERENCE FRAMING, FROM WHICHEVER SIDE OF IT THE WALKER IS ON. In
+      // first person the pose is the camera; in third the camera is on the arm,
+      // so what the pose has to place is the FIGURE -- where the picture draws
+      // his soles -- and the rule carries the camera back to the same fit. Two
+      // poses, one framing; see POSE_TARGET_TERZA in src/core/poses.js.
+      const p = player.person === 'terza' ? POSE_TARGET_TERZA : POSE_TARGET;
+      player.setPose(p);
+      camera.fov = p.fov;
       camera.updateProjectionMatrix();
     }
     if (code === 'KeyG') grade.cycleStage();
@@ -471,8 +511,11 @@ if (dev) {
       calibrate(true);
     }
     // The grass is the only thing in this world drawn in real time, so it is
-    // the only thing whose cost has to be measurable on its own.
-    if (code === 'KeyV') {
+    // the only thing whose cost has to be measurable on its own. ON H AND NO
+    // LONGER ON V: V is the walker's own key, promised by the menu since it was
+    // written, and a development lever does not get to keep a letter a visitor
+    // has been told is theirs.
+    if (code === 'KeyH') {
       grassVisible = !grassVisible;
       hub.setGrassVisible(grassVisible);
     }

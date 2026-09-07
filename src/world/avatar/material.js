@@ -248,6 +248,7 @@ function fragment(body) {
   uniform float uArrisLean;
   uniform float uOverhang;
   uniform float uOverhangCells;
+  uniform float uFade;
 
   ${SCENE_LIGHT_GLSL}
   ${FACE_LIGHT_GLSL}
@@ -255,7 +256,35 @@ function fragment(body) {
   ${FOG_GLSL}
   ${garmentGlsl(body)}
 
+  // THE SCREEN DOOR, AND IT IS A DOOR RATHER THAN A GLASS.
+  //
+  // For the first metre the camera travels away from the eye the body is between
+  // the near plane and the lens. Drawn, it is a wall of navy across the whole
+  // frame for a tenth of a second; cut, it appears out of nothing. So it goes
+  // through a dither: a fixed 4x4 threshold on the pixel grid, and the pixels
+  // whose threshold the fade has not reached are DISCARDED.
+  //
+  // WHY NOT ALPHA. Transparency would cost this figure everything the recipe
+  // bought him: a blend needs a sort, a sort needs him out of the opaque pass,
+  // and out of the opaque pass he no longer writes depth -- so the meadow behind
+  // his own head draws over it. A discard keeps him opaque, keeps the one draw,
+  // and costs a compare. It is the same answer the campaign has already taken
+  // for anything that has to come and go without a second pass.
+  float doorAt(vec2 p) {
+    vec2 c = floor(mod(p, 4.0));
+    float i = c.y * 4.0 + c.x;
+    // The 4x4 ordered (Bayer) matrix, written as its own permutation so nothing
+    // has to be looked up: values 0..15 scaled into (0, 1).
+    float b = 0.0;
+    if (i == 0.0) b = 0.0;  else if (i == 1.0) b = 8.0;  else if (i == 2.0) b = 2.0;  else if (i == 3.0) b = 10.0;
+    else if (i == 4.0) b = 12.0; else if (i == 5.0) b = 4.0; else if (i == 6.0) b = 14.0; else if (i == 7.0) b = 6.0;
+    else if (i == 8.0) b = 3.0;  else if (i == 9.0) b = 11.0; else if (i == 10.0) b = 1.0; else if (i == 11.0) b = 9.0;
+    else if (i == 12.0) b = 15.0; else if (i == 13.0) b = 7.0; else if (i == 14.0) b = 13.0; else b = 5.0;
+    return (b + 0.5) / 16.0;
+  }
+
   void main() {
+    if (uFade < doorAt(gl_FragCoord.xy)) discard;
     vec3 n = normalize(vNormal);
     vec3 local = normalize(vFacing);
 
@@ -368,6 +397,9 @@ export function avatarMaterial(voxel, settings, body = BODY_M) {
     uArrisLean: { value: settings.arrisLean },
     uOverhang: { value: settings.overhang },
     uOverhangCells: { value: settings.overhangCells },
+    // How much of him to draw: written every frame by the layer out of STANDING,
+    // and one at every frame that is not a switch.
+    uFade: { value: 1 },
     // The sun, the exposure and the lifts, from the one seat that produces the
     // pair they act on. THE EXPOSURE IS THE GROUND'S, INHERITED AND NOT FITTED:
     // he stands on that ground, in that air, under that sun, and the campaign

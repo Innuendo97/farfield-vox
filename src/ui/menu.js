@@ -105,7 +105,7 @@ const CONTROLS = [
   ['Mouse', 'guardarsi intorno'],
   ['E', 'aprire il monolite vicino, poi la voce scelta'],
   ['W S', 'scorrere le voci a pannelli aperti'],
-  ['V', 'passare dalla prima alla terza persona'],
+  ['V', 'passare dalla terza alla prima persona, e tornare'],
   ['Esc', 'tornare indietro di un passo'],
   ['TAB', 'aprire e chiudere questo menu'],
 ];

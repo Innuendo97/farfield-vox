@@ -149,6 +149,10 @@ const layer = {
       // same way and for the same reason.
       body.mesh.visible = STANDING.drawn && kind === LOOK.corpo;
       if (!body.mesh.visible) continue;
+      // AND HOW MUCH OF HIM, over the metre either side of the switch. One float
+      // a frame into the one material he has; the dither is in his own fragment,
+      // so nothing here sorts, blends or adds a pass. See STANDING.fade.
+      body.material.uniforms.uFade.value = STANDING.fade;
       // The origin is the middle of the plane the soles stand on, which is what
       // the plan means by y = 0. So the stance goes straight in: no offset, and
       // nothing to get wrong the day the ground changes shape.
