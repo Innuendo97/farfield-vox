@@ -186,6 +186,11 @@ export function createCampo({
     tiles: 0,
     tilesAsked: 0,
     farTiles: 0,
+    // The far window's own share of the worker, kept apart from the near one's:
+    // M2.1 made a far tile dearer and a near tile not at all, and a budget that
+    // could not tell them apart could not be held to (guard-livello3).
+    farWorkerMs: 0,
+    worstFarWorkerMs: 0,
     workerMs: 0,
     worstWorkerMs: 0,
     uploadMs: 0,
@@ -231,6 +236,11 @@ export function createCampo({
   // U-CAMPO-2, not here -- so `snap` is a handle and the tier sets it.
   let lodCentre = null;
   let lodSnap = 0.75;
+  // WHETHER THE FAR WINDOW SPEAKS LEVEL THREE OF THE NEAR PYRAMID (M2.1). It is
+  // ON, and the handle exists so that a bench can take the other arm -- the far
+  // texel carrying the law's flat expectation, which is what the strip used to
+  // change into every 6.4 m -- in the same page and the same half hour.
+  let farSample = true;
   // The ring of bearings, and the vec4s the fragment reads it through: the
   // uniform is allocated once and written in place, because this is rewritten
   // four times a second on the thread the walker is on.
@@ -355,6 +365,10 @@ export function createCampo({
     stats.workerMs += message.ms;
     if (message.ms > w.worstWorkerMs) w.worstWorkerMs = message.ms;
     if (message.ms > stats.worstWorkerMs) stats.worstWorkerMs = message.ms;
+    if (w === far) {
+      stats.farWorkerMs += message.ms;
+      if (message.ms > stats.worstFarWorkerMs) stats.worstFarWorkerMs = message.ms;
+    }
   }
 
   /**
@@ -416,7 +430,6 @@ export function createCampo({
         if (message.lowest < w.lowest) { w.lowest = message.lowest; moved = true; }
       }
     }
-    if (moved) fitBox();
   }
 
   let thread = null;
@@ -426,7 +439,7 @@ export function createCampo({
     for (const c of list) w.asked.add(`${c.cx},${c.cz}`);
     w.tilesAsked += list.length;
     stats.tilesAsked += list.length;
-    if (thread) thread.postMessage({ job: w.job, radius, chunks: list });
+    if (thread) thread.postMessage({ job: w.job, radius, chunks: list, sample: farSample });
     else w.pending.push(...list);
   }
 
@@ -512,7 +525,7 @@ export function createCampo({
       if (!thread) return;
       for (const w of windows) {
         if (w.pending.length) {
-          thread.postMessage({ job: w.job, radius, chunks: w.pending.splice(0) });
+          thread.postMessage({ job: w.job, radius, chunks: w.pending.splice(0), sample: farSample });
         }
       }
     },
@@ -581,6 +594,26 @@ export function createCampo({
         lodCentre = null;
       }
       return { near: u.uLodNear.value, step: u.uLodStep.value, snap: lodSnap };
+    },
+
+    /**
+     * THE BENCH'S OWN ARM FOR M2.1: whether the far window speaks level three
+     * of the near pyramid or the law's flat expectation. Refilling all sixty
+     * four far tiles is what taking the arm costs, and it is taken once per
+     * measurement rather than per step, so it is asked for here rather than
+     * being a thing a frame could change.
+     */
+    setFarSample(on) {
+      const want = on !== false;
+      if (want === farSample) return farSample;
+      farSample = want;
+      far.held.clear();
+      far.coarse.clear();
+      far.asked.clear();
+      far.arrived.length = 0;
+      far.centre = null;
+      moveTo(far, 0, 0);
+      return farSample;
     },
 
     /** Every tile of both windows is in its picture. */

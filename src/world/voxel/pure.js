@@ -60,6 +60,7 @@ export {
   mantoAt,
   mantoIntensity,
   mantoVerge,
+  slimAtColumn,
 } from './mesher.js';
 
 // AND THE STORE ITSELF, because a guard that asserts the world is a plane has

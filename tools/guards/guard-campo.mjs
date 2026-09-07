@@ -7,7 +7,7 @@ import {
   campoBladeOf, campoDecode, campoFarTile, campoGroundByte, campoHeights, campoLookOf,
   campoSlimCode, campoSlimEighths,
   campoSlot, campoTile, campoTintByte, campoTintOf, campoTopStep, chunkColumns, columnSpec,
-  pigTint,
+  bladeAtColumn, mantoIntensity, pigTint, slimAtColumn,
 } from '../../src/world/voxel/pure.js';
 import { reporter, selfTest } from './lib.mjs';
 
@@ -234,7 +234,12 @@ let farBeyond = 0;
   // 128 texels a tile, tile 2 covers 102.4 to 153.6 m of x.
   const tile = campoFarTile(2, 0, RADIUS);
   const stride = Math.round(CAMPO_FAR.cell / VOXEL);
-  const half = stride >> 1;
+  // AND THE COLUMN IT IS READ AT IS THE CORNER OF ITS OWN FOOTPRINT (U-CAMPO-2,
+  // M2.1), not the middle. A far texel is level three of the near pyramid, and
+  // three reductions on level ground come down to the child at (0, 0): reading
+  // the corner is what lets the two windows say ONE byte where they meet, which
+  // is the whole of why the strip stopped changing nature when the window moved.
+  const half = 0;
   for (let j = 0; j < CAMPO_FAR.tile; j += 1) {
     for (let i = 0; i < CAMPO_FAR.tile; i += 1) {
       farWalked += 1;
@@ -247,23 +252,29 @@ let farBeyond = 0;
       if (family < 0) continue;
       farPresent += 1;
       if (spec.top < -1) farBeyond += 1;
+      // The blade and its width, at the corner blade column, out of the law's
+      // own doors -- the same two this guard asks the near window with.
+      const bx = ix * BLADES_PER_VOXEL;
+      const bz = iz * BLADES_PER_VOXEL;
+      const lays = spec.mat === MATERIAL.GRASS
+        || (MANTO.onVerge && spec.mat === MATERIAL.EARTH);
+      const i0 = lays ? mantoIntensity((bx + 0.5) * BLADE, (bz + 0.5) * BLADE) : 0;
+      const h = lays && family !== CAMPO_MATERIAL.PATH ? bladeAtColumn(bx, bz, i0) : 0;
+      const w = h ? campoSlimEighths(campoSlimCode(slimAtColumn(bx, bz, i0))) : 0;
       if (campoTopStep(texel) !== spec.top) farWrong += 1;
       else if (texel.mat !== family) farWrong += 1;
-      else if (texel.blade !== (family === CAMPO_MATERIAL.PATH ? 0 : CAMPO_FAR_BLADE)) {
-        farWrong += 1;
-      } else if (texel.look !== (family === CAMPO_MATERIAL.PATH
-        ? 0 : CAMPO_FAR_LOOK / CAMPO_LOOK_MAX)) {
-        // AND THE STATISTIC RIDES IN THE SAME BYTE. A far texel draws the mat's
-        // EXPECTATION and hides the whole law under it, so it carries the look
-        // the law itself says it is hiding (CAMPO_FAR_LOOK), from the first
-        // byte it is written with and not only after a reduction.
-        farWrong += 1;
-      } else if (texel.tint !== campoTintByte(ix, iz)) farWrong += 1;
+      else if (texel.blade !== h) farWrong += 1;
+      else if (texel.slim !== w) farWrong += 1;
+      else if (texel.tint !== campoTintByte(ix, iz)) farWrong += 1;
+      // The STATISTIC in that same byte is not checked here: it is the debt the
+      // sixty four blades under this texel owe the plate, and the only honest
+      // reader of it is the near pyramid itself -- see guard-livello3, which
+      // builds it with campoTile + campoReduce and compares texel to texel.
     }
   }
 }
 report.check(farWrong === 0 && farPresent > 0 && farBeyond > 0,
-  'every texel of a far tile is the law at its own column, boundary included',
+  'every texel of a far tile is the law at the corner of its own footprint',
   `${farWalked} texels, ${farPresent} standing, ${farBeyond} under the plateau, `
   + `${farWrong} disagree`);
 

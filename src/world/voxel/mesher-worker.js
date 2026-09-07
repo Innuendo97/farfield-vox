@@ -72,7 +72,13 @@ self.onmessage = (event) => {
     const far = message.job === 'campo-far';
     const { chunks = [], radius: reach = DISC_RADIUS } = message;
     for (const { cx, cz } of chunks) {
-      const built = far ? campoFarTile(cx, cz, reach) : campoTile(cx, cz, reach);
+      // `sample` is the far window speaking level three of the near pyramid
+      // (U-CAMPO-2, M2.1). It rides on the message rather than on a module
+      // constant so a bench can take the arm without a second build; absent, it
+      // is ON, because one truth is what ships.
+      const built = far
+        ? campoFarTile(cx, cz, reach, message.sample !== false)
+        : campoTile(cx, cz, reach);
       self.postMessage({
         kind: message.job,
         cx,

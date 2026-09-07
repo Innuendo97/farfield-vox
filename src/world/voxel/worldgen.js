@@ -1052,6 +1052,33 @@ export function bladeAtColumn(bx, bz, intensity) {
   return Math.max(1, Math.round(h * SUB * tall));
 }
 
+/**
+ * How WIDE the blade on one column stands, in eighths of a cell, and nought
+ * where the law draws it whole.
+ *
+ * IT LIVES HERE BECAUSE IT IS THE LAW AND NOT A PICTURE. layMat asked this
+ * question inline for as long as the store was the only reader of it; the far
+ * window of the clipmap is a second reader now (see campoFarTile in
+ * ./campo.js), and a second reader of a law written twice is two laws. The
+ * rule that file states of itself -- «what it does NOT do is invent a second
+ * law» -- is what this extraction is for: one hash, one door, and the guard
+ * then compares the two windows byte for byte instead of comparing two copies
+ * of a formula that have yet to drift.
+ *
+ * @param {number} bx  the blade column along x
+ * @param {number} bz  the blade column along z
+ * @param {number} intensity  the mat's own field there, as mantoIntensity draws it
+ * @returns {number} the width in eighths of a cell, or 0 for the whole cell
+ */
+export function slimAtColumn(bx, bz, intensity) {
+  if (!(intensity < MANTO.slim.below)) return 0;
+  const r = hash2(bx * 2699 + 131, bz * 5077 + 617);
+  const w = MANTO.slim.low
+    + Math.min(MANTO.slim.high - MANTO.slim.low,
+      Math.floor(r * (MANTO.slim.high - MANTO.slim.low + 1)));
+  return w < MANTO.slim.high ? w : 0;
+}
+
 /** Where the middle of a blade column stands, in metres. */
 export function bladeCentre(bx, bz) {
   return { x: (bx + 0.5) * BLADE, z: (bz + 0.5) * BLADE };
@@ -2135,12 +2162,9 @@ function layMat(store, focus) {
       // the mesher is merging a patch of blades into one rectangle on purpose;
       // insetting them there would be paying the block's whole saving back to
       // undo the block.
-      if (h && near && i0 < MANTO.slim.below) {
-        const r = hash2(bx * 2699 + 131, bz * 5077 + 617);
-        const w = MANTO.slim.low
-          + Math.min(MANTO.slim.high - MANTO.slim.low,
-            Math.floor(r * (MANTO.slim.high - MANTO.slim.low + 1)));
-        if (w < MANTO.slim.high) store.slim[j * bw + i] = w;
+      if (h && near) {
+        const w = slimAtColumn(bx, bz, i0);
+        if (w) store.slim[j * bw + i] = w;
       }
     }
   }
