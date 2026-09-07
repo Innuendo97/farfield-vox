@@ -153,6 +153,7 @@ export const TIERS = [
     // grain is fine, at 18 it is five and it starts to read as steps. The
     // bottom tier buys back the frames it does not have with a wider band.
     groundDetail: { near: 9, step: 1.45, lag: 300 },     // [V1] the ring in metres, the band in ms
+    campoScale: 0.75,     // [U-CAMPO-3] la frazione di lato: vedi la nota al tier alto
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
@@ -176,6 +177,28 @@ export const TIERS = [
     // touching it. The disc's reach is measured: see the block over TIERS.
     voxelDiscRadius: 14,   // [V1] metres of ten centimetre ground from the centre
     groundDetail: { near: 9, step: 1.45, lag: 300 },     // [V1] the ring in metres, the band in ms
+    // [U-CAMPO-3] LA FRAZIONE DI LATO A CUI LA TERRA E' MARCIATA, e i due
+    // numeri di questa riga sono l'unica cosa che questa unita' abbia deciso
+    // per conto di chi guarda.
+    //
+    // TRE QUARTI IN ALTO, MEZZO SOTTO. A quattro volte la grandezza naturale,
+    // affiancato al nativo, il prato VICINO a mezzo lato si vede diverso -- i
+    // grumi di terra del sentiero ai piedi diventano piu' grossi -- e a tre
+    // quarti no. E' esattamente il criterio che il coordinatore ha posto, e la
+    // lastra 2026-09-08-campo-3-ritagli-4x.png e' dove si e' guardato. Il costo
+    // del tre quarti e' 47% del disegno nativo della terra contro il 24% del
+    // mezzo (misurato per DISEGNO, orologio del driver), e sui numeri di
+    // E-PERF5 quello mette la posa P a 17,6 p50 e 22,1 p95: il cancello dei 22
+    // ms preso, con la scritta del monolite intatta -- che e' precisamente cio'
+    // che la leva del FOTOGRAMMA a 0,85 non poteva dare (E-PERF5 §6.1: stesso
+    // p95, e «la scritta del monolite si ammorbidisce col prato»).
+    //
+    // E SOTTO SI SCENDE A MEZZO PERCHE' LI' IL QUADRO E' GIA' RIDOTTO. Il tier
+    // medio disegna a 0,85 di lato e il basso a 0,75: il prato vicino e' gia'
+    // piu' morbido di quello a cui il confronto a quattro volte e' stato fatto,
+    // e cio' che quel confronto separa non si separa piu'. Quel che si compra
+    // e' il cancello, che e' l'unica ragione per cui quei due tier esistono.
+    campoScale: 0.75,
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
@@ -199,6 +222,7 @@ export const TIERS = [
     // touching it. The disc's reach is measured: see the block over TIERS.
     voxelDiscRadius: 14,   // [V1] metres of ten centimetre ground from the centre
     groundDetail: { near: 6, step: 1.75, lag: 300 },     // [V1] the ring in metres, the band in ms
+    campoScale: 0.5,       // [U-CAMPO-3] la frazione di lato: vedi la nota al tier alto
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
@@ -215,6 +239,7 @@ export const TIERS = [
     // ground is how much of it there is. 119 614 triangles against 151 470.
     voxelDiscRadius: 12,   // [V1] metres of ten centimetre ground from the centre
     groundDetail: { near: 4.5, step: 2, lag: 400 },      // [V1] the ring in metres, the band in ms
+    campoScale: 0.5,       // [U-CAMPO-3] la frazione di lato: vedi la nota al tier alto
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
@@ -365,8 +390,17 @@ export function createQuality({ renderer, hub }) {
     renderer.setBloomTier(tier.bloom);
   }
 
-  /** And the three that reallocate the buffers the frame is drawn into. */
+  /** And the four that reallocate the buffers the frame is drawn into. */
   function applyHard(tier) {
+    // THE GROUND'S OWN PIXEL, AND THE WORLD ANSWERS FIRST. The lever has two
+    // halves that have to agree on one number -- which of the field's two
+    // meshes draws, and whether the frame gives the marcher a buffer of its own
+    // -- and a handle in the address may overrule the tier on the world's half.
+    // So the world is asked, and what it SETTLED ON is what the renderer is
+    // told, rather than what this tier wanted. Told in that order, too: the
+    // buffer must exist before the quad that reads it is made visible, and the
+    // quad must be hidden before the buffer goes away.
+    renderer.setCampoScale(hub.setCampoScale(tier.campoScale ?? 1));
     // Through the same seam the development panel grades through: the pixel of
     // the scene buffer is a property of the picture, like the bloom's shape,
     // and not one of the levers every caller of the renderer needs to know
@@ -379,7 +413,7 @@ export function createQuality({ renderer, hub }) {
   function apply(tier, { immediate = false } = {}) {
     applySoft(tier);
     const needsHard = !applied || applied.scale !== tier.scale || applied.samples !== tier.samples
-      || applied.sceneFormat !== tier.sceneFormat;
+      || applied.sceneFormat !== tier.sceneFormat || applied.campoScale !== tier.campoScale;
     if (!needsHard) {
       applied = tier;
       return;

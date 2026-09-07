@@ -199,6 +199,23 @@ export function buildHub() {
       soil.setGroundDetail(gain);
     },
 
+    /**
+     * WHAT FRACTION OF A SIDE THE RAY MARCHED GROUND IS DRAWN AT.
+     *
+     * HELD, PUSHED, AND IT ANSWERS BACK, which none of the three above do. The
+     * lever has two halves that must agree on one number -- which of the
+     * field's two meshes draws, here, and whether the frame gives it a buffer
+     * of its own, in the post chain -- and a handle in the address may overrule
+     * the tier on the world's half. So this returns what the world ACTUALLY
+     * settled on, and the governor hands that same number to the renderer
+     * rather than the one it asked for. See applySoft in src/core/quality.js.
+     */
+    setCampoScale(scale) {
+      const settled = soil.setCampoScale ? soil.setCampoScale(scale) : scale;
+      wanted.campoScale = settled;
+      return settled;
+    },
+
     /** Development handle: the grass alone, so its cost can be measured. */
     setGrassVisible(visible) { green.setVisible(visible); },
 

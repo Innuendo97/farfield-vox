@@ -85,6 +85,11 @@ import { SPAWN } from '../layout.js';
  *                  owns, and how deep under its canopy that mat stands
  *   campoombra=0   the sun's own march off, to price it
  *   campodepth=0   gl_FragDepth off, to price the early test it costs
+ *   campores=R     the fraction of a SIDE the ground is marched at, and the
+ *                  one lever of the tier that does not touch the writing on the
+ *                  monoliths: 1 is the frame drawn whole (the null), 0.75 and
+ *                  0.5 draw the earth into a buffer of their own and put it
+ *                  back at the frame's pixel. U-CAMPO-3.
  *   campozone=0    bind the NEUTRAL zone instead of the delivered map, which
  *                  is the null arm this term is priced against: one fetch and
  *                  one multiply, in the field and in the three programs of the
@@ -143,6 +148,7 @@ function asked() {
     campoDepth: query.get('campodepth') !== '0',
     campoDebug: Number(query.get('campodebug')) || 0,
     campoZone: query.get('campozone') !== '0',
+    campoRes: query.get('campores') === null ? null : Number(query.get('campores')),
   };
 }
 
@@ -268,6 +274,17 @@ const layer = {
       if (wanted.campoDither !== null) u.uDither.value = wanted.campoDither;
       u.uHorizon.value = wanted.campoShadow ? 1 : 0;
       u.uDebug.value = wanted.campoDebug;
+      // AND WHAT PIXEL THE EARTH IS MARCHED AT, on the same rule as the ring
+      // above: the address wins where it is given, because a bench holding one
+      // arm still cannot have a tier settle underneath it between two readings.
+      // The post chain's half of the same number is set by the governor, which
+      // reads it back from here -- see setCampoScale below and applySoft in
+      // src/core/quality.js.
+      if (wanted.campoRes !== null && Number.isFinite(wanted.campoRes)) {
+        layer.campo.setScale(wanted.campoRes);
+      }
+      layer.campoResFromAddress = wanted.campoRes !== null
+        && Number.isFinite(wanted.campoRes);
       layer.campo.start(SPAWN.x, SPAWN.z);
 
       // ---------------------------------------------------------- THE BENCH
@@ -314,6 +331,20 @@ const layer = {
   setGroundDetail(detail) {
     if (!layer.campo || !detail || layer.lodFromAddress) return;
     layer.campo.setDetail(detail);
+  },
+
+  /**
+   * WHAT FRACTION OF A SIDE THE GROUND IS MARCHED AT.
+   *
+   * The address wins, on the same rule the ring above keeps: a walker who has
+   * written `?campores=` in the bar is holding an arm still while a bench takes
+   * two readings of it, and a tier that settled underneath them would move the
+   * thing being measured between the two.
+   */
+  setCampoScale(scale) {
+    if (!layer.campo) return scale;
+    if (layer.campoResFromAddress) return layer.campo.scale();
+    return layer.campo.setScale(scale);
   },
 
   update(frame) {
