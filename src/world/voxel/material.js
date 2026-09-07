@@ -1566,6 +1566,34 @@ export function pavingMaterial(voxel, settings, maps) {
   maps.grain.anisotropy = 8;
   maps.grain.needsUpdate = true;
 
+  // AND THE TONE IS FETCHED WITHOUT A RAMP, WHICH IS THE ONE THING A PIECEWISE
+  // CONSTANT FIELD ASKS OF ITS SAMPLER AND HAD NEVER BEEN GIVEN.
+  //
+  // The tone is the LEVEL OF A PIECE, constant across the piece by construction,
+  // and the delivery handed it out with the loader's own linear filter -- so at
+  // a piece boundary the fetch drew a ramp one texel wide between the two
+  // pieces' levels. The ramp is 19.4 mm and the note in
+  // assets.d/v3-sentiero.json said exactly how far that could be pushed:
+  // «below that the ramp gets wider than the joint and two pieces begin
+  // borrowing each other's level». The block is 0.20 m since U-SENT-7 and a
+  // piece is 7 cm -- three and a half texels -- so the ramp was a third of a
+  // piece, and half of every one of those ramps CROSSES the midpoint of the
+  // earth-to-stone ramp the level codes, which paints stone as soil in a band
+  // round every piece.
+  //
+  // WHAT IT IS WORTH, MEASURED AND NOT ASSUMED: under a level and a half on the
+  // corridor's own stone at the fitted camera (fondazione/lav/u7-vero.py). It is
+  // kept because it costs nothing and because the field asks for it -- the map's
+  // own note says it is not even supersampled when it is painted, for this
+  // reason -- and not because it bought the level back. What the level is short
+  // by is a light and is declared in the verbale.
+  //
+  // MAGNIFICATION ONLY. Minification still walks the mip chain, because past the
+  // near stretch a texel is under a pixel and a piecewise constant field sampled
+  // point-wise there is aliasing and not identity.
+  maps.tone.magFilter = NearestFilter;
+  maps.tone.needsUpdate = true;
+
   const material = new ShaderMaterial({
     uniforms: {
       uVoxel: { value: voxel },

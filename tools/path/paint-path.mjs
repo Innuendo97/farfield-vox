@@ -3,10 +3,12 @@ import { join } from 'node:path';
 import { REPO_ROOT } from '../grade/lib/framing.mjs';
 import { writeCleanPng } from '../grade/lib/png.mjs';
 import {
-  GRAIN, JOINT_LIP, PATH_SKIN, PEB_EDGE, RELIEF, SKIN_REACH,
+  GRAIN, JOINT_LIP, KERB, PATH_SKIN, PEB_EDGE, RELIEF, SKIN_REACH,
   grainAt, grainTone, paveAt, skinPitch, skinToWorld,
 } from '../../src/world/path.js';
-import { pathCoord, pathRun, smoothstep } from '../../src/world/terrain-field.js';
+import {
+  pathEdge, pathOffset, pathRun, smoothstep,
+} from '../../src/world/terrain-field.js';
 
 // Paints the three maps the corridor is drawn from.
 //
@@ -246,7 +248,15 @@ function paintTone() {
       const depth = Math.max(0, (seat.gape - seat.jm) / 2);
       const term = smoothstep(0, JOINT_LIP[1], depth) * (seat.lift / RELIEF.high);
       slotLiftAll += term;
-      if (pathRun(z) > 0 && Math.abs(pathCoord(x, z)) <= 1) {
+      // AND THE PAVING REACHES THE BARE BAND SINCE U-SENT-7. The fragment runs
+      // on every top the paving's family draws, and that family now takes the
+      // strip of bare earth beside the stone as well (`pavedTop` in
+      // ../../src/world/voxel/worldgen.js): a mean taken over the corridor alone
+      // would be the mean of a smaller surface than the term is spent on, and
+      // the term would come back a dimmer over the band -- which is the one
+      // place the thinning has just put the last of the pieces.
+      const s = pathOffset(x, z);
+      if (pathRun(z) > 0 && Math.abs(s) <= pathEdge(z, s >= 0 ? 1 : -1) + KERB) {
         slotLift += term;
         onPaving++;
       }

@@ -3,7 +3,7 @@ import {
 } from './columns.js';
 import {
   BASE_STEP, CENTRE, DISC_RADIUS, EARTH, EMPTY, FACING, chunkColumns,
-  chunkList as genChunkList, columnCentre, earthFacing, onPaving,
+  chunkList as genChunkList, columnCentre, earthFacing, onPaving, pavedTop,
 } from './worldgen.js';
 
 // THE GREEDY MESHER OVER THE BLOCK STORE.
@@ -77,7 +77,7 @@ export {
   bareRaisedAt, bladeAtColumn, bladeCentre, bladeHeightAt, chunkColumns,
   columnCentre, columnSpec, columnTop, earthFacing, framedTally, mantoAt, mantoIntensity,
   mantoVerge,
-  meadowMoundAt, moundAt, moundBankAt, moundCutAt, onPaving, pathDrop, pathVerge,
+  meadowMoundAt, moundAt, moundBankAt, moundCutAt, onPaving, pavedTop, pathDrop, pathVerge,
 } from './worldgen.js';
 
 // The six orientations, in the order the material reads them: the top first,
@@ -238,11 +238,13 @@ export function meshChunk(cx, cz, grain = true, radius = DISC_RADIUS, focus = CE
   // the meadow's flat brown while the stone beside it is pieces would put the
   // hard line back one column further out, which is the defect being closed.
   //
-  // So a top of earth that stands ON the corridor is drawn by the paving, whose
+  // So a top of earth that stands ON the corridor -- or in the bare band beside
+  // it, which is the paving's since U-SENT-7: see `pavedTop` in ./worldgen.js --
+  // is drawn by the paving, whose
   // own law thins its stone into earth across exactly that band (SPREAD in
-  // ../path.js). The question is asked of `onPaving`, which is the generator's
-  // own footprint and not a second opinion about it; nothing about the store
-  // changes, and neither does what the walker stands on.
+  // ../path.js). The question is asked of the generator's own predicate and not
+  // of a second opinion about it; nothing about the store changes, and neither
+  // does what the walker stands on.
   const family = new Uint8Array(n * n);
   for (let j = 0; j < n; j++) {
     for (let i = 0; i < n; i++) {
@@ -251,7 +253,7 @@ export function meshChunk(cx, cz, grain = true, radius = DISC_RADIUS, focus = CE
       else if (mat !== MATERIAL.EARTH) family[j * n + i] = MEADOW;
       else {
         const c = columnCentre(ox + i, oz + j);
-        family[j * n + i] = onPaving(c.x, c.z) ? STONE : SOIL;
+        family[j * n + i] = pavedTop(c.x, c.z) ? STONE : SOIL;
       }
     }
   }

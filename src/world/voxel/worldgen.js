@@ -1439,10 +1439,18 @@ export const PATH = {
   // column boundary the verge is counted in is not a boundary of anything drawn.
   verge: { min: 2, max: 4, at: 0.5, per: 0.7 },
   // The most the two noises in pathEdge can push an edge past the nominal half
-  // width, in metres: 0.105 of wobble and 0.0434 of wander, both at their own
-  // full swing. Published so a reader that has to stay CLEAR of the corridor
-  // can do it without evaluating either of them.
-  wander: 0.105 + 0.0434,
+  // width, in metres, at their own full swing. Published so a reader that has to
+  // stay CLEAR of the corridor can do it without evaluating either of them.
+  //
+  // AND IT IS A CEILING NOW AND NOT THE VALUE. The two noises are a tenth of the
+  // half width since U-SENT-7 refitted them (EDGE_WOBBLE in
+  // ../terrain-field.js), so what they are worth is a tenth of the WIDEST the
+  // law ever gets -- the flare in front of the bottom step, 1.10 m. Every reader
+  // of this number wants the most it can be, so a ceiling is the right thing for
+  // it to hold; the two places that read it both add it to pathHalfWidth at
+  // their own northing and would be tighter with the local value, which is a
+  // conservatism this file is happy to pay.
+  wander: 0.110,
 };
 
 /**
@@ -1504,6 +1512,37 @@ function corridorAt(x, z) {
 /** Whether a point stands on the corridor at all, stone or verge. */
 export function onPaving(x, z) {
   return corridorAt(x, z) >= 0;
+}
+
+/**
+ * Whether a top standing here is DRAWN by the paving, which is a wider question
+ * than whether it stands on the corridor.
+ *
+ * THE BAND OF BARE EARTH IS THE PAVING'S TO DRAW, AND UNTIL NOW IT WAS THE
+ * MEADOW'S. `MANTO.verge.bare` is the strip beside the stone where no blade
+ * stands, and the eye finds the kerb at the far side of it (U-SENT-6 §4). What
+ * that strip is made of is a share `MANTO.ground` of columns of bare soil with
+ * open meadow between them -- and those columns were handed to the SOIL family,
+ * which draws one flat brown. So the paving's own thinning had nowhere to
+ * arrive: it could fall to nothing by the last column of the corridor and then
+ * stop, because past that column there was no surface of this paving left to put
+ * a piece on. R3 S2 and S4 are one sentence about that: «ai margini del
+ * sentiero, sulla terra bruna, ci sono i tasselli di sentiero», and the target
+ * carries 10 to 20 per cent of stone AT its kerb and a few pieces past it.
+ *
+ * SO THE FAMILY REACHES THE BAND AND THE GEOMETRY DOES NOT. Nothing here changes
+ * which columns exist, how high they stand or what material they are: a column
+ * of the band is bare soil exactly as it was, at the height it was, and
+ * `onPaving` -- which is what the walker's floor, the width of the corridor in
+ * voxels and the meadow's own guards are asked through -- still answers for the
+ * corridor alone. What moves is which of two materials draws the TOP of a column
+ * that is already brown, and the answer is the one that knows the paving has
+ * pieces in it.
+ */
+export function pavedTop(x, z) {
+  if (corridorAt(x, z) >= 0) return true;
+  const gap = pathEdgeGap(x, z);
+  return gap >= 0 && gap < MANTO.verge.bare;
 }
 
 // ======================================================================
