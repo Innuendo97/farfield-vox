@@ -5,20 +5,20 @@ import { AREA_CENTER, MONOLITHS } from './layout.js';
 
 // THE HUB'S TREES. Owned by V4.
 //
-// They are ALBERELLI and not trees: the tallest of the three the day target
-// shows stands a metre and a half, the other two under a metre, and their
-// crowns are four to ten cubes across. Anything here that reads as a forest
+// They are ALBERELLI and not trees: the tallest of the four the day target
+// shows stands a metre and a half, the other three under a metre, and their
+// crowns are three to seven cubes across. Anything here that reads as a forest
 // tree is wrong before it is drawn.
 //
-// WHERE THE THREE MEASURED ONES COME FROM. Their crowns were flood filled off
-// the day target as the island of not-water that holds each one -- two of the
-// three stand against the lake and one against the sky, and water is the one
-// class a crown can never be mistaken for -- and their trunks and base rows
-// read off the same picture one character per pixel. The pixels were then
-// carried into metres through THE POSES AS THEY STAND NOW: the earlier
-// inventory went through the camera in ricetta.json, which stands 1.15 m higher
-// and sees seven degrees more of this world, and every metre it produced is a
-// metre about that camera. Nothing from it survives here.
+// WHERE THE FOUR MEASURED ONES COME FROM. Their crowns were read off the day
+// target as the island of not-water that holds each one -- three of the four
+// stand against the lake and one against the sky, and water is the one class a
+// crown can never be mistaken for -- and their trunks and base rows read off the
+// same picture one character per pixel. The pixels were then carried into metres
+// through THE POSES AS THEY STAND NOW: the earlier inventory went through the
+// camera in ricetta.json, which stands 1.15 m higher and sees seven degrees more
+// of this world, and every metre it produced is a metre about that camera.
+// Nothing from it survives here.
 //
 // AND THE FLOOR THEY ARE DERIVED ON IS y = 0, WHICH IS MEASURED. Put the five
 // blocks' feet on the plane and on the delivered height field and compare both
@@ -29,13 +29,51 @@ import { AREA_CENTER, MONOLITHS } from './layout.js';
 // on the ground is a worse fault than a tree a few pixels high.
 
 /**
- * The step of the world, and everything here is a whole number of them.
- *
- * Not a preference: the material rebuilds the joint and the lightened arris out
- * of `fract(position / VOXEL)`, so a cube whose faces are not on the lattice
- * gets a joint drawn across its middle. Every position below is snapped.
+ * The step of the world. Everything about WHERE a tree stands is a number of
+ * these; nothing about what a tree is MADE of is.
  */
 const V = VOXEL;
+
+// -------------------------------------------------------- THE CUBE OF A CROWN
+//
+// AND IT IS NOT THE CELL OF THE WORLD, WHICH IS THE WHOLE OF WHY THESE TREES
+// WERE READ AS ABSENT.
+//
+// The trees have stood at the target's own seats since the foundation cured
+// their winding, and switching them off at the fitted pose moves five thousand
+// pixels exactly where the target draws them. What the eye of the campaign saw
+// was not an empty seat: it was a GRAIN. A crown built of the world's own
+// 0.10 m cells is five to ten cubes across at seven pixels each, and at sixteen
+// metres a seven pixel cube inside a thirty six pixel crown is not a cube, it is
+// a speckle -- so the shape has no edges to read and the whole thing reads as a
+// smear of the meadow's own green.
+//
+// THE TARGET'S CUBE, MEASURED ON FOUR TREES. Each silhouette was stepped off
+// against the lake at eight and twelve times, and the steps are the cubes:
+//
+//                 distance   px/m    crown px      crown m      cube px
+//   T1  (fra 01/02)  16.4 m   70.6   38 x 45   0.54 x 0.64      9-10
+//   T2  (sul lago)   32.7 m   35.5   35 x 36   0.99 x 1.01      8-10
+//   T3  (dietro 04)  18.9 m   61.4   25 x 39   0.41 x 0.64      6-9
+//   T4  (margine dx) 16.0 m   72.5   34 x 46   0.47 x 0.63     10-11
+//
+// Nine to eleven pixels at sixteen metres is 0.13 to 0.16 m, and R7's own count
+// at six times -- three to four cubes across T1, T3 and T4, four to five across
+// T2 -- puts the same number on it from the other side: 0.54/3.5 = 0.154.
+// 0.15 m, which is a cube and a half of the world, is what they agree on and it
+// is what is built here.
+//
+// WHAT THIS NUMBER CANNOT DO, DECLARED RATHER THAN AVERAGED AWAY. T2 stands at
+// thirty two metres and ITS cubes read 8 to 10 px -- 0.22 to 0.28 m, nearly
+// twice T1's. The target's cube is very nearly constant in PIXELS whatever the
+// distance, which is the same finding R4 published for the clouds and R6 for the
+// hills, and no single world-space size can be that. A size in metres is what a
+// solid standing in a world the walker moves through can have; the price is that
+// T2 comes out finer grained than the target draws it (5.3 px against 8-10), and
+// the alternative -- a cube per tree of width/4, so the big ones are built of
+// big cubes -- is D-R7-4 with the committente and costs a draw per size class
+// against a budget of two. Measured, said, and left where the choice belongs.
+const CROWN_CUBE = 0.15;
 
 // ---------------------------------------------------------------- the pigments
 //
@@ -58,46 +96,79 @@ const V = VOXEL;
 //        Its HUE is its own pixels; its LEVEL is the bark's side faces against
 //        the crowns' side faces -- same orientation, same trees, same sun --
 //        which comes to 0.538 of the crown's luminance.
+//
+// AND THE CHROMA OF THE SUNLIT TOPS IS NOT REACHABLE FROM HERE. The target's
+// lit crowns read C* 44 to 52; ours read 25 to 37, and a sweep of this albedo to
+// 1.7x on the page moved it by 3.4. What compresses it is the chain -- the air
+// at sixteen metres, the blue ramp, the grade, the meadow's own well -- and
+// R1/R4/R6 own every one of those. When they land, this triple is refitted as
+// the same ratio to the meadow that is here now: one line, and it is not this
+// unit's to write (R7 S3).
 const CROWN_ALBEDO = new Vector3(0.1836, 0.4160, 0.0247);
 const BARK_ALBEDO = new Vector3(0.2675, 0.1702, 0.0468);
 
 // ------------------------------------------------------------------ the shape
 //
-// THE CROWN IS NOT AN ELLIPSOID AND THE PICTURE SAYS SO. Each of the three
-// crowns reads as three tiers on the flood fill, and all three agree: full
-// width from the bottom to about two thirds of the way up, then a taper to
-// about 0.44 of the width at nine tenths, then nothing. Measured, as width over
-// the widest row against height over the crown:
+// THE CROWN IS A SOLID IN TIERS WITH A POINT ON IT, AND NOT AN ELLIPSOID.
 //
-//   T2 0.24 -> 1.00   T3 0.24 -> 1.00
-//   T1 0.50 -> 0.81   T3 0.63 -> 1.00   T2 0.64 -> 0.81   T1 0.66 -> 1.00
-//   T3 0.88 -> 0.50   T2 0.90 -> 0.39   T1 0.90 -> 0.43
+// Read at eight and twelve times against the water, all four crowns say the same
+// thing from the top down: ONE cube at the point, then a tier about twice that,
+// then the full width for the body of it, and a foot that closes back in a
+// little where the trunk comes through. T1, in pixels of its own silhouette:
 //
-// The 0.81 readings at two thirds are the fringe and not a waist -- they are one
-// tier of one tree each, against a full width tier above and below.
-const TAPER_FROM = 0.65;
-const TAPER_POWER = 0.7;
+//   rows 603-613   x 419..434   15 px   the point, and it is ONE cube
+//   rows 613-625   x 407..445   38 px
+//   rows 625-638   x 402..453   51 px
+//   rows 638-649   x 403..456   53 px   the widest, and it is the bottom
+//
+// A cube of 0.15 m at that seat projects a box of 15.9 x 11.9 px through the
+// fitted camera. The point measures 15 x 10. Nothing else in this file is as
+// direct as that.
+//
+// What an ellipsoid does instead is put its widest row in the MIDDLE and close
+// symmetrically above and below it, which reads as a ball on a stick at any size
+// and is what shipped. The profile below is the reading: full at the body,
+// closing to a point over the top tier, and a foot that gives the trunk
+// somewhere to come out of.
+//
+// THE UNITS ARE TIERS AND NOT A CONTINUUM, because a crown four cubes tall has
+// four values of this function in it and a curve fitted through four points is
+// four points with a curve drawn on them.
+//
+// AND THE WIDEST TIER IS THE BOTTOM ONE, WHICH IS THE HALF AN ELLIPSOID GETS
+// WRONG BY CONSTRUCTION: on all four trees the silhouette grows monotonically
+// downward until the foot closes a little round the trunk.
+const PROFILE = [
+  // up to this fraction of the crown's height, this much of its half width
+  { upTo: 0.22, half: 0.86 }, // the foot, closed a little round the trunk
+  { upTo: 0.62, half: 1.00 }, // the body, at full width
+  { upTo: 1.01, half: 0.72 }, // and the tier under the point
+];
 
-/** Half width of the crown at a height fraction, one at its widest. */
+/** Half width of a crown at a height fraction, one at its widest. */
 function profile(u) {
-  const taper = u <= TAPER_FROM ? 1 : ((1 - u) / (1 - TAPER_FROM)) ** TAPER_POWER;
-  // And it closes a little under itself, where the trunk comes through. The
-  // picture cannot see this -- the meadow is in front of it in all three -- so
-  // it is the mildest thing that is not a flat disc sitting on a stick.
-  const foot = u >= 0.15 ? 1 : 0.78 + 0.22 * (u / 0.15);
-  return taper * foot;
+  for (const tier of PROFILE) if (u < tier.upTo) return tier.half;
+  return PROFILE[PROFILE.length - 1].half;
 }
 
-// How much of the outer shell is bitten away, and from where inwards. A full
-// ellipsoid of cubes reads as a ball and the target's crowns read as clumps:
-// the edge is ragged at the scale of a single cube, which is the only scale a
-// crown four cubes across has.
-// Only the OUTERMOST ring is bitten, and that is a triangle count as much as a
-// look: a bite taken deeper leaves holes with their own walls, and every hole
-// is four quads the greedy merge cannot join to anything. At 0.62 the crowns
-// came to 1.06 quads a cell against the 0.77 of a smooth one; here they do not.
-const FRINGE_FROM = 0.70;
-const FRINGE_BITE = 0.38;
+// AND THERE IS NO LOTTERY IN THE SHAPE, WHICH IS A FINDING AND NOT A SAVING.
+//
+// The first cut of this law bit cubes out of the outer ring and stood others one
+// step proud of it, on a hash, because a crown whose edge follows a circle
+// exactly reads as a machined object. Measured through the fitted camera, that
+// is not what these crowns can afford: they are THREE TO FIVE cubes across, so
+// EVERY cell is on the outer ring, and one cell added or removed at the rim
+// moves the silhouette by a whole cube -- 17 to 32 per cent of the box the
+// target draws. A shape gated at five per cent cannot be drawn by a draw.
+//
+// And the target does not ask for it. Read at eight and twelve times, all four
+// crowns are SOLID clumps: what makes their edges ragged is the tier steps and
+// the staircase a disc of cubes makes of its own rim, both of which are here by
+// construction. T3 at eight times is the plainest -- four whole tiers and a
+// point, no hole in any of them.
+//
+// What makes one tree different from another is therefore its SIZE, of which
+// the target measured four, and the sown population draws from those four.
 
 /**
  * Two decorrelated draws from three whole numbers, without a transcendental.
@@ -115,12 +186,14 @@ function cellHash(x, y, z) {
 }
 
 /**
- * The cells of one crown, in world voxel coordinates.
+ * The cells of one crown, in the tree lattice.
  *
- * @param {number} cx,cz  the trunk's own column, in voxels
- * @param {number} y0     the crown's lowest row, in voxels
- * @param {number} width  crown width, in voxels
- * @param {number} tall   crown height, in voxels
+ * @param {number} cx  the trunk's own column in x, in crown cubes
+ * @param {number} cz  the trunk's own column in z, in crown cubes
+ * @param {number} y0  the crown's lowest row, in crown cubes
+ * @param {number} width  crown width, in crown cubes
+ * @param {number} tall  crown height BELOW the point, in crown cubes
+ * @param {Set} into  the cells, as "x,y,z"
  */
 function crownCells(cx, cz, y0, width, tall, into) {
   // A crown an EVEN number of cubes across cannot be centred on a cell, so its
@@ -128,62 +201,118 @@ function crownCells(cx, cz, y0, width, tall, into) {
   // width it was measured at. Centring it on the trunk instead would round four
   // cubes to three or to five, which on a crown this small is a quarter of it.
   const off = width % 2 === 1 ? 0 : -0.5;
-  const r = (width - 1) / 2;
+  const r = width / 2;
   const reach = Math.ceil(r + 1);
   for (let j = 0; j < tall; j++) {
     const u = (j + 0.5) / tall;
     const half = r * profile(u);
     for (let i = -reach; i <= reach; i++) {
       for (let k = -reach; k <= reach; k++) {
-        const d = Math.hypot(i - off, k - off) / Math.max(half, 1e-6);
-        if (d > 1.0001) continue;
-        if (d > FRINGE_FROM && cellHash(cx + i, y0 + j, cz + k) < FRINGE_BITE) continue;
+        // A disc and not a square, because a square of cubes turned to the
+        // camera shows its diagonal and reads a third wider than it is: T1's
+        // crown is three cubes across the axis and would be four and a half
+        // across the corner.
+        if (Math.hypot(i - off, k - off) > half + 0.05) continue;
         into.add(`${cx + i},${y0 + j},${cz + k}`);
       }
     }
   }
+  // AND THE POINT: one cube, on the axis, over the whole of it. The target shows
+  // it on T1, T2 and T4 as a single step ten to eleven pixels wide standing
+  // clear of the tier below, and it is the one feature that makes a crown of
+  // three cubes read as a tree rather than as a bush.
+  into.add(`${cx},${y0 + tall},${cz}`);
 }
 
-/** The cells of one trunk: one column of one voxel, which is what is drawn. */
+/** The cells of one trunk: one column of one cube, which is what is drawn. */
 function trunkCells(cx, cz, from, to, into) {
   for (let j = from; j < to; j++) into.add(`${cx},${j},${cz}`);
 }
 
-// ------------------------------------------------------------- the three read
+// -------------------------------------------------------------- the four read
 //
-// x and z in metres on the plane the target stands its blocks on; height, crown
-// and trunk in VOXELS, because that is what they were counted in. The pixel
-// evidence for each is written beside it so a reader can go back to the picture
-// without the tool.
+// x and z in metres on the plane the target stands its blocks on; crown width,
+// crown height and trunk in CROWN CUBES of 0.15 m, because that is the unit they
+// were counted in. The pixel evidence for each is written beside it so a reader
+// can go back to the picture without the tool.
+//
+// `crown` is the width; `crownTall` is the number of tiers UNDER the point, so a
+// crown occupies crownTall + 1 rows; `trunkTall` is how many rows of trunk stand
+// between the floor and the crown's lowest row.
 export const MEASURED = [
   {
     id: 'T1',
-    // crown x 407..443 rows 602..648, trunk x 419..423 rows 657..673,
-    // base row 674 +/- 4 -> range 16.36 m (15.84..16.92)
-    x: -5.35, z: -1.03, crown: 5, crownTall: 6, trunkTall: 4,
+    // Silhouette against the lake x 402..456 rows 603..656; bark (hue 62..90)
+    // x 418..428 rows 656..673; base row 674 +/- 4. Its point is ONE cube whose
+    // box measures 15 x 10 px at twelve times, against the 15.9 x 11.9 a cube of
+    // 0.15 m projects at this seat: that single reading is the whole case for
+    // the cube. Foot of the crown in the deepest shade of the four (0.54 of the
+    // meadow beside it), which is why the last tier cannot be counted.
+    x: -5.35, z: -1.03, crown: 4, crownTall: 3, trunkTall: 2,
   },
   {
     id: 'T2',
-    // crown x 702..737 rows 556..592, trunk x 714..717 rows 594..611,
-    // base row 611 +/- 4 -> range 32.38 m (30.28..34.79). The big one.
-    x: -3.74, z: -17.87, crown: 10, crownTall: 10, trunkTall: 5,
+    // Silhouette x 702..730 rows 555..594, trunk x 712..719 rows 594..611, base
+    // row 611 +/- 4. Tall and narrow -- five cubes across against seven of
+    // height -- and the only one whose trunk is three cubes. Its own cubes read
+    // 8 to 10 px where 0.15 m projects 6.2: see the note over CROWN_CUBE.
+    x: -3.74, z: -17.87, crown: 5, crownTall: 6, trunkTall: 3,
   },
   {
     id: 'T3',
-    // crown x 1227..1252 rows 599..638; no bark resolvable, its trunk falls in
-    // the shaded band, so the base row is 658 +/- 8 read off where the sunlit
-    // meadow starts under the crown -> range 18.80 m (17.47..20.35). The band
-    // is twice the others' and that is why.
-    x: 6.17, z: -3.74, crown: 4, crownTall: 6, trunkTall: 3,
+    // Silhouette x 1219..1259 rows 599..637; no bark resolvable, its trunk falls
+    // in the shaded band, so the base row is 658 +/- 8 read off where the sunlit
+    // meadow starts under the crown. THE PLAINEST OF THE FOUR at eight times:
+    // four whole tiers of nine to ten pixels each and a point of one cube on
+    // top, no hole in any of them -- it is what settled the shape.
+    x: 6.17, z: -3.74, crown: 3, crownTall: 3, trunkTall: 2,
+  },
+  {
+    id: 'T4',
+    // THE ONE NO INVENTORY CARRIED. R7 found it at the right margin and left it
+    // to be measured; this is the measurement. Crown against open water on three
+    // sides -- the cleanest silhouette of the four -- trunk (L* 3 to 8, too dark to carry a hue) x 1577..1587 rows 675..691,
+    // base row 692 +/- 4. Through the fitted camera on the plane that is
+    // (8.76, 0.47), 16.0 m out. Silhouette x 1550..1612 rows 629..675, a point
+    // of one cube 11 x 10 px on top. It stands 4.2 m south of block 05, and
+    // contracts.js says the ground there is meadow at y = 0.
+    //
+    // R7 put it at (10.1, -0.85) off an eyeballed base row of 680 at u 0.975;
+    // the trunk is at u 0.946 and its foot at 692, and the difference between
+    // those two readings is 1.3 m of ground. This one is off the pixels.
+    x: 8.76, z: 0.47, crown: 3, crownTall: 2, trunkTall: 2,
   },
 ];
+
+/**
+ * WHERE THE TREES STAND, AS A CONTRACT AND NOT AS A COMMENT.
+ *
+ * The zone map of R1-S3 owes each of these seats a disc of shade -- the target
+ * puts the meadow under T1 at 0.53 of the meadow beside it and under T3 at 0.62
+ * -- and a second list of four seats written into that map is a second list to
+ * keep in step. So the seats are published from the one place that decides them,
+ * with the crown's own radius in metres, and U-ALBERI-2 reads this rather than
+ * copying it. E-V1h asked for exactly this reconciliation under the heading of
+ * the alberelli.
+ *
+ * @returns {{id:string, x:number, z:number, radius:number, height:number}[]}
+ */
+export function treeSeats() {
+  return MEASURED.map((t) => ({
+    id: t.id,
+    x: t.x,
+    z: t.z,
+    radius: (t.crown / 2) * CROWN_CUBE,
+    height: (t.trunkTall + t.crownTall + 1) * CROWN_CUBE,
+  }));
+}
 
 // --------------------------------------------------- and the ones out of frame
 //
 // The two pictures cannot show what stands beside or behind the camera, and a
 // hub with trees only where a picture happened to look is a hub that falls apart
 // the moment the walker turns round. So the rest of the population is SOWN, out
-// of the sizes of the three that were measured and nothing else -- no shape, no
+// of the sizes of the four that were measured and nothing else -- no shape, no
 // spacing and no colour is invented here that the picture did not already say.
 //
 // WHERE THEY MAY STAND, AND WHY IT IS A WEDGE. Both target eyes stand within a
@@ -203,10 +332,10 @@ const SOWN_STEP = 3.2;
  * And how many of those candidates actually carry a tree.
  *
  * SET BY THE TRIANGLE ALLOCATION AND NOT BY TASTE, because the picture has
- * nothing to say about ground it cannot see: the three measured trees come to
+ * nothing to say about ground it cannot see: the four measured trees come to
  * about a quarter of the four thousand triangles this session allocated to
  * trees, and this is how many more fit in the rest. It is one number, so moving
- * it is one line.
+ * it is one line -- which is what D-R7-4 C would move.
  */
 const SOWN_TAKE = 0.15;
 /** Clearance from a block's footprint, in metres. */
@@ -231,7 +360,7 @@ function nearBlock(x, z) {
   return false;
 }
 
-/** The sown population: same material, sizes drawn from the three measured. */
+/** The sown population: same material, sizes drawn from the four measured. */
 export function sownTrees() {
   const out = [];
   const steps = Math.ceil(SOWN_RADIUS / SOWN_STEP);
@@ -280,10 +409,13 @@ export function sownTrees() {
 // are not. What it spends is vertex memory, which is quoted with the triangles.
 //
 // AND THE MESH STANDS AT THE ORIGIN, UNROTATED. The material reads the cube a
-// fragment belongs to out of `floor(position / VOXEL)` plus the chunk the model
+// fragment belongs to out of `floor(position / cube)` plus the chunk the model
 // matrix says it is in, so geometry built in world coordinates under an identity
-// transform lands on the same lattice as V1's own columns -- the tint of a
-// crown and the tint of the grass under it come out of one hash of one grid.
+// transform lands on the lattice the material is TOLD about -- which for these
+// two meshes is the tree's 0.15 m lattice and not the world's 0.10 m one. That
+// is the point of the whole unit: the joint and the lightened arris the material
+// draws are then the edges of the cube a reader counts on the target, and drawn
+// on the world's step they would fall a cube and a half inside every one of them.
 const DIRS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 
 /**
@@ -316,7 +448,7 @@ function mergeFaces(faces) {
     // (u, v) is the cyclic pair after the axis -- (y, z), (z, x), (x, y) -- so
     // a rectangle grown in (u, v) winds the way its normal says. Reading (x, z)
     // for the Y planes handed every top and bottom face to the back-face cull:
-    // a third of every crown and trunk was never drawn.
+    // a third of every crown and trunk was never drawn (E-GUARDIA1).
     const u = axis === 0 ? y : axis === 1 ? z : x;
     const v = axis === 0 ? z : axis === 1 ? x : y;
     const key = `${d}|${slab}`;
@@ -345,7 +477,7 @@ function mergeFaces(faces) {
 }
 
 /** The quads of one pigment, as a buffer geometry in world metres. */
-function geometryOf(quads) {
+function geometryOf(quads, step) {
   const pos = [];
   const nor = [];
   const idx = [];
@@ -363,7 +495,7 @@ function geometryOf(quads) {
     const b = pos.length / 3;
     for (const [du, dv] of [[0, 0], [w, 0], [w, h], [0, h]]) {
       const c = corner(du, dv);
-      pos.push(c[0] * V, c[1] * V, c[2] * V);
+      pos.push(c[0] * step, c[1] * step, c[2] * step);
       nor.push(n[0], n[1], n[2]);
     }
     if (d % 2 === 0) idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
@@ -381,34 +513,30 @@ function geometryOf(quads) {
 const BURY = 2;
 
 /**
- * The hub's trees: two meshes, one draw each, and nothing to update.
+ * The cells of the whole population, as the two families and their union.
  *
- * WHY TWO AND NOT ONE. The trunk is brown in the target -- it is how the trunks
- * were found at all -- and the material carries one albedo. A second colour
- * inside one draw would have to be a per-voxel property in a vertex attribute,
- * which `guard-vertice` forbids and which the campaign priced at 3.0x. Two
- * draws for every tree in the hub, at any count, is the cheap answer.
+ * SEPARATE FROM THE MESHING BECAUSE A GUARD MUST BE ABLE TO ASK. What
+ * guard-alberi gates is a silhouette in pixels at the fitted pose, and a
+ * silhouette is a set of cubes projected through a camera -- not a buffer. Every
+ * number this file claims about the shape is claimed about THESE cells, and the
+ * meshes below are made out of the same call, so the guard and the frame cannot
+ * be measuring two different worlds.
  *
- * NOTHING HERE IS REBUILT AS THE WALKER MOVES. A ring that re-sows itself is
- * what the cards need because they face the eye; a tree is a solid standing in
- * one place, so it is built once and never touched again -- which is also why
- * there is no pop to look for in a walk.
- *
- * @param {object} options
- * @param {Function} options.height  where the ground is, from the hub's bag
+ * @param {Function} height  where the ground is, from the hub's bag
+ * @returns {{trees:object[], crowns:Set, trunks:Set, solid:Set, cube:number}}
  */
-export function createTrees({ height }) {
+export function treeCells(height) {
   const trees = [...MEASURED, ...sownTrees()];
   const solid = new Set();
   const crowns = new Set();
   const trunks = new Set();
 
   for (const t of trees) {
-    // Snapped to the lattice, or the joint and the arris the material draws out
-    // of fract(position / VOXEL) would be drawn across the middle of a face.
-    const cx = Math.round(t.x / V);
-    const cz = Math.round(t.z / V);
-    const floor = Math.round(height((cx + 0.5) * V, (cz + 0.5) * V) / V);
+    // Snapped to the tree lattice, or the joint and the arris the material draws
+    // out of fract(position / cube) would be drawn across the middle of a face.
+    const cx = Math.round(t.x / CROWN_CUBE);
+    const cz = Math.round(t.z / CROWN_CUBE);
+    const floor = Math.round(height((cx + 0.5) * CROWN_CUBE, (cz + 0.5) * CROWN_CUBE) / CROWN_CUBE);
     crownCells(cx, cz, floor + t.trunkTall, t.crown, t.crownTall, crowns);
     trunkCells(cx, cz, floor - BURY, floor + t.trunkTall + 1, trunks);
   }
@@ -428,22 +556,50 @@ export function createTrees({ height }) {
   // It is not hypothetical and it is not everywhere: a crown an EVEN number of
   // cubes across has its axis half a cube to one side, so its bottom row covers
   // the trunk's column but not the column's +x and +z neighbours, and those two
-  // faces stand open. Measured on the population as it stands, four crowns of
-  // four cubes leave eight such faces -- 0.08 m2 drawn twice.
+  // faces stand open.
   //
   // The crown keeps them, because a cube level with the foliage reads as
   // foliage. `solid` is already the union above, so nothing about what is
   // hidden changes: this only settles which family draws what is not.
   for (const key of crowns) trunks.delete(key);
 
+  return { trees, crowns, trunks, solid, cube: CROWN_CUBE };
+}
+
+/**
+ * The hub's trees: two meshes, one draw each, and nothing to update.
+ *
+ * WHY TWO AND NOT ONE. The trunk is brown in the target -- it is how the trunks
+ * were found at all -- and the material carries one albedo. A second colour
+ * inside one draw would have to be a per-voxel property in a vertex attribute,
+ * which `guard-vertice` forbids and which the campaign priced at 3.0x. Two
+ * draws for every tree in the hub, at any count, is the cheap answer.
+ *
+ * NOTHING HERE IS REBUILT AS THE WALKER MOVES. A ring that re-sows itself is
+ * what the cards need because they face the eye; a tree is a solid standing in
+ * one place, so it is built once and never touched again -- which is also why
+ * there is no pop to look for in a walk.
+ *
+ * @param {object} options
+ * @param {Function} options.height  where the ground is, from the hub's bag
+ */
+export function createTrees({ height }) {
+  const { trees, crowns, trunks, solid } = treeCells(height);
+
   const meshes = [];
-  const census = { trees: trees.length, cells: solid.size, quads: 0, triangles: 0, by: {} };
+  const census = {
+    trees: trees.length, cells: solid.size, quads: 0, triangles: 0, by: {},
+    cube: CROWN_CUBE, worldVoxel: V,
+  };
   for (const [name, cells, albedo] of [['trees-crowns', crowns, CROWN_ALBEDO],
     ['trees-trunks', trunks, BARK_ALBEDO]]) {
     const quads = mergeFaces(facesOf(cells, solid));
     const settings = voxelSettings();
     settings.albedo = albedo;
-    const mesh = new Mesh(geometryOf(quads), voxelMaterial(V, settings));
+    // THE MATERIAL IS TOLD THE TREE'S CUBE AND NOT THE WORLD'S. One argument,
+    // and it is what puts the joint, the lightened arris and the per-cube tint
+    // on the edges a reader can count on the target.
+    const mesh = new Mesh(geometryOf(quads, CROWN_CUBE), voxelMaterial(CROWN_CUBE, settings));
     mesh.name = name;
     meshes.push(mesh);
     census.quads += quads.length;
