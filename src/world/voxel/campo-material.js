@@ -1,7 +1,9 @@
 import {
-  BackSide, BoxGeometry, DataTexture, GLSL3, LinearFilter, Matrix4, Mesh, RedFormat,
-  ShaderMaterial, Vector2, Vector3, Vector4,
+  BackSide, BoxGeometry, CustomBlending, DataTexture, DoubleSide, GLSL3, LinearFilter, Matrix4,
+  Mesh, OneMinusSrcAlphaFactor, PlaneGeometry, RedFormat, ShaderMaterial, SrcAlphaFactor, Vector2,
+  Vector3, Vector4,
 } from 'three';
+import { CAMPO_LAYER } from '../../core/post.js';
 import { SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS } from '../../core/sky.js';
 import { FACE_LIGHT_GLSL, faceLightUniforms } from '../face-light.js';
 import { FOG_GLSL, GROUND_EXPOSURE, fogUniforms } from '../air.js';
@@ -1468,6 +1470,268 @@ export function campoMaterial({
   return material;
 }
 
+// ============================================================================
+//                      THE RECOMPOSITION, AT FULL RESOLUTION
+// ============================================================================
+//
+// WHAT IT HAS TO DO AND WHAT IT CANNOT DO, said in that order.
+//
+// It CANNOT invent the edges the reduced buffer did not draw. A cube's arris
+// against the meadow behind it was decided by one ray in four pixels, and no
+// filter puts back a silhouette nobody marched. What half a side costs is
+// exactly that, and it is what the plate at four times life size is for.
+//
+// What it MUST do is keep the edges that were never the field's to draw. The
+// foot of a monolith, the stem of a flower, the walker's own boot: those are
+// drawn at the frame's own pixel, into the frame's own depth, and they are in
+// the buffer BEFORE this quad is. So this pass writes gl_FragDepth and lets the
+// depth test decide, pixel by whole pixel, whether the ground is in front of
+// the masonry or behind it. Nothing of the meadow can land on a monolith,
+// because a whole pixel of monolith says it may not -- and that is a sharper
+// answer than the field itself used to give, which was a half resolution guess
+// at a whole resolution question only in the sense that it was the same guess.
+//
+// AND THE FIELD'S OWN DEPTH EDGES ARE GATED RATHER THAN SMEARED. Four texels
+// surround this pixel. Read them bilinearly and a pixel sitting where a raised
+// cube meets ground four metres behind it gets the MEAN of two depths, which is
+// a place in the air between them -- and a flower standing at the foot of that
+// cube then cuts into nothing at all. So the four are gated on depth first: a
+// tap more than a tolerance away from the tap this pixel actually falls in is
+// dropped, and what is left is weighed bilinearly.
+//
+// THE TOLERANCE IS THE LOCAL SLOPE AND NOT A NUMBER. Window depth is affine in
+// screen space over any PLANE -- that is the property the hardware's own
+// interpolator is built on -- so four taps of a meadow seen at a grazing angle
+// disagree hugely and are all on one surface, while four taps across a cube's
+// edge disagree by more than any plane through them could account for. The gate
+// is therefore `uEdge` times the local difference plus a floor, and the local
+// difference is taken as the SMALLER of the two parallel ones on each axis, so
+// an edge crossing one of them cannot inflate the tolerance that is supposed to
+// catch it.
+//
+// AND THE COVERAGE IS FINALLY SPENT. The field has always computed it -- the
+// share of a pixel's rays that found ground -- and has always thrown it away,
+// because the scene buffer is a packed float with no alpha to put it in. The
+// reduced buffer has four channels, so here the rim of the ridge against the
+// sky arrives as a fraction and is blended against the sky that is already in
+// the frame. `uCoverage` at nought puts back the binary rim that shipped, which
+// is the null this is measured against.
+const RESOLVE_VERTEX = /* glsl */`
+  void main() {
+    // No matrix at all: the two triangles are given in clip space and stay
+    // there. A quad that went through the camera would be a quad that could be
+    // clipped by the near plane of a walker standing in the wrong place.
+    gl_Position = vec4(position.xy, 0.0, 1.0);
+  }
+`;
+
+const RESOLVE_FRAGMENT = /* glsl */`
+  precision highp float;
+  precision highp int;
+
+  out vec4 fragColour;
+
+  uniform sampler2D tCampo;
+  uniform sampler2D tCampoDepth;
+  uniform vec2 uCampoSize;
+  uniform float uCampoOn;
+  uniform vec2 uFrameSize;
+  uniform float uEdge;
+  uniform float uEdgeFloor;
+  uniform float uCoverage;
+  uniform float uDebug;
+
+  void main() {
+    // The null, and it is a whole pixel of nothing: with no field buffer bound
+    // there is no ground to put back, and the field's own mesh is drawn in the
+    // world's pass instead. See CAMPO_LAYER in src/core/post.js.
+    if (uCampoOn < 0.5) discard;
+
+    // Where this pixel's CENTRE falls in the reduced buffer, in texel units
+    // with the half texel taken off, so «base» is the lower left of the four
+    // that surround it -- the footing a bilinear tap stands on.
+    vec2 t = (gl_FragCoord.xy / uFrameSize) * uCampoSize - 0.5;
+    vec2 base = floor(t);
+    vec2 f = t - base;
+    ivec2 lim = ivec2(uCampoSize) - 1;
+    ivec2 b = ivec2(base);
+
+    ivec2 at[4];
+    at[0] = clamp(b,               ivec2(0), lim);
+    at[1] = clamp(b + ivec2(1, 0), ivec2(0), lim);
+    at[2] = clamp(b + ivec2(0, 1), ivec2(0), lim);
+    at[3] = clamp(b + ivec2(1, 1), ivec2(0), lim);
+
+    vec4 c[4];
+    float d[4];
+    float w[4];
+    w[0] = (1.0 - f.x) * (1.0 - f.y);
+    w[1] = f.x * (1.0 - f.y);
+    w[2] = (1.0 - f.x) * f.y;
+    w[3] = f.x * f.y;
+    for (int i = 0; i < 4; i++) {
+      c[i] = texelFetch(tCampo, at[i], 0);
+      d[i] = texelFetch(tCampoDepth, at[i], 0).x;
+    }
+
+    // I MODI DI DIAGNOSI, prima di ogni cancello: quello che il quadro LEGGE,
+    // separato da quello che ne fa. 3 il colore del texel, 4 la sua copertura,
+    // 5 la sua profondita', 6 il quadro intero in magenta.
+    if (uDebug > 2.5) {
+      int r0 = (f.x >= 0.5 ? 1 : 0) + (f.y >= 0.5 ? 2 : 0);
+      vec3 show = uDebug < 3.5 ? c[r0].rgb
+        : uDebug < 4.5 ? vec3(c[r0].a)
+        : uDebug < 5.5 ? vec3(pow(d[r0], 64.0))
+        : uDebug < 6.5 ? (c[r0].a > 0.0 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 1.0))
+        : vec3(1.0, 0.0, 1.0);
+      fragColour = vec4(show, 1.0);
+      gl_FragDepth = uDebug > 5.5 ? 0.0 : d[r0];
+      return;
+    }
+
+    // THE TAP THIS PIXEL IS ACTUALLY IN, which is the one the gate clusters
+    // around. Not the nearest of the four and not the mean of them: a pixel
+    // belongs to one texel of the reduced buffer, and at an edge the honest
+    // answer is the side of the edge it is on.
+    int ref = (f.x >= 0.5 ? 1 : 0) + (f.y >= 0.5 ? 2 : 0);
+    if (c[ref].a <= 0.0) {
+      // It fell on sky. Then this pixel is on the rim, and what it clusters
+      // around is the heaviest neighbour that DID find ground -- so the colour
+      // comes from the ridge and the coverage from how much of the pixel the
+      // ridge holds.
+      float best = -1.0;
+      for (int i = 0; i < 4; i++) {
+        if (c[i].a > 0.0 && w[i] > best) { best = w[i]; ref = i; }
+      }
+      if (best < 0.0) discard;
+    }
+    float dr = d[ref];
+
+    float gx = min(abs(d[1] - d[0]), abs(d[3] - d[2]));
+    float gy = min(abs(d[2] - d[0]), abs(d[3] - d[1]));
+    float tol = uEdge * (gx + gy) + uEdgeFloor;
+
+    vec3 rgb = vec3(0.0);
+    float depth = 0.0;
+    float mass = 0.0;
+    // The whole neighbourhood's coverage, gate or no gate: what is being asked
+    // here is how much of this pixel is ground at all, and a tap dropped for
+    // standing on the far side of an arris is still ground.
+    float cover = 0.0;
+    float dropped = 0.0;
+    for (int i = 0; i < 4; i++) {
+      float a = c[i].a;
+      cover += w[i] * a;
+      float keep = (a > 0.0 && abs(d[i] - dr) <= tol) ? 1.0 : 0.0;
+      dropped += (a > 0.0 ? 1.0 : 0.0) * (1.0 - keep);
+      float m = w[i] * a * keep;
+      rgb += c[i].rgb * m;
+      depth += d[i] * m;
+      mass += m;
+    }
+    if (mass <= 0.0) discard;
+    rgb /= mass;
+    depth /= mass;
+
+    // NOUGHT IS THE RIM THAT SHIPPED and one is the rim the coverage pays for.
+    // The binary arm rounds at a half rather than at anything above nothing,
+    // because a rim that turned on at the first lit texel would grow the meadow
+    // by a texel into the sky -- which is the one thing a recomposition is not
+    // allowed to do, and the name for it is a halo.
+    float alpha = mix(step(0.5, cover), clamp(cover, 0.0, 1.0), uCoverage);
+    if (alpha <= 0.0) discard;
+
+    if (uDebug > 0.5) {
+      // 1: where the gate did work, which is where the field's own depth breaks
+      //    -- the arrises, the rim, the lip of a terrace.
+      // 2: the coverage itself, which is where the ridge meets the sky.
+      vec3 mark = uDebug > 1.5 ? vec3(alpha) : mix(rgb, vec3(1.0, 0.1, 0.0), min(1.0, dropped));
+      fragColour = vec4(mark, alpha);
+      gl_FragDepth = depth;
+      return;
+    }
+
+    fragColour = vec4(rgb, alpha);
+    gl_FragDepth = depth;
+  }
+`;
+
+/**
+ * The mesh that puts the reduced field back at the frame's own pixel.
+ *
+ * IT IS A MESH IN THE WORLD AND NOT A PASS IN THE POST CHAIN, and that is the
+ * whole of why this is cheap. The field ships at renderOrder 10 -- last of the
+ * opaques, behind the sky and the skyline, in front of the transparent flowers
+ * -- and every one of those relations is load bearing. Standing here, the
+ * recomposition inherits all of them for nothing: it is drawn where the field
+ * was drawn, in the one render into the scene target that the frame is allowed,
+ * with the same depth test against the same buffer.
+ *
+ * @param {object} seat  the field's own uniforms from src/core/post.js, shared
+ *                       BY REFERENCE: the chain writes the buffer and its size
+ *                       once a frame and this material sees the new value,
+ *                       because there is one object behind every copy.
+ */
+export function campoResolve(seat) {
+  const material = new ShaderMaterial({
+    glslVersion: GLSL3,
+    uniforms: {
+      ...seat,
+      uFrameSize: { value: new Vector2(1, 1) },
+      // Two of the local slope, which is the tolerance a plane needs and an
+      // arris does not: measured over the four taps rather than assumed, so a
+      // meadow seen at a grazing angle -- where the depth across one texel
+      // changes more than a whole cube does at fifty metres -- is still one
+      // surface to this gate.
+      uEdge: { value: 2.0 },
+      // And a floor under it, in raw depth units, so four taps that agree to
+      // the bit on a flat floor do not gate each other out on the buffer's own
+      // quantisation.
+      uEdgeFloor: { value: 1e-5 },
+      uCoverage: { value: 1 },
+      uDebug: { value: 0 },
+    },
+    vertexShader: RESOLVE_VERTEX,
+    fragmentShader: RESOLVE_FRAGMENT,
+    // THE COVERAGE HAS TO REACH THE BLENDER, and NormalBlending would not get
+    // it there: three turns a material that is `transparent: false` and
+    // normally blended into NO blending at all, which is exactly why the
+    // field's own alpha has never been spent. Asked for by name, it survives --
+    // and `transparent` stays false, which is what keeps this draw in the
+    // OPAQUE pass where the field has always been, in front of the sky and
+    // behind the flowers.
+    blending: CustomBlending,
+    blendSrc: SrcAlphaFactor,
+    blendDst: OneMinusSrcAlphaFactor,
+    transparent: false,
+    // Two triangles handed over in clip space, so which way they face is a
+    // property of the geometry and not of where anybody is standing.
+    side: DoubleSide,
+    fog: false,
+    depthWrite: true,
+    depthTest: true,
+  });
+
+  const mesh = new Mesh(new PlaneGeometry(2, 2), material);
+  mesh.name = 'ground-campo-resolve';
+  mesh.frustumCulled = false;
+  // THE SAME PLACE IN THE ORDER THE FIELD ITSELF HELD. See campoBox: after
+  // every other opaque, so the sky and the skyline are already in the buffer
+  // for the coverage to stand against and every monolith is already in the
+  // depth for the test to answer with.
+  mesh.renderOrder = 10;
+  mesh.onBeforeRender = (renderer) => {
+    // The frame, in pixels, read from the target that is actually bound rather
+    // than from the canvas: this pass is the one place where the two are the
+    // same and the field's own pass is the one place where they are not.
+    const target = renderer.getRenderTarget();
+    if (target) SCRATCH.set(target.width, target.height);
+    else renderer.getDrawingBufferSize(SCRATCH);
+    material.uniforms.uFrameSize.value.copy(SCRATCH);
+  };
+  return mesh;
+}
+
 /**
  * The one box the field is drawn on.
  *
@@ -1490,7 +1754,21 @@ export function campoBox(material, onRenderer = null) {
     // The footprint of one pixel at one metre, head on: the height of the view
     // frustum at unit distance over the pixels it is drawn in. The fragment
     // divides by the face's own lean to get what an fwidth would have read.
-    const size = renderer.getDrawingBufferSize(SCRATCH);
+    //
+    // AND THE BUFFER IS THE ONE THAT IS BOUND, not the canvas. The two are the
+    // same on every frame drawn whole -- the scene target is the drawing buffer
+    // -- and they are exactly not the same on the frame this field is drawn
+    // apart at half a side. What every term below the line spends this on is
+    // sub-pixel filtering: the blade's prefilter, the joint, the arris. That is
+    // the scale the SUB-SAMPLING lives at (U-CAMPO-1 §9, RESTA: «ogni termine
+    // in pixel ... sono la scala del sotto-campionamento e devono esserlo»), so
+    // a field marching into a buffer of half the side and filtering as though
+    // it were marching into the whole one would alias by construction. The LOD
+    // itself does not move: it is a distance in metres from the walker and
+    // names no pixel at all, which is guard-zoom's own assertion.
+    const bound = renderer.getRenderTarget();
+    const size = bound ? SCRATCH.set(bound.width, bound.height)
+      : renderer.getDrawingBufferSize(SCRATCH);
     const fov = (camera.fov ?? 45) * Math.PI / 180;
     u.uPixelScale.value = size.y > 0 ? 2 * Math.tan(fov / 2) / size.y : 0.002;
     if (onRenderer) onRenderer(renderer);
@@ -1500,6 +1778,13 @@ export function campoBox(material, onRenderer = null) {
   // sphere recomputed as it moves is main thread work for an answer that never
   // changes.
   mesh.frustumCulled = false;
+  // ITS OWN LAYER, ALWAYS, WHETHER OR NOT ANYBODY TAKES IT OFF THE WORLD'S
+  // PASS. The frame decides which of the two it draws -- the field here, at the
+  // frame's own pixel, or the field into a buffer of its own and this quad's
+  // twin over the top of it -- and it decides it by enabling or disabling this
+  // layer on the camera. A mesh that changed layer when the tier moved would be
+  // a second place the same decision is written down.
+  mesh.layers.set(CAMPO_LAYER);
   // AFTER EVERY OTHER OPAQUE. The field writes gl_FragDepth, so it has no early
   // depth test of its own; what it can still have is everybody else's depth
   // already written, which kills its fragments behind the monoliths at the late

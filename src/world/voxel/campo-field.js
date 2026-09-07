@@ -8,7 +8,8 @@ import {
   CAMPO, CAMPO_BEARINGS, CAMPO_BIAS, CAMPO_BLADE_CEIL, CAMPO_FAR, CAMPO_HORIZON_REACH,
   campoCoarseSpan, campoFarOrigin, campoHorizon,
 } from './campo.js';
-import { campoBox, campoMaterial } from './campo-material.js';
+import { campoBox, campoMaterial, campoResolve } from './campo-material.js';
+import { campoUniforms } from '../../core/post.js';
 
 // THE TWO WINDOWS THE GROUND IS KEPT IN, AND THE ONE CALL THAT MOVES THEM.
 //
@@ -184,6 +185,24 @@ export function createCampo({
     for (const w of windows) renderer.initTexture(w.texture);
   });
   group.add(mesh);
+
+  // THE FIELD'S OTHER HALF, AND IT IS ASLEEP UNTIL A TIER ASKS FOR IT.
+  //
+  // Two meshes, one field. `mesh` above marches, and it sits on CAMPO_LAYER so
+  // that the frame can take it out of the world's own pass and give it a buffer
+  // of its own at a fraction of a side; this one puts that buffer back at the
+  // frame's pixel, standing exactly where the marcher stands in the order.
+  // Exactly one of them draws on any frame, and which one is a property of the
+  // FRAME (src/core/post.js: CAMPO_LAYER on the camera) rather than a flag kept
+  // here -- so the two can never both be on, which would draw the ground twice,
+  // nor both be off, which would draw no ground at all.
+  //
+  // Asking for the seat is what tells the post chain there is a field to draw
+  // apart, so it is asked for once, here, at the moment the field is built.
+  const resolve = campoResolve(campoUniforms());
+  resolve.visible = false;
+  group.add(resolve);
+  let fieldScale = 1;
 
   const stats = {
     tiles: 0,
@@ -592,10 +611,31 @@ export function createCampo({
   return {
     group,
     mesh,
+    resolve,
     material,
     texture: near.texture,
     farTexture: far.texture,
     stats,
+
+    /**
+     * WHAT FRACTION OF A SIDE THE GROUND IS MARCHED AT, on this side of the
+     * seam. The other side is renderer.setCampoScale, and the governor holds
+     * both handles -- see applySoft in src/core/quality.js.
+     *
+     * All this does is decide WHICH of the field's two meshes is drawn. It
+     * cannot decide it alone: at scale one the frame leaves CAMPO_LAYER enabled
+     * and the marcher draws in the world's pass, and this quad would be a
+     * second ground over the top of it. So it is set from the one place that
+     * sets the other, and never from two.
+     */
+    setScale(scale) {
+      fieldScale = Math.min(1, Math.max(0.25, Number(scale) || 1));
+      resolve.visible = fieldScale < 1;
+      return fieldScale;
+    },
+
+    /** What the field is marching at, read back rather than deduced. */
+    scale() { return fieldScale; },
 
     /**
      * The renderer, which this needs for one thing only: the copy.
