@@ -5,7 +5,7 @@
     "skyBytes": 4194304,
     "skyNote": "everything a visitor downloads for the sky, whatever its priority: the sum over the shipped entries whose id begins \"cloud-\". Counted here and not in a verbale because a weight nobody builds is a weight that comes back — two and a third megabytes of generated relighting table were streamed and thrown away by every visitor of the plate delivery, and no first-frame budget could see it, because none of it is critical"
   },
-  "criticalBytes": 1296094,
+  "criticalBytes": 1300997,
   "assets": [
     {
       "id": "baketest-scene",
@@ -36,6 +36,16 @@
       "url": "assets/textures/soil-sheets.ktx2",
       "bytes": 1247,
       "sourceBytes": 1930
+    },
+    {
+      "id": "zone-shade",
+      "type": "texture",
+      "role": "coverage",
+      "priority": "critical",
+      "scope": "app",
+      "url": "assets/textures/zone-shade.ktx2",
+      "bytes": 4903,
+      "sourceBytes": 4863
     },
     {
       "id": "path-joint",
