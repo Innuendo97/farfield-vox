@@ -11,7 +11,9 @@ import { Assets } from '../core/assets.js';
 import { loadSection, setContentBase } from '../core/content.js';
 import { loadLut } from '../core/post.js';
 import { createQuality } from '../core/quality.js';
-import { DEFAULT_FOV, POSE_TARGET } from '../core/poses.js';
+import {
+  DEFAULT_FOV, POSE_HAND_15, POSE_PEAK_85, POSE_RIM_BACK, POSE_TARGET,
+} from '../core/poses.js';
 import {
   SCENE_LIGHT_UNIFORMS, SKY_UNIFORMS, applySky, setSceneLight, setSkyPreset,
 } from '../core/sky.js';
@@ -29,6 +31,8 @@ import {
   CHUNK, DISC_RADIUS, NO_COLUMN, VOXEL,
   createMasonry, runInWorker, stoneTile, voxelMaterial, voxelSettings,
 } from '../world/voxel/index.js';
+import { stoneSpecs } from '../world/stone.js';
+import MASONRY_SPEC from '../../assets-src/monoliths/masonry-spec.json' with { type: 'json' };
 import SKY from '../../assets-src/sky/sky.json' with { type: 'json' };
 import SCENE_LIGHT from '../../assets-src/sky/scene-light.json' with { type: 'json' };
 import TERRAIN from '../../assets-src/terrain/terrain.json' with { type: 'json' };
@@ -211,7 +215,14 @@ function addChunk(chunk) {
 
 // The engine's own arithmetic, off the thread the walker is on, through the
 // one seat that knows where the worker file is.
-runInWorker({ grain: query.get('grana') !== '0', radius: RADIUS }, (message) => {
+//
+// ONE BLOCK AND NOT SIX, because this bench is one CORNER of the hub: the disc
+// is fourteen metres across and only 05 stands in it. The spec it is cut from
+// is the same one the world's own stone comes through — src/world/stone.js —
+// so what stands here is the wall the hub is built of and not a second reading
+// of it.
+const BENCH_BLOCK = stoneSpecs(MASONRY_SPEC).filter((s) => s.id === '05');
+runInWorker({ grain: query.get('grana') !== '0', radius: RADIUS, blocks: BENCH_BLOCK }, (message) => {
   // Timed from the first statement, because this handler IS the main thread's
   // share of the work and the gate is about how long it holds the frame.
   const started = performance.now();
@@ -221,7 +232,7 @@ runInWorker({ grain: query.get('grana') !== '0', radius: RADIUS }, (message) => 
     if (masonry) masonry.material.uniforms.tStone.value = stone;
   } else if (message.kind === 'masonry') {
     boot.masonryMs = message.elapsedMs;
-    masonry = createMasonry(message.id, stone, message.built);
+    masonry = createMasonry(BENCH_BLOCK[0], stone, message.built);
     scene.add(masonry.mesh);
     engraveBlock();
   } else if (message.kind === 'plan') {
@@ -763,17 +774,34 @@ input.onKey((code) => {
   if (code === 'KeyN') { setNight(!night); repaintNote(); }
   // The cluster that failed its budget, so it can still be LOOKED at.
   if (code === 'KeyL') { lampsWanted = !lampsWanted; setNight(night); repaintNote(); }
-  if (code === 'KeyP') place(POSE_TARGET.position.x, POSE_TARGET.position.z, 0, 4.5, 45);
-  if (code === 'Digit1') place(2.5, 8, 0, -48.6, 45);
-  if (code === 'Digit2') place(2.5, 8, 0, -85, 45);
-  if (code === 'Digit3') place(0, -12.5, 180, -6, 45);
+  if (code === 'KeyP') place(POSE_TARGET);
+  if (code === 'Digit1') place(POSE_HAND_15);
+  if (code === 'Digit2') place(POSE_PEAK_85);
+  if (code === 'Digit3') place(POSE_RIM_BACK);
 });
 
-function place(x, z, yaw, pitch, fov) {
+/**
+ * Stand the camera at a named pose, at ALL SIX of its numbers.
+ *
+ * IT USED TO TAKE FIVE LOOSE ARGUMENTS AND THE SIXTH WAS A LITERAL. The four
+ * keys above passed an easting, a northing, a yaw, a pitch and a field of view,
+ * and the altitude was written into this function as 1.70 -- so a pose whose
+ * whole point was an eye at 1.583 m was placed at 1.70, and the pose the
+ * campaign's own reference frames are judged at was reached here through `0,
+ * 4.5, 45`: three numbers copied out of POSE_TARGET before it was corrected, and
+ * left behind when it was. The same three had been copied into the other three
+ * keys as well.
+ *
+ * A pose is one object with six numbers in it and this page is a READER of the
+ * register, not a second opinion about what these four poses are.
+ */
+function place(pose) {
   player.setPose({
-    position: { x, y: 1.70, z }, yaw, pitch,
+    position: { ...pose.position },
+    yaw: pose.yaw,
+    pitch: pose.pitch,
   });
-  camera.fov = fov;
+  camera.fov = pose.fov;
   camera.updateProjectionMatrix();
 }
 

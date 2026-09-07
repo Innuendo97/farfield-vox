@@ -10,6 +10,11 @@ import {
 // e' il disco su un altopiano» -- and no longer of a tier, so the floor reads
 // it from the seat that states it instead of being told a radius by a layer.
 import { PLATEAU } from './voxel/confine.js';
+import { CHAMFER } from './voxel/pure.js';
+import MASONRY from '../../assets-src/monoliths/masonry-spec.json' with { type: 'json' };
+import { builtStoneAt, stoneSpecs } from './stone.js';
+
+const STONE_SPECS = stoneSpecs(MASONRY);
 
 // THE CONTRACTS BETWEEN THE SESSIONS, AND THE ONLY DOOR BETWEEN THEM.
 //
@@ -369,6 +374,7 @@ const PLATFORM_COS = Math.cos(PLATFORM.rotationY * DEG);
  * is where it changes.
  */
 export function builtHeightAt(x, z) {
+  const stone = builtStoneAt(STONE_SPECS, x, z);
   const dx = x - PLATFORM.x;
   const dz = z - PLATFORM.z;
   // Back into the platform's own frame, which is the inverse of the rotation
@@ -376,9 +382,14 @@ export function builtHeightAt(x, z) {
   const lx = dx * PLATFORM_COS - dz * PLATFORM_SIN;
   const lz = dx * PLATFORM_SIN + dz * PLATFORM_COS;
   if (Math.abs(lx) <= PLATFORM.width / 2 && Math.abs(lz) <= PLATFORM.depth / 2) {
-    return PLATFORM.height;
+    const inside = Math.min(
+      PLATFORM.width / 2 - Math.abs(lx),
+      PLATFORM.depth / 2 - Math.abs(lz),
+    );
+    // The chamfered lip never answers below the tread that runs under it.
+    return Math.max(PLATFORM.height - Math.max(0, CHAMFER - inside), stone, stairRunHeight(x, z));
   }
-  return stairRunHeight(x, z);
+  return Math.max(stone, stairRunHeight(x, z));
 }
 
 /**

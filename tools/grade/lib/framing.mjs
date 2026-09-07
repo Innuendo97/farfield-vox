@@ -15,12 +15,29 @@ const DEG = Math.PI / 180;
 
 // Parsed rather than imported: poses.js belongs to the runtime and pulls the
 // world layout with it, which has no business running inside a build tool.
+//
+// AND IT FOLLOWS A SPREAD, WHICH IS THE PRICE OF PARSING RATHER THAN IMPORTING.
+// POSE_TARGET is the day fit now (U-SENT-6, R3 S5: the five round numbers that
+// stood there were assembled out of the walker's body and the spawn point and
+// were never the camera the reference was fitted at), and the fit is written
+// once under a name of its own so the two poses that ARE that camera cannot
+// drift apart. A reader that only knows how to find `fov:` inside a brace sees
+// nothing there; so when a key is missing this follows the `...NAME` in the
+// block to the object that holds it. One level, which is all there is: the
+// alternative is either a copy of six numbers or importing the runtime.
 function readPose() {
   const source = readFileSync(new URL('../../../src/core/poses.js', import.meta.url), 'utf8');
-  const block = /export const POSE_TARGET = \{([\s\S]*?)\};/.exec(source);
-  if (!block) throw new Error('POSE_TARGET not found in src/core/poses.js');
+  const blockOf = (name) => {
+    const hit = new RegExp(`const ${name} = \\{([\\s\\S]*?)\\n\\};`).exec(source);
+    if (!hit) throw new Error(`${name} not found in src/core/poses.js`);
+    return hit[1];
+  };
+  const block = blockOf('POSE_TARGET');
+  const spread = /\.\.\.([A-Za-z_$][\w$]*)/.exec(block);
+  const from = spread ? blockOf(spread[1]) : null;
   const number = (key) => {
-    const found = new RegExp(`${key}:\\s*(-?[0-9.]+)`).exec(block[1]);
+    const find = (text) => new RegExp(`${key}:\\s*(-?[0-9.]+)`).exec(text);
+    const found = find(block) || (from ? find(from) : null);
     if (!found) throw new Error(`${key} not found in POSE_TARGET`);
     return Number(found[1]);
   };

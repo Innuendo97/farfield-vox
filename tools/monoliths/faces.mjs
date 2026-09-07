@@ -1,5 +1,6 @@
 import { EYE_HEIGHT, MONOLITHS, SPAWN } from '../../src/world/layout.js';
 import { FRAME, POSE } from '../grade/lib/framing.mjs';
+import { floorAt } from './lib/pose.mjs';
 
 // Where each face of each block lands in the reference framing.
 //
@@ -11,7 +12,22 @@ import { FRAME, POSE } from '../grade/lib/framing.mjs';
 
 const DEG = Math.PI / 180;
 
-const EYE = { x: 0, y: EYE_HEIGHT, z: SPAWN.z };
+// THE EYE, AT THE HEIGHT THE PAGE PUTS IT (E-V8i).
+//
+// This said `y: EYE_HEIGHT` and meant 1.70. EYE_HEIGHT is not an altitude: it
+// is how far a walker's eye sits above his own FEET, and the pose these
+// rectangles are drawn for -- POSE_TARGET, whose yaw, pitch and fov arrive
+// through framing.mjs -- stands a walker at (0, SPAWN.z), where the floor is
+// -0.1842. So the page's eye is at 1.5158 and this file's was 184 mm above it,
+// which is 6.5 to 12 px of vertical mis-registration over the five blocks in
+// frame. Every rectangle this file hands out is a window a colour is measured
+// in, and on the flanks of 02 and 03 -- nine and ten pixels wide -- a slip that
+// size is wider than the strip itself.
+//
+// The rule has one implementation and it is ./lib/pose.mjs, so this file and
+// outline.mjs cannot drift into agreeing with each other while disagreeing with
+// the frame.
+const EYE = { x: 0, y: floorAt(0, SPAWN.z) + EYE_HEIGHT, z: SPAWN.z };
 
 /** Reference camera projection: world metres to pixels of the framing. */
 export function project(wx, wy, wz) {

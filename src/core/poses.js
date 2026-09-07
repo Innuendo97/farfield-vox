@@ -2,22 +2,58 @@ import { EYE_HEIGHT, SPAWN } from '../world/layout.js';
 import { pathCentreX } from '../world/terrain-field.js';
 
 // Named camera setups used to compare the running scene against the reference
-// framing. POSE_TARGET reproduces that framing exactly: same eye height, same
-// slight upward tilt, same vertical field of view. Its values come from the
-// same fit that produced the monolith placements in layout.js.
+// framing. POSE_TARGET reproduces that framing exactly: it IS the day fit, and
+// the numbers are the ones POSE_VOX_DAY below carries.
 //
 // A POSE IS NOT A CONVENIENCE, IT IS THE UNIT OF EVIDENCE. Every judgement this
 // campaign makes is a pair of frames at the same pose before and after a
 // change, and a pose reached by hand is not the same pose twice: a pixel of
 // mouse is a twentieth of a degree, and the sky is argued over in tenths. So
 // they are written down, once, here.
+//
+// AND FOR SEVERAL MONTHS THIS ONE WAS NOT THE FRAMING IT CLAIMED TO BE. What
+// stood here was `{ x: 0, y: EYE_HEIGHT, z: SPAWN.z }`, yaw 0, pitch 4.5, fov
+// 45 -- five round numbers assembled out of the WALKER's body and the spawn
+// point, with a comment saying they came from the fit. They did not: the fit is
+// the one written over POSE_VOX_DAY below, solved against the silhouettes of the
+// five blocks, and it says 0.599 / 1.583 / 14.215, yaw 1.818, pitch 4.124, fov
+// 44.199. The eye stood 12 cm too high and 60 cm too far west and looked through
+// a lens nearly a degree too wide, so every row of the picture looked half a
+// metre to a metre and a half further out than the reference's own camera does
+// and two metres of corridor at the bottom of the frame measured 446 px where
+// the fit measures 486 -- eight per cent (the table is in R3 1.4).
+//
+// It was never the cause of anything, because the units measure at the fit and
+// not at this key. It was the pose the COMMITTENTE judges at: the dev key P
+// placed him here, so what he was shown and what the campaign was measuring were
+// two different cameras. So this is now the fit and not an assembly of round
+// numbers, and the two names below stand for one camera.
+//
+// WHAT MOVES WITH IT, DECLARED. DEFAULT_FOV at the foot of this file is
+// POSE_TARGET.fov and follows it from 45 to 44.199 -- the walker's own lens,
+// which was always meant to be the reference picture's and now is. And
+// REFERENCE_GAZE in ../core/eye.js is built from this pose's yaw and pitch, so
+// the zero of the eye's adaptation moves 1.818 degrees of yaw and 0.376 of
+// pitch onto the gaze the graded picture is actually of. EYE_HEIGHT does not
+// move: it is the walker's body, it is used by every pose below that stands a
+// walker somewhere, and the reason the fit disagrees with it is written over
+// POSE_VOX_DAY -- the pictures cannot say how high their camera was, so the
+// figure was fixed from outside and the altitude derived from it.
+
+// THE DAY FIT ITSELF, WRITTEN ONCE. Two names ask for this camera and a copy of
+// six numbers in two places is where two names stop meaning one camera.
+const DAY_FIT = {
+  // rms 8.02 px, median 6.4 px, over 81 silhouette points on the five blocks
+  position: { x: 0.599, y: 1.583, z: 14.215 },
+  yaw: 1.818,
+  pitch: 4.124,
+  fov: 44.199,
+};
 
 export const POSE_TARGET = {
   name: 'target',
-  position: { x: 0, y: EYE_HEIGHT, z: SPAWN.z },
-  yaw: 0,          // degrees, 0 == north
-  pitch: 4.5,      // degrees, positive looks up
-  fov: 45,         // vertical, degrees
+  ...DAY_FIT,
+  position: { ...DAY_FIT.position },
 };
 
 export const POSE_SPAWN = {
@@ -131,11 +167,8 @@ export const POSE_RIM_BACK = {
 
 export const POSE_VOX_DAY = {
   name: 'vox-giorno',
-  // rms 8.02 px, median 6.4 px, over 81 silhouette points on the five blocks
-  position: { x: 0.599, y: 1.583, z: 14.215 },
-  yaw: 1.818,
-  pitch: 4.124,
-  fov: 44.199,
+  ...DAY_FIT,
+  position: { ...DAY_FIT.position },
 };
 
 export const POSE_VOX_NIGHT = {

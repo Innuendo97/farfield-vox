@@ -1,0 +1,108 @@
+{
+  "why": [
+    "THE STONE OF THIS WORLD, AS A CONTRACT. V2 is its only author; V5 consumes it",
+    "in READ-ONLY for the rock spires of the near ridge (E-V5b), and references the",
+    "id below rather than the authoring. This file is the whole of what is promised",
+    "and the whole of what may be relied on.",
+    "",
+    "IT IS NOT A SHEET, AND THAT IS THE FIRST THING A CONSUMER HAS TO KNOW. A sheet",
+    "of many tiles on one page is the other convention and it inverts every answer",
+    "here: bilinear filtering reaches across a tile boundary, every mip level",
+    "reaches twice as far, so a sheet needs a clamped sampler and a gutter half a",
+    "tile wide. What V2 delivers is ONE TILE THAT WRAPS. Under wrapping the texel",
+    "past the last column IS the first column, so the right gutter is nought -- and",
+    "the nought is EARNED rather than assumed: tools/guards/guard-padding.mjs",
+    "measures the field's jump at its own seam against the jump between ordinary",
+    "neighbours inside it, on both axes, every run.",
+    "",
+    "AND IT IS NOT A DOWNLOAD EITHER, which is the second thing. There is no PNG",
+    "here and there is not going to be one. The tile is three octaves of wrapped",
+    "value noise over a crack field, and 512 squared of it is 93.6 ms of arithmetic",
+    "-- too long to hold a frame, which is why it is generated in the engine's",
+    "worker and posted to the page, and short enough that shipping half a megabyte",
+    "to say the same thing would be a download bought with nothing. A consumer",
+    "calls the generator named below and gets the identical bytes: the sha256 is",
+    "published here so that identical can be CHECKED and not hoped for.",
+    "",
+    "WHAT IS STABLE FROM THIS DELIVERY: the path of this file, the id, the side, the",
+    "format and the meaning of the two channels, the wrap mode and the nought",
+    "gutter. Any change to one of them is a notification to the coordinator before",
+    "it lands, never a silent edit -- that is the whole of E-V5b's sequencing, and",
+    "the reason V5's spires may be textured at all before V2 is finished.",
+    "",
+    "WHAT IS NOT PROMISED: how often the tile repeats in metres. That is the",
+    "MATERIAL's number and not the tile's, and the two consumers inside V2 already",
+    "disagree about it on purpose -- the wall repeats every 1.6 m because a face",
+    "carries several courses, the rocks every 0.55 m because a rock's face is one",
+    "or two cells and at 1.6 m it would read flat. V5 picks its own from the size a",
+    "spire's face has on screen, and picking it is the only fitting a consumer has",
+    "to do.",
+    "",
+    "THE OCTAVES WERE RE-CUT ON 2026-09-07 AND THE BYTES CHANGED WITH THEM. This is",
+    "the notification E-V5b asks for, written where a consumer reads it. Nothing in",
+    "the stable list above moved -- path, id, side, format, channels, wrap and the",
+    "nought gutter are what they were, and the periodicity is measured every run as",
+    "before. What changed is the FIELD: it used to open at 4 cells over the tile,",
+    "which at the masonry's 1.6 m is 0.40 m and at the rocks' 0.55 m is 0.14 m, and",
+    "44% of its amplitude sat in that one octave. Measured against the day target",
+    "(R5 SS1.4), that made the wall read its BLOCK at 0.46 m where the reference",
+    "reads 0.19 -- a patch walking across the joint between two blocks and joining",
+    "them, which is the camouflage the committente saw. The octaves now open at 16",
+    "cells and run 16 / 32 / 64 with gains 0.50 / 0.30 / 0.20, so the largest thing",
+    "on the surface is under half a block at the masonry's own repeat.",
+    "",
+    "WHAT IT DOES TO A CONSUMER THAT PICKED ITS OWN METRES. The field is finer, so",
+    "a surface repeating the tile every 0.55 m now carries its grain at 0.034 m",
+    "instead of 0.14 m, and one that repeats it every 6 m carries it at 0.375 m",
+    "instead of 1.5 m. Nobody has to change anything; whoever wants the old feature",
+    "size back gets it by winding their own metresPerTile out, which is the number",
+    "this contract has always said is theirs. V5's spires are read-only consumers",
+    "and were not re-fitted by V2: the coordinator is told, and the refit is theirs",
+    "to take or to decline."
+  ],
+
+  "id": "stone-tile",
+  "owner": "V2",
+  "consumers": [
+    "V2, the masonry of the six blocks, the stair and the platform",
+    "V2, the rock piles",
+    "V5, the rock spires of the near ridge -- read-only, E-V5b"
+  ],
+
+  "kind": "wrapping-tile",
+  "tiles": 1,
+  "side": 512,
+  "format": "RG8",
+  "channels": {
+    "r": "the mottling of the stone, nought to one over the byte",
+    "g": "the same field read as a HEIGHT: on this stone the pale grain stands proud and the crack is the hollow, so one field answers both questions and a second fetch a step up-sun is a slope"
+  },
+  "wrap": "repeat",
+  "mipmaps": true,
+  "gutter": 0,
+  "gutterWhy": "under a wrapping sampler the texel past the last column IS the first column, so a gutter would BE the seam it is meant to prevent. Earned every run by guard-padding, not assumed.",
+
+  "generated": {
+    "by": "stoneTileData(side) -- src/world/voxel/courses.js, re-exported from src/world/voxel/pure.js",
+    "wrappedBy": "stoneTile(data, side) -- src/world/voxel/masonry.js, which is where the sampler settings above are declared",
+    "pure": "the generator imports no three.js and no DOM: it runs in the worker, on the page and under plain node from one source, which is what lets this contract be checked offline",
+    "costMs": 93.6,
+    "why": "measured, and the reason the generating is done in the engine's worker rather than on the thread the walker is on"
+  },
+
+  "bytes": 524288,
+  "sha256": "db3e1c751e1da5a0912bc63ba53ba1b2787e61fb72faedd3e11c70295ece893f",
+  "statistics": {
+    "meanR": 122.517,
+    "meanG": 122.517,
+    "min": 12,
+    "max": 232,
+    "why": "published so a consumer that gets different bytes finds out from a number rather than from a screenshot"
+  },
+
+  "metresPerTile": {
+    "why": "NOT part of the contract. Listed because a consumer choosing its own is easier with two worked examples than with none.",
+    "masonry": 1.6,
+    "rocks": 0.55
+  }
+}

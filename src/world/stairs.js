@@ -1,4 +1,8 @@
 import { PLATFORM, STAIRS } from './layout.js';
+// The dressed edge, from the engine that cuts it. Out of the PURE door, because
+// this file has to answer under plain node for tools/monoliths/underfoot.mjs
+// and the page's door reaches three.js.
+import { CHAMFER } from './voxel/pure.js';
 
 // The way up to the central block.
 //
@@ -47,14 +51,13 @@ const TOP_STEP_TUCK = 1.1;
 // platform. That was the black wedge across the head of the run.
 const TOP_STEP_DROP = 0.012;
 
-// The strip that lights the risers. Sizes are a fraction of the riser so they
-// follow it now that the run has been refitted against the reference. It is a
-// line under the nosing and not a lit riser: at a fifth of the riser it read as
-// six cyan bars stacked up the run, which is a staircase made of light rather
-// than a staircase with light under its edges.
-const GLOW_HEIGHT = 0.09;
-const GLOW_INSET = 0.06;
-const GLOW_LIFT = 0.006;
+// THE STRIP THAT LIT THE RISERS IS GONE, geometry and all. It was six quads
+// inset into the risers, sized as a fraction of one, and it existed because the
+// PHOTOREAL reference this world superseded drew a line under each nosing. The
+// two voxel targets do not: measured on the treads themselves the run reads
+// B/G 1.02, grey stone under a blue sky, with no emission on it in either the
+// day or the night frame. Deviazione 1 of the session verbale is that reading;
+// this is it carried out.
 
 const DEG = Math.PI / 180;
 
@@ -73,13 +76,44 @@ export function stepHeight(k) {
  * reaching the head of the run dropped the whole height of the platform into
  * the meadow before its footprint pushed them back out. This answers for
  * exactly the stone the treads cover, tuck included.
+ *
+ * AND IT CARRIES THE TOP STEP'S DROP, which it did not until it was measured.
+ * The top tread is drawn a centimetre below the platform so that the two are
+ * not coplanar where one runs under the other, and this answered the undropped
+ * height: over eleven thousand sampled points of the head of the run the walker
+ * stood 12.0 mm above the stone the frame draws. Twelve millimetres is not felt
+ * on a step, which is exactly why it would have stayed -- and the contract this
+ * feeds says in its own words that nothing in it may quietly become a different
+ * answer from the one the frame draws. tools/monoliths/underfoot.mjs is where
+ * that is now asked rather than assumed.
  */
 export function stairHeightAt(x, z) {
   if (Math.abs(x - STAIRS.x) > STAIRS.width / 2) return -Infinity;
   if (z < STAIRS.z - TOP_STEP_TUCK) return -Infinity;
   if (z > STAIRS.z + STAIRS.tread * STAIRS.steps) return -Infinity;
   const k = Math.min(STAIRS.steps - 1, Math.max(0, Math.floor((z - STAIRS.z) / STAIRS.tread)));
-  return stepHeight(k);
+  const tread = stepHeight(k) - (k === 0 ? TOP_STEP_DROP : 0);
+
+  // AND IT CARRIES THE DRESSED EDGE, which the run did not have to have while
+  // it was a delivered mesh with square arrises and has to have now that it is
+  // masonry. Every course of this world is chamfered at its top edge -- real
+  // geometry, and the reference's brightest single signal comes off it -- so
+  // the last 28 mm before the rim of a tread is a facet leaning up, and the
+  // stone there stands lower than the tread by as much as the chamfer. Asked
+  // against the masonry the world now draws, the undressed answer stood the
+  // walker 28.0 mm over the stone on 3,937 sampled points, all of them on the
+  // strip of a tread a foot actually lands on.
+  //
+  // WHICH THREE EDGES ARE DRESSED IS NOT A CHOICE HERE EITHER: they are the two
+  // long sides of the run, and the NOSING -- the rim a tread overhangs the one
+  // below it by. The edge where the next tread rises is not an edge at all;
+  // the stone carries on up, and there is nothing there to dress.
+  const inside = Math.min(
+    STAIRS.width / 2 - Math.abs(x - STAIRS.x),
+    STAIRS.z + STAIRS.tread * (k + 1) - z,
+    k === 0 ? z - (STAIRS.z - TOP_STEP_TUCK) : Infinity,
+  );
+  return tread - Math.max(0, CHAMFER - inside);
 }
 
 function quad(a, b, c, d, kind) {
@@ -147,22 +181,6 @@ export function stairFaces() {
     faces.push(quad(
       corner(ax, az, H), corner(bx, bz, H), corner(bx, bz, 0), corner(ax, az, 0), 'platform-side',
     ));
-  }
-  return faces;
-}
-
-/** The dark strip on each riser, ready for the emissive pass to light it. */
-export function glowFaces() {
-  const faces = [];
-  const x0 = STAIRS.x - STAIRS.width / 2 + GLOW_INSET;
-  const x1 = STAIRS.x + STAIRS.width / 2 - GLOW_INSET;
-  for (let k = 0; k < STAIRS.steps; k++) {
-    const h = stepHeight(k);
-    const below = k + 1 < STAIRS.steps ? stepHeight(k + 1) : 0;
-    const z = STAIRS.z + STAIRS.tread * (k + 1) + GLOW_LIFT;
-    const top = h - (h - below) * 0.18;
-    const bottom = top - (h - below) * GLOW_HEIGHT;
-    faces.push(quad([x0, top, z], [x1, top, z], [x1, bottom, z], [x0, bottom, z], 'glow'));
   }
   return faces;
 }
@@ -252,30 +270,4 @@ export function stairMesh(faces = stairFaces()) {
   });
 
   return { positions, uvs, indices, faces, rects };
-}
-
-/**
- * The riser strips, as a mesh of their own.
- *
- * No atlas and no light: it is emissive geometry, and until the emissive pass
- * arrives it is drawn at zero intensity. It exists now so that switching it on
- * later is a uniform and not a change of scene.
- */
-export function glowMesh() {
-  const faces = glowFaces();
-  const positions = new Float32Array(faces.length * 12);
-  const indices = new Uint16Array(faces.length * 6);
-  faces.forEach((face, f) => {
-    for (let c = 0; c < 4; c++) {
-      const o = (f * 4 + c) * 3;
-      positions[o] = face.corners[c][0];
-      positions[o + 1] = face.corners[c][1];
-      positions[o + 2] = face.corners[c][2];
-    }
-    const base = f * 4;
-    const k = f * 6;
-    indices[k] = base; indices[k + 1] = base + 2; indices[k + 2] = base + 1;
-    indices[k + 3] = base; indices[k + 4] = base + 3; indices[k + 5] = base + 2;
-  });
-  return { positions, indices, faces };
 }

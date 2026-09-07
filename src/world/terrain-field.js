@@ -182,10 +182,9 @@ const PATH_CENTRE = [
 ];
 
 /**
- * The second derivatives of the natural cubic through PATH_CENTRE, solved once
- * at load and never again.
+ * A NATURAL CUBIC THROUGH A TABLE OF (northing, value), solved once at load.
  *
- * A NATURAL CUBIC AND NOT A CATMULL-ROM. Three readers care about this line's
+ * A NATURAL CUBIC AND NOT A CATMULL-ROM. Three readers care about the axis's
  * CURVATURE and not only its position -- how far off the axis a point stands,
  * which is a foreshortening by the local normal; how wide the strip's frame has
  * to reach; and the eye, at a turn -- and a Catmull-Rom's second derivative
@@ -197,49 +196,98 @@ const PATH_CENTRE = [
  * straight when it arrives there and the linear continuation below joins it with
  * the same value, the same slope AND the same curvature. Nothing built from this
  * line meets a kink at either end.
+ *
+ * AND IT IS A FACTORY BECAUSE THERE ARE TWO LAWS AND NOT ONE. The axis was the
+ * first; the WIDTH is the second (PATH_WIDTH below), and it wants exactly the
+ * same properties for exactly the same reason -- a corridor whose half width had
+ * a corner at every knot would draw that corner along both of its edges. Written
+ * twice this would be the place two nearly identical solvers drift apart, so it
+ * is written once and both tables are read through it. Nothing about the axis
+ * changed when this became a factory: the arithmetic below is the arithmetic
+ * that stood here, in the same order, and it was verified value by value over a
+ * millimetre sweep of the whole run before the second caller was added.
+ *
+ * @returns {{ at: (z: number) => number, held: (z: number) => number,
+ *             slope: (z: number) => number }}
+ *   `at` continues in a straight line past either end; `held` holds the end
+ *   value instead. A position wants the first (a path goes on); a width wants
+ *   the second (a corridor does not grow for ever off the end of its table).
  */
-const PATH_CENTRE_D2 = (() => {
-  const n = PATH_CENTRE.length;
+function naturalCubic(knots) {
+  const n = knots.length;
   const h = new Float64Array(n - 1);
-  for (let i = 0; i < n - 1; i++) h[i] = PATH_CENTRE[i + 1][0] - PATH_CENTRE[i][0];
+  for (let i = 0; i < n - 1; i++) h[i] = knots[i + 1][0] - knots[i][0];
   const m = new Float64Array(n);
   const c = new Float64Array(n);
   const d = new Float64Array(n);
   for (let i = 1; i < n - 1; i++) {
     const a = h[i - 1];
     const b = 2 * (h[i - 1] + h[i]);
-    const rhs = 6 * ((PATH_CENTRE[i + 1][1] - PATH_CENTRE[i][1]) / h[i]
-      - (PATH_CENTRE[i][1] - PATH_CENTRE[i - 1][1]) / h[i - 1]);
+    const rhs = 6 * ((knots[i + 1][1] - knots[i][1]) / h[i]
+      - (knots[i][1] - knots[i - 1][1]) / h[i - 1]);
     const den = b - a * c[i - 1];
     c[i] = h[i] / den;
     d[i] = (rhs - a * d[i - 1]) / den;
   }
   for (let i = n - 2; i >= 1; i--) m[i] = d[i] - c[i] * m[i + 1];
-  return m;
-})();
 
-/** Which span of PATH_CENTRE a northing falls in, clamped to the two ends. */
-function pathSpan(z) {
-  let lo = 0;
-  let hi = PATH_CENTRE.length - 2;
-  while (lo < hi) {
-    const mid = (lo + hi + 1) >> 1;
-    if (z >= PATH_CENTRE[mid][0]) lo = mid; else hi = mid - 1;
-  }
-  return lo;
+  /** Which span a northing falls in, clamped to the two ends. */
+  const span = (z) => {
+    let lo = 0;
+    let hi = n - 2;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (z >= knots[mid][0]) lo = mid; else hi = mid - 1;
+    }
+    return lo;
+  };
+
+  const slope = (z) => {
+    const i = span(z);
+    const z0 = knots[i][0];
+    const z1 = knots[i + 1][0];
+    const hi = z1 - z0;
+    const zc = z < z0 ? z0 : z > z1 ? z1 : z;
+    const a = (z1 - zc) / hi;
+    const b = (zc - z0) / hi;
+    return (knots[i + 1][1] - knots[i][1]) / hi
+      + ((1 - 3 * a * a) * m[i] + (3 * b * b - 1) * m[i + 1]) * hi / 6;
+  };
+
+  const inside = (z) => {
+    const i = span(z);
+    const z0 = knots[i][0];
+    const z1 = knots[i + 1][0];
+    const hi = z1 - z0;
+    const a = (z1 - z) / hi;
+    const b = (z - z0) / hi;
+    return a * knots[i][1] + b * knots[i + 1][1]
+      + ((a * a * a - a) * m[i] + (b * b * b - b) * m[i + 1]) * hi * hi / 6;
+  };
+
+  return {
+    slope,
+    at(z) {
+      if (z < knots[0][0] || z > knots[n - 1][0]) {
+        const end = z < knots[0][0] ? 0 : n - 1;
+        const ze = knots[end][0];
+        return knots[end][1] + slope(ze) * (z - ze);
+      }
+      return inside(z);
+    },
+    held(z) {
+      const lo = knots[0][0];
+      const hi = knots[n - 1][0];
+      return inside(z < lo ? lo : z > hi ? hi : z);
+    },
+  };
 }
+
+const PATH_CENTRE_CURVE = naturalCubic(PATH_CENTRE);
 
 /** How fast the axis moves east per metre of northing. */
 export function pathCentreSlope(z) {
-  const i = pathSpan(z);
-  const z0 = PATH_CENTRE[i][0];
-  const z1 = PATH_CENTRE[i + 1][0];
-  const h = z1 - z0;
-  const zc = z < z0 ? z0 : z > z1 ? z1 : z;
-  const a = (z1 - zc) / h;
-  const b = (zc - z0) / h;
-  return (PATH_CENTRE[i + 1][1] - PATH_CENTRE[i][1]) / h
-    + ((1 - 3 * a * a) * PATH_CENTRE_D2[i] + (3 * b * b - 1) * PATH_CENTRE_D2[i + 1]) * h / 6;
+  return PATH_CENTRE_CURVE.slope(z);
 }
 
 /**
@@ -250,21 +298,7 @@ export function pathCentreSlope(z) {
  * end condition has already brought its curvature to nought there.
  */
 export function pathCentreX(z) {
-  const last = PATH_CENTRE.length - 1;
-  if (z < PATH_CENTRE[0][0] || z > PATH_CENTRE[last][0]) {
-    const end = z < PATH_CENTRE[0][0] ? 0 : last;
-    const ze = PATH_CENTRE[end][0];
-    return PATH_CENTRE[end][1] + pathCentreSlope(ze) * (z - ze);
-  }
-  const i = pathSpan(z);
-  const z0 = PATH_CENTRE[i][0];
-  const z1 = PATH_CENTRE[i + 1][0];
-  const h = z1 - z0;
-  const a = (z1 - z) / h;
-  const b = (z - z0) / h;
-  return a * PATH_CENTRE[i][1] + b * PATH_CENTRE[i + 1][1]
-    + ((a * a * a - a) * PATH_CENTRE_D2[i] + (b * b * b - b) * PATH_CENTRE_D2[i + 1])
-    * h * h / 6;
+  return PATH_CENTRE_CURVE.at(z);
 }
 
 /**
@@ -506,29 +540,112 @@ export const VERGE_OFFSET = 0.34;
 // ruler. The stone core inside it is still eight to twelve voxels, because
 // SPREAD in ../path.js is a fraction of THIS number and the crossing moves out
 // with it.
+//
+// ---------------------------------------------------------------------------
+// AND THAT WHOLE FIT WAS TAKEN THROUGH A SCREEN, WHICH IS WHY IT IS BEING TAKEN
+// AGAIN. Every line above is honest and every number in it was measured; what
+// none of them knew is that the ruler could not see this corridor's own edge.
+//
+// The mat of grass stood ON the bare earth of the verges (MANTO.onVerge in
+// ./voxel/worldgen.js), at an intensity of 0.10 -- which the cover law turns
+// into a blade on forty one columns in a hundred. At the pose the campaign is
+// judged from the ground is seen at eight to fourteen degrees, so a blade four
+// centimetres tall covers twelve to twenty six centimetres of the ground BEHIND
+// it: forty one per cent of density reads seventy eight to ninety eight per cent
+// of green. The ruler crosses half a share of green at the FIRST column of the
+// verge and stops there, a third of a metre inside the corridor, on both flanks.
+// Take the blades off the verge and the same ruler on the same frame reads
+// 0.55 m more corridor (the A/B is in the research of 2026-09-07, R3 1.3).
+//
+// So the two tenths of a metre this law added «that the mat covers at the kerb»
+// were four to eight tenths, and they were added at the two bands where the
+// reference happens to read narrow and not at the two where it reads wide. The
+// law that came out of it tapers the wrong way round.
+//
+// WHAT THE REFERENCE ACTUALLY DOES, row by row, with the verge visible on both
+// pictures (the ruler is the same one -- half a share of green in a window of
+// 0.15 m of world, walked out from the axis; the bench of this unit is
+// fondazione/lav/largh.py and it reproduces the research's table figure for
+// figure):
+//
+//     z         9.2   8.7   8.2   7.7   7.2   6.2   5.5   4.5   3.5   2.5   1.5   0.5  -0.5  -1.5  -2.5
+//     TARGET   1.99  1.91  1.88  1.77  1.92  1.49  1.18  1.00  1.33  1.06  1.25  1.24  1.32  1.37  1.30
+//     before   1.70  1.50  1.20  1.22  1.63  1.06  1.11  1.42  1.61  1.42  1.42  1.62  1.27  1.63  1.63
+//
+// TWO METRES UNDER THE WALKER'S FEET, ONE METRE AT THE WAIST, AND 1.25 TO 1.35
+// TOWARDS THE BOTTOM. Ours did the opposite: narrow where the reference is wide
+// and wide where it is narrow, eleven per cent short at the median with nine per
+// cent of its rows inside five.
+//
+// SO THE WIDTH IS NO LONGER A TAPER WITH A WAIST IN IT: IT IS A LAW OF z, and
+// it is read through the same natural cubic the axis is read through. The reason
+// is the same reason, and it is not tidiness: pathCoord divides by this number
+// and SPREAD in ../path.js takes a fraction of it, so a corner in the half width
+// is a corner drawn down both edges of the paving and a step in the stone's own
+// thinning. The knots are one metre apart through the field because that is the
+// pitch the reference's own reading has -- closer than a metre and the spline
+// would be interpolating the toothed kerb's noise, further and the metre-scale
+// swells the reference actually has would be averaged away.
+//
+// AND THE KNOTS ARE CALIBRATED AND NOT COPIED FROM THE READING. What the ruler
+// reads is the PERCEIVED width and what this table holds is the corridor's own
+// half width on the normal; between them stand the bare band beside the stone,
+// the wobble of pathEdge, and the secant of the axis's own slope where it runs
+// diagonally (up to 1.31 at z = +7). So the table was closed by iteration
+// against the render itself -- lay the law, shoot the fitted pose, run the same
+// ruler, move each knot by half the miss -- and what is written here is where
+// that loop settled. The bench is fondazione/lav/u6-legge.mjs.
 const PATH_WIDTH = [
-  [12.0, 1.00],
-  [9.1, 1.00],
-  [8.1, 0.90],
-  [6.0, 0.83],
-  [-3.0, 0.92],
-  [-5.5, 1.20],
-  // The far end is the stair's own northing, read from layout.js rather than
-  // typed: PATH_STAIR_Z used to hold this number as one end of a ramp, and the
-  // ramp is gone.
-  [STAIRS.z, 1.20],
+  // The apron in front of OUR staircase and not the reference's. The reference
+  // opens to 2.4 m in front of a bottom step that stands at z = -4; ours stands
+  // at -12.14 (E-DECISIONI18), so the apron is put where the walker meets the
+  // step rather than in the middle of a meadow. The northing is the stone's own
+  // end, read from layout.js rather than typed.
+  [PATH_STONE_END_Z, 1.100],
+  [-11.2, 0.780],
+  [-10.2, 0.560],
+  // The stretch the reference shows past the field is flat at 1.25 to 1.35 m of
+  // perceived width, and it stays flat: nothing down there is in its frame.
+  //
+  // AND THE THREE KNOTS ACROSS IT ARE THE PRICE OF THE FLARE. A cubic asked to
+  // climb 0.55 m in the two metres before the step, with nothing but the flat
+  // stretch to lean on, swings the other way first: with a single knot at -10.2
+  // this curve dipped to 0.288 m at z = -7.5 -- a corridor pinched to 58 cm
+  // where the law says 1.08, half a metre of undershoot on a stretch the
+  // reference has nothing to say about and the walker walks down. Knots at
+  // -8.0 and -5.5 hold it flat, which is what the reading says it is.
+  [-8.0, 0.540],
+  [-5.5, 0.540],
+  [-3.0, 0.530],
+  [0.0, 0.500],
+  [2.0, 0.450],
+  [3.0, 0.540],
+  // The waist. The reference closes to one metre here and this is the band the
+  // law used to be widest at.
+  [4.0, 0.480],
+  [5.0, 0.480],
+  [6.0, 0.700],
+  [7.0, 0.680],
+  [8.0, 0.790],
+  [9.0, 0.900],
+  // And it holds under the walker's feet, where the reference reads 1.99 m with
+  // twenty five whole rows either side of him.
+  [12.0, 0.870],
 ];
 
+const PATH_WIDTH_CURVE = naturalCubic(PATH_WIDTH);
+
+/**
+ * The corridor's half width at a northing, in metres ACROSS the corridor.
+ *
+ * HELD AND NOT CONTINUED PAST THE TABLE, which is the one way this curve is
+ * read differently from the axis. A path goes on past the last knot it was
+ * measured at, so pathCentreX extends the line it arrives on; a WIDTH that did
+ * the same would grow without bound off the north end of the frame and go
+ * negative off the south end. Both ends of the table stand where nothing looks.
+ */
 export function pathHalfWidth(z) {
-  const t = PATH_WIDTH;
-  if (z >= t[0][0]) return t[0][1];
-  for (let i = 1; i < t.length; i++) {
-    if (z >= t[i][0]) {
-      const f = (z - t[i][0]) / (t[i - 1][0] - t[i][0]);
-      return t[i][1] + (t[i - 1][1] - t[i][1]) * f;
-    }
-  }
-  return t[t.length - 1][1];
+  return PATH_WIDTH_CURVE.held(z);
 }
 
 /**

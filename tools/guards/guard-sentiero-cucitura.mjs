@@ -1,6 +1,6 @@
 import { SPAWN, STAIRS } from '../../src/world/layout.js';
 import {
-  pathCentreX, pathEdge, pathHalfWidth, pathRun,
+  pathCentreSlope, pathCentreX, pathEdge, pathHalfWidth, pathRun,
 } from '../../src/world/terrain-field.js';
 import { groundHeightAt, materialAt } from '../../src/world/contracts.js';
 import {
@@ -161,11 +161,69 @@ const PLATEAU = 2.20;
 // m from z 7.5 to z 1.9 and does not narrow at all. With the two tenths of a
 // metre the mat covers at the kerb that is fifteen to nineteen voxels of laid
 // corridor, and the eight to twelve is now the STONE CORE, gated below.
+//
+// AND THE ROW ABOVE WAS ALSO READ THROUGH THE MAT, WHICH IS WHY IT MOVES AGAIN.
+// «The two tenths of a metre the mat covers at the kerb» is the number this
+// whole family of readings rests on, and it was never measured -- it was the
+// difference between two rulers, one of which could not see the ground it was
+// standing on. The mat used to lay on the bare earth of the verge at an
+// intensity of a tenth, which is a blade on 41 columns in a hundred, and at
+// eight to fourteen degrees of grazing a blade hides three to four times its own
+// footprint: 78 to 98 per cent of that band reads green. The A/B is one change
+// and nothing else -- take the blades off the verge and the same ruler on the
+// same frame reads 0.55 m more corridor. So the mat covered FOUR to EIGHT tenths
+// of a metre and not two, and it covered them unevenly: the reference is 1.99 m
+// under the walker's feet, 1.00 at the waist and 1.25 to 1.35 towards the
+// bottom, where the law fitted through the mat ran 1.70 / 1.42 / 1.62 -- narrow
+// where the reference is wide and wide where it is narrow.
+//
+// The law is refitted with the verge bare (PATH_WIDTH in
+// ../../src/world/terrain-field.js) and these three rows are its own numbers,
+// each with the same tolerance of two voxels the reading has always carried. The
+// SHAPE they now hold is the reference's: twenty voxels of corridor under the
+// feet, TEN at the waist -- the corridor really does close to a metre in the
+// middle of the field, which is the reading the old row's «does not narrow at
+// all» was the mat's answer to -- and the flare at the step, which no picture
+// sees, following the law's own approach to it.
 const TAPER = [
-  { z: 9.2, low: 18, high: 22, what: 'under the walker' },
-  { z: 4.0, low: 15, high: 19, what: 'through the middle of the field' },
-  { z: -7.0, low: 22, high: 26, what: 'in the apron at the step' },
+  { z: 9.2, low: 16, high: 20, what: 'under the walker' },
+  { z: 4.0, low: 8, high: 12, what: 'through the middle of the field' },
+  { z: -7.0, low: 10, high: 14, what: 'in the apron at the step' },
 ];
+
+// WHAT THE EYE READS OF THAT LAW, WHICH IS NOT WHAT THE LAW SAYS, and the two
+// have to be gated apart or the next unit fits one to the other again.
+//
+// The corridor a frame shows is the laid corridor PLUS the shoulder it stands
+// proud of it -- the bare band beside the stone, the wobble of pathEdge, and the
+// brown of MANTO.ground beyond both -- opened by the secant of the axis's own
+// slope because a row of a picture is a row of EASTING and the law is measured
+// on the normal. That shoulder is a MEASUREMENT and not a term: run the ruler
+// (half a share of green in a window of 0.15 m of world, walked out from the
+// axis) on the frame at POSE_TARGET and take the median of the two flanks over a
+// band of northing. fondazione/lav/largh.py, fondazione/lav/u6-misura.py.
+//
+// AND ITS REPEATABILITY IS MEASURED TOO, WHICH IS WHAT THE TOLERANCES ARE. Laid
+// twice with laws 0.1 to 0.2 m apart, the shoulder comes back to 0.03 m in the
+// bands the near field resolves (23 to 32 rows apiece) and no better than 0.15 m
+// in the bands past z = 3, where a metre of northing is seven to sixteen rows of
+// picture and the meadow's own noise -- a field in WORLD coordinates, so moving
+// the corridor samples a different realisation of it -- moves the crossing by
+// more than the law does. So the four seats below are the four the reference
+// reads with 18 rows or more, and each tolerance is three times the shoulder's
+// own scatter there carried into WIDTH, which is twice it.
+const WIDTH = [
+  { z: 9.2, target: 1.99, shoulder: 0.035, tol: 0.18, what: 'under the walker\'s feet' },
+  { z: 8.25, target: 1.88, shoulder: 0.149, tol: 0.18, what: 'where the run turns west' },
+  { z: 7.75, target: 1.77, shoulder: 0.060, tol: 0.18, what: 'at the near end of the field' },
+  { z: 4.5, target: 1.00, shoulder: 0.061, tol: 0.18, what: 'at the waist' },
+];
+
+/** The corridor as a row of the picture reads it, in metres of easting. */
+export function seenWidthAt(z, shoulder) {
+  const s = pathCentreSlope(z);
+  return 2 * (pathHalfWidth(z) + shoulder) * Math.sqrt(1 + s * s);
+}
 
 /**
  * How wide the PALE STONE inside the corridor is at a northing, in voxels:
@@ -181,8 +239,22 @@ export function coreAt(z) {
   return 2 * ((SPREAD.from + SPREAD.to) / 2) * pathHalfWidth(z) / VOXEL;
 }
 
-/** What the reference's own stone core comes to, in voxels, at the middle. */
-const CORE = { z: 4.0, low: 8, high: 12 };
+/**
+ * What the reference's own stone core comes to, in voxels, at the middle.
+ *
+ * AND IT MOVES WITH THE WIDTH, BECAUSE IT IS A FRACTION OF IT. SPREAD is written
+ * in fractions of pathHalfWidth, so a corridor refitted from 1.7 m to 1.0 m at
+ * the waist carries its stone core down with it -- there is no second dial here
+ * and there must not be one. What the row has to say is whether the number it
+ * lands on is the reference's, and it is: Otsu on the L* of the corridor's own
+ * rows, band by band, puts the reference's pale stone at 0.56 m across at z 4-5
+ * and 0.82 m at z 3-4 (fondazione/lav/largh.py, column «T core»), which is five
+ * and a half to eight voxels. The law lands at 6.7. The eight to twelve that
+ * stood here was that same reading taken when the corridor was fitted twice as
+ * wide, and it is not a second opinion about the stone -- it is the old width,
+ * once removed.
+ */
+const CORE = { z: 4.0, low: 5, high: 9 };
 
 /** The full width of the corridor at a northing, in voxels. */
 export function widthAt(z) {
@@ -405,6 +477,41 @@ if (process.argv.includes('--self')) {
       what: 'a walker put down beside his own path',
       caught: onPaving(SPAWN.x, SPAWN.z),
     },
+    {
+      // The defect this whole file was re-read for, and it is not hypothetical:
+      // it is the law that shipped until U-SENT-6. Fitted through a mat that
+      // covered the verge, it reads 2.11 m under the walker's feet against the
+      // reference's 1.99 -- which looks close, and is the one seat it passes --
+      // and 1.85 at the waist against 1.00, which is a different path. The seats
+      // catch it at three of the four and by 4.7 times the tolerance at the
+      // waist, which is where the mat was hiding the most.
+      what: 'a width fitted THROUGH the mat that hid the verge, which is what shipped',
+      caught: (() => {
+        const was = [[12.0, 1.00], [9.1, 1.00], [8.1, 0.90], [6.0, 0.83], [-3.0, 0.92]];
+        const half = (z) => {
+          if (z >= was[0][0]) return was[0][1];
+          for (let i = 1; i < was.length; i++) {
+            if (z >= was[i][0]) {
+              const f = (z - was[i][0]) / (was[i - 1][0] - was[i][0]);
+              return was[i][1] + (was[i - 1][1] - was[i][1]) * f;
+            }
+          }
+          return was[was.length - 1][1];
+        };
+        return WIDTH.some((s) => {
+          const sec = Math.sqrt(1 + pathCentreSlope(s.z) ** 2);
+          return Math.abs(2 * (half(s.z) + s.shoulder) * sec - s.target) > s.tol;
+        });
+      })(),
+    },
+    {
+      // And the other half of the same defect, which no width can answer: the
+      // mat standing on the bare earth of the verge. A tenth of intensity is a
+      // blade on 41 columns in a hundred and at this pose a blade hides three to
+      // four times its own footprint, so the verge disappears whatever it is.
+      what: 'the mat back on the verge at the intensity that hid it',
+      caught: MANTO.verge.low === 0 && MANTO.verge.bare > 0,
+    },
   ]);
 }
 
@@ -453,6 +560,21 @@ report.check(pathVerge(9.2) >= PATH.verge.min && pathVerge(9.2) <= PATH.verge.ma
   `the corridor writes ${PATH.verge.min} to ${PATH.verge.max} columns of bare earth a side`,
   `${pathVerge(9.2)} near, ${pathVerge(0)} through the middle, ${pathVerge(-7)} in the apron`);
 
+// AND WHAT THE EYE READS OF IT, AT THE FOUR SEATS THE REFERENCE READS TO 18 ROWS
+// OR MORE. The law plus the shoulder, opened by the secant, against the width a
+// row of the reference measures: see WIDTH above for where every number comes
+// from and what its tolerance is three sigma of.
+report.line('');
+for (const s of WIDTH) {
+  const seenW = seenWidthAt(s.z, s.shoulder);
+  report.check(Math.abs(seenW - s.target) <= s.tol,
+    `and a row of the picture reads ${s.target.toFixed(2)} m of corridor ${s.what} `
+    + `(z ${s.z}), within ${s.tol.toFixed(2)}`,
+    `${seenW.toFixed(2)} m = 2 x (${pathHalfWidth(s.z).toFixed(3)} laid + ${s.shoulder.toFixed(3)} `
+    + `shoulder) x ${Math.sqrt(1 + pathCentreSlope(s.z) ** 2).toFixed(3)}, `
+    + `${(seenW - s.target >= 0 ? '+' : '')}${(seenW - s.target).toFixed(3)} m off the reading`);
+}
+
 // AND THE BROWN THINS PAST THAT BAND INSTEAD OF STOPPING AT IT.
 report.line('');
 const share = seen.bands.map((b) => (b.all ? b.earth / b.all : 0));
@@ -463,11 +585,24 @@ for (let k = 0; k < BANDS.length; k++) {
 report.check(share.every((v, k) => k === 0 || v <= share[k - 1] + 1e-9),
   'and past it the bare earth THINS instead of stopping -- no step back up',
   share.map((v) => `${(v * 100).toFixed(1)}%`).join(' -> '));
-report.check(share[0] > 0.5 && share[share.length - 1] < 0.02,
-  'from most of the kerb to none of the open meadow, over the ramp MANTO states',
-  `${(share[0] * 100).toFixed(1)}% at the kerb, `
+// AND THE CEILING OF THE FIRST BAND IS MANTO.ground AND NOT A HALF.
+//
+// A literal 0.5 stood here and it was reading one number through another. What
+// the corridor's ramp can put at the kerb is `ground` exactly -- the share is
+// `(1 - mantoVerge) * MANTO.ground` and mantoVerge is nought there -- so a
+// threshold of a half was a threshold on `ground` being over a half, written
+// somewhere that does not say so. It held while `ground` was 0.75; it fails at
+// 0.45 with the ramp doing precisely what it is asked. So the row asks what it
+// means: that the kerb carries very nearly all the brown the law allows there,
+// and the open meadow carries none.
+const KERB_OF_GROUND = 0.85;
+report.check(share[0] > KERB_OF_GROUND * MANTO.ground && share[share.length - 1] < 0.02,
+  `from ${(100 * KERB_OF_GROUND).toFixed(0)}% of what MANTO.ground allows at the kerb `
+  + 'to none of the open meadow, over the ramp MANTO states',
+  `${(share[0] * 100).toFixed(1)}% at the kerb against a ceiling of `
+  + `${(MANTO.ground * 100).toFixed(0)}%, `
   + `${(share[share.length - 1] * 100).toFixed(1)}% at ${BANDS[BANDS.length - 1].mid} m, `
-  + `ramp ${MANTO.verge.reach} m`);
+  + `ramp ${MANTO.verge.bare} m bare then ${MANTO.verge.reach} m`);
 
 // ------------------------------------------------------------------- 3
 report.line('');

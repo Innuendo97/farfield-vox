@@ -3,6 +3,7 @@ import {
   Mesh, PlaneGeometry, ShaderMaterial, Vector2, Vector3,
 } from 'three';
 import { loadEngravingFont } from './engraving.js';
+import { INK_CORE, INK_HALO } from './voxel/masonry.js';
 
 // The panels that stand in front of a monolith once its surface opens.
 //
@@ -59,10 +60,32 @@ const MAX_TEXELS = 2048;
 // alpha is high: the writing the panels stand in front of is lit at more than
 // twice its resting brightness while they are open, and a plate that let a
 // quarter of it through would be read against its own stone.
-const INK = [0.72, 0.90, 1.02];
-const ACCENT = [0.42, 0.86, 1.08];
-const EDGE = [0.50, 0.92, 1.18];
-const FILL = [0.010, 0.026, 0.038];
+//
+// AND THE FOUR OF THEM COME OFF THE ONE SEAT NOW, WHICH IS THIS FILE'S WHOLE
+// SHARE OF THE DELIVERY. There are exactly two colours of light in this hub —
+// the cyan cut into the stone and the halo around it — and
+// src/world/voxel/masonry.js is where they were measured, on both targets, by
+// quantile of luminance inside the stone the picture actually draws. This file
+// used to declare FOUR MORE triplets of its own, which is the same defect
+// src/world/monoliths.js was cured of when the rhombus and the hoop stopped
+// carrying their own copy: a panel is the same light as the writing it stands
+// in front of, so a fourth answer about that colour is four answers about one
+// colour. What is left here is what genuinely belongs to a panel — how BRIGHT
+// each of its four registers is — and that is a number a panel may own.
+//
+// THE LEVELS ARE UNCHANGED, WHICH IS HOW THIS IS CHECKABLE. Each multiplier is
+// the ratio of the old triplet's luminance to the seat's, at 0.2126 / 0.7152 /
+// 0.0722, so every one of the four is delivered at EXACTLY the luminance it was
+// delivered at before: 0.8704 for the type, 0.7823 for the accent, 0.8495 for
+// the border, 0.0235 for the fill. Nothing on a panel is brighter or dimmer and
+// no composition moved. What moved is the HUE, and it moved a long way, which
+// is the point: the type was at blue-over-red 1.42 against the engraving's 4.55
+// — a whitish cyan, which is the exact defect the writing on the stone was
+// re-anchored out of two deliveries ago and which this file kept.
+const INK = INK_CORE.map((v) => v * 0.6297);
+const ACCENT = INK_HALO.map((v) => v * 0.9273);
+const EDGE = INK_CORE.map((v) => v * 0.6146);
+const FILL = INK_CORE.map((v) => v * 0.0170);
 const FILL_ALPHA = 0.93;
 
 const FONT = 'Farfield Sans';

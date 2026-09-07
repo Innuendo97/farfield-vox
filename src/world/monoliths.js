@@ -1,344 +1,215 @@
 import {
-  AdditiveBlending, BufferAttribute, BufferGeometry, DoubleSide, Mesh,
-  ShaderMaterial, Vector2, Vector3,
+  AdditiveBlending, Box3, BufferAttribute, BufferGeometry, DoubleSide,
+  DynamicDrawUsage, Mesh, ShaderMaterial, Sphere, Vector3,
 } from 'three';
-import {
-  SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS, SKY_GLSL, SKY_REFLECTION,
-  SKY_REFLECTION_GLSL, SKY_UNIFORMS,
-} from '../core/sky.js';
-import { BAKED_TERMS_GLSL, FOG_GLSL, fogUniforms, LOW_SKY } from './air.js';
 import { MONOLITHS } from './layout.js';
-import MONOLITH_BAKE from '../../assets-src/monoliths/monoliths.json' with { type: 'json' };
+import { INK_CORE, INK_GAIN, INK_HALO } from './voxel/masonry.js';
 
-// The six blocks.
+// The six blocks: what hangs AROUND them.
 //
-// Same contract as the ground: a painted albedo, a Cycles bake of the light on
-// it, one multiply, one fog. Two things are added that the meadow does not
-// need, and both come straight off the reference image.
+// THE STONE ITSELF IS NOT HERE ANY MORE, and this file is what is left when it
+// goes. It used to carry a painted albedo, a Cycles bake of the light on it and
+// the mesh the two were unwrapped for; the six are courses of masonry now,
+// generated from the plan and from the measurement of the two targets, and the
+// material that draws them is the engine's. What was left behind when the bake
+// was retired is everything that is NOT stone: the rhombus that hangs in front
+// of every block, the hoop at the fifth, how they breathe, and what a block
+// does when a walker comes within reach of its face.
 //
-// The first is a sky reflection weighted by Fresnel. The stone of the reference
-// is dark and slightly polished: the faces turned towards the walker sit at a
-// twentieth of the light they receive, but the flanks seen almost edge on are
-// near white, and the narrower the sliver the brighter it is. That is not a
-// light falling on them, it is the sky in them, and its strength across the
-// five blocks follows the grazing angle to within a few per cent. So it is
-// drawn as what it is: one sample of the sky already hanging behind the scene.
-//
-// The second is the engraving, which arrives as a two channel texture from
-// src/world/engraving.js and is laid on the face in the block's own
-// coordinates, so the writing is placed in metres of stone and not in texture
-// space that a change of mesh could shift.
+// A block's stone is handed back in through attach() as the worker cuts it, so
+// that the writing and the focus can still be sent to it by name. Which is the
+// whole of what this file needs to know about what a block is made of.
 
 const DEG = Math.PI / 180;
 
-// Exposure of the stone, on top of the light the bake stored.
+// THE FIVE NUMBERS OF THE STONE ARE NOT HERE ANY MORE either, and where they
+// went is worth writing down. The reflectance, the grazing gain, its power, how
+// blurred the sky is in it and how much of the relief reaches the shading were
+// all FITTED against five baked flanks, on a curved-lit surface, for a material
+// that no longer exists. The stone of this world is a wall of flat faces now
+// and its material is src/world/voxel/masonry.js, which carries them at their
+// delivered values and owns the refit. Two copies of a fitted number is how a
+// world ends up lit twice.
+
+// The engraved cyan of the reference is read from the material that draws it
+// and not declared a second time here. The rhombus and the hoop are the same
+// light as the writing on the stone behind them — that is why they are cyan at
+// all — so a copy of the three numbers here would be two answers about one
+// colour, which is exactly the defect this session spent its first paragraph on.
+
+// THE STRIP UNDER THE STAIR NOSINGS IS NOT HERE ANY MORE, and it is worth
+// saying what it was and why it went. It was a gain — STAIR_GLOW = 0.30, pushed
+// to 0.54 when the third block took focus — lighting six quads built dark by
+// src/world/stairs.js, and its comment justified itself by what "the reference"
+// lights. That reference was the PHOTOREAL scene this world superseded. The two
+// voxel targets this session measured against draw no such strip: the treads
+// read B/G 1.02, which is grey stone under a blue sky and no emission at all
+// (v2-pietra/an/scalinata.mjs; FASE 0 and Deviazione 1 of the session verbale).
+// So the strip is gone rather than turned down, because a mesh drawn at zero is
+// still a mesh somebody has to keep switching off.
 //
-// Declared here rather than folded into the bake for the same reason the ground
-// declares its own: the bake is a physical render and the reference is an
-// illustration with lifted midtones, and the difference has to be a number
-// somebody can see and change.
-export const STONE_EXPOSURE = 1.25;
+// WHAT DOES GLOW ON THIS STRUCTURE IS BELOW AND STAYS: the rhombus at the foot
+// of every block and the hoop at the fifth are things the targets DO show, and
+// they are content, not decoration.
 
-// Reflectance of the stone face on. It is far under the 0.04 of a smooth
-// dielectric, and it is fitted rather than physical: what has to be reproduced
-// is the reference's ratio between a face turned towards the walker and a flank
-// seen almost edge on, which is better than twenty to one. Schlick carries the
-// whole of that ratio from this one number, so the dark faces and the bright
-// flanks cannot be tuned against each other.
-const STONE_F0 = 0.006;
-
-// And how much of the sky the grazing term is allowed to carry. Schlick sends a
-// dielectric to a perfect mirror at ninety degrees; nothing in this framing is
-// seen closer to that than about seventy seven, and at seventy seven Schlick
-// alone leaves the flank of the tallest block at a third of the brightness the
-// reference shows. The gain is fitted against the five flanks at once.
-const STONE_RIM = 5.9;
-
-// And how sharply that gain is confined to the very edge. Schlick's fifth power
-// is too broad: raised to it, the gain that brings the flank of the tallest
-// block up to the reference also brightens flanks seen at seventy degrees,
-// which the reference leaves dark. The eighth power separates seventy seven
-// degrees from seventy by a factor of four, which is what the five flanks
-// measure.
-const STONE_RIM_POWER = 8.0;
-
-// How blurred the sky is in the stone.
+// WHAT HANGS AT THE FOOT OF THE BLOCKS IS SEVEN THINGS AND ONE DRAW.
 //
-// A weathered rock is not a mirror. Sampling a coarse level of the sky rather
-// than its surface is the cheapest honest way to say so — one texture fetch,
-// no second buffer — and it is also what stops the relief map from tearing the
-// reflection into vertical streaks, because a blurred reflection barely notices
-// which way a millimetre of surface is leaning.
-const SKY_BLUR = 3.0;
-
-// How much of the relief map reaches the shading. It is the high frequency part
-// of the direct light, which the light atlas is far too coarse to hold: at
-// thirty seven texels to the metre a hairline crack is a third of a texel.
-const RELIEF_STRENGTH = 0.50;
-
-// The engraved cyan of the reference, from the core of a stroke out to the halo
-// around it, and the light it gives off.
-const INK_CORE = [0.44, 0.80, 0.99];
-const INK_HALO = [0.16, 0.48, 0.72];
-const INK_GAIN = 0.78;
-
-// The strip of light under the nosing of every stair riser. It is built dark by
-// src/world/stairs.js and lit from here, because it is the same light as the
-// engraving and has to move with it. The reference lights it very gently:
-// what reads is a thin line under each nosing, not a lit staircase.
-export const STAIR_GLOW = 0.30;
-
-const VERTEX = /* glsl */`
-  attribute vec2 aLight;
-  attribute vec2 aStone;
-
-  varying vec2 vLight;
-  varying vec2 vStone;
-  varying vec3 vWorld;
-  varying vec3 vNormal;
-  varying float vDistance;
-
-  void main() {
-    vLight = aLight;
-    vStone = aStone;
-    vec4 world = modelMatrix * vec4(position, 1.0);
-    vWorld = world.xyz;
-    vNormal = normalize(mat3(modelMatrix) * normal);
-    vDistance = length(cameraPosition - world.xyz);
-    gl_Position = projectionMatrix * viewMatrix * world;
-  }
-`;
-
-const FRAGMENT = /* glsl */`
-  precision highp float;
-
-  varying vec2 vLight;
-  varying vec2 vStone;
-  varying vec3 vWorld;
-  varying vec3 vNormal;
-  varying float vDistance;
-
-  uniform sampler2D tAlbedo;
-  uniform sampler2D tRelief;
-  uniform sampler2D tLight;
-  uniform sampler2D tInk;
-
-  uniform float uLightScale;
-  uniform float uSkyBlur;
-  uniform float uF0;
-  uniform float uRim;
-  uniform float uRimPower;
-  uniform float uRelief;
-  uniform vec3 uLowSky;
-
-  uniform vec3 uCentre;
-  uniform vec3 uRight;
-  uniform vec3 uFront;
-  uniform vec2 uFace;
-  uniform float uInk;
-  uniform vec3 uInkCore;
-  uniform vec3 uInkHalo;
-
-  ${SCENE_LIGHT_GLSL}
-  ${BAKED_TERMS_GLSL}
-  ${SKY_GLSL}
-  ${SKY_REFLECTION_GLSL}
-  ${FOG_GLSL}
-
-  // Tangent frame from the derivatives of the position and of the texture
-  // coordinates. The stone is mapped face by face in metres, so a frame could
-  // be derived from the normal alone, but this one is right for the chamfers
-  // too, where there is no dominant axis to derive it from.
-  mat3 cotangentFrame(vec3 n, vec3 p, vec2 uv) {
-    vec3 dp1 = dFdx(p);
-    vec3 dp2 = dFdy(p);
-    vec2 duv1 = dFdx(uv);
-    vec2 duv2 = dFdy(uv);
-    vec3 dp2perp = cross(dp2, n);
-    vec3 dp1perp = cross(n, dp1);
-    vec3 t = dp2perp * duv1.x + dp1perp * duv2.x;
-    vec3 b = dp2perp * duv1.y + dp1perp * duv2.y;
-    float scale = inversesqrt(max(dot(t, t), dot(b, b)));
-    return mat3(t * scale, b * scale, n);
-  }
-
-  void main() {
-    vec3 geometric = normalize(vNormal);
-    vec3 relief = texture2D(tRelief, vStone).xyz * 2.0 - 1.0;
-    vec3 normal = normalize(cotangentFrame(geometric, vWorld, vStone) * relief);
-
-    vec3 albedo = texture2D(tAlbedo, vStone).rgb;
-    // Red is how much of the sun this texel sees, green how much of the sky.
-    vec3 light = bakedLight(bakedTerms(tLight, vLight)) * uLightScale;
-
-    // The part of the direct light the atlas cannot resolve: the ratio of what
-    // the perturbed surface catches to what the flat one does. The bias keeps
-    // a face that is already in shadow from being multiplied by a ratio of two
-    // numbers that are both nearly zero.
-    // Against uSunDir, the uniform the dome is drawn from, rather than against
-    // a direction rebuilt here out of the bake's own report: the relief has to
-    // turn with the light when an evening turns it, and a second copy of where
-    // the sun is is the defect this session began by removing.
-    float flat0 = max(dot(geometric, uSunDir), 0.0);
-    float bumped = max(dot(normal, uSunDir), 0.0);
-    float detail = mix(1.0, (bumped + 0.30) / (flat0 + 0.30), uRelief);
-
-    // ------------------------------------------------------------ engraving
-    vec3 offset = vWorld - uCentre;
-    vec2 ink = vec2(
-      dot(offset, uRight) / uFace.x + 0.5,
-      0.5 - offset.y / uFace.y);
-    float facing = smoothstep(0.55, 0.90, dot(geometric, uFront));
-    float inside = step(0.0, ink.x) * step(ink.x, 1.0) * step(0.0, ink.y) * step(ink.y, 1.0);
-    vec2 cut = texture2D(tInk, ink).rg * (facing * inside);
-    // Nothing is cut where nothing is drawn, so the groove term has to fall
-    // back to one rather than to the half grey the map stores.
-    float groove = mix(1.0, 0.42 + 1.16 * cut.g, facing * inside);
-
-    vec3 colour = albedo * light * detail * groove;
-
-    // ---------------------------------------------------------- the sky in it
-    //
-    // Off the shape of the block, not off its surface: the reflection belongs
-    // to the face, and letting a hairline crack steer it drags a smear of sky
-    // the height of the stone behind every one of them.
-    vec3 view = normalize(vWorld - cameraPosition);
-    vec3 mirrored = reflect(view, geometric);
-    vec3 sky = skyReflection(mirrored, uSkyBlur);
-    // A face seen edge on reflects almost exactly along the horizon, which is
-    // where the brightest flanks of the reference come from, and below this
-    // elevation it is handed the one pale air of the reference instead. The
-    // grazing gain above was fitted against the five flanks with that colour
-    // behind it, so the two belong to the same solve and move together.
-    sky = mix(uLowSky, sky, smoothstep(0.12, 0.38, mirrored.y));
-
-    float fresnel = uF0 + uRim
-      * pow(1.0 - clamp(dot(-view, geometric), 0.0, 1.0), uRimPower);
-    colour += sky * fresnel;
-
-    // ------------------------------------------------------------- the light
-    colour += mix(uInkHalo, uInkCore, cut.r) * cut.r * uInk;
-
-    colour = mix(colour, uFogColour, fogAmount(vDistance, vWorld.y));
-    gl_FragColor = vec4(colour, 1.0);
-  }
-`;
-
-// The marker at the foot of every block: a small cyan rhombus that hangs in
-// front of the stone and breathes. Drawn as a quad with the shape cut out of it
-// in the shader rather than as a sprite, because a rhombus is one absolute
-// value and a texture for it would be a download.
+// The marker at the foot of every block is a small cyan rhombus that hangs in
+// front of the stone and breathes, and at the fifth there is a hoop as well.
+// Both are quads with their shape cut out of them in the shader rather than
+// sprites, because a rhombus is one absolute value and a texture for it would
+// be a download.
+//
+// THEY USED TO BE SEVEN MESHES WITH SEVEN ShaderMaterials, and the gate counted
+// what that cost: SEVEN DRAW CALLS FOR FOURTEEN TRIANGLES, submitted at every
+// pose in the world because each of them carried `frustumCulled = false`. They
+// are one mesh now — one geometry of seven quads, one material, one call — and
+// what used to be a uniform per mesh is an attribute per quad:
+//
+//   aCentre  where this quad hangs, in world metres. The billboarding needs a
+//            centre per quad and nothing else changes, so the whole turn to the
+//            eye still happens in the vertex shader.
+//   aShape   which of the two figures to cut: the rhombus or the hoop.
+//   aPulse   (size in metres, intensity), the two things that breathe. They are
+//            written into the buffer every frame instead of into seven uniform
+//            blocks -- 56 floats, against seven material binds.
+//
+// FUSING THEM CANNOT CHANGE THE PICTURE, and the reason is worth stating rather
+// than hoping: the arithmetic of each figure below is the arithmetic it had,
+// and the blending is ADDITIVE with depth writes off, so the order the quads
+// are drawn in cannot matter. Seven meshes sorted back to front and one mesh
+// drawn in index order composite to the same colour.
+//
+// AND THE CULLING IS REAL NOW rather than switched off. Each of the seven had
+// to disable it, because a billboard built in the vertex shader has nothing to
+// do with the bounds three.js would compute from its unit quad -- so all seven
+// went to the GPU wherever the walker stood, including with their backs to the
+// hub. One mesh can afford a bound that is actually true: the sphere is set by
+// hand below, over the seven centres and the largest a quad can breathe to.
 const MARKER_VERTEX = /* glsl */`
+  attribute vec3 aCentre;
+  attribute float aShape;
+  attribute vec2 aPulse;
   varying vec2 vUv;
-  uniform vec3 uCentre;
-  uniform vec2 uSize;
+  varying float vShape;
+  varying float vIntensity;
 
   void main() {
     vUv = uv;
+    vShape = aShape;
+    vIntensity = aPulse.y;
     // Billboarded about the vertical only: the marker is a thing standing in
     // the world, not a decal on the lens, and rolling it with the camera pitch
     // makes it read as interface.
-    vec3 toEye = cameraPosition - uCentre;
+    vec3 toEye = cameraPosition - aCentre;
     vec3 right = normalize(vec3(-toEye.z, 0.0, toEye.x));
-    vec3 world = uCentre + right * (position.x * uSize.x) + vec3(0.0, position.y * uSize.y, 0.0);
+    vec3 world = aCentre + right * (position.x * aPulse.x) + vec3(0.0, position.y * aPulse.x, 0.0);
     gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
   }
 `;
 
+// The two figures, in the one shader that draws them both.
+//
+// THE RHOMBUS: an outlined diamond with a filled heart and a soft field around
+// it, because the reference draws all three.
+//
+// THE HOOP AT THE FIFTH: the reference puts a lit circle there and nowhere
+// else, which is the section about where the walker is going -- a hoop of light
+// standing on the meadow with a star burning in the middle of it. It is
+// billboarded like the rhombus because in the reference it is a circle seen
+// face on while everything around it is seen in perspective, which a hoop lying
+// on the ground could never be.
 const MARKER_FRAGMENT = /* glsl */`
   precision highp float;
   varying vec2 vUv;
+  varying float vShape;
+  varying float vIntensity;
   uniform vec3 uCore;
   uniform vec3 uHalo;
-  uniform float uIntensity;
 
   void main() {
     vec2 p = (vUv - 0.5) * 2.0;
-    float d = abs(p.x) + abs(p.y);
-    // An outlined rhombus with a filled heart, and a soft field around it: the
-    // reference draws all three.
-    float ring = smoothstep(0.045, 0.0, abs(d - 0.76));
-    float core = smoothstep(0.44, 0.16, d);
-    float glow = smoothstep(1.0, 0.30, d) * 0.34;
-    float amount = (ring + core * 0.85 + glow) * uIntensity;
+    float amount;
+    if (vShape > 0.5) {
+      float d = length(p);
+      float hoop = smoothstep(0.09, 0.0, abs(d - 0.72));
+      float star = smoothstep(0.34, 0.0, d);
+      // Four spokes out of the middle, which is what a point of light does when
+      // it is drawn rather than photographed.
+      float spokes = max(
+        smoothstep(0.055, 0.0, abs(p.x)) * smoothstep(0.95, 0.1, abs(p.y)),
+        smoothstep(0.055, 0.0, abs(p.y)) * smoothstep(0.95, 0.1, abs(p.x)));
+      float wash = smoothstep(1.0, 0.0, d) * 0.22;
+      amount = (hoop + star * 1.5 + spokes * 0.55 + wash) * vIntensity;
+    } else {
+      float d = abs(p.x) + abs(p.y);
+      float ring = smoothstep(0.045, 0.0, abs(d - 0.76));
+      float core = smoothstep(0.44, 0.16, d);
+      float glow = smoothstep(1.0, 0.30, d) * 0.34;
+      amount = (ring + core * 0.85 + glow) * vIntensity;
+    }
     gl_FragColor = vec4(mix(uHalo, uCore, clamp(amount, 0.0, 1.0)) * amount, 1.0);
   }
 `;
 
-// The ring at the foot of the fifth block. The reference puts a lit circle
-// there and nowhere else, which is the section about where the walker is going:
-// a hoop of light standing on the meadow, with a star burning in the middle of
-// it. It is billboarded like the rhombus, because in the reference it is a
-// circle seen face on while everything around it is seen in perspective, which
-// a hoop lying on the ground could never be.
-const RING_FRAGMENT = /* glsl */`
-  precision highp float;
-  varying vec2 vUv;
-  uniform vec3 uCore;
-  uniform vec3 uHalo;
-  uniform float uIntensity;
-
-  void main() {
-    vec2 p = (vUv - 0.5) * 2.0;
-    float d = length(p);
-    float hoop = smoothstep(0.09, 0.0, abs(d - 0.72));
-    float star = smoothstep(0.34, 0.0, d);
-    // Four spokes out of the middle, which is what a point of light does when
-    // it is drawn rather than photographed.
-    float spokes = max(
-      smoothstep(0.055, 0.0, abs(p.x)) * smoothstep(0.95, 0.1, abs(p.y)),
-      smoothstep(0.055, 0.0, abs(p.y)) * smoothstep(0.95, 0.1, abs(p.x)));
-    float wash = smoothstep(1.0, 0.0, d) * 0.22;
-    float amount = (hoop + star * 1.5 + spokes * 0.55 + wash) * uIntensity;
-    gl_FragColor = vec4(mix(uHalo, uCore, clamp(amount, 0.0, 1.0)) * amount, 1.0);
-  }
-`;
+const SHAPE_RHOMBUS = 0;
+const SHAPE_HOOP = 1;
 
 /**
- * Renames the coordinate sets the exporter delivered.
+ * The seven quads, as one geometry, with a bound that is true.
  *
- * The bake writes the light on the first set and the tiling stone on the
- * second, which is the order Blender lists them in. Their names in the runtime
- * would then depend on how the loader chose to number them; renaming them once,
- * here, means the shader asks for the light by its name and cannot be pointed
- * at the wrong sheet by a change of exporter.
+ * The quads are unit squares centred on the origin; the vertex shader turns
+ * each one to the eye and gives it its size in metres from `aPulse`. Which
+ * means the positions in this buffer say NOTHING about where the mesh is in the
+ * world, and the sphere three.js would compute from them would cull the whole
+ * hub's markers the moment the origin left the frustum. So it is set here, over
+ * the centres the quads actually hang at and the largest each can breathe to.
+ *
+ * @param {{centre: Vector3, shape: number, size: number}[]} quads
  */
-function nameAttributes(geometry) {
-  const light = geometry.attributes.uv;
-  const stone = geometry.attributes.uv1 || geometry.attributes.uv2 || light;
-  geometry.setAttribute('aLight', light);
-  geometry.setAttribute('aStone', stone);
-  geometry.deleteAttribute('uv');
-  geometry.deleteAttribute('uv1');
-  geometry.deleteAttribute('uv2');
-  return geometry;
-}
-
-function emissiveMaterial(fragmentShader, vertexShader, uniforms) {
-  return new ShaderMaterial({
-    uniforms,
-    vertexShader,
-    fragmentShader,
-    transparent: true,
-    depthWrite: false,
-    blending: AdditiveBlending,
-    side: DoubleSide,
-    fog: false,
-  });
-}
-
-function markerGeometry() {
-  // A unit quad centred on the origin; the vertex shader turns it to the eye
-  // and gives it its size in metres.
+function markersGeometry(quads) {
   const geometry = new BufferGeometry();
-  geometry.setAttribute('position', new BufferAttribute(new Float32Array([
-    -0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0,
-  ]), 3));
-  geometry.setAttribute('uv', new BufferAttribute(new Float32Array([
-    0, 0, 1, 0, 1, 1, 0, 1,
-  ]), 2));
-  geometry.setIndex([0, 1, 2, 0, 2, 3]);
-  geometry.computeBoundingSphere();
+  const position = new Float32Array(quads.length * 12);
+  const uv = new Float32Array(quads.length * 8);
+  const centre = new Float32Array(quads.length * 12);
+  const shape = new Float32Array(quads.length * 4);
+  const pulse = new Float32Array(quads.length * 8);
+  const index = [];
+
+  quads.forEach((q, i) => {
+    position.set([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0], i * 12);
+    uv.set([0, 0, 1, 0, 1, 1, 0, 1], i * 8);
+    for (let c = 0; c < 4; c++) {
+      centre.set([q.centre.x, q.centre.y, q.centre.z], i * 12 + c * 3);
+      shape[i * 4 + c] = q.shape;
+      pulse.set([q.size, 0], i * 8 + c * 2);
+    }
+    const base = i * 4;
+    index.push(base, base + 1, base + 2, base, base + 2, base + 3);
+  });
+
+  geometry.setAttribute('position', new BufferAttribute(position, 3));
+  geometry.setAttribute('uv', new BufferAttribute(uv, 2));
+  geometry.setAttribute('aCentre', new BufferAttribute(centre, 3));
+  geometry.setAttribute('aShape', new BufferAttribute(shape, 1));
+  const breathing = new BufferAttribute(pulse, 2);
+  breathing.setUsage(DynamicDrawUsage);
+  geometry.setAttribute('aPulse', breathing);
+  geometry.setIndex(index);
+
+  // The bound, over where the quads hang and how large they can get. A quad of
+  // side s billboarded about the vertical reaches s/2 sideways and s/2 up, so
+  // its far corner is s/sqrt(2) from its centre; FOCUS_SIZE is how much wider
+  // than its resting size a lit one breathes.
+  const box = new Box3();
+  for (const q of quads) box.expandByPoint(q.centre);
+  const middle = box.getCenter(new Vector3());
+  let radius = 0;
+  for (const q of quads) {
+    radius = Math.max(radius,
+      middle.distanceTo(q.centre) + q.size * (1 + FOCUS_SIZE) * Math.SQRT1_2);
+  }
+  geometry.boundingSphere = new Sphere(middle, radius);
   return geometry;
 }
 
@@ -378,101 +249,52 @@ const RING_DROP = 0.30;
 const RING_GAIN = 0.95;
 
 /**
- * Hangs the six blocks, their markers and the ring on the scene.
+ * What hangs in front of the six blocks, and the seat their stone reports to.
  *
- * @param {object} assets  the loaded glTF scene, the stone sheets, the light
- *                         atlas and the sky
+ * IT NEEDS NO ASSET AND WAITS FOR NOTHING. A rhombus is one absolute value in a
+ * shader and a hoop is two, so the markers stand in the first walkable frame
+ * with the blockers — where they hang comes off the plan, which is known before
+ * anything has been downloaded or cut.
  */
-export function createMonoliths({
-  scene: loaded, stone: albedo, relief, stoneLight: light,
-  lightScale = MONOLITH_BAKE.lightScale,
-}) {
+export function createMonoliths() {
   const meshes = [];
   const blocks = new Map();
   const pulses = [];
   // How lit each block is, nought to one. It is written from outside, ramped
   // there, and read back every frame by the pulse below.
   const focus = new Map();
+  // AND WHAT IS WRITTEN ON EACH ONE, held by the same rule and for the same
+  // reason. Both are things the outside says about a block BEFORE the block
+  // necessarily exists, and a seat that remembers one of them and forgets the
+  // other is the defect below.
+  const engravings = new Map();
 
-  if (loaded && albedo && relief && light) {
-    for (const spec of MONOLITHS) {
-      const found = loaded.getObjectByName(`monolith-${spec.id}`);
-      if (!found) continue;
-      const angle = spec.rotationY * DEG;
-      const centre = new Vector3(
-        spec.position.x, spec.baseY + spec.size[1] / 2, spec.position.z,
-      );
-      const material = new ShaderMaterial({
-        uniforms: {
-          tAlbedo: { value: albedo },
-          tRelief: { value: relief },
-          tLight: { value: light },
-          tInk: { value: null },
-          uLightScale: { value: lightScale * STONE_EXPOSURE },
-              ...SCENE_LIGHT_UNIFORMS,
-          ...SKY_UNIFORMS,
-          ...SKY_REFLECTION,
-          uSkyBlur: { value: SKY_BLUR },
-          uF0: { value: STONE_F0 },
-          uRim: { value: STONE_RIM },
-          uRimPower: { value: STONE_RIM_POWER },
-          uRelief: { value: RELIEF_STRENGTH },
-          uLowSky: { value: new Vector3(...LOW_SKY) },
-          uCentre: { value: centre.clone() },
-          uRight: { value: new Vector3(Math.cos(angle), 0, -Math.sin(angle)) },
-          uFront: { value: new Vector3(Math.sin(angle), 0, Math.cos(angle)) },
-          uFace: { value: new Vector2(spec.size[0], spec.size[1]) },
-          uInk: { value: INK_GAIN },
-          uInkCore: { value: new Vector3(...INK_CORE) },
-          uInkHalo: { value: new Vector3(...INK_HALO) },
-          ...fogUniforms(),
-        },
-        vertexShader: VERTEX,
-        fragmentShader: FRAGMENT,
-        fog: false,
-      });
-
-      const mesh = new Mesh(nameAttributes(found.geometry), material);
-      mesh.name = `monolith-${spec.id}`;
-      mesh.position.copy(found.position);
-      mesh.quaternion.copy(found.quaternion);
-      mesh.scale.copy(found.scale);
-      meshes.push(mesh);
-      blocks.set(spec.id, { spec, mesh, material, centre, angle });
-    }
-  }
-
-  // ------------------------------------------------------------- the markers
-  const quad = markerGeometry();
-  for (const [, block] of blocks) {
-    const { spec, centre, angle } = block;
+  // ------------------------------------------------- where the seven quads hang
+  const quads = [];
+  const placed = new Map();
+  for (const spec of MONOLITHS) {
+    const angle = spec.rotationY * DEG;
+    const centre = new Vector3(
+      spec.position.x, spec.baseY + spec.size[1] / 2, spec.position.z,
+    );
+    placed.set(spec.id, { spec, centre, angle });
     const front = new Vector3(Math.sin(angle), 0, Math.cos(angle));
     const at = new Vector3(
       centre.x + front.x * (spec.size[2] / 2 + MARKER_STANDOFF),
       spec.baseY + spec.size[1] * MARKER_HEIGHT,
       centre.z + front.z * (spec.size[2] / 2 + MARKER_STANDOFF),
     );
-    const material = emissiveMaterial(MARKER_FRAGMENT, MARKER_VERTEX, {
-      uCentre: { value: at },
-      uSize: { value: new Vector2(MARKER_SIZE, MARKER_SIZE) },
-      uCore: { value: new Vector3(...INK_CORE) },
-      uHalo: { value: new Vector3(...INK_HALO) },
-      uIntensity: { value: MARKER_GAIN },
-    });
-    const marker = new Mesh(quad, material);
-    marker.name = `marker-${spec.id}`;
-    marker.frustumCulled = false;
-    meshes.push(marker);
+    quads.push({ centre: at, shape: SHAPE_RHOMBUS, size: MARKER_SIZE });
     // Each one breathes on its own clock, so five markers in one frame never
     // pulse as a single blinking row.
     pulses.push({
-      id: spec.id, material, phase: Number(spec.id) * 1.13, base: MARKER_GAIN,
-      size: MARKER_SIZE,
+      id: spec.id, slot: quads.length - 1, phase: Number(spec.id) * 1.13,
+      base: MARKER_GAIN, size: MARKER_SIZE,
     });
   }
 
   // ----------------------------------------------------------- the ring at 05
-  const target = blocks.get('05');
+  const target = placed.get('05');
   if (target) {
     const { spec, centre, angle } = target;
     const front = new Vector3(Math.sin(angle), 0, Math.cos(angle));
@@ -482,34 +304,85 @@ export function createMonoliths({
       spec.baseY + spec.size[1] * MARKER_HEIGHT - RING_DROP,
       centre.z + front.z * (spec.size[2] / 2 + MARKER_STANDOFF + RING_FORWARD) - right.z * RING_LEFT,
     );
-    const material = emissiveMaterial(RING_FRAGMENT, MARKER_VERTEX, {
-      uCentre: { value: at },
-      uSize: { value: new Vector2(RING_SIZE, RING_SIZE) },
-      uCore: { value: new Vector3(...INK_CORE) },
-      uHalo: { value: new Vector3(...INK_HALO) },
-      uIntensity: { value: RING_GAIN },
-    });
-    const ring = new Mesh(quad, material);
-    ring.frustumCulled = false;
-    ring.name = 'marker-ring-05';
-    meshes.push(ring);
+    quads.push({ centre: at, shape: SHAPE_HOOP, size: RING_SIZE });
     pulses.push({
-      id: '05', material, phase: 2.5, depth: 0.14, base: RING_GAIN, size: RING_SIZE,
+      id: '05', slot: quads.length - 1, phase: 2.5, depth: 0.14,
+      base: RING_GAIN, size: RING_SIZE,
     });
   }
+
+  // ------------------------------------------------------- and the one mesh
+  const geometry = markersGeometry(quads);
+  const breath = geometry.getAttribute('aPulse');
+  const markers = new Mesh(geometry, new ShaderMaterial({
+    uniforms: {
+      uCore: { value: new Vector3(...INK_CORE) },
+      uHalo: { value: new Vector3(...INK_HALO) },
+    },
+    vertexShader: MARKER_VERTEX,
+    fragmentShader: MARKER_FRAGMENT,
+    transparent: true,
+    depthWrite: false,
+    blending: AdditiveBlending,
+    side: DoubleSide,
+    fog: false,
+  }));
+  markers.name = 'markers';
+  meshes.push(markers);
 
   return {
     meshes,
 
-    /** Lays the engraving of one section onto its block. */
+    /**
+     * A block's stone, as soon as the worker has cut it.
+     *
+     * ANYTHING ALREADY SAID ABOUT THIS BLOCK IS APPLIED HERE RATHER THAN LOST,
+     * and that is the whole contract of this seat: TWO asynchronous deliveries
+     * meet at it and neither can be told to wait for the other. The stone
+     * arrives from the engine's worker, one piece per message; the writing
+     * arrives from engraveAll(), one face per frame, in order of distance from
+     * the reference pose. Nothing keeps those two queues in step.
+     *
+     * IT USED TO REMEMBER THE FOCUS AND FORGET THE WRITING, and the asymmetry
+     * cost four faces out of six. Measured at the seat before it was touched
+     * (v2-pietra/dev3/inkbind.mjs, which wraps this door and the scene and
+     * writes down which walls existed at each knock): the writing for 06, 05,
+     * 01 and 04 was handed in between 5.5 and 8.2 seconds, with NOT ONE wall
+     * yet standing, and was dropped on the floor by a `if (block)` that had
+     * nothing to put it on; 02 at 9.9 s and 03 at 16.5 s found all eight
+     * standing and were kept. That is exactly the three faces the verbale
+     * reported as `tInk` null — 01, 04, 05 — plus the one nobody could see
+     * because it is out of the reference framing.
+     *
+     * So both are held, and both are applied here.
+     */
+    attach(id, stone) {
+      blocks.set(id, stone);
+      const held = focus.get(id);
+      if (held) {
+        stone.material.uniforms.uInk.value = INK_GAIN
+          * (1 + FOCUS_INK * held.value * (1 - FOCUS_OPEN_DIM * held.out));
+      }
+      const written = engravings.get(id);
+      if (written) stone.setEngraving(written);
+    },
+
+    /**
+     * Lays the engraving of one section onto its block.
+     *
+     * HELD WHETHER OR NOT THE STONE IS THERE. A block whose courses have not
+     * landed yet is the ordinary case and not the exception — see attach() —
+     * so the texture is remembered first and applied second.
+     */
     setEngraving(id, texture) {
+      engravings.set(id, texture);
       const block = blocks.get(id);
-      if (block) block.material.uniforms.tInk.value = texture;
+      if (block) block.setEngraving(texture);
     },
 
     /** Distance from the reference camera, which is what sizes the engraving. */
     faceCentre(id) {
-      const block = blocks.get(id);
+      const block = placed.get(id);
       return block ? block.centre.clone() : null;
     },
 
@@ -532,16 +405,29 @@ export function createMonoliths({
       }
     },
 
+    /**
+     * The breathing, written into the one buffer the seven quads share.
+     *
+     * The arithmetic is untouched from when each quad had a material to write
+     * it into; what changed is where it lands. A quad's four corners all carry
+     * its own (size, intensity), so one upload of 56 floats replaces seven
+     * uniform writes and the seven binds that went with them.
+     */
     update(elapsed) {
+      const values = breath.array;
       for (const pulse of pulses) {
         const lit = focus.get(pulse.id)?.value || 0;
         const depth = (pulse.depth === undefined ? MARKER_PULSE.depth : pulse.depth)
           + FOCUS_PULSE * lit;
-        pulse.material.uniforms.uIntensity.value = pulse.base * (1 + FOCUS_MARKER * lit)
+        const intensity = pulse.base * (1 + FOCUS_MARKER * lit)
           * (1 + depth * Math.sin(elapsed * (Math.PI * 2 / MARKER_PULSE.period) + pulse.phase));
         const size = pulse.size * (1 + FOCUS_SIZE * lit);
-        pulse.material.uniforms.uSize.value.set(size, size);
+        for (let c = 0; c < 4; c++) {
+          values[pulse.slot * 8 + c * 2] = size;
+          values[pulse.slot * 8 + c * 2 + 1] = intensity;
+        }
       }
+      breath.needsUpdate = true;
     },
   };
 }
