@@ -37,9 +37,94 @@
 // banco che li riprende e' fondazione/lav/campo1-scatti.mjs +
 // campo1-analisi.mjs + campo1-fit.mjs, alla posa vox-giorno, 1672x941, tier
 // alto, sui soli pixel che il campo disegna.
-import { reporter, selfTest } from './lib.mjs';
+import { braceBody, reporter, selfTest } from './lib.mjs';
 import { TIERS } from '../../src/core/quality.js';
 import { read } from './lib.mjs';
+
+// ==========================================================================
+// COME SI LEGGE UN SORGENTE QUI, E PERCHE' NON PIU' A LETTERA.
+//
+// COS'ERA ROTTO. Questa guardia teneva sette proprieta' del campo con altret-
+// tanti `includes()` di TESTO ESATTO: un letterale d'oggetto intero
+// (`trail.push({ t: now, x: eye.x, z: eye.z })`), due chiamate intere con i
+// loro argomenti scritti a mano, l'INTESTAZIONE DI UN CICLO parola per parola
+// (`while (trail.length > 2 && trail[1].t <= now - lodLag)`), un letterale di
+// uniform con la sua spaziatura (`uLodWorld: { value: 1 }`) e due espressioni
+// GLSL. Basta rimettere in ordine due proprieta' dentro la graffa, mandare a
+// capo la condizione del ciclo o togliere uno spazio, e la guardia dichiara
+// rotto un campo che non e' cambiato di una virgola. E' il difetto che
+// U-GUARDIA-3 ha censito qui (residuo 3) ed e' la trappola che aveva
+// guard-zone: una guardia che va rossa a una riscrittura corretta e' una
+// guardia che la prossima unita' spegne.
+//
+// E DUE FETTE ERANO PEGGIO, perche' sbagliavano IN SILENZIO. La regione
+// misurata si ritagliava fra `glsl.indexOf('Hit march(')` e l'indice di una
+// RIGA DI COMMENTO -- una fila di trattini e le parole «one shading». Se quel
+// commento si riscrive, `indexOf` torna -1, la fetta diventa un'altra cosa, e
+// le sei gambe che ci stanno sopra continuano a dire di si' su un testo che
+// non e' piu' quello che credono. Nessuna di loro se ne accorgerebbe.
+//
+// LA CURA. Le fette si prendono per STRUTTURA -- il corpo della funzione
+// `march` per bilanciamento di graffe, con `braceBody` di lib.mjs, che e' la
+// stessa cosa che altre guardie usano per non confondere due materiali a
+// quaranta righe di distanza -- e ogni delimitatore che non si trova e' una
+// gamba ROSSA e non una fetta vuota. Le sette proprieta' sono predicati con un
+// nome, che il run chiama e che il `--self` chiama negli stessi termini su tre
+// ingressi: la consegna, un difetto vero, e LA STESSA COSA RISCRITTA IN ALTRA
+// FORMA -- proprieta' in altro ordine, condizione mandata a capo, spazi tolti
+// -- che deve continuare a passare. E' quel terzo caso il motivo di tutto: e'
+// lui che dice che il chiodo non c'e' piu'.
+// ==========================================================================
+
+/** Se un nome compare come identificatore intero. */
+const mentions = (text, word) => new RegExp(`(?<![\\w.$])${word}(?![\\w$])`).test(text);
+
+/**
+ * Il corpo di una funzione, per bilanciamento di graffe e non per commento.
+ *
+ * @param {string} text il sorgente
+ * @param {RegExp} opens come si riconosce la sua intestazione
+ */
+function bodyOf(text, opens) {
+  const at = text.search(opens);
+  if (at < 0) return null;
+  // PAST THE PARAMETER LIST FIRST. `setDetail({ near, step, snap } = {})`
+  // opens a brace inside its own signature, and a reader that took the first
+  // one would hand back the parameters and call them the body -- which is how a
+  // structural reader goes wrong in exactly the way a literal one does.
+  let depth = 0;
+  let i = text.indexOf('(', at);
+  if (i < 0) return null;
+  for (; i < text.length; i++) {
+    if (text[i] === '(') depth++;
+    else if (text[i] === ')') { depth--; if (depth === 0) break; }
+  }
+  const brace = text.indexOf('{', i);
+  return brace < 0 ? null : braceBody(text, brace);
+}
+
+/**
+ * Gli argomenti di ogni chiamata a un nome, per bilanciamento di parentesi.
+ *
+ * Cosi' una chiamata mandata a capo, spaziata in un altro modo o con gli
+ * argomenti in altro ordine e' la stessa chiamata, che e' quello che e'.
+ */
+function callsTo(text, name) {
+  const out = [];
+  const finder = new RegExp(`(?<![\\w$])${name.replace(/\./g, '\\s*\\.\\s*')}\\s*\\(`, 'g');
+  for (const found of text.matchAll(finder)) {
+    let depth = 0;
+    const open = found.index + found[0].length - 1;
+    for (let i = open; i < text.length; i++) {
+      if (text[i] === '(') depth++;
+      else if (text[i] === ')') {
+        depth--;
+        if (depth === 0) { out.push(text.slice(open + 1, i)); break; }
+      }
+    }
+  }
+  return out;
+}
 
 const STEP = 0.5;          // il passo con cui l'isteresi si misura, in metri
 const NEAR_WINDOW = 19.2;  // la finestra vicina, oltre cui non c'e' altro che 40 cm
@@ -102,23 +187,59 @@ for (const tier of TIERS) {
     `e il tier ${tier.id} non porta piu' l'isteresi che la banda ha sostituito`);
 }
 const field = read('src/world/voxel/campo-field.js');
-report.check(field.includes('trail.push({ t: now, x: eye.x, z: eye.z })'),
+
+// I QUATTRO PREDICATI DELLA BANDA, per nome e per flusso e non a lettera.
+/** La coda delle posizioni da cui la banda e' misurata viene alimentata. */
+const pushesTheTrail = (text) => callsTo(text, 'trail.push')
+  .some((arg) => mentions(arg, 'now') && /eye\s*\.\s*x/.test(arg) && /eye\s*\.\s*z/.test(arg));
+/** E il frammento riceve DUE centri: dov'era il camminatore, e dov'e' adesso. */
+const handsTheTwoCentres = (text) => callsTo(text, 'uLodCentre.value.set')
+  .some((arg) => mentions(arg, 'was'))
+  && callsTo(text, 'uLodCentre2.value.set').some((arg) => mentions(arg, 'eye'));
+/** La coda non si asciuga mai sotto due campioni. */
+const keepsTwoSamples = (text) => /while\s*\([^)]*?trail\s*\.\s*length\s*>\s*2\b[\s\S]*?lodLag[^)]*\)/
+  .test(text);
+/** Un modo che cambia ripianta il centro invece di trascinarlo. */
+const replantsOnMode = (text) => {
+  const body = bodyOf(text, /(?<![\w$])setDetail\s*\(/);
+  return body !== null && /lodCentre\s*=\s*null/.test(body);
+};
+/** E il centro sta fermo finche' il camminatore non ha lasciato la sua palla. */
+const holdsTheCentre = (text) => /Math\s*\.\s*hypot\([\s\S]{0,120}?\)\s*>\s*lodSnap/.test(text);
+
+report.check(pushesTheTrail(field),
   'il campo tiene la coda delle posizioni da cui la banda e\' misurata');
-report.check(field.includes('u.uLodCentre.value.set(was.x, was.z)')
-  && field.includes('u.uLodCentre2.value.set(eye.x, eye.z)'),
+report.check(handsTheTwoCentres(field),
   'e il frammento riceve i DUE centri: dov\'era il camminatore e dov\'e\' adesso');
-report.check(field.includes('while (trail.length > 2 && trail[1].t <= now - lodLag)'),
+report.check(keepsTwoSamples(field),
   'la coda non si asciuga mai sotto due campioni',
   'una coda vuota rimetterebbe la LINEA per un fotogramma, che e\' il difetto stesso');
-report.check(/lodCentre = null;/.test(field.slice(field.indexOf('setDetail('))),
+report.check(replantsOnMode(field),
   'un modo che cambia ripianta il centro invece di trascinarlo',
   'una misura presa in un modo non e\' mai meta\' di un\'altra');
+report.check(holdsTheCentre(field),
+  'e fuori dalla banda il centro e\' TENUTO e non segue l\'occhio',
+  'la palla di lodSnap: senza di lei il ramo senza banda ridisegna a ogni passo');
 
 // ------------------------------------- 2. LA LEGGE NON LEGGE NULLA CHE VARI
 const glsl = read('src/world/voxel/campo-material.js');
-const march = glsl.slice(glsl.indexOf('Hit march('),
-  glsl.indexOf('// ------------------------------------------------------------ one shading'));
-const ladder = march.slice(march.indexOf('float jitter'), march.indexOf('int floorLevel'));
+
+// LE DUE FETTE, PRESE PER STRUTTURA E CONTROLLATE.
+//
+// `march` e' il CORPO della funzione, chiuso dalla sua graffa e non da una riga
+// di commento; `ladder` e' la scala della LOD dentro di lui, fra la sua prima e
+// la sua ultima riga PER NOME. E se una delle due non si trova, questa e' una
+// gamba rossa: la fetta vuota di prima lasciava passare tutto in silenzio, che
+// e' il modo peggiore in cui una guardia possa sbagliare.
+const march = bodyOf(glsl, /(?<![\w$])Hit\s+march\s*\(/);
+const ladderFrom = march === null ? -1 : march.search(/(?<![\w$])float\s+jitter\b/);
+const ladderTo = march === null ? -1 : march.search(/(?<![\w$])int\s+floorLevel\b/);
+const ladder = march !== null && ladderFrom >= 0 && ladderTo > ladderFrom
+  ? march.slice(ladderFrom, ladderTo) : '';
+report.check(ladder.length > 0,
+  'la scala della LOD si trova dove questa guardia va a leggerla',
+  march === null ? 'il corpo di march() non si chiude' : `${ladder.length} caratteri`);
+
 for (const forbidden of ['uTime', 'uFrame', 'cameraPosition']) {
   report.check(!ladder.includes(forbidden),
     `la scala della LOD non legge ${forbidden}`,
@@ -131,21 +252,55 @@ for (const forbidden of ['uTime', 'uFrame', 'cameraPosition']) {
 // mentre il camminatore le passa accanto. Misurati fianco a fianco sulla stessa
 // linea, sono pari al pixel — 1,008 % per passo e 0,66 % di componente l'uno e
 // l'altro — e costano 32,0/34,9 ms contro 33,7/38,5. A parita', il mondo (R8 §6).
+/**
+ * Quante volte la scala nomina il vetro, comunque sia mandata a capo.
+ *
+ * A OCCORRENZE E NON A RIGHE, che e' la correzione di una misura sbagliata: la
+ * gamba di prima contava le RIGHE che contenevano `gl_FragCoord` e ne trovava
+ * una, mentre la riga ne contiene due (le due coordinate dello stesso hash). Un
+ * conto per righe dice «una volta» anche di dieci usi scritti di seguito.
+ */
+const glassMentions = (text) => (text.match(/gl_FragCoord/g) || []).length;
+/** Quante volte lo nomina DENTRO l'hash del pixel, che e' l'unico posto lecito. */
+const glassInsideHash = (text) => callsTo(text, 'pigHash')
+  .reduce((n, arg) => n + (arg.match(/gl_FragCoord/g) || []).length, 0);
+/** E quindi: nessuna posizione dello schermo entra nella legge. */
+const glassOnlyHashed = (text) => glassMentions(text) === glassInsideHash(text);
+/** E in una chiamata sola, che e' il ramo che il tier non prende. */
+const glassCalls = (text) => callsTo(text, 'pigHash')
+  .filter((arg) => /gl_FragCoord/.test(arg)).length;
+/** Cio' che si spedisce e' la grana attaccata al prato: la uniform, per valore. */
+const shipsTheWorldGrain = (text) => {
+  const found = /uLodWorld\s*:\s*\{\s*value\s*:\s*([\d.]+)\s*,?\s*\}/.exec(text);
+  return found !== null && Number(found[1]) > 0.5;
+};
+/** La grana del mondo e' presa alla CELLA del prato, che sta ferma sotto i piedi. */
+const grainAtTheCell = (text) => callsTo(text, 'floor')
+  .filter((arg) => /grain\s*\.\s*[xy]/.test(arg) && mentions(arg, 'uCell')).length >= 2;
+/** E l'ancora e' dove il raggio tocca il piano. */
+const anchoredAtTheFoot = (text) => {
+  const found = /(?<![\w$])float\s+toFoot\s*=([\s\S]*?);/.exec(text);
+  return found !== null && /dir\s*\.\s*y/.test(found[1]);
+};
+
 {
-  const onGlass = ladder.split('\n').filter((l) => l.includes('gl_FragCoord'));
-  report.check(onGlass.length === 1,
-    'la scala nomina lo schermo una volta sola, nel ramo che il tier non prende',
-    `${onGlass.length} riga`);
-  report.check(onGlass.every((l) => l.includes('pigHash(gl_FragCoord')),
-    'e quella volta e\' un hash del pixel, non una posizione che entri nella legge');
-  report.check(glsl.includes('uLodWorld: { value: 1 }'),
+  report.check(glassCalls(ladder) === 1,
+    'la scala nomina lo schermo in UNA chiamata sola, nel ramo che il tier non prende',
+    `${glassCalls(ladder)} chiamata, ${glassMentions(ladder)} nomi`);
+  report.check(glassOnlyHashed(ladder),
+    'e quella chiamata e\' un hash del pixel, non una posizione che entri nella legge',
+    `${glassInsideHash(ladder)} nomi su ${glassMentions(ladder)} stanno dentro pigHash`);
+  report.check(shipsTheWorldGrain(glsl),
     'cio\' che si spedisce e\' la grana attaccata al PRATO e non al vetro');
-  report.check(ladder.includes('floor(grain.x / uCell), floor(grain.y / uCell)'),
+  report.check(grainAtTheCell(ladder),
     'la grana del mondo e\' presa alla cella del prato, che e\' ferma sotto chi cammina');
-  report.check(ladder.includes('float toFoot = dir.y < -1e-3'),
+  report.check(anchoredAtTheFoot(ladder),
     'e l\'ancora e\' dove il raggio tocca il piano, che non si muove quando si muove la camera');
 }
-report.check(/far2 = max\(far2,/.test(ladder),
+/** La scala sale e non scende mai: la distanza e' il massimo raggiunto. */
+const onlyClimbs = (text) => /(?<![\w$])far2\s*=\s*max\s*\(/.test(text)
+  && callsTo(text, 'max').some((a) => mentions(a, 'far2'));
+report.check(onlyClimbs(ladder),
   'la scala sale e non scende mai, anche con il centro tenuto indietro',
   'la distanza usata e\' il massimo che il raggio ha raggiunto');
 
@@ -331,6 +486,67 @@ cases.push({ what: 'la quota chiara della legge che spediva, a 17 punti dal bers
   caught: !(Math.abs(AT_TODAY.quotePrima[2] - AT_TODAY.quoteBersaglio[2]) <= CEILING.quota) });
 cases.push({ what: 'un anello il cui terzo fronte esce dalla finestra vicina',
   caught: !(9 * 1.6 * 1.6 <= NEAR_WINDOW) });
-cases.push({ what: 'un centro che segue l\'occhio invece di essere tenuto',
-  caught: !/> lodSnap\)/.test(field.replace('> lodSnap)', '>= 0)')) });
+
+// ------------------------------------------- I SETTE LETTORI, NEI TRE VERSI
+//
+// Ogni predicato che legge un sorgente e' chiamato qui su tre ingressi: la
+// consegna, un DIFETTO vero, e la stessa cosa RISCRITTA IN ALTRA FORMA. Il
+// terzo e' quello che conta: prima, ognuna di queste sette righe sarebbe andata
+// rossa davanti a un rimescolamento corretto del campo, e nessuno l'avrebbe
+// saputo finche' non fosse successo.
+const REWRITTEN = {
+  trail: 'trail.push({\n      x: eye.x,\n      z: eye.z,\n      t: now,\n    });',
+  centres: 'u.uLodCentre .value .set(\n  was.x,\n  was.z,\n);\n'
+    + 'u.uLodCentre2.value.set( eye.x , eye.z );',
+  queue: 'while (\n  trail.length > 2\n  && trail[1].t <= now - lodLag\n) {\n  trail.shift();\n}',
+  mode: 'function setDetail(next) {\n  if (next) {\n    lodCentre = null;\n  }\n}',
+  hold: 'if (\n  Math.hypot(\n    eye.x - lodCentre.x,\n    eye.z - lodCentre.z,\n  ) > lodSnap\n) {',
+  world: 'uLodWorld: {\n        value: 1,\n      },',
+  grain: 'ivec2 cell = ivec2(\n  floor( grain.x/uCell ),\n  floor( grain.y/uCell )\n);',
+  foot: 'float toFoot =\n  dir.y < -1e-3\n    ? -eye.y / dir.y\n    : 1e9;',
+};
+const BENT = {
+  trail: 'trail.push({ t: now, x: 0.0, z: 0.0 });',
+  centres: 'u.uLodCentre.value.set(eye.x, eye.z);\nu.uLodCentre2.value.set(eye.x, eye.z);',
+  queue: 'while (trail.length > 0 && trail[1].t <= now - lodLag) trail.shift();',
+  mode: 'function setDetail(next) {\n  lodCentre = { x: eye.x, z: eye.z };\n}',
+  hold: 'if (Math.hypot(eye.x - lodCentre.x, eye.z - lodCentre.z) >= 0) {',
+  world: 'uLodWorld: { value: 0 },',
+  grain: 'ivec2 cell = ivec2(floor(grain.x / uPixel), floor(grain.y / uPixel));',
+  foot: 'float toFoot = cameraPosition.y;',
+};
+const three = (what, predicate, key) => {
+  cases.push({ what: `${what}: il difetto e' preso`, caught: !predicate(BENT[key]) });
+  cases.push({ what: `${what}: la consegna passa`, caught: predicate(key === 'world' ? glsl : (key === 'grain' || key === 'foot' ? ladder : field)) });
+  cases.push({ what: `${what}: e la stessa cosa riscritta in altra forma passa ancora`, caught: predicate(REWRITTEN[key]) });
+};
+three('la coda della banda', pushesTheTrail, 'trail');
+three('i due centri', handsTheTwoCentres, 'centres');
+three('la coda che non si asciuga', keepsTwoSamples, 'queue');
+three('il centro ripiantato al cambio di modo', replantsOnMode, 'mode');
+three('il centro tenuto nella sua palla', holdsTheCentre, 'hold');
+three('la grana attaccata al prato', shipsTheWorldGrain, 'world');
+three('la grana presa alla cella', grainAtTheCell, 'grain');
+three('l\'ancora al piede del raggio', anchoredAtTheFoot, 'foot');
+cases.push({
+  what: 'lo schermo nominato fuori dall\'hash: la legge si e\' attaccata al vetro',
+  caught: !glassOnlyHashed(`${ladder}\n  float k = gl_FragCoord.x;`),
+});
+cases.push({
+  what: 'e un secondo hash del pixel in un altro ramo della scala',
+  caught: glassCalls(`${ladder}\n  float k = pigHash(gl_FragCoord.y, 1.0);`) === 2,
+});
+cases.push({
+  what: 'e la scala che si spedisce nomina il vetro solo dentro il suo unico hash',
+  caught: glassOnlyHashed(ladder) && glassCalls(ladder) === 1,
+});
+cases.push({
+  what: 'una scala che puo\' anche SCENDERE, e allora il fronte torna indietro sui suoi passi',
+  caught: !onlyClimbs('float far2 = t;') && onlyClimbs('far2 = max(\n  far2,\n  t\n);'),
+});
+cases.push({
+  what: 'e una fetta che non si trova e\' una gamba rossa e non una fetta vuota',
+  caught: bodyOf('nothing here', /(?<![\w$])Hit\s+march\s*\(/) === null
+    && bodyOf(glsl, /(?<![\w$])Hit\s+march\s*\(/) !== null,
+});
 selfTest('guard-stabilita', cases);
