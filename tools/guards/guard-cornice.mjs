@@ -11,6 +11,7 @@ import {
   TOLERANCE, highestRead, inFrame, onCompass, skylineBearings,
 } from '../../assets-src/distant/fit-cornice.mjs';
 import { AIR_NEAR, HEIGHT_FOG } from '../../src/core/sky.js';
+import { rampBend, rampRadiance } from '../../src/core/sky-ramp.js';
 import {
   AIR_BETA, AIR_PALE, AIR_PATH_ORIGIN, FOG_LOW_CAP, FOG_RADIANCE,
 } from '../../src/world/air.js';
@@ -787,69 +788,137 @@ report.check(quotaMisses.length === 0,
       + `${(matter.grass * 100).toFixed(0)}% grass, over ${(matter.area / 1000).toFixed(0)} thousand `
       + 'square metres of built face on the near ring (the reference reads 20 / 49 / 15)');
 
-// AND THE PALETTE IS SIX MEASURED RADIANCES AND NOT FIVE AND A DERIVATION, with
-// the two classes the reference separates kept apart: a shadow under its own
-// flank on every channel, and grass that is green where the rock is not.
+// AND THE PALETTE IS SIX RADIANCES AND NOT FIVE AND A DERIVATION, with the two
+// classes the reference separates kept apart: a shadow under its own flank, and
+// grass that is green where the rock is not.
+//
+// «UNDER ITS FLANK ON EVERY CHANNEL» USED TO BE A STRICT INEQUALITY, AND IT
+// CANNOT BE ONE ANY MORE. U-CORNICE-4 re-solved these six WITH THE AIR IN FRONT
+// of them, and on the blue that solve arrives at a FLOOR: the low haze's ceiling
+// alone puts 0.0992 of blue in front of every surface past sixty-three metres,
+// where the whole of what the reference shows at the near flank is 0.1040 --
+// ninety-five per cent of it -- so what a pigment has left to be blue with is
+// four thousandths, and three of the six classes come out at nought exactly. Two
+// noughts are not ordered, and a guard that demanded they were would be
+// demanding a pigment the ceiling has already spent.
+//
+// So the shadow is at or under its flank on every channel, STRICTLY under it on
+// every channel where the flank still has pigment left to be under, and strictly
+// under on at least one. That is the same statement wherever the old one could
+// be made and a true one where it could not. The floor itself is gated below, so
+// the reason stands in the guard and not only in this note.
 const PAL = palette();
-const under = (a, b) => PAL[a].every((v, c) => v < PAL[b][c]);
+const under = (a, b) => PAL[a].every((v, c) => v <= PAL[b][c])
+  && PAL[a].every((v, c) => (PAL[b][c] > 0 ? v < PAL[b][c] : true))
+  && PAL[a].some((v, c) => v < PAL[b][c]);
 report.check(PAL.length === 6
   && under(SHADE.GRASS_SHADE, SHADE.GRASS_LIT)
   && under(SHADE.ROCK_SHADE, SHADE.ROCK_LIT)
   && PAL[SHADE.GRASS_LIT][1] > PAL[SHADE.GRASS_LIT][2]
   && PAL[SHADE.ROCK_LIT][2] > PAL[SHADE.GRASS_LIT][2],
   'and the palette keeps the classes apart: a shadow under its flank, grass greener than the rock',
-  `grass lit [${PAL[SHADE.GRASS_LIT].map((v) => v.toFixed(3)).join(', ')}], `
-  + `rock in shadow [${PAL[SHADE.ROCK_SHADE].map((v) => v.toFixed(3)).join(', ')}]`);
+  `grass lit [${PAL[SHADE.GRASS_LIT].map((v) => v.toFixed(4)).join(', ')}], `
+  + `rock in shadow [${PAL[SHADE.ROCK_SHADE].map((v) => v.toFixed(4)).join(', ')}]`);
+
+// AND THE FLOOR ITSELF, WHICH IS WHY THE BLUE OF THIS PALETTE IS WHAT IT IS.
+//
+// This is not a second check on the palette: it is the check that the SENTENCE
+// above is still true of the world. The ceiling is a MIX and not an addition, so
+// what it puts in front of a distant surface is FOG_RADIANCE times the cap, and
+// against the near flank's own reference reading in radiance that share is the
+// whole story of the blue. Move the ceiling or the fog's colour and this number
+// moves, and the palette above stops being the solve it says it is.
+const CEILING_BLUE = FOG_RADIANCE[2] * FOG_LOW_CAP;
+/** The near flank's reference reading in radiance: U-CORNICE-2's own solve. */
+const NEAR_FLANK_BLUE = 0.1040;
+report.check(CEILING_BLUE > NEAR_FLANK_BLUE * 0.85 && CEILING_BLUE < NEAR_FLANK_BLUE,
+  'and the blue of every class is at the floor because the ceiling has already spent it',
+  `the ceiling alone puts ${CEILING_BLUE.toFixed(4)} of blue in front of everything past 63 m, `
+  + `against ${NEAR_FLANK_BLUE.toFixed(4)} in the whole of the reference's near flank `
+  + `(${((CEILING_BLUE / NEAR_FLANK_BLUE) * 100).toFixed(0)}%); the six are left with `
+  + `[${PAL.map((c) => c[2].toFixed(4)).join(', ')}]`);
 
 // --------------------------------------------------------------------------
 // AND WHAT THAT PALETTE DEVELOPS TO ONCE THE AIR IS IN FRONT OF IT, PER PLANE.
 //
-// THE ONE THING THE SECTION ABOVE CANNOT SEE. `palette()` was solved by
-// U-CORNICE-2 WITH THE AIR SWITCHED OFF, so every check up to here judges a
-// PIGMENT. What the client sees is that pigment veiled by two terms at the
-// plane's own distance and height, and the campaign has now spent two units
-// discovering, separately, that the veil is where the near planes go wrong:
-// U-LUCE-6 on the three betas, U-LUCE-7 on the near end of the colour. Neither
-// of them moved a number, and a measurement nobody carries is a measurement the
-// next unit re-derives. So it is carried here, where the palette is.
+// THIS IS THE SECTION THE PALETTE IS NOW SOLVED AGAINST, and until U-CORNICE-4
+// it was the section that could only watch. What stood here said: `palette()`
+// was solved by U-CORNICE-2 WITH THE AIR SWITCHED OFF, so the pigment IS the
+// near flank's own reading, air of the reference included, and any air this
+// world puts in front of it is that air counted twice. The distance term
+// declined to count it -- AIR_PATH_ORIGIN puts its zero at that plane -- but the
+// LOW HAZE'S CEILING does not decline, and what it left over the reference was
+// 4 / 14 / 30 levels with the owner named as the coordinator.
 //
-// IT IS AN AT_TODAY AND NOT A TARGET. The gate is drift: these are what this
-// desk measures the delivered colour to be, and a change to the palette, to the
-// air, to the seat or to the grade that moves one of them shows up here as a
-// number instead of as a mood. The reference's own reading is printed beside it
-// and is NOT gated, because the near flank cannot be reached from here — and
-// U-LUCE-8 finally has the reason, which is not the one that stood here.
+// D-L8-2 = B CLOSED IT FROM THIS SIDE INSTEAD. The six radiances are now solved
+// so that the picture falls on the reference WITH everything the delivered air
+// puts in front of the plane they are measured on -- which is the difference
+// between a pigment and a compensation, said the other way round from how
+// U-CORNICE-2 had to say it. The rock in shadow is solved on the THREE planes at
+// once (least squares per channel), because it is the class that carries them;
+// the lit rock and the lit grass on U-CORNICE-2's own class masks, at the plane
+// those masks are read on; the two tops and the grass in shadow are derived,
+// with the reasons in assets-src/distant/cornice.json's own history.
 //
-// THE NEAR FLANK'S AIR IS ALREADY IN THE PALETTE. `palette()` was solved WITH
-// THE AIR SWITCHED OFF against the reference's own class mask of that plane, so
-// the rock in shadow develops to exactly 74 / 104 / 103, which is that mask's
-// reading — the reference's air of those 227 metres included. Any air this world
-// then puts in front of it is the same air counted twice. The distance term now
-// declines to do it (its path has its origin at that plane: AIR_PATH_ORIGIN),
-// and what is left over the reference is 4 / 14 / 30, ALL of it the low haze's
-// ceiling -- which is no longer a choice either: D-L8-1 took it from 0.13, "a
-// little past the last window E-LUCE2 fitted", to the haze AT that window on
-// that window's own ray, and this plane is where those two thousandths are worth
-// four levels of blue. The note that stood here gave 37 of
-// the 45 levels of blue to the distance and 8 to the ceiling; it read them with
-// THE PIGMENT AT ZERO, where a ceiling that MIXES replaces nothing and looks
-// cheap. Over the rock in shadow it replaces a blue of 0.104 with a fog of
-// 0.895. The owners were right; the sizes were the wrong way round.
+// WHAT IT BOUGHT AND WHAT IT COST, both measured: rms on the three planes
+// 12.79 -> 6.42, the near flank exactly on its mask, and the blue of every class
+// on the floor -- see the ceiling check above, which is the same fact from the
+// other end.
+//
+// IT IS AN AT_TODAY *AND* A TARGET NOW, and the two gates say different things.
+// The AT_TODAY is drift: a change to the palette, to the air, to the seat or to
+// the grade that moves one of these shows up as a number instead of as a mood.
+// The TARGET is the reference itself, in L* C* h, which is the language the
+// client's eye is nearest to.
+//
+// AND THE HUE IS NOT GATED AT FOUR, WHICH IS SAID OUT LOUD RATHER THAN QUIETLY.
+// L* and C* land inside four on all three planes. The hue does not: 8.2 degrees
+// at the near flank and 9.9 at the middle crest, and NEITHER is the palette's to
+// close -- at the near flank the plane sits exactly on the reference in levels
+// (0 / +2 / -1) and eight degrees of hue at chroma 12 is what two levels of
+// green ARE; at the middle crest the residual is the air's shape, which D-L8-3
+// left at A on purpose (a steeper exponent buys it and pays with the depth of
+// the far half). So the hue is gated where this desk can hold it, at eleven, and
+// the number is printed so that a change shows.
 //
 // THE PLANES ARE R6 §2.3's OWN WINDOWS, at the distance and height the delivered
 // cornice puts them at: the near flank at 227 m and 21 m up, which is where R6's
 // 4.84-degree window falls on the front this world builds; the middle crest at
 // the 400 m and 10 m guard-aria asks its pair at; the pale veil at 1550 m and
-// 45 m. The reference's near flank has TWO readings fourteen L* apart — R6's
-// window (34 / 74 / 92) and U-CORNICE-2's class mask (74 / 104 / 103) — and the
-// second is the one the palette was solved against, so it is the one printed.
+// 45 m. The reference's near flank has TWO readings fourteen L* apart -- R6's
+// window (34 / 74 / 92) and U-CORNICE-2's class mask (74 / 104 / 103) -- and the
+// second is the one the palette is solved against, so it is the one gated.
 // --------------------------------------------------------------------------
 const AIR_PLANES = [
-  { what: 'near flank', d: 227, h: 21, reference: [74, 104, 103], today: [79, 118, 133] },
-  { what: 'middle crest', d: 400, h: 10, reference: [83, 139, 180], today: [88, 136, 184] },
-  { what: 'pale veil', d: 1550, h: 45, reference: [149, 187, 213], today: [134, 179, 210] },
+  { what: 'near flank', d: 227, h: 21, reference: [74, 104, 103], today: [74, 106, 102] },
+  { what: 'middle crest', d: 400, h: 10, reference: [83, 139, 180], today: [84, 132, 181] },
+  { what: 'pale veil', d: 1550, h: 45, reference: [149, 187, 213], today: [134, 178, 210] },
 ];
 const AIR_DRIFT = 2;
+/** L* and C* against the reference, per plane. The hue has its own, wider, band. */
+const LC_BAND = 4;
+const HUE_BAND = 11;
+
+// CIELAB, HERE AND NOT IMPORTED. guard-pietra exports the same twelve lines, but
+// a guard is a SCRIPT: importing it would run it, and a guard that runs another
+// guard to borrow a helper reports twice and fails twice. Twelve lines of a
+// published colour space are the cheaper of the two.
+const toLinear = (v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+function lch(rgb255) {
+  const [r, g, b] = rgb255.map((v) => toLinear(v / 255));
+  const x = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047;
+  const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  const z = (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883;
+  const f = (t) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+  const a = 500 * (f(x) - f(y));
+  const bb = 200 * (f(y) - f(z));
+  return { L: 116 * f(y) - 16, C: Math.hypot(a, bb), h: (Math.atan2(bb, a) / DEG + 360) % 360 };
+}
+/** How far one reading stands from another, in the three numbers the eye reads. */
+function apart(got, want) {
+  const a = lch(got); const b = lch(want);
+  return { dL: a.L - b.L, dC: a.C - b.C, dh: Math.abs(((a.h - b.h + 540) % 360) - 180) };
+}
 
 /**
  * The two terms of src/world/air.js in this language, over one pigment.
@@ -881,27 +950,187 @@ function veiled(radiance, distance, height) {
 
 const develop = await renderChain();
 const airMisses = [];
+const planeReadings = [];
 report.line('');
 for (const plane of AIR_PLANES) {
   const got = develop(veiled(PAL[SHADE.ROCK_SHADE], plane.d, plane.h)).map(Math.round);
   const drift = got.map((v, c) => v - plane.today[c]);
-  if (drift.some((v) => Math.abs(v) > AIR_DRIFT)) {
-    airMisses.push(`${plane.what} ${got.join('/')} against ${plane.today.join('/')}`);
-  }
-  report.check(drift.every((v) => Math.abs(v) <= AIR_DRIFT),
+  const off = apart(got, plane.reference);
+  planeReadings.push({ plane, got, off });
+  const held = drift.every((v) => Math.abs(v) <= AIR_DRIFT)
+    && Math.abs(off.dL) <= LC_BAND && Math.abs(off.dC) <= LC_BAND && off.dh <= HUE_BAND;
+  if (!held) airMisses.push(`${plane.what} ${got.join('/')} against ${plane.today.join('/')}`);
+  report.check(held,
     `the rock in shadow through the air at the ${plane.what}, ${plane.d} m out and ${plane.h} m up`,
     `${got.join(' / ')} (AT_TODAY ${plane.today.join(' / ')}); the reference reads `
     + `${plane.reference.join(' / ')}, so it is `
-    + `${got.map((v, c) => (v > plane.reference[c] ? '+' : '') + (v - plane.reference[c])).join(' / ')}`);
+    + `${got.map((v, c) => (v > plane.reference[c] ? '+' : '') + (v - plane.reference[c])).join(' / ')}`
+    + ` = dL* ${off.dL.toFixed(1)} dC* ${off.dC.toFixed(1)} dh ${off.dh.toFixed(1)} deg`);
 }
-report.line('  the near flank is over on all three and no palette reaches it FROM HERE, because the '
-  + 'palette IS its reading: U-CORNICE-2 solved the rock');
-report.line('  in shadow with the air off against that very mask, so the pigment develops to '
-  + '74 / 104 / 103 exactly, and every metre of air this world adds');
-report.line('  is the air of the reference counted a second time. The distance term declines to add '
-  + 'it; the 4 / 14 / 30 left over is ALL the low haze');
-report.line('  ceiling, which is E-LUCE2 and frozen. Closing it means re-solving the palette WITH '
-  + 'the air in front of it. Owner: the coordinator, D-L8-1');
+report.line('  the three planes are what the six radiances are SOLVED on, with the air in front of '
+  + 'them (D-L8-2 = B): the rock in shadow on all');
+report.line('  three at once, the lit rock and the lit grass on the class masks of U-CORNICE-2 at '
+  + 'the near plane. rms on the three planes 12.79 -> 6.42.');
+report.line('  What is left is the pale veil, fifteen levels short on the red: that is D-L8-3, left '
+  + 'at A on purpose, and it belongs to the air and not');
+report.line('  to the palette -- at every ceiling, zero included, the same fifteen levels stand '
+  + 'there (the table of D-L8-1). Owner: src/world/air.js.');
+
+// --------------------------------------------------------------------------
+// 6b. THE LAKE, WHICH WAS THE SKY COUNTED TWICE.
+//
+// R6 §2.5 solved the water by INVERTING the reference's own lake pixel -- «colore
+// invertito dal target, lin 0,0245 / 0,163 / 0,169» -- and that reading is the
+// water WITH the sky already reflected in it. `uSkyShare` then put another
+// twenty-eight per cent of this sky on top of it. It is D-L8-2's defect in the
+// other half of the file, and it measures the same way: at 268 m the sky the
+// water reflects develops to 134 / 185 / 219, so twenty-eight per cent of it
+// plus the haze's ceiling puts the lake at 72 / 132 / 173 WITH BLACK WATER
+// UNDERNEATH -- forty-seven levels of blue over the reference, with nothing left
+// to take away. A share no pigment can survive is a share that is wrong.
+//
+// WHAT THE TARGET IS, AND WHY IT IS NOT THE TWO NUMBERS R6 PUBLISHES. R6's own
+// lake windows cannot be reproduced from the picture by any window convention
+// this desk could find (centred at r=10 they read 92/148/166 where R6 publishes
+// 70/128/133; R6's own column arms, water-classified, read 78/139/168), and the
+// lake is the ONE row of R6 §2.3 whose rgb and whose L*C*h disagree -- 70/128/133
+// is chroma 20 and R6 writes 28. What IS reproducible is the like-for-like
+// comparison: the reference, with its corner shading divided out, read in the
+// exact mask of OUR lake -- the same 3.571 pixels, the same metric, no window to
+// guess. That is 80.1 / 124.2 / 127.8 = L* 49.2 C* 15.7 h 205, and it agrees with
+// R6's published pair on the two numbers that matter (L* 48.1, h 202) and parts
+// from it only on the red. The mask itself is in the unit's bench, built as the
+// INTERSECTION of two shots that fail in opposite directions: the water turned
+// up bright (which also catches the bloom halo it lays on the shore) and the
+// water taken away altogether.
+//
+// AND THE SHARE IS NOT IDENTIFIABLE FROM THE PICTURE, which is said out loud.
+// Between 200 and 500 m the reflected sky moves less than a degree and a half of
+// elevation, so every share below six per cent delivers the SAME three numbers
+// once the water is re-solved under it. What decides it is therefore not the
+// fit: it is that the water must keep a pigment of its own on every channel, so
+// that an hour which moves the sky moves the lake with it instead of replacing
+// it. Five per cent is the largest share at which the solved water still has
+// blue of its own (0.0164); at six it is 0.0000 and the sky carries all of it
+// again.
+// --------------------------------------------------------------------------
+const SKY_JSON = readJson('assets-src/sky/sky.json');
+const DAY_BEND = rampBend(SKY_JSON.day.ramp);
+/** The lake's fragment in this language: mix(uWater, sky, share), then the air. */
+function lakeAt(distance, share = SPEC.palette.skyShare, water = SPEC.palette.water) {
+  const el = Math.atan2(POSE_VOX_DAY.position.y - WATER, distance);
+  const sky = rampRadiance(SKY_JSON.day,
+    [Math.cos(el), Math.sin(el), 0], [0, 0, 0], 1, DAY_BEND);
+  const mixed = water.map((v, c) => v + (sky[c] - v) * share);
+  return develop(veiled(mixed, distance, WATER)).map(Math.round);
+}
+/** Where the lake is measured: the pixel-weighted middle of its own mask. */
+const LAKE_AT = 268;
+const LAKE_REFERENCE = [80.1, 124.2, 127.8];
+const LAKE_TODAY = [80, 124, 128];
+const lakeGot = lakeAt(LAKE_AT);
+const lakeOff = apart(lakeGot, LAKE_REFERENCE);
+const lakeDrift = lakeGot.map((v, c) => v - LAKE_TODAY[c]);
+report.line('');
+report.check(lakeDrift.every((v) => Math.abs(v) <= AIR_DRIFT)
+  && Math.abs(lakeOff.dL) <= LC_BAND && Math.abs(lakeOff.dC) <= LC_BAND && lakeOff.dh <= HUE_BAND,
+  `the lake through the air at ${LAKE_AT} m, where the middle of its own mask stands`,
+  `${lakeGot.join(' / ')} (AT_TODAY ${LAKE_TODAY.join(' / ')}); the reference in the same pixels `
+  + `reads ${LAKE_REFERENCE.join(' / ')}, so it is dL* ${lakeOff.dL.toFixed(1)} `
+  + `dC* ${lakeOff.dC.toFixed(1)} dh ${lakeOff.dh.toFixed(1)} deg, on water `
+  + `[${SPEC.palette.water.map((v) => v.toFixed(4)).join(', ')}] at ${SPEC.palette.skyShare} of sky`);
+
+// AND THE SHARE HAS A CEILING THE REFERENCE SETS, which is the check that keeps
+// the sky from being counted twice again. With the water at nought the lake is
+// the reflected sky and the haze alone: if THAT is already over the reference,
+// no water can bring it back, and the share is wrong whatever is written under
+// it.
+const bareLake = (share) => lakeAt(LAKE_AT, share, [0, 0, 0]);
+const floorNow = bareLake(SPEC.palette.skyShare);
+report.check(floorNow.every((v, c) => v <= LAKE_REFERENCE[c] + 1),
+  'and the share is under the ceiling the reference sets: black water still reaches it',
+  `with the water at nought the lake reads ${floorNow.join(' / ')} against `
+  + `${LAKE_REFERENCE.map((v) => v.toFixed(0)).join(' / ')}; at the 0.28 that shipped before it `
+  + `read ${bareLake(0.28).join(' / ')}, which no pigment can come back from`);
+
+// --------------------------------------------------------------------------
+// 6c. THE FOUR CROWNS STAND WHERE A MEASUREMENT PUTS THEM, NOT WHERE AN AIR DID.
+//
+// R6 §1 is explicit about how it reached 250 / 400 / 820 / 1550 m: «le distanze
+// assolute delle colline del target non sono nel quadro: le fissano il pelo
+// dell'acqua e la riva lontana a −2,3° → piede della collina vicina a ~160 m; DA
+// LI' LE ALTRE PER FRAZIONE D'ARIA». The first is geometry. The other three came
+// from the air of E-LUCE4 -- an air that U-LUCE-6, U-LUCE-7 and U-LUCE-8 have
+// since rebuilt three times, the last of them retiring the very term the
+// fractions were read off. A distance that hangs from a retired law hangs from
+// nothing, so U-CORNICE-4 re-anchored all four to measurements that never touch
+// the air. THREE of them, and they agree.
+//
+//  1. THE APPARENT CUBE. R6 §2.2 measured the reference's own hills and found
+//     the same apparent cube on every plane, 5-8 px = 0.25-0.40 deg, «s(D) =
+//     D·tan 0,30° = D/190». Each ring's cube is a delivered number, so the
+//     distance at which that cube has the measured apparent size is DETERMINED:
+//     D = 190·s. The four crowns land inside ten per cent of it -- 1.2, 5.3, 7.9
+//     and 2.0 -- with every apparent size between 0.279 and 0.298 deg, the middle
+//     of R6's band. (The law itself is already gated at 360 bearings in section
+//     3; this is the same law asked of the four RADII, which is the thing R6 §1
+//     could not anchor.)
+//
+//  2. THE SHORE. The near crown's own profile, exp(-2.2 t^2) inward, falls to a
+//     hundredth of its height at 160 m -- which is R6's geometric anchor to the
+//     metre, and it was never fitted to it.
+//
+//  3. THE PARALLAX, measured on the frame and carried here as numbers. Two shots
+//     five metres apart at the fitted pose, correlated inside the hills' own
+//     mask: the right flank moves 32.5 px at rows 470-560 and 29.5 px at 350-470
+//     (rms 3.7 and 6.9 px), which is 188 and 207 m; the gap between 04 and 05
+//     moves 16.5 px (rms 4.0), which is 370 m. The left flank gives no
+//     correlation at all -- rms 52 to 67 px -- because it is in shadow and has no
+//     grain to correlate, exactly as R6 §2.2 found on the reference. Each
+//     measured distance has to fall between its crown's own foot and its crest,
+//     which is the only place the visible face of a dome can be.
+// --------------------------------------------------------------------------
+const CUBE_ANCHOR_BAND = 0.10;
+const anchoredCrowns = SPEC.ridges.map((r, k) => ({
+  radius: r.radius,
+  want: SPEC.cubePerMetre * SPEC.rings.cubes[k],
+  degrees: Math.atan2(SPEC.rings.cubes[k], r.radius) / DEG,
+}));
+const anchorOut = anchoredCrowns.filter((a) => Math.abs(a.radius / a.want - 1) > CUBE_ANCHOR_BAND);
+report.check(anchorOut.length === 0,
+  'and the four crowns stand where the apparent cube puts them, not where an air did',
+  anchorOut.length
+    ? anchorOut.map((a) => `${a.radius} m against ${a.want.toFixed(0)}`).join('; ')
+    : `${anchoredCrowns.map((a) => `${a.radius}/${a.want.toFixed(0)}`).join('  ')}`
+      + '  (m delivered over m anchored, worst '
+      + `${(Math.max(...anchoredCrowns.map((a) => Math.abs(a.radius / a.want - 1))) * 100).toFixed(1)}%; `
+      + `apparent ${Math.min(...anchoredCrowns.map((a) => a.degrees)).toFixed(3)} to `
+      + `${Math.max(...anchoredCrowns.map((a) => a.degrees)).toFixed(3)} deg against R6's 0.25-0.40)`);
+
+/** Where a crown's dome has fallen to a hundredth of its height, going inward. */
+const footOf = (r) => r.radius - Math.sqrt(-Math.log(0.01) / 2.2) * r.widthIn;
+const SHORE_ANCHOR = 160;
+report.check(Math.abs(footOf(SPEC.ridges[0]) - SHORE_ANCHOR) < 16,
+  'and the near crown\'s foot is where the reference\'s own far shore puts it',
+  `it falls to a hundredth of its height at ${footOf(SPEC.ridges[0]).toFixed(0)} m, against the `
+  + `~${SHORE_ANCHOR} m R6 §1 derives from the water at -4.74 m and the far shore at -2.3 deg`);
+
+/** The frame's own parallax, with the pose and the residual it was measured at. */
+const PARALLAX = [
+  { what: 'right flank, rows 470-560', metres: 188, rms: 3.7, crown: 0 },
+  { what: 'right flank, rows 350-470', metres: 207, rms: 6.9, crown: 0 },
+  { what: 'the gap 04-05, rows 500-565', metres: 370, rms: 4.0, crown: 1 },
+];
+const parallaxOut = PARALLAX.filter((q) => {
+  const r = SPEC.ridges[q.crown];
+  return q.metres < footOf(r) || q.metres > r.radius;
+});
+report.check(parallaxOut.length === 0,
+  'and a five metre step moves each of them by what its own distance says it should',
+  parallaxOut.length
+    ? parallaxOut.map((q) => `${q.what} reads ${q.metres} m, outside crown ${q.crown}`).join('; ')
+    : PARALLAX.map((q) => `${q.what} ${q.metres} m (rms ${q.rms} px), inside crown ${q.crown} `
+      + `[${footOf(SPEC.ridges[q.crown]).toFixed(0)}, ${SPEC.ridges[q.crown].radius}]`).join('  --  '));
 
 // --------------------------------------------------------------------------
 // 7. THE CONTRACT V7 IS OWED IS ANSWERED, ON REAL TREADS.
@@ -1144,8 +1373,84 @@ if (process.argv.includes('--self')) {
       caught: (() => {
         const p = palette().map((c) => c.slice());
         p[SHADE.ROCK_SHADE] = p[SHADE.ROCK_LIT].map((v) => v * 1.4);
-        return !p[SHADE.ROCK_SHADE].every((v, c) => v < p[SHADE.ROCK_LIT][c]);
+        return !p[SHADE.ROCK_SHADE].every((v, c) => v <= p[SHADE.ROCK_LIT][c]);
       })(),
+    },
+    {
+      // THE CHANNEL THE OLD STRICT TEST WOULD HAVE MISSED IF IT HAD BEEN
+      // LOOSENED CARELESSLY. Two noughts are allowed to tie; a shadow that is
+      // bluer than a flank WHICH STILL HAS BLUE is the inversion the reference
+      // does not have, and it has to keep failing.
+      what: 'a shadow bluer than the flank it belongs to, where the flank still has blue to spare',
+      caught: (() => {
+        const p = palette().map((c) => c.slice());
+        p[SHADE.ROCK_SHADE][2] = p[SHADE.ROCK_LIT][2] * 1.5;
+        return !(p[SHADE.ROCK_SHADE].every((v, c) => v <= p[SHADE.ROCK_LIT][c])
+          && p[SHADE.ROCK_SHADE].every((v, c) => (p[SHADE.ROCK_LIT][c] > 0
+            ? v < p[SHADE.ROCK_LIT][c] : true)));
+      })(),
+    },
+    {
+      what: 'and the six that ship keep the shadow under its flank on every channel',
+      caught: under(SHADE.GRASS_SHADE, SHADE.GRASS_LIT) && under(SHADE.ROCK_SHADE, SHADE.ROCK_LIT),
+    },
+    {
+      // THE DEFECT IN ITS OWN SHAPE: the share this unit found, put back.
+      what: 'the sky counted twice on the water again, at the 0.28 that shipped before',
+      caught: !bareLake(0.28).every((v, c) => v <= LAKE_REFERENCE[c] + 1),
+    },
+    {
+      what: 'and the share that ships leaves the water something to be',
+      caught: floorNow.every((v, c) => v <= LAKE_REFERENCE[c] + 1),
+    },
+    {
+      what: 'the water solved on the reference\'s own lake pixel, sky and all, as R6 inverted it',
+      caught: (() => {
+        const got = lakeAt(LAKE_AT, 0.28, [0.0245, 0.1629, 0.1687]);
+        const off = apart(got, LAKE_REFERENCE);
+        return Math.abs(off.dL) > LC_BAND || Math.abs(off.dC) > LC_BAND || off.dh > HUE_BAND;
+      })(),
+    },
+    {
+      what: 'and the water that ships lands on the reference read in its own mask',
+      caught: Math.abs(lakeOff.dL) <= LC_BAND && Math.abs(lakeOff.dC) <= LC_BAND
+        && lakeOff.dh <= HUE_BAND,
+    },
+    {
+      // A CROWN PUT WHERE AN AIR FRACTION WOULD PUT IT rather than where its own
+      // cube is seen: the middle crest at the frontier of its ring, which is the
+      // kind of number a fraction of haze produces and a cube never does.
+      what: 'a crown moved off the apparent cube that fixes it',
+      caught: (() => {
+        const moved = JSON.parse(JSON.stringify(SPEC));
+        moved.ridges[1].radius = 575;
+        return moved.ridges.some((r, k) => Math.abs(
+          r.radius / (moved.cubePerMetre * moved.rings.cubes[k]) - 1) > CUBE_ANCHOR_BAND);
+      })(),
+    },
+    {
+      what: 'and the four that ship stand inside a tenth of it',
+      caught: anchorOut.length === 0,
+    },
+    {
+      what: 'the near crown steepened until its foot leaves the reference\'s far shore',
+      caught: Math.abs(footOf({ ...SPEC.ridges[0], widthIn: 30 }) - SHORE_ANCHOR) >= 16,
+    },
+    {
+      what: 'and the near crown that ships wades in where the reference\'s water ends',
+      caught: Math.abs(footOf(SPEC.ridges[0]) - SHORE_ANCHOR) < 16,
+    },
+    {
+      what: 'a crown pushed past the parallax the frame measured on its own face',
+      caught: (() => {
+        const moved = { ...SPEC.ridges[0], radius: 420, widthIn: 62 };
+        return PARALLAX.filter((q) => q.crown === 0)
+          .some((q) => q.metres < footOf(moved) || q.metres > moved.radius);
+      })(),
+    },
+    {
+      what: 'and every distance the frame measured falls on the crown it belongs to',
+      caught: parallaxOut.length === 0,
     },
     {
       what: 'the water laid as a disc again, reaching under the meadow that hides it',
