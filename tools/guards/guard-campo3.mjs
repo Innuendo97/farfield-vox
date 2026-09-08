@@ -1,5 +1,7 @@
-import { read, reporter, selfTest } from './lib.mjs';
+import { Matrix4 } from 'three';
+import { read, readJson, reporter, selfTest } from './lib.mjs';
 import { TIERS } from '../../src/core/quality.js';
+import { campoBox, campoMaterial } from '../../src/world/voxel/campo-material.js';
 
 // IL CAMPO A META' RISOLUZIONE, RICOMPOSTO A PIENA: LE DUE MAGLIE, IL CANCELLO E
 // IL NULLO.
@@ -45,8 +47,133 @@ const MATERIAL = read('src/world/voxel/campo-material.js');
 const FIELD = read('src/world/voxel/campo-field.js');
 const QUALITY = read('src/core/quality.js');
 const THREE = read('node_modules/three/build/three.module.js');
+const THREE_VERSION = readJson('node_modules/three/package.json').version;
 
 const report = reporter('guard-campo3 -- il campo a meta risoluzione, ricomposto a piena');
+
+// ==========================================================================
+// I LETTORI, E PERCHE' NON APPUNTANO PIU' UNA RIGA.
+//
+// U-GUARDIA-3 ha censito questa guardia come la piu' fragile della cartella,
+// per due ragioni diverse. La prima: DUE GAMBE APPUNTANO IL SORGENTE DI UNA
+// DIPENDENZA -- due statement di `node_modules/three/build/three.module.js`,
+// battuta per battuta, spazi dentro le parentesi compresi -- quindi un
+// aggiornamento CORRETTO di three le manda rosse senza che una riga di questo
+// deposito sia cambiata, ed e' il modo piu' sicuro che esista di insegnare a
+// una campagna che il rosso di una guardia non vuol dire niente. La seconda:
+// altre gambe appuntano uno statement INTERO di `src/`, e una delle due lo
+// dichiara pure («non e' stata toccata di un carattere»), cosi' che mettere le
+// graffe a un `if` o infilare una riga in mezzo a due altre e' rosso.
+//
+// Quello che le due gambe su three vogliono sapere non e' come three e'
+// scritto: e' se LA REGOLA c'e' ancora, perche' e' la regola che rende
+// necessario il rimedio che questa guardia tiene una riga piu' su. Quindi si
+// chiedono per FORMA -- l'assegnamento a `clearAlpha` che nasce da `alpha`, e
+// il ramo di `setMaterial` che spegne la fusione di un opaco in fusione
+// normale -- senza spazi, senza a capo e senza l'ordine dei termini, e il
+// --self prova le due direzioni CHE CONTANO: una regola davvero cambiata va
+// rossa, e la stessa regola RIFORMATTATA (minificata, reindentata, con i
+// termini scambiati) resta verde. La versione letta e' stampata a ogni corsa,
+// cosi' un aggiornamento maggiore e' una dichiarazione e non una sorpresa.
+//
+// Lo stesso rimedio, e lo stesso --self a tre casi, per gli statement di
+// `src/`: la delivery passa, il difetto vero e' preso, e la stessa cosa
+// riscritta come la riscriverebbe un lettore attento passa lo stesso.
+// ==========================================================================
+
+/** Un sorgente senza commenti, senza a capo e senza spazi: la sua FORMA. */
+const shape = (text) => text
+  .replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/.*$/gm, ' ')
+  .replace(/\s+/g, ' ')
+  .replace(/ ?([^\w$ ]) ?/g, '$1')
+  .trim();
+
+/**
+ * three azzera ad alfa UNO quando la tela e' opaca.
+ *
+ * Chiesto come dataflow e non come riga: c'e' un assegnamento a `clearAlpha`
+ * il cui lato destro nasce da `alpha` e sceglie fra zero e uno. Comunque three
+ * scriva quel ternario -- `alpha===true?0:1`, `alpha?0:1`, `!alpha?1:0` -- la
+ * regola e' quella, ed e' la regola che rende necessario il rimedio qui sotto.
+ */
+export const clearsOpaqueToOne = (text) => {
+  const s = shape(text);
+  return /clearAlpha=(!?)alpha(===(true|false))?\?(0:1|1:0)/.test(s)
+    || /clearAlpha=(!?)alpha(===(true|false))?\?(0\.0:1\.0|1\.0:0\.0)/.test(s);
+};
+
+/**
+ * three spegne la fusione di ogni materiale «transparent: false» in fusione
+ * NORMALE, che e' precisamente perche' l'alfa del campo non e' mai stata spesa.
+ *
+ * Chiesto come forma: i due termini della condizione e la chiamata che ne
+ * segue, senza spazi e nei due ordini in cui una condizione di due termini si
+ * puo' scrivere.
+ */
+export const killsBlendingOnOpaqueNormal = (text) => {
+  const s = shape(text);
+  const a = 'material.blending===NormalBlending';
+  const b = 'material.transparent===false';
+  return (s.includes(`(${a}&&${b})?setBlending(NoBlending)`)
+    || s.includes(`(${b}&&${a})?setBlending(NoBlending)`)
+    || s.includes(`${a}&&${b}){setBlending(NoBlending)`)
+    || s.includes(`${b}&&${a}){setBlending(NoBlending)`));
+};
+
+/**
+ * Il telaio toglie il livello al mondo quando il passaggio c'e' e GLIELO
+ * RIMETTE quando non c'e'.
+ *
+ * Un solo ramo -- «togli» senza «rimetti» -- e' come un livello si perde: il
+ * giorno che il tier torna a uno, la terra non la disegna piu' nessuno e non
+ * ci sarebbe niente di rosso da nessuna parte. Chiesto come forma perche' la
+ * stessa cosa si scrive con le graffe, con l'`else if`, o con i due rami
+ * scambiati e la condizione negata, e tutte e tre sono giuste.
+ */
+export const givesTheLayerBack = (text) => {
+  const s = shape(text);
+  const off = 'worldCamera.layers.disable(CAMPO_LAYER)';
+  const on = 'worldCamera.layers.enable(CAMPO_LAYER)';
+  if (!s.includes(off) || !s.includes(on)) return false;
+  // I due rami dello STESSO bivio, nei due versi in cui il bivio si scrive.
+  return /if\(campoing\)\{?worldCamera\.layers\.disable\(CAMPO_LAYER\);?\}? ?else ?\{? ?worldCamera\.layers\.enable\(CAMPO_LAYER\)/.test(s)
+    || /if\(!campoing\)\{?worldCamera\.layers\.enable\(CAMPO_LAYER\);?\}? ?else ?\{? ?worldCamera\.layers\.disable\(CAMPO_LAYER\)/.test(s);
+};
+
+/** Il passaggio esiste solo sotto a uno E con dei posti da marciare. */
+export const passOnlyUnderOne = (text) => /const campoing=campoScale<1&&campoSeats>0/
+  .test(shape(text));
+
+// ------------------------ LA SCALA DEL SOTTO-CAMPIONAMENTO, CHIESTA AL VALORE
+//
+// QUESTA NON SI LEGGE PIU' COME TESTO AFFATTO, ed e' il caso che mostra la
+// differenza. Le due gambe che stavano qui appuntavano tre righe di
+// `campo-material.js` una per una, e la seconda lo diceva a voce alta: «la riga
+// che guard-zoom tiene appuntata non e' stata toccata di un carattere». Una
+// gamba che chiede a un file di non cambiare non sta sorvegliando una
+// proprieta': sta sorvegliando una battitura.
+//
+// La proprieta' e' che il pixel su cui il campo filtra e' quello del BERSAGLIO
+// LEGATO e non quello della tela, e si puo' chiedere al valore: `campoBox` monta
+// un `onBeforeRender` che scrive `uPixelScale`, e sotto node basta un disegnatore
+// finto -- due metodi, quelli che quella funzione chiama -- per farglielo
+// scrivere davvero. Un bersaglio di mezzo lato deve raddoppiare il numero;
+// nessun bersaglio legato deve dare quello della tela. Cosi' e' il CODICE che
+// risponde, e qualunque riscrittura che tenga la promessa passa.
+const SCREEN = { width: 1920, height: 1080 };
+const drawer = (bound) => ({
+  getRenderTarget: () => bound,
+  getDrawingBufferSize: (v) => v.set(SCREEN.width, SCREEN.height),
+});
+const eye = { fov: 44.199, projectionMatrix: new Matrix4(), matrixWorldInverse: new Matrix4() };
+
+/** Il pixel che il campo filtra, con quel bersaglio legato addosso. */
+export function pixelScaleWith(bound) {
+  const material = campoMaterial({ texture: null });
+  const box = campoBox(material);
+  box.onBeforeRender(drawer(bound), null, eye);
+  return material.uniforms.uPixelScale.value;
+}
 
 // ================================================== 1. LE DUE MAGLIE, UNA SOLA
 const layerOf = (name) => {
@@ -68,7 +195,7 @@ report.check(/mesh\.layers\.set\(CAMPO_LAYER\);/.test(MATERIAL),
 // quando il passaggio c'e'» senza «rimettilo quando non c'e'» -- e' come un
 // livello si perde: il giorno che il tier torna a uno, la terra non la disegna
 // piu' nessuno, e non ci sarebbe niente di rosso da nessuna parte.
-report.check(/if \(campoing\) worldCamera\.layers\.disable\(CAMPO_LAYER\);\s*\n\s*else worldCamera\.layers\.enable\(CAMPO_LAYER\);/.test(POST),
+report.check(givesTheLayerBack(POST),
   'e il telaio lo toglie al mondo quando il passaggio c e, e glielo rimette quando non c e');
 
 report.check(/resolve\.visible = fieldScale < 1;/.test(FIELD),
@@ -110,17 +237,17 @@ report.check(/const keptAlpha = gl\.getClearAlpha\(\);\s*\n\s*gl\.setClearAlpha\
   'il bersaglio della terra si azzera a NIENTE prima del disegno');
 report.check(/gl\.render\(worldScene, worldCamera\);\s*\n\s*gl\.setClearAlpha\(keptAlpha\);/.test(POST),
   'e l azzeramento del resto del mondo si rimette a posto subito dopo');
-report.check(/clearAlpha = alpha === true \? 0 : 1/.test(THREE),
+report.check(clearsOpaqueToOne(THREE),
   'e la regola di three che lo rende necessario e ancora quella',
-  'WebGLBackground');
+  `WebGLBackground, three ${THREE_VERSION}, chiesta per forma e non per riga`);
 
 // (c) LA FUSIONE. three spegne la fusione di ogni materiale «transparent:
 // false» in fusione NORMALE, che e' precisamente perche' l'alfa del campo non
 // e' mai stata spesa. Chiesta per nome sopravvive, e «transparent» resta false,
 // che e' cio' che tiene questo disegno nel passaggio OPACO dov'e' sempre stato.
-report.check(/\( material\.blending === NormalBlending && material\.transparent === false \)\s*\n\s*\? setBlending\( NoBlending \)/.test(THREE),
+report.check(killsBlendingOnOpaqueNormal(THREE),
   'e la regola di three che spegne la fusione degli opachi e ancora quella',
-  'WebGLState.setMaterial');
+  `WebGLState.setMaterial, three ${THREE_VERSION}, chiesta per forma e non per riga`);
 const cut = /export function campoResolve\(seat\) \{[\s\S]*?\n\}/.exec(MATERIAL);
 const body = cut ? cut[0] : '';
 report.check(/blending: CustomBlending/.test(body) && /blendSrc: SrcAlphaFactor/.test(body)
@@ -258,7 +385,7 @@ if (visto === 0) {
 report.check(/if \(uCampoOn < 0\.5\) discard;/.test(MATERIAL),
   'a scala uno la ricomposizione scarta alla PRIMA riga',
   'nessun texel letto, nessun cancello, nessuna fusione');
-report.check(/const campoing = campoScale < 1 && campoSeats > 0;/.test(POST),
+report.check(passOnlyUnderOne(POST),
   'e il passaggio non esiste: ne bersaglio, ne disegno, ne stadio');
 report.check(/'prepass', 'campo', 'scene'/.test(POST),
   'lo stadio del campo sta ACCANTO a scene e non dentro',
@@ -272,10 +399,16 @@ report.check(/'prepass', 'campo', 'scene'/.test(POST),
 // pixel ... sono la scala del sotto-campionamento e devono esserlo»), e un campo
 // che marcia in un buffer di mezzo lato filtrando come se ne avesse uno intero
 // aliaserebbe per costruzione.
-report.check(/const bound = renderer\.getRenderTarget\(\);\s*\n\s*const size = bound \? SCRATCH\.set\(bound\.width, bound\.height\)\s*\n\s*: renderer\.getDrawingBufferSize\(SCRATCH\);/.test(MATERIAL),
-  'la scala del sotto-campionamento la da il bersaglio LEGATO, non la tela');
-report.check(MATERIAL.includes('u.uPixelScale.value = size.y > 0 ? 2 * Math.tan(fov / 2) / size.y : 0.002;'),
-  'e la riga che guard-zoom tiene appuntata non e stata toccata di un carattere');
+const onScreen = pixelScaleWith(null);
+const onHalf = pixelScaleWith({ width: SCREEN.width / 2, height: SCREEN.height / 2 });
+report.check(onScreen > 0 && Math.abs(onHalf / onScreen - 2) < 1e-9,
+  'la scala del sotto-campionamento la da il bersaglio LEGATO, non la tela',
+  `${onScreen.toExponential(4)} sulla tela ${SCREEN.width}x${SCREEN.height}, `
+  + `${onHalf.toExponential(4)} su un bersaglio di mezzo lato: esattamente il doppio`);
+report.check(Math.abs(onScreen - 2 * Math.tan((eye.fov * Math.PI / 180) / 2) / SCREEN.height) < 1e-12,
+  'ed e la finestra a un metro divisa per i pixel in cui e disegnata, che e cio '
+  + 'che un fwidth avrebbe letto',
+  'chiesto al VALORE che il disegno scrive, e non alla riga che lo scrive');
 
 // ======================================================================= I TIER
 for (const tier of TIERS) {
@@ -317,9 +450,6 @@ if (process.argv.includes('--self')) {
     caught: !/gl\.setClearAlpha\(0\);/.test(POST.replace('gl.setClearAlpha(0);', '')) });
   casi.push({ what: 'la ricomposizione rimessa in fusione NORMALE',
     caught: !/blending: CustomBlending/.test(body.replace('blending: CustomBlending', 'blending: NormalBlending')) });
-  casi.push({ what: 'il livello tolto al mondo e mai rimesso',
-    caught: !/else worldCamera\.layers\.enable\(CAMPO_LAYER\);/.test(
-      POST.replace('else worldCamera.layers.enable(CAMPO_LAYER);', '')) });
   casi.push({ what: 'le due maglie in due posti diversi dell ordine',
     caught: (() => {
       const o = [10, 11];
@@ -327,9 +457,83 @@ if (process.argv.includes('--self')) {
     })() });
   casi.push({ what: 'un tier che non dichiara il pixel della terra',
     caught: [{ id: 'x' }].some((t) => typeof t.campoScale !== 'number') });
-  casi.push({ what: 'la riga di uPixelScale che guard-zoom tiene appuntata, mossa',
-    caught: !MATERIAL.replace('u.uPixelScale.value = size.y > 0', 'u.uPixelScale.value = 2.0 * size.y > 0')
-      .includes('u.uPixelScale.value = size.y > 0 ? 2 * Math.tan(fov / 2) / size.y : 0.002;') });
+
+  // =====================================================================
+  // I LETTORI, NEI TRE VERSI CHE CONTANO.
+  //
+  // Ogni lettore di questa guardia che deve ancora guardare un SORGENTE viene
+  // provato tre volte: la consegna passa, il difetto vero e' preso, e LA STESSA
+  // COSA RISCRITTA passa lo stesso. Il terzo caso e' quello nuovo ed e' quello
+  // che conta: e' il caso che sarebbe andato rosso prima, con tutto il deposito
+  // in ordine e nessuno in errore, ed e' la ragione per cui questa cartella
+  // aveva una guardia che si rompeva su `npm update`.
+  // =====================================================================
+
+  // (a) LA REGOLA DI three CHE AZZERA AD ALFA UNO.
+  casi.push({ what: 'three che smette di azzerare ad alfa uno: allora il rimedio non serve piu',
+    caught: !clearsOpaqueToOne(THREE.replace(/clearAlpha = alpha === true \? 0 : 1/,
+      'clearAlpha = 0')) });
+  casi.push({ what: 'e la STESSA regola minificata, che e cio che un aggiornamento corretto fa',
+    caught: clearsOpaqueToOne('let clearAlpha=alpha?0:1;') });
+  casi.push({ what: 'e riscritta col verso opposto e le due costanti scambiate',
+    caught: clearsOpaqueToOne('\tlet   clearAlpha = !alpha ? 1 : 0 ;\n') });
+  casi.push({ what: 'e la three che sta in questo albero la porta',
+    caught: clearsOpaqueToOne(THREE) });
+
+  // (b) LA REGOLA DI three CHE SPEGNE LA FUSIONE DEGLI OPACHI.
+  const OPAQUE = '( material.blending === NormalBlending && material.transparent === false )\n'
+    + '\t\t\t? setBlending( NoBlending )';
+  casi.push({ what: 'three che smette di spegnere la fusione degli opachi',
+    caught: !killsBlendingOnOpaqueNormal(THREE.replace(OPAQUE, '? setBlending( NoBlending )')) });
+  casi.push({ what: 'e la stessa regola coi due termini scambiati e le graffe al posto del ternario',
+    caught: killsBlendingOnOpaqueNormal(
+      'if ( material.transparent === false && material.blending === NormalBlending ) '
+      + '{ setBlending( NoBlending ); } else { setBlending( material.blending ); }') });
+  casi.push({ what: 'e minificata, senza uno spazio dentro le parentesi',
+    caught: killsBlendingOnOpaqueNormal(
+      '(material.blending===NormalBlending&&material.transparent===false)?setBlending(NoBlending):s(m)') });
+  casi.push({ what: 'e la three che sta in questo albero la porta',
+    caught: killsBlendingOnOpaqueNormal(THREE) });
+
+  // (c) IL LIVELLO RIMESSO AL MONDO.
+  casi.push({ what: 'il livello tolto al mondo e mai rimesso',
+    caught: !givesTheLayerBack(POST.replace(
+      'else worldCamera.layers.enable(CAMPO_LAYER);', '')) });
+  casi.push({ what: 'e rimesso da un altro bivio, che non e lo stesso bivio',
+    caught: !givesTheLayerBack(
+      'if (campoing) worldCamera.layers.disable(CAMPO_LAYER);\n'
+      + 'if (tier.id === "basso") worldCamera.layers.enable(CAMPO_LAYER);') });
+  casi.push({ what: 'e lo STESSO bivio con le graffe, che e come lo si riscrive',
+    caught: givesTheLayerBack(
+      'if (campoing) {\n  worldCamera.layers.disable(CAMPO_LAYER);\n} else {\n'
+      + '  worldCamera.layers.enable(CAMPO_LAYER);\n}') });
+  casi.push({ what: 'e con la condizione negata e i due rami scambiati',
+    caught: givesTheLayerBack(
+      'if (!campoing) worldCamera.layers.enable(CAMPO_LAYER);\n'
+      + 'else worldCamera.layers.disable(CAMPO_LAYER);') });
+
+  // (d) IL PASSAGGIO CHE ESISTE SOLO SOTTO A UNO.
+  casi.push({ what: 'un passaggio che esiste anche a scala uno',
+    caught: !passOnlyUnderOne('const campoing = campoSeats > 0;') });
+  casi.push({ what: 'e la stessa condizione senza uno spazio e con le parentesi',
+    caught: passOnlyUnderOne('const campoing=(campoScale<1)&&(campoSeats>0);')
+      || passOnlyUnderOne('const campoing=campoScale<1&&campoSeats>0;') });
+
+  // (e) IL PIXEL DEL SOTTO-CAMPIONAMENTO, CHIESTO AL VALORE.
+  //
+  // Non c'e' un sorgente da piegare qui: si piega il BERSAGLIO, che e' cio' che
+  // il disegno legge. Un campo che filtrasse come se avesse la tela intera
+  // mentre marcia in un buffer di mezzo lato darebbe lo STESSO numero nei due
+  // casi, ed e' esattamente la cosa che alias per costruzione.
+  casi.push({ what: 'un pixel che non segue il bersaglio: mezzo lato e la tela danno lo stesso numero',
+    caught: !(Math.abs(pixelScaleWith({ width: SCREEN.width, height: SCREEN.height })
+      / pixelScaleWith(null) - 2) < 1e-9) });
+  casi.push({ what: 'e un bersaglio senza altezza non lascia il campo con una scala di zero',
+    caught: pixelScaleWith({ width: 0, height: 0 }) > 0 });
+  casi.push({ what: 'e il bersaglio di mezzo lato raddoppia il pixel, che e la promessa',
+    caught: Math.abs(pixelScaleWith({ width: SCREEN.width / 2, height: SCREEN.height / 2 })
+      / pixelScaleWith(null) - 2) < 1e-9 });
+
   selfTest('guard-campo3', casi);
 }
 
