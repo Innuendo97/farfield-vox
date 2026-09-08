@@ -291,17 +291,48 @@ async function measureTerm(port) {
   let world = null;
   try {
     world = await openWorld({ chromium, port: server.port });
-    const families = await world.page.evaluate(INSTALL);
+    // THE HANDLE IS PUT BACK IF THE PAGE GOES AWAY, AND THE FACT IS CARRIED OUT
+    // OF HERE RATHER THAN SWALLOWED.
+    //
+    // This measurement takes a couple of dozen plates and a minute of wall
+    // clock, and the development server reloads the page whenever a file it
+    // watches moves. On this desk some of those files are SHARED -- node_modules
+    // is one directory for eight worktrees, tools/bin is a junction into a ninth
+    // -- so somebody else's build can reload the page between two plates. The
+    // recorder survives that, being an init script; `window.__zone` does not,
+    // and this guard died once with «cannot read properties of undefined»
+    // instead of saying what had happened.
+    //
+    // So the handle is re-installed when it is not there, and every plate is
+    // taken against a base from the SAME load: if the world came back, the base
+    // is taken again, because a difference between two plates of two different
+    // loads is not a measurement of anything.
+    const install = async () => world.page.evaluate(INSTALL);
+    let families = await install();
     const programs = await world.writes('zoneAt');
-    const base = await plate(world, decoder);
+    let base = await plate(world, decoder);
+    let seen = world.loads();
+    let reloads = 0;
     const readings = [];
     for (const f of families) {
+      // eslint-disable-next-line no-await-in-loop
+      if (world.loads() !== seen) {
+        reloads += 1;
+        seen = world.loads();
+        // eslint-disable-next-line no-await-in-loop
+        families = await install();
+        // eslint-disable-next-line no-await-in-loop
+        base = await plate(world, decoder);
+      }
+      // eslint-disable-next-line no-await-in-loop
       await world.page.evaluate((id) => window.__zone.blind(id), f.id);
+      // eslint-disable-next-line no-await-in-loop
       const blind = await plate(world, decoder);
+      // eslint-disable-next-line no-await-in-loop
       await world.page.evaluate(() => window.__zone.restore());
       readings.push({ ...f, moved: bandDiff(base, blind, [0, 1], MOVED_FLOOR) });
     }
-    return { families, programs, readings, driver: world.driver };
+    return { families, programs, readings, reloads, driver: world.driver };
   } finally {
     if (world) await world.close().catch(() => {});
     await server.stop().catch(() => {});
@@ -506,6 +537,15 @@ async function main() {
       + 'leggere la mappa delle zone passa.');
   } else {
     r.line(`    driver ${term.driver}`);
+    if (term.reloads) {
+      r.note(`il server ha RICARICATO la pagina ${term.reloads} volt${term.reloads === 1 ? 'a' : 'e'} `
+        + 'mentre questo termine si misurava, e la misura e\' stata ripresa da capo (base e '
+        + 'famiglie) dopo ognuna. Non e\' un difetto di questo mondo: e\' un file guardato dal '
+        + 'server che si e\' mosso, e su questa scrivania alcuni di quei file sono CONDIVISI '
+        + '(node_modules e\' una cartella sola per otto alberi, tools/bin e\' una giunzione '
+        + 'verso un nono). Dichiarato perche\' un termine ripreso e\' un termine che ha '
+        + 'aspettato, non uno che ha sbagliato.');
+    }
     for (const reading of term.readings) {
       const was = AT_TODAY[reading.id];
       r.line(`    ${reading.id.padEnd(18)} mappa ${reading.map} px, accecata muove `

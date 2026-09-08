@@ -371,9 +371,29 @@ export async function openWorld({
     if (message.type() === 'error') noise.push(message.text().slice(0, 300));
   });
 
+  // HOW MANY TIMES THE PAGE WENT AWAY UNDER THE GUARD, COUNTED.
+  //
+  // A development server reloads the page whenever a file it watches moves, and
+  // on this desk several of those files are SHARED: node_modules is one
+  // directory for eight worktrees and tools/bin is a junction into a ninth. So
+  // a page a guard is halfway through measuring can be reloaded by somebody
+  // else's build, and everything that guard put on `window` goes with it --
+  // which is exactly how guard-zone died with «cannot read properties of
+  // undefined», its own blinding handle gone out from under it between two
+  // plates, twice in a day and never twice running.
+  //
+  // The recorder survives a reload, being an init script; a handle installed
+  // with page.evaluate does not. This counts the loads, so a guard can ask
+  // whether the world went away under it and say so, instead of failing with a
+  // message about undefined that names neither the cause nor the owner.
+  let loads = 0;
+  page.on('framenavigated', (frame) => { if (frame === page.mainFrame()) loads += 1; });
+
   const world = {
     page,
     noise,
+    /** How many times the page has been loaded since the browser opened. */
+    loads: () => loads,
     width,
     height,
     driver: 'unknown',
