@@ -106,31 +106,167 @@ export const bandaDelCampo = (tune = PIGMENT) => tune.tintCeil / tune.tintFloor;
 // che non e' la sua, e -- peggio -- diventerebbe verde il giorno che qualcuno
 // togliesse le mappe al selciato per farla tacere.
 const sorgente = read('src/world/voxel/material.js');
-const fragment = sorgente.slice(sorgente.indexOf('const FRAGMENT ='),
-  sorgente.indexOf('// THE PAVING: THE MATERIAL OF A CORRIDOR'));
+
+/**
+ * Il corpo del modello che si apre a un nome, dal suo apice al suo compagno.
+ *
+ * IL TAGLIO NON SI PRENDE PIU' SU UNA FRASE DI COMMENTO. Quel che stava qui
+ * finiva il frammento all'indice di «// THE PAVING: THE MATERIAL OF A CORRIDOR»,
+ * cioe' su una riga di PROSA in un file che non e' di questa guardia: chi
+ * riscrive quel commento -- una cosa che nessuno considera un cambiamento --
+ * fa saltare il taglio, e nel modo peggiore possibile, perche' `indexOf`
+ * risponde -1 e `slice(a, -1)` NON e' vuoto: e' quasi tutto il file. La guardia
+ * non diventa rossa, comincia a leggere anche il selciato e a rispondere di
+ * un'altra famiglia.
+ *
+ * Quindi il taglio si prende sul modello stesso, contando gli apici e le
+ * interpolazioni che ci stanno dentro. Una riga di commento riscritta, un
+ * blocco spostato o un secondo materiale aggiunto in fondo al file non lo
+ * muovono, e un modello che non c'e' torna vuoto invece che intero.
+ */
+export function modelloDi(testo, nome) {
+  const apre = testo.indexOf(nome);
+  if (apre < 0) return '';
+  const primo = testo.indexOf('`', apre);
+  if (primo < 0) return '';
+  let annidato = 0;
+  for (let i = primo + 1; i < testo.length; i++) {
+    if (testo[i] === '\\') { i += 1; continue; }
+    if (testo[i] === '$' && testo[i + 1] === '{') { annidato += 1; i += 1; continue; }
+    if (testo[i] === '}' && annidato > 0) { annidato -= 1; continue; }
+    if (testo[i] === '`' && annidato === 0) return testo.slice(primo + 1, i);
+  }
+  return '';
+}
+
+const fragment = modelloDi(sorgente, 'const FRAGMENT');
+
+// =========================================================================
+// COME SI CHIEDE, ADESSO, CHE IL PIGMENTO SIA UNA FUNZIONE DELLA COLONNA.
+//
+// LA DOMANDA NON E' CAMBIATA. Quel che questa guardia difende e' che il
+// pigmento sia una funzione della COLONNA e mai dell'altezza del cubo: una cima
+// e il fianco sotto di lei portano una tinta sola, che e' quel che rende
+// compatta la famiglia chiara e riporta il gradino piu' basso a essere la sola
+// scala d'orientamento.
+//
+// E' LA RISPOSTA CHE ERA SCRITTA MALE. Erano due statement GLSL interi appuntati
+// alla lettera -- `pigmentOf(column.x, column.y)` e `vec2 column = floor(cell.xz
+// * uCellRatio)` -- e ognuno dei due si rompe su una riscrittura CORRETTA del
+// frammento: la variabile rinominata, i due fattori scambiati (`uCellRatio *
+// cell.xz` e' la stessa moltiplicazione), la chiamata spezzata su due righe, uno
+// spazio in piu' dentro le parentesi. Una guardia che va rossa quando il
+// frammento viene riscritto bene insegna a riscriverlo male, ed e' il difetto
+// che U-GUARDIA-3 ha censito qui (residuo 3).
+//
+// Quel che si chiede adesso e' il FLUSSO e non il testo, in quattro passi che
+// non nominano nessun identificatore del frammento:
+//
+//   1. il pigmento e' chiesto UNA volta sola, con DUE argomenti;
+//   2. nessuno dei due argomenti raggiunge l'altezza della cella -- e
+//      «raggiunge» vuol dire che una swizzle di `cell` contiene una y, quindi
+//      `cell.xz` passa e `cell.xyz`, `cell.y` e `cell.zy` no;
+//   3. i due argomenti sono due componenti di UN SOLO nome, e quel nome nasce
+//      da una swizzle di `cell` che non contiene la y: e' la colonna, comunque
+//      la si chiami e comunque sia scritta l'espressione che la fa;
+//   4. ne' lo statement che riceve il pigmento ne' nessuna riassegnazione di
+//      quel nome rimette l'altezza dentro per la porta di servizio.
+//
+// Il passo 3 e' quello che sostituisce i due letterali: al passo del suolo la
+// colonna e' `cell.xz` esatta, al passo del manto e' `cell.xz` per il rapporto
+// fra i due passi (U-ERBA-1), e tutte e due passano perche' quel che si guarda
+// e' da dove viene, non come e' scritta.
+// =========================================================================
+
+/** Il GLSL senza i suoi commenti, che non sono codice e non decidono niente. */
+const senzaCommenti = (glsl) => glsl.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
+
+/** Le swizzle di `cell` che un'espressione nomina. */
+const swizzleDiCella = (expr) => [...expr.matchAll(/\bcell\s*\.\s*([xyzwrgba]+)/g)].map((m) => m[1]);
+
+/** Un'espressione raggiunge la QUOTA: una swizzle di cella che porta la y. */
+const portaLaQuota = (expr) => swizzleDiCella(expr).some((s) => s.includes('y'))
+  || /\bcell\s*\[\s*1\s*\]/.test(expr);
+
+/** Le chiamate a una funzione, con la lista di argomenti bilanciata. */
+function chiamate(glsl, nome) {
+  const trovate = [];
+  const re = new RegExp(`\\b${nome}\\s*\\(`, 'g');
+  let m = re.exec(glsl);
+  while (m) {
+    let profondita = 1;
+    let i = re.lastIndex;
+    while (i < glsl.length && profondita > 0) {
+      if (glsl[i] === '(') profondita += 1;
+      else if (glsl[i] === ')') profondita -= 1;
+      i += 1;
+    }
+    trovate.push({ argomenti: glsl.slice(re.lastIndex, i - 1), da: m.index, a: i });
+    re.lastIndex = i;
+    m = re.exec(glsl);
+  }
+  return trovate;
+}
+
+/** Gli argomenti di primo livello di una lista, che le virgole annidate non tagliano. */
+function argomenti(lista) {
+  const fuori = [];
+  let profondita = 0;
+  let inizio = 0;
+  for (let i = 0; i < lista.length; i++) {
+    const c = lista[i];
+    if (c === '(' || c === '[') profondita += 1;
+    else if (c === ')' || c === ']') profondita -= 1;
+    else if (c === ',' && profondita === 0) { fuori.push(lista.slice(inizio, i)); inizio = i + 1; }
+  }
+  fuori.push(lista.slice(inizio));
+  return fuori.map((v) => v.trim()).filter((v) => v.length > 0);
+}
+
+/** Lo statement in cui un indice cade: fra il separatore prima e il punto e virgola dopo. */
+function statementIntorno(glsl, da, a) {
+  let inizio = da;
+  while (inizio > 0 && !';{}'.includes(glsl[inizio - 1])) inizio -= 1;
+  let fine = a;
+  while (fine < glsl.length && glsl[fine] !== ';') fine += 1;
+  return glsl.slice(inizio, fine);
+}
+
+/** Da che cosa nasce un nome: la parte destra della sua dichiarazione. */
+function nasceDa(glsl, nome) {
+  const re = new RegExp(`\\b(?:vec2|vec3|vec4|ivec2|ivec3|ivec4|float|int)\\s+${nome}\\s*=([^;]*);`);
+  const m = re.exec(glsl);
+  return m ? m[1] : null;
+}
+
+/** Ogni riassegnazione di un nome, come parte destra. */
+function riassegnazioniDi(glsl, nome) {
+  const re = new RegExp(`(?:^|[;{}\\n])\\s*${nome}(?:\\s*\\.\\s*[xyzwrgba]+)?\\s*(?:\\*|\\+|-|/)?=([^;]*);`, 'g');
+  return [...glsl.matchAll(re)].map((m) => m[1]);
+}
 
 /** Il pigmento e' una funzione della COLONNA: la chiamata non porta la quota. */
-// LA DOMANDA NON E' CAMBIATA, LO E' LA FORMA DELLA RISPOSTA. Quel che questa
-// guardia difende e' che il pigmento sia una funzione della COLONNA e mai
-// dell'altezza del cubo: una cima e il fianco sotto di lei portano una tinta
-// sola, che e' quel che rende compatta la famiglia chiara e riporta il gradino
-// piu' basso a essere la sola scala d'orientamento.
-//
-// PERCHE' IL LETTERALE SI E' MOSSO. U-ERBA-1 ha messo nel mondo una quarta
-// famiglia disegnata a META' PASSO -- il manto di fili da 5 cm -- e per lei
-// `cell` non e' piu' la colonna del mondo, e' il cubo da cinque centimetri. Il
-// frammento risolve la colonna a parte (`column`, che e' `cell.xz` per il
-// rapporto fra il passo del materiale e quello del magazzino: uno per il suolo,
-// un mezzo per il manto) e chiede il pigmento a QUELLA. E' la stessa domanda
-// posta bene: al passo del suolo `column` e' `cell.xz` esatta, e il manto
-// disegna il campo del mondo invece di uno suo alla frequenza doppia.
-//
-// Quel che la riga rifiuta e' invariato: l'altezza non entra, in nessuna forma.
-// Il letterale e' PROPOSTO da U-ERBA-1 (verbale, sezione U-ERBA-1).
-export const perColonna = (testo) => /pigmentOf\(column\.x,\s*column\.y\)/.test(testo)
-  && /vec2 column = floor\(cell\.xz \* uCellRatio\)/.test(testo)
-  && !/pigmentOf\([^)]*cell\.y/.test(testo)
-  && !/column\s*[*+]=?\s*cell\.y/.test(testo);
+export function perColonna(testo) {
+  const glsl = senzaCommenti(testo);
+  const chieste = chiamate(glsl, 'pigmentOf');
+  // 1. una chiamata sola, e due argomenti: un terzo argomento e' la quota che
+  //    torna dentro sotto un altro nome.
+  if (chieste.length !== 1) return false;
+  const args = argomenti(chieste[0].argomenti);
+  if (args.length !== 2) return false;
+  // 2. nessuno dei due raggiunge l'altezza.
+  if (args.some(portaLaQuota)) return false;
+  // 3. i due sono due componenti di UN nome, e quel nome nasce dalla cella
+  //    senza la sua y.
+  const basi = args.map((a) => (/^([A-Za-z_]\w*)\s*\.\s*[xyzwrgba]$/.exec(a) || [])[1]);
+  if (!basi[0] || basi[0] !== basi[1]) return false;
+  const nascita = nasceDa(glsl, basi[0]);
+  if (nascita === null || portaLaQuota(nascita)) return false;
+  if (swizzleDiCella(nascita).length === 0) return false;
+  if (riassegnazioniDi(glsl, basi[0]).some(portaLaQuota)) return false;
+  // 4. e lo statement che riceve il pigmento non se la rimette accanto.
+  return !portaLaQuota(statementIntorno(glsl, chieste[0].da, chieste[0].a));
+}
 
 /** I semi stanno in un posto solo: il GLSL li porta dall'oggetto, non a mano. */
 export const semiCondivisi = (glsl, seeds) => Object.values(seeds)
@@ -163,7 +299,52 @@ if (process.argv.includes('--self')) {
     {
       what: 'and one that reaches the height beside the column is caught',
       caught: !perColonna('vec2 column = floor(cell.xz * uCellRatio);\n'
-        + 'vec3 albedo = pigmentOf(column.x, column.y) * f(cell.y);\n pigmentOf(cell.x + cell.y, cell.z)'),
+        + 'vec3 albedo = pigmentOf(column.x, column.y) * f(cell.y);'),
+    },
+    {
+      what: 'and a column BUILT out of the height, which is the same defect one line up',
+      caught: !perColonna('vec2 column = floor(cell.xz * uCellRatio) + cell.y;\n'
+        + 'vec3 albedo = pigmentOf(column.x, column.y);'),
+    },
+    {
+      what: 'and one that gets it back by a later assignment to the column itself',
+      caught: !perColonna('vec2 column = floor(cell.xz * uCellRatio);\n'
+        + 'column += cell.y;\n vec3 albedo = pigmentOf(column.x, column.y);'),
+    },
+    {
+      what: 'and a second call, which is the field drawn twice at two frequencies',
+      caught: !perColonna('vec2 column = floor(cell.xz * uCellRatio);\n'
+        + 'vec3 albedo = pigmentOf(column.x, column.y);\n'
+        + 'vec3 other = pigmentOf(column.y, column.x);'),
+    },
+    {
+      what: 'and a column whose two components come from two different names',
+      caught: !perColonna('vec2 column = floor(cell.xz * uCellRatio);\n'
+        + 'vec2 other = floor(cell.zx);\n'
+        + 'vec3 albedo = pigmentOf(column.x, other.y);'),
+    },
+    {
+      // ------------------------------------------------------------------
+      // E QUESTA E' LA GAMBA PER CUI IL LETTORE E' STATO RISCRITTO: il
+      // frammento riscritto BENE deve continuare a passare. Ognuna di queste
+      // quattro e' una riscrittura che un'unita' potrebbe fare domani senza
+      // toccare la proprieta' -- e ognuna delle quattro faceva rossa la
+      // guardia di ieri, che appuntava i due statement alla lettera.
+      what: 'and a fragment REWRITTEN and not broken still passes: renamed, reordered, wrapped, spaced',
+      caught: perColonna('vec2 xz = floor(cell.xz * uCellRatio);\n'
+          + 'vec3 albedo = pigmentOf(xz.x, xz.y);')
+        && perColonna('vec2 column = floor(uCellRatio * cell.xz);\n'
+          + 'vec3 albedo = pigmentOf(column.x, column.y);')
+        && perColonna('vec2 column = floor(cell.xz * uCellRatio);\n'
+          + 'vec3 albedo = pigmentOf(\n    column.x,\n    column.y\n  );')
+        && perColonna('vec2  column  =  floor( cell.xz  *  uCellRatio ) ;\n'
+          + 'vec3  albedo  =  pigmentOf( column . x , column . y ) ;'),
+    },
+    {
+      what: 'and the comment that used to end the fragment can be rewritten without moving the cut',
+      caught: modelloDi('const FRAGMENT = () => `A ${x} B`;\n// ANY PROSE AT ALL\n'
+        + 'const PAVING = () => `C`;', 'const FRAGMENT') === 'A ${x} B'
+        && modelloDi('const OTHER = 1;', 'const FRAGMENT') === '',
     },
     {
       what: 'a shader carrying its own copy of a seed is caught',
@@ -225,11 +406,28 @@ report.check(semiCondivisi(PIGMENT_GLSL, PIGMENT_SEEDS),
 const SAMPLER_AMMESSI = ['tSheets', 'tShade'];
 const sampler = [...fragment.matchAll(/uniform\s+sampler\w*\s+(\w+)/g)].map((m) => m[1]);
 const estranei = sampler.filter((n) => !SAMPLER_AMMESSI.includes(n));
+// E FIN DOVE ARRIVA QUESTO CENSIMENTO, detto invece che sottinteso. Il modello
+// del prato interpola otto pezzi di GLSL che vivono altrove, e il taglio ne
+// porta il NOME e non il corpo -- come faceva anche il taglio di prima, che
+// arrivava fino al selciato passando sopra gli stessi otto marcatori. Un
+// sampler nascosto dentro uno di quei pezzi non lo vede ne' l'uno ne' l'altro.
+// Ognuno degli otto e' di un'altra sede e ha la sua guardia; quel che manca e'
+// la domanda posta sul GLSL COMPOSTO, che si fa sul programma compilato e non
+// qui sotto node nudo.
+// I pezzi sono le interpolazioni che portano GLSL: un'interpolazione dentro una
+// riga di commento e' un numero stampato nella prosa e non un pezzo di codice.
+const PEZZI = [...new Set(senzaCommenti(fragment).matchAll(/\$\{\s*(\w+)/g))]
+  .map((m) => m[1]);
 report.check(estranei.length === 0,
   'and the only maps the meadow reads are the grain and the mat\'s own shadow',
   estranei.length ? `it also declares ${estranei.join(', ')}`
     : `${sampler.join(', ') || 'none'} -- the field itself is still rebuilt in the fragment `
       + 'from the cube\'s own integer cell, so the greedy fusion keeps the 2.3-3.3x it is worth');
+report.note(`il censimento dei sampler legge il MODELLO del prato e non i ${PEZZI.length} pezzi `
+  + `che interpola (${PEZZI.join(', ')}): quelli portano il nome e non il corpo, come nel taglio `
+  + 'di prima. Un sampler nascosto dentro uno di loro non lo vede questa gamba; si vedrebbe sul '
+  + 'GLSL COMPOSTO, cioe\' sul programma compilato, che non e\' una domanda da node nudo. '
+  + 'Proprietari: le sedi degli otto pezzi, e guard-programmi per il composto.');
 
 // ------------------------------------------------------- la gamba del quadro
 const frame = process.argv.find((a) => a.startsWith('--frame='));
