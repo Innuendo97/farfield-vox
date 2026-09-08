@@ -422,10 +422,37 @@ if (process.argv.includes('--self')) {
       })(),
     },
     {
+      // AND THE FLOOR OF THIS ONE IS A SHARE AND NOT A NUMBER OF VEIL, WHICH IS
+      // A REPAIR AND NOT A LOOSENING.
+      //
+      // It stood at «more than 0.005 of veil», and that number was fitted when
+      // the ceiling was 0.13 -- a little PAST the last window. U-LUCE-8 put the
+      // ceiling ON the last window instead (D-L8-1), and that window is a metre
+      // up with the walking eye at 1.70: a column of forty-two metres barely
+      // enters into a reading taken across seventy centimetres of it, so
+      // thinning the column by two fifths moves the ceiling by 0.0044 -- FOUR
+      // PER CENT of it, and just under a floor written for the other ceiling.
+      // The case went MISS on this delivery with the seat, the law and the
+      // reader all correct, which is a self test failing for arithmetic that
+      // moved under it.
+      //
+      // So the floor is a SHARE of the ceiling: a column thinned by two fifths
+      // has to move it by at least one per cent, and it moves it by four. A
+      // literal moves it by nothing at all, which is the whole claim, and the
+      // share stays true wherever a later unit puts the window.
       what: 'and so does a thinner column, which is the seat other half',
       caught: (() => {
         const thinner = { ...FITTED, scaleHeight: FITTED.scaleHeight * 0.6 };
-        return Math.abs(ceilingFrom(thinner) - DISTANCE.lowCap) > 0.005;
+        return Math.abs(ceilingFrom(thinner) - DISTANCE.lowCap) > 0.01 * DISTANCE.lowCap;
+      })(),
+    },
+    {
+      what: 'and a column thinned to a quarter moves it further, in the same direction',
+      caught: (() => {
+        const quarter = { ...FITTED, scaleHeight: FITTED.scaleHeight * 0.25 };
+        const thinner = { ...FITTED, scaleHeight: FITTED.scaleHeight * 0.6 };
+        return ceilingFrom(quarter) < ceilingFrom(thinner)
+          && ceilingFrom(thinner) < ceilingFrom(FITTED);
       })(),
     },
     {
