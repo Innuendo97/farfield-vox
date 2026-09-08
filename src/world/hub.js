@@ -73,7 +73,16 @@ export function buildHub() {
   // What the quality tier has asked for. It is held here rather than pushed
   // straight through because the tier is chosen before the meadow exists, and a
   // lever set on nothing has to survive until there is something to set it on.
-  const wanted = { grass: null, voxelDiscRadius: null, groundDetail: null };
+  //
+  // AND campoScale IS NAMED HERE FOR A REASON THAT COST THE VISITOR THE WHOLE
+  // MEADOW (E-SUOLO1). It was the one lever of the four that was held and never
+  // REPLAYED: quality.start() runs at src/main.js:373 and the field is built at
+  // :642, so the tier's fraction was always asked for on a world with no field
+  // in it, and nothing carried it across when the field finally arrived. What
+  // that did to the picture is written over setCampoScale below.
+  const wanted = {
+    grass: null, voxelDiscRadius: null, groundDetail: null, campoScale: null,
+  };
 
   /**
    * Builds every layer that has something to build at this arrival and hangs
@@ -99,6 +108,11 @@ export function buildHub() {
       // And how finely the ground is resolved, which travels the same way and
       // is the tier's answer to a machine rather than anybody's taste.
       groundDetail: wanted.groundDetail,
+      // AND WHAT FRACTION OF A SIDE THE GROUND IS MARCHED AT, which travels in
+      // this bag for exactly the same reason and did not until E-SUOLO1. A
+      // field built without it is a field that does not know the frame has
+      // already given it a buffer of its own.
+      campoScale: wanted.campoScale,
     };
     // BUILT FIRST, HUNG SECOND, AND THE GAP BETWEEN THE TWO IS THE POINT.
     //
@@ -209,6 +223,28 @@ export function buildHub() {
      * the tier on the world's half. So this returns what the world ACTUALLY
      * settled on, and the governor hands that same number to the renderer
      * rather than the one it asked for. See applySoft in src/core/quality.js.
+     *
+     * AND HELD, WHICH IS THE HALF THAT WAS MISSING AND IS E-SUOLO1.
+     *
+     * `wanted.campoScale` was written here from the first day and read by
+     * nobody. The tier is settled before the meadow exists, so the number that
+     * reached this seat reached a layer with no field on it -- and the layer
+     * answered back with the number it had been ASKED, having settled nothing.
+     * The governor believed it and told the renderer: the post chain took the
+     * field's own buffer, turned uCampoOn on and dropped CAMPO_LAYER out of the
+     * world's pass, while the recomposition that was supposed to put the ground
+     * back stayed INVISIBLE, because the mesh that carries it is the one thing
+     * that lives on a field that did not exist yet.
+     *
+     * The ground was then drawn every frame into a buffer nothing read, and the
+     * visitor got the sky where the meadow is -- measured on the committente's
+     * own window, 87.7% of the ground band. The guard never saw it because the
+     * FIRST thing a guard does is ask for a tier by hand, which moves the
+     * fraction, which reaches the field the second time round.
+     *
+     * So the number is now replayed onto the field the way the radius and the
+     * ring already were: it travels in raise()'s bag, and the layer answers
+     * with what it is GOING to hold rather than with what it was handed.
      */
     setCampoScale(scale) {
       const settled = soil.setCampoScale ? soil.setCampoScale(scale) : scale;

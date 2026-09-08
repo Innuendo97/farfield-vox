@@ -285,6 +285,24 @@ const layer = {
       }
       layer.campoResFromAddress = wanted.campoRes !== null
         && Number.isFinite(wanted.campoRes);
+      // AND WHERE THE ADDRESS SAYS NOTHING, THE TIER'S OWN FRACTION -- REPLAYED
+      // ONTO A FIELD THAT DID NOT EXIST WHEN THE TIER WAS CHOSEN.
+      //
+      // E-SUOLO1, and it is the whole defect. The governor settles a tier at
+      // src/main.js:373 and this build runs at :642, so setCampoScale below was
+      // always asked first on a layer whose `campo` was null. It answered with
+      // the number it had been handed, the governor believed it, and the post
+      // chain went and took the field's own buffer -- while the mesh that reads
+      // that buffer back into the frame sat here unbuilt and then invisible,
+      // because setScale is the ONLY thing that raises it. The visitor's page
+      // drew the ground into a buffer nobody read and showed the sky instead.
+      //
+      // It travels in the hub's bag beside voxelDiscRadius and groundDetail,
+      // which are the two levers that already knew a tier outlives the world it
+      // was chosen for.
+      if (!layer.campoResFromAddress && Number.isFinite(assets.campoScale)) {
+        layer.campo.setScale(assets.campoScale);
+      }
       layer.campo.start(SPAWN.x, SPAWN.z);
 
       // ---------------------------------------------------------- THE BENCH
@@ -340,9 +358,25 @@ const layer = {
    * written `?campores=` in the bar is holding an arm still while a bench takes
    * two readings of it, and a tier that settled underneath them would move the
    * thing being measured between the two.
+   *
+   * AND BEFORE THERE IS A FIELD AT ALL, THE ANSWER IS WHAT THE FIELD IS GOING
+   * TO BE BUILT AT, WHICH IS NOT THE SAME THING AS THE QUESTION.
+   *
+   * This used to hand `scale` straight back -- an answer about a field that did
+   * not exist, from a layer that had settled nothing -- and that one line is
+   * E-SUOLO1: see the note beside the replay in dress.build above. The two
+   * halves of this lever are only ever safe apart when the frame is drawn
+   * WHOLE, and the frame is not drawn whole on the strength of an answer like
+   * that. Now the bag replays the tier's fraction onto the field the moment it
+   * is built, so the number returned here is one the world will actually hold
+   * -- unless the address has already spoken, in which case it wins here for
+   * the same reason it wins below.
    */
   setCampoScale(scale) {
-    if (!layer.campo) return scale;
+    if (!layer.campo) {
+      const fromAddress = asked().campoRes;
+      return fromAddress !== null && Number.isFinite(fromAddress) ? fromAddress : scale;
+    }
     if (layer.campoResFromAddress) return layer.campo.scale();
     return layer.campo.setScale(scale);
   },
