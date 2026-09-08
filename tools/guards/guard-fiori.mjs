@@ -695,6 +695,37 @@ for (const kind of KINDS) {
     + 'top to nought at the foot');
 }
 
+/**
+ * THE MOST THE HALO'S OWN TERM REACHES ANYWHERE ON A HEAD'S SKIN, per kind.
+ *
+ * Hoisted out of the block below because two legs need it: the one that keeps a
+ * wall inside the bloom's shoulder, and the far family's, which may not paint a
+ * quad brighter, relative to its own mean, than the solid it stands in for.
+ */
+function piuAlto(kind) {
+  const seat = LANT[kind].seat;
+  const r2 = seat.half * seat.half;
+  let top = 0;
+  for (const f of censo.faces[kind]) {
+    if (f.role !== RUOLI.petal && f.role !== RUOLI.floor) continue;
+    const c = f.corners;
+    for (let iy = 0; iy <= 12; iy += 1) {
+      for (let ix = 0; ix <= 12; ix += 1) {
+        const u = ix / 12;
+        const v = iy / 12;
+        const p = [0, 1, 2].map((k) => (c[0][k] * (1 - u) + c[1][k] * u) * (1 - v)
+          + (c[3][k] * (1 - u) + c[2][k] * u) * v);
+        let h = 0;
+        for (const [cx, cz] of seat.xz) {
+          h += r2 / (r2 + (p[0] - cx) ** 2 + (p[1] - seat.y) ** 2 + (p[2] - cz) ** 2);
+        }
+        top = Math.max(top, h);
+      }
+    }
+  }
+  return top;
+}
+
 // AND THE HALO IS THERE, IS WARM, AND DOES NOT GO WHITE.
 //
 // <<Basta un alone che simuli il pistillo illuminato, che si intraveda
@@ -706,38 +737,21 @@ for (const kind of KINDS) {
 // of the same term the near family evaluates, so the exchange ring has no step
 // of warmth in it.
 {
-  report.check(LANT.halo > 0, 'the shell carries a halo and not just the lamp',
-    `${LANT.halo} of the lamp's own pigment, averaged over the head's own skin`);
+  report.check(LANT.halo.bianco > 0 && LANT.halo.ciano > 0,
+    'the shell carries a halo and not just the lamp',
+    `${LANT.halo.bianco} of the lamp's own pigment on a white head and `
+    + `${LANT.halo.ciano} on a blue one, averaged over the head's own skin`);
   // The brightest a shell fragment can be driven to by day: the warm pigment's
   // worst channel, the day's glow, the biggest flower's own multiplier, this
-  // strength, and the most the radial term reaches anywhere on the skin.
-  const alone = (kind) => {
-    const seat = LANT[kind].seat;
-    const r2 = seat.half * seat.half;
-    let top = 0;
-    for (const f of censo.faces[kind]) {
-      if (f.role !== RUOLI.petal && f.role !== RUOLI.floor) continue;
-      const c = f.corners;
-      for (let iy = 0; iy <= 12; iy += 1) {
-        for (let ix = 0; ix <= 12; ix += 1) {
-          const u = ix / 12;
-          const v = iy / 12;
-          const p = [0, 1, 2].map((k) => (c[0][k] * (1 - u) + c[1][k] * u) * (1 - v)
-            + (c[3][k] * (1 - u) + c[2][k] * u) * v);
-          let h = 0;
-          for (const [cx, cz] of seat.xz) {
-            h += r2 / (r2 + (p[0] - cx) ** 2 + (p[1] - seat.y) ** 2 + (p[2] - cz) ** 2);
-          }
-          top = Math.max(top, h);
-        }
-      }
-    }
-    return top;
-  };
+  // strength, and the most the radial term reaches anywhere on the skin. The
+  // last of the five is piuAlto(), hoisted over this block because the far
+  // family's own leg reads the SAME number: a quad may not be driven past, on
+  // its own mean, the solid it stands in for.
+  const alone = piuAlto;
   // AND THE STRENGTH IS PER KIND, DERIVED: the mean asked for, over what the
   // term averages on that kind's own skin. Read here the same way the material
   // is given it, so a session that changed one and not the other goes red.
-  const forza = (kind) => LANT.halo / LANT[kind].haloMean;
+  const forza = (kind) => LANT.halo[kind] / LANT[kind].haloMean;
   const piu = Math.max(...KINDS.map((kind) => alone(kind) * forza(kind)
     * canale(kind === 'ciano' ? cyanPistil : pistil)))
     * LANT.glowDay * GLOW_PER_FIORE;
@@ -775,10 +789,10 @@ for (const kind of KINDS) {
     // AND THE TWO KINDS CARRY THE SAME LIGHT THROUGH THEIR WALLS, which is the
     // normalisation itself and the reason the far family needs no per-kind
     // number: strength times mean is the asked mean, for either flower.
-    report.check(Math.abs(forza(kind) * LANT[kind].haloMean - LANT.halo) < 1e-12,
+    report.check(Math.abs(forza(kind) * LANT[kind].haloMean - LANT.halo[kind]) < 1e-12,
       `and a ${kind} head carries exactly the mean the far quad paints for it`,
       `strength ${forza(kind).toFixed(3)} on a mean of ${LANT[kind].haloMean.toFixed(4)} `
-      + `= ${LANT.halo}`);
+      + `= ${LANT.halo[kind]}`);
   }
   // AND A BLUE HEAD IS STILL A BLUE HEAD, which is the end this number was
   // actually chosen against. Not gated -- it is a reading of a FRAME, and the
@@ -787,6 +801,30 @@ for (const kind of KINDS) {
   report.check(forza('ciano') < forza('bianco'),
     'and the blue head, which carries four lamps, is driven softer than the white',
     `${forza('ciano').toFixed(2)} against ${forza('bianco').toFixed(2)}`);
+
+  // AND THE TWO FAMILIES DO NOT CARRY THE SAME AMOUNT OF IT, WHICH IS D-F7-2 = B.
+  //
+  // The normalisation just above answers four lamps against one and it is not an
+  // answer to the second question: the halo is the LAMP's pigment and the lamp is
+  // warm, so the same mean that merely warms a white head takes the blue out of a
+  // blue one. Probed a metre from a shut head, on its own side wall where no lamp
+  // shows through (fondazione/fiori8/unmetro.mjs), the blue reads a chroma of 3.8
+  // at the white's own halo and its whole head reads B-R 15; at 0.10 the same
+  // wall reads B-R 30, which is the measure the sweep printed below was chosen
+  // on. So the white keeps the number the committente ratified and the blue takes
+  // its own.
+  //
+  // WHAT IS GATED IS THE LAW AND NOT THE LITERAL. The white stays inside the band
+  // its own sweep was read in -- under it the head is E-FIORI4's glass box again,
+  // over it the wall passes the bloom's shoulder -- and the blue is at most half
+  // of it and never nought, because a blue flower is a lantern too.
+  report.check(LANT.halo.bianco >= 0.18 && LANT.halo.bianco <= 0.26,
+    'the white head keeps the halo D-F6 ratified',
+    `${LANT.halo.bianco} inside the 0.18 to 0.26 the sweep was read in`);
+  report.check(LANT.halo.ciano > 0 && LANT.halo.ciano <= LANT.halo.bianco / 2,
+    'and the blue head carries less than half of it, which is D-F7-2 = B',
+    `${LANT.halo.ciano} against the white's ${LANT.halo.bianco}: a blue head under a `
+    + 'white halo reads a chroma of 3.8, a grey cube with a light in it');
 }
 
 // AND THE SHARE THE FAR FAMILY PAINTS IS THE SHARE THE SOLID FILLS. Past the
@@ -1212,6 +1250,180 @@ report.check(Math.abs(lid.L - BERSAGLIO_LID.L) <= 5,
   `L* ${lid.L.toFixed(1)} against ${BERSAGLIO_LID.L}, croma ${lid.C.toFixed(1)} `
   + `against ${BERSAGLIO_LID.C}`);
 
+// AND ITS SIDE IS THE LEVEL THE TARGET'S SIDE IS, WHICH IS WHAT HEAD_SHADE IS.
+//
+// The lid above was already there and it is only half a head: it is the ONE face
+// whose normal is the same in both pictures whatever the sun does, and a flower
+// that landed on it could still be a uniform blob. The other half is the step
+// down to the side -- 67.6 to 50.7 on the target's own specimen at 5.84 m, 16.9
+// levels -- and that step is exactly what HEAD_SHADE in src/world/vegetation.js
+// decides: how much of this world's orientation ladder a head of petals takes.
+//
+// IT IS ASKED THROUGH THE SAME CHAIN AND WITH NO SECOND OPINION ABOUT THE LIGHT.
+// faceColour() is AFFINE in the pair it is handed -- a sun term, a sky term, and
+// the ground's return read off one minus the sky term -- so a pair mixed towards
+// the head's own top face comes out as the same mix of the two COLOURS. The bend
+// is therefore written here without a second copy of faceTerms() and without this
+// file ever holding an opinion about where the sun is:
+//
+//     bent(n, s) = lid + s * (faceColour(n) - lid)
+//
+// The side is the mean of the four flanks, because a head has no bearing of its
+// own: whichever way a walker comes at it, two of the four are what he sees.
+//
+// AND THE FRAME CANNOT HOLD THIS, WHICH IS SAID PLAINLY. On the delivered frame
+// the same step reads 1.8 L* before this session and 5.9 after, because at the
+// size D-F7-1 ratified a head at 5.75 m covers six rows of pixels against the
+// target's nineteen, and the lantern's own maximum sits in the middle of them.
+// The step is a fact about the OBJECT; this is where the object is.
+const BERSAGLIO_FIANCO = { L: 50.7, C: 13.0 };
+const BERSAGLIO_SALTO = 16.9;
+const FIANCHI = [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1]];
+const piegata = (n, ombra) => {
+  const su = faceColour([0, 1, 0], luce, [pale.x, pale.y, pale.z]);
+  const via = faceColour(n, luce, [pale.x, pale.y, pale.z]);
+  return su.map((v, i) => v + (via[i] - v) * ombra);
+};
+const fiancoA = (ombra) => {
+  const q = FIANCHI.map((n) => lab(composite(piegata(n, ombra))));
+  return { L: q.reduce((t, f) => t + f.L, 0) / q.length,
+    C: q.reduce((t, f) => t + f.C, 0) / q.length };
+};
+const fianco = fiancoA(censo.headShade);
+const salto = lid.L - fianco.L;
+report.check(Math.abs(fianco.L - BERSAGLIO_FIANCO.L) <= 5,
+  "and its side is the level the target's side is",
+  `L* ${fianco.L.toFixed(1)} against ${BERSAGLIO_FIANCO.L}, croma ${fianco.C.toFixed(1)} `
+  + `against ${BERSAGLIO_FIANCO.C}, at a bend of ${censo.headShade}`);
+report.check(Math.abs(salto - BERSAGLIO_SALTO) <= 3,
+  "so a head has a face in the light and a face in its own shade, at the target's step",
+  `${salto.toFixed(1)} L* against ${BERSAGLIO_SALTO}; at the 0.34 fitted under the old `
+  + `sun the same chain gives ${(lid.L - fiancoA(0.34).L).toFixed(1)}`);
+// And read as a ratio of encoded luminance, which is the language the note in
+// vegetation.js argues the ladder in: the target climbs 1.97 from its dark face
+// to its bright one, and a head that climbs much more is a stone again.
+const Ylum = (L) => ((L + 16) / 116) ** 3;
+const scala = Ylum(lid.L) / Ylum(fianco.L);
+report.check(scala >= 1.6 && scala <= 2.4,
+  "and the ladder inside one head is the ladder inside the target's own head",
+  `${scala.toFixed(3)} against ${(Ylum(BERSAGLIO_LID.L) / Ylum(BERSAGLIO_FIANCO.L)).toFixed(3)}`);
+
+// ---------------------------------------- the far family, and what it now paints
+//
+// THE QUAD IS NOT ONE COLOUR ANY MORE, AND BOTH OF THE THINGS THAT CHANGED KEEP
+// THE MEAN. Past the exchange ring a head is one quad, and until this session it
+// carried the average of its three faces painted flat and the mean of its own
+// halo painted flat with it. Two facts about the object were lost in those two
+// means: a head has a LID IN THE LIGHT over a side in its own shade, and its
+// lamp is in the MIDDLE of it. Both are now painted, and both are painted so
+// that the quad's TOTAL is exactly what it was -- which is the whole of why the
+// exchange ring does not move. This leg is that arithmetic, checked rather than
+// asserted in a comment: it is the only place a session could put back a step at
+// the ring without a gate seeing it.
+{
+  const nom = censo.head.nominal;
+  // The lamp on the quad, in units of the head's own edge, off the same seats
+  // the solid hangs its lamps on -- lampOnQuad() in vegetation.js, read here
+  // from the census rather than copied.
+  // The depth is the head's own half edge: the lamp is inside the bud and the
+  // wall the eye sees is in front of it, so no point of that wall is ever at
+  // nought from the lamp. It is the term that keeps the quad's middle under the
+  // solid's own brightest pixel, which is the third assertion below.
+  const lampada = (kind) => ({
+    r: LANT[kind].seat.half / nom,
+    off: Math.abs(LANT[kind].seat.xz[0][0]) / nom,
+    z: 0.5,
+  });
+  // The shader's own law, on the plane of the quad. Four seats always: a white
+  // head's four coincide at the centre and the factor of four cancels in the
+  // mean.
+  const forma = (px, py, l) => {
+    const r2 = l.r * l.r;
+    const z2 = l.z * l.z;
+    let t = 0;
+    for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      const dx = px - sx * l.off;
+      const dy = py - sz * l.off;
+      t += r2 / (r2 + z2 + dx * dx + dy * dy);
+    }
+    return t;
+  };
+  const media = (l, N) => {
+    let t = 0;
+    for (let i = 0; i < N; i += 1) {
+      for (let j = 0; j < N; j += 1) {
+        t += forma((i + 0.5) / N - 0.5, (j + 0.5) / N - 0.5, l);
+      }
+    }
+    return t / (N * N);
+  };
+
+  // THE BEARINGS A WALKER CAN TAKE. The quad's side is the head's edge times the
+  // root of the silhouette sum, so the lamp's own seat on it shrinks by the same
+  // root: everything below is checked over the whole range that sum can take at
+  // a walker's eye, not at one convenient angle.
+  let peggioMedia = 0;
+  let peggioFacce = 0;
+  let piuPicco = 0;
+  for (const kind of KINDS) {
+    const l0 = lampada(kind);
+    for (let b = 0; b < 24; b += 1) {
+      const az = (b / 24) * Math.PI / 2;
+      // A unit vector to the eye at a walker's height, thirteen metres out:
+      // the two flanks and the lid, exactly as FAR_VERTEX reads them.
+      for (const alt of [0.03, 0.116, 0.30, 0.70]) {
+        const piano = Math.sqrt(1 - alt * alt);
+        const sh = [Math.abs(Math.sin(az)) * piano, alt, Math.abs(Math.cos(az)) * piano];
+        const area = sh[0] + sh[1] + sh[2];
+        const q = Math.sqrt(area);
+        const l = { r: l0.r / q, off: l0.off / q, z: l0.z / q };
+        // 1. THE MEAN OF THE HALO. The vertex divides by a nine by nine sample of
+        //    the same law; what has to hold is that the sample is the mean, or
+        //    the quad emits a little more or a little less than the solid it
+        //    stands in for and the ring has a step of warmth in it.
+        peggioMedia = Math.max(peggioMedia, Math.abs(media(l, 9) / media(l, 240) - 1));
+        // 2. THE MEAN OF THE TWO FACES. The lid takes the top share.y/area of the
+        //    quad and the side the rest, and the quad has ONE width, so the
+        //    share of the height is the share of the area: stacked, the two come
+        //    to the same weighted average the flat quad painted. Written with the
+        //    three face weights as pure numbers, since the pigment and the light
+        //    are common factors and cancel.
+        const quotaLid = sh[1] / area;
+        const fianchi = sh[0] + sh[2];
+        const pesoFianco = fianchi > 1e-4 ? (sh[0] * 1 + sh[2] * 2) / fianchi : 0;
+        const impilato = quotaLid * 3 + (1 - quotaLid) * pesoFianco;
+        const piatto = (sh[0] * 1 + sh[1] * 3 + sh[2] * 2) / area;
+        peggioFacce = Math.max(peggioFacce, Math.abs(impilato - piatto));
+        // 3. THE PEAK. The quad's brightest point over its own mean, against the
+        //    solid's brightest point over ITS own mean: a quad may be shaped, but
+        //    it may not be driven anywhere the solid on the other side of the
+        //    ring is not already driven, or the ring gets a step the other way.
+        let picco = 0;
+        for (let i = 0; i < 60; i += 1) {
+          for (let j = 0; j < 60; j += 1) {
+            picco = Math.max(picco, forma((i + 0.5) / 60 - 0.5, (j + 0.5) / 60 - 0.5, l));
+          }
+        }
+        piuPicco = Math.max(piuPicco, (picco / media(l, 240))
+          / (piuAlto(kind) / LANT[kind].haloMean));
+      }
+    }
+  }
+  report.check(peggioMedia < 0.01,
+    "the far quad's halo is shaped without changing what it emits",
+    `the nine by nine mean the vertex divides by is within `
+    + `${(peggioMedia * 100).toFixed(2)}% of the true mean, over both kinds and every `
+    + 'bearing a walker can take');
+  report.check(peggioFacce < 1e-12,
+    'and its lid and its side, stacked, come to the average the flat quad painted',
+    `worst departure ${peggioFacce.toExponential(1)} of a face weight: the exchange ring `
+    + 'has no step of colour in it');
+  report.check(piuPicco <= 1,
+    'and the shaped quad is never driven past the solid it stands in for',
+    `brightest over its own mean, ${(piuPicco * 100).toFixed(1)}% of what the solid's own `
+    + 'term reaches on the cup floor');
+}
+
 // -------------------------------------------------------- the contract
 //
 // THE NIGHT READS THIS LIST AND THIS LIST HAS TO BE THE SAME LIST TWICE. V7
@@ -1445,9 +1657,10 @@ if (process.argv.includes('--self')) {
     { what: 'a mean the solid never draws anywhere on its own skin',
       caught: !(2.0 > 0.0356 && 2.0 < 0.2809) },
     { what: 'a strength left unnormalised, so a blue head goes white',
-      caught: !(Math.abs(1 * LANT.ciano.haloMean - LANT.halo) < 1e-12) },
+      caught: !(Math.abs(1 * LANT.ciano.haloMean - LANT.halo.ciano) < 1e-12) },
     { what: 'a blue head driven as hard as a white one',
-      caught: !(LANT.halo / LANT.ciano.haloMean < LANT.halo / LANT.ciano.haloMean) },
+      caught: !((LANT.halo.bianco / LANT.bianco.haloMean)
+        < (LANT.halo.bianco / LANT.bianco.haloMean)) },
     { what: 'a quad painting a share the solid does not fill',
       caught: !(Math.abs(0.28 - LANT.bianco.share) < 0.005) },
     { what: 'a stalk left open on one side',
@@ -1508,6 +1721,31 @@ if (process.argv.includes('--self')) {
       caught: !(1.0 > 2.2 && 1.0 < 3.4) },
     { what: 'a meadow half of it cyan',
       caught: !(1.0 >= 3 && 1.0 <= 12) },
+    // U-FIORI-8: l'alone per famiglia, la testa sotto il sole nuovo, il quad
+    // lontano con la sua faccia. Ognuno di questi passava ogni gate del file
+    // prima di questa sessione.
+    { what: "a white head whose halo has been turned down to the blue's",
+      caught: !(LANT.halo.ciano >= 0.18 && LANT.halo.ciano <= 0.26) },
+    { what: "a blue head handed the white's halo, which is the grey cube of D-F7-2",
+      caught: !(LANT.halo.bianco > 0 && LANT.halo.bianco <= LANT.halo.bianco / 2) },
+    { what: 'a blue head with its lamp walled off, which is not a lantern either',
+      caught: !(0 > 0 && 0 <= LANT.halo.bianco / 2) },
+    { what: 'the bend still at the third fitted under the sun of before U-LUCE-4',
+      caught: !(Math.abs(lid.L - fiancoA(0.34).L - BERSAGLIO_SALTO) <= 3) },
+    { what: "a head taking the whole of this world's ladder, which is a stone again",
+      caught: !(Math.abs(lid.L - fiancoA(1).L - BERSAGLIO_SALTO) <= 3) },
+    { what: 'a head with no bend at all, which is the floating blob of B-LUCE',
+      caught: !(Math.abs(lid.L - fiancoA(0).L - BERSAGLIO_SALTO) <= 3) },
+    { what: "a side ten levels under the target's own side",
+      caught: !(Math.abs((BERSAGLIO_FIANCO.L - 10) - BERSAGLIO_FIANCO.L) <= 5) },
+    { what: "a ladder inside the head three times the target's",
+      caught: !(3 * 1.969 >= 1.6 && 3 * 1.969 <= 2.4) },
+    { what: 'a far quad whose halo is normalised on four samples instead of eighty-one',
+      caught: !(Math.abs(0.06) < 0.01) },
+    { what: 'a far quad whose two faces do not come back to the average it painted',
+      caught: !(Math.abs(0.02) < 1e-12) },
+    { what: 'a far quad driven brighter, on its own mean, than the solid it stands for',
+      caught: !(1.9 <= 1) },
     { what: 'a contract that answers differently twice',
       caught: impronta(campo) !== impronta(campo.slice(1)) },
     { what: 'a signature with a field taken out of it',
