@@ -128,19 +128,29 @@ function ownCacheConfig() {
 /**
  * The server does not hand a world over while it is still rebuilding its cache.
  *
- * AND THIS IS A DEFECT THAT WAS ALREADY THERE, made visible by giving the guard
- * a cache of its own. When the pre-bundled dependencies are rebuilt, the
- * development server tells the page to RELOAD -- and a reload takes with it
- * everything a guard installed on `window`: guard-zone's own blinding handle
- * (`window.__zone`) went with it and the guard died on the next call with
- * «cannot read properties of undefined», measured on a cold cache and never on
- * a warm one. Sharing seven other worktrees' cache had been hiding it by
- * accident, because somebody else had usually warmed it first.
+ * WHEN THE PRE-BUNDLED DEPENDENCIES ARE REBUILT the development server tells
+ * the page to RELOAD, and a reload takes with it everything a guard installed
+ * on `window`: guard-zone's own blinding handle went with it and the guard died
+ * on the next call with «cannot read properties of undefined». So the server
+ * waits for the cache to be WRITTEN AND TO STOP MOVING before it says it is up:
+ * three quarters of a second warm, and cold however long the optimiser needs,
+ * which is time the guard would have paid anyway -- paid before the page exists
+ * instead of underneath it.
  *
- * So the server waits for the cache to be WRITTEN AND TO STOP MOVING before it
- * says it is up. On a warm cache that is three quarters of a second; on a cold
- * one it is however long the optimiser needs, which is time the guard would have
- * paid anyway -- paid before the page exists instead of underneath it.
+ * AND WHAT WAS ACTUALLY MEASURED, because the first version of this comment
+ * claimed more than the bench supports and a number nobody can reproduce is
+ * worse than no number. The failure is INTERMITTENT and it does not need a cold
+ * cache: it was seen twice on a WARM one, inside a full suite, and once in three
+ * runs on a deliberately cold one with this wait switched off -- and not at all
+ * in the runs, cold or warm, with it on. That is a mitigation with a mechanism
+ * behind it and not a proof, and it is written down as one.
+ *
+ * WHAT ACTUALLY MAKES THE MEASUREMENT SAFE IS ONE FLOOR UP. The page can be
+ * reloaded by ANY watched file moving, and on this desk several of those are
+ * shared between eight worktrees, so no wait here can rule it out: openWorld
+ * COUNTS the loads and guard-zone survives one -- it puts its handle back, takes
+ * its base plate again, and says in a NOTE that it did. This wait removes one
+ * cause; that counter answers all of them.
  */
 async function cacheSettled(ms = 90000) {
   const meta = join(GUARD_CACHE, '.vite', 'deps', '_metadata.json');
