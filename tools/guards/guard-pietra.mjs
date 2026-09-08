@@ -538,6 +538,33 @@ export function turfPerHead(specs2, built) {
   return counts;
 }
 
+// ==========================================================================
+// FOUR VERDICTS THAT WERE WRITTEN TWICE, AND ARE NOW WRITTEN ONCE.
+//
+// U-GUARDIA-3's census found in the self test below a handful of cases that
+// were INEQUALITIES EVALUATED BY HAND -- `![0.62, 1.30, 0.58].every(v => v <
+// 1)`, `!(0.125 === 0 && 0.0057 === 0)`, `1.27 > BAND.ruinHeight` -- comparing
+// a number written in the case against a band, and never going through the gate
+// the run uses. They are not blind (a band moved would move them) but they
+// exercise a COPY of the question, so a gate rewritten below leaves them
+// agreeing with the version that has stopped shipping.
+//
+// The four gates are named here, the run calls them, and the self test calls
+// the same four with the defect handed to them as a READING: the moss lighter
+// than its stone on one channel, the rim and the reflection left standing, a
+// ruin at the height the target's own box measures, a basin narrower than its
+// water.
+// ==========================================================================
+
+/** The moss is darker than the stone it grows on, on all three channels. */
+const mossDarkerThanStone = (tint) => tint.every((v) => v < 1);
+/** The stone is opaque: no sky is reflected off a still frame. */
+const opaqueStone = (m) => m.rim === 0 && m.f0 === 0;
+/** No ruin stands taller than the metre the reading allows one. */
+const ruinsUnderTheCap = (ruins) => Math.max(...ruins.map((r) => r.height)) <= BAND.ruinHeight;
+/** A basin of the size the target draws, and wider than the water it holds. */
+const basinHoldsItsWater = (f) => Boolean(f) && f.basinDiameter >= BAND.basin[0]
+  && f.basinDiameter <= BAND.basin[1] && f.poolDiameter < f.basinDiameter;
 
 if (process.argv.includes('--self')) {
   const tile = stoneTileData(512);
@@ -598,12 +625,23 @@ if (process.argv.includes('--self')) {
       caught: mossOfFace(painted, f05, 0.425, spec.course.rise) > BAND.mossLitFront[1],
     },
     {
-      what: 'a moss drawn lighter than its stone is caught',
-      caught: ![0.62, 1.30, 0.58].every((v) => v < 1),
+      what: 'a moss drawn lighter than its stone is caught, on any one of the three channels',
+      caught: !mossDarkerThanStone([0.62, 1.30, 0.58])
+        && !mossDarkerThanStone(material.mossTint.map((v, i) => (i === 2 ? 1.02 : v))),
     },
     {
-      what: 'a sky reflection left standing on the stone is caught',
-      caught: !(0.125 === 0 && 0.0057 === 0),
+      what: 'and the tint the wall ships is under one on all three',
+      caught: mossDarkerThanStone(material.mossTint),
+    },
+    {
+      what: 'a sky reflection left standing on the stone is caught, rim or reflection either one',
+      caught: !opaqueStone({ rim: 0.125, f0: 0.0057 })
+        && !opaqueStone({ ...material, f0: 0.0057 })
+        && !opaqueStone({ ...material, rim: 0.125 }),
+    },
+    {
+      what: 'and the stone that ships carries neither',
+      caught: opaqueStone(material),
     },
     {
       what: 'a weight rewritten without one of its terms is caught',
@@ -637,15 +675,30 @@ if (process.argv.includes('--self')) {
       })(),
     },
     {
+      // 1.27 m is the target's own tallest component in these windows, boxed
+      // WITH the shadow of a block inside the box: the piece nobody may build,
+      // handed to the gate that ships rather than compared here.
       what: 'a ruin built as tall as the bounding box the target boxes one in is caught',
-      caught: 1.27 > BAND.ruinHeight,
+      caught: !ruinsUnderTheCap([...RUINS, { height: 1.27 }]),
+    },
+    {
+      what: 'and the pieces that ship all stand under the metre',
+      caught: ruinsUnderTheCap(RUINS),
     },
     {
       // A basin narrower than the water in it is the one defect of this piece
       // that no picture is needed to see, and the reason the two diameters are
       // read from one place.
       what: 'a basin narrower than its own pool is caught',
-      caught: !(FOUNTAIN && 1.10 > FOUNTAIN.poolDiameter),
+      caught: !basinHoldsItsWater({ ...FOUNTAIN, poolDiameter: FOUNTAIN.basinDiameter + 0.1 }),
+    },
+    {
+      what: 'and one drawn at half the width the target gives it, which is a bowl and not a basin',
+      caught: !basinHoldsItsWater({ ...FOUNTAIN, basinDiameter: BAND.basin[0] / 2 }),
+    },
+    {
+      what: 'and the basin that ships holds its own water',
+      caught: basinHoldsItsWater(FOUNTAIN),
     },
     {
       what: 'the loose stone cut as three meshes -- three draws for the price of one -- is caught',
@@ -686,15 +739,15 @@ if (process.argv.includes('--self')) {
     },
     {
       what: 'the delivered material passes every one of those',
-      caught: material.rim === 0 && material.f0 === 0
-        && material.mossTint.every((v) => v < 1)
+      caught: opaqueStone(material)
+        && mossDarkerThanStone(material.mossTint)
         && mottleSpread(composite, light, front.normal, material, material.tint, material.gain, tile) <= BAND.mottle
         && tileFeatureMetres(tile, 1.6) <= BAND.tileFeature
         && weightNamesEveryTerm(masonry, WEIGHT_UNIFORMS)
         && greyness(material.albedo) <= BAND.pigmentGrey
         && loose.triangles <= BAND.looseTriangles
         && oneMeshOneMaterial(read(LOOSE))
-        && RUINS.every((r) => r.height <= BAND.ruinHeight)
+        && ruinsUnderTheCap(RUINS) && basinHoldsItsWater(FOUNTAIN)
         && triple(masonry, 'INK_CORE')[2] / triple(masonry, 'INK_CORE')[0] >= BAND.inkPigmentBlue,
     },
   ]);
@@ -797,14 +850,14 @@ for (const f of faces) {
 report.check(mossOk, 'the moss grows by the class of face the target separates',
   `shaded fronts ${BAND.mossShadedFront.join(' to ')}, lit fronts ${BAND.mossLitFront.join(' to ')}, `
   + `west flanks ${BAND.mossWestFlank.join(' to ')}`);
-report.check(material.mossTint.every((v) => v < 1),
+report.check(mossDarkerThanStone(material.mossTint),
   'the moss is darker than the stone it grows on, on all three channels',
   `[${material.mossTint}] against the target's [${spec.palette.moss.tintOverStoneBeside}]`);
 report.check(weightNamesEveryTerm(masonry, WEIGHT_UNIFORMS),
   'and the fragment still writes the weight this file walks',
   `${WEIGHT_UNIFORMS.length} terms named`);
 
-report.check(material.rim === 0 && material.f0 === 0,
+report.check(opaqueStone(material),
   'the stone is opaque: no sky is reflected off a still frame',
   `rim ${material.rim}, F0 ${material.f0}`);
 report.check(material.arris > 1,
@@ -850,7 +903,7 @@ const tallest = Math.max(...RUINS.map((r) => r.height));
 const ruinCap = lch(composite(bareFace([0, 1, 0], light, RUIN_ALBEDO, material.scale, rock.skyShare)));
 report.line(`  ruins             ${RUINS.length} pieces, tallest ${tallest.toFixed(2)} m, `
   + `pigment [${RUIN_ALBEDO}] -> L* ${ruinCap.L.toFixed(1)} h ${ruinCap.h.toFixed(0)}`);
-report.check(tallest <= BAND.ruinHeight,
+report.check(ruinsUnderTheCap(RUINS),
   'no ruin stands taller than the metre the reading allows one',
   `${tallest.toFixed(2)} m against ${BAND.ruinHeight}, where the target's own tallest `
   + 'component in these windows boxes at 1.27 m with the shadow of a block inside the box');
@@ -868,8 +921,7 @@ report.check(RUIN_ALBEDO === rock.albedo || RUIN_ALBEDO.every((v, i) => v === ro
 if (FOUNTAIN) {
   report.line(`  the basin         ${FOUNTAIN.basinDiameter.toFixed(2)} m over a pool of `
     + `${FOUNTAIN.poolDiameter.toFixed(2)} m, at (${FOUNTAIN.x.toFixed(2)}, ${FOUNTAIN.z.toFixed(2)})`);
-  report.check(FOUNTAIN.basinDiameter >= BAND.basin[0] && FOUNTAIN.basinDiameter <= BAND.basin[1]
-    && FOUNTAIN.poolDiameter < FOUNTAIN.basinDiameter,
+  report.check(basinHoldsItsWater(FOUNTAIN),
     'the fountain stands in a basin of the size the target draws, wider than its own water',
     `${FOUNTAIN.basinDiameter.toFixed(2)} m in ${BAND.basin.join(' to ')} over `
     + `${FOUNTAIN.poolDiameter.toFixed(2)} m of water`);
