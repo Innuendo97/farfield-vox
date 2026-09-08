@@ -197,6 +197,44 @@ export const groundCarriesCoverage = (campo) => Boolean(campo)
 export const bytesPerFramePixel = (bytes, scale, samples) => bytes * scale * scale
   * Math.max(1, samples);
 
+// ============================================================== AT_TODAY, MEASURED
+//
+// 2026-09-08 (U-PERF-6), QUIET DESK: three runs of ninety readings a pose, high
+// tier at three quarters of a side and low tier at a half, first person, veil
+// off, the native arm and the null taken in the SAME opening.
+//
+// What the ground's march costs at a fraction of a side, against what the same
+// march costs at the frame's own pixel -- the empirical half of the sentence
+// over campoBufferOf, which until today rested on the FRAME scale sweep of
+// E-PERF5 and not on this lever at all:
+//
+//   three quarters (high tier)   21.902 -> 9.480 ms    43.3 % of 56.3 % of the pixels
+//   a half         (low tier)    11.115 -> 2.310 ms    20.8 % of 25.0 % of the pixels
+//
+// AND IT IS SUB PROPORTIONAL, which is the finding and not a rounding: a
+// quarter of the pixels buys a fifth of the march, three quarters of a side
+// buys under eight tenths of it. The reason is in the field's own prefilter --
+// the blade, the joint and the edge follow the TARGET's pixel (guard-campo3),
+// so a coarser target also takes a coarser step and leaves the cell sooner. A
+// guard that asserted proportionality would be asserting the wrong law and
+// would go red the day somebody improved the prefilter.
+//
+// The recomposition is not in this number: it is a full frame pass, it does not
+// scale with the target, and it is gated where it belongs -- guard-cammino,
+// on the whole quota.
+const AT_TODAY = {
+  0.75: { native: 21.902, march: 9.480, share: 9.480 / 21.902 },
+  0.5: { native: 11.115, march: 2.310, share: 2.310 / 11.115 },
+};
+
+/** Does a march at this fraction of a side cost no more than its share of pixels? */
+export function marchIsSubProportional(scale, add = 0) {
+  const seen = AT_TODAY[scale];
+  if (!seen) return true;
+  return (seen.march + add) / seen.native <= scale * scale;
+}
+
+
 /**
  * Whether the grade still takes the cube's own black off its own answer.
  *
@@ -302,6 +340,28 @@ if (process.argv.includes('--self')) {
   // spaces, which is what wrapping a table in anything at all would do.
   const reindent = (text) => text.replace(/^/gm, '    ');
   selfTest('guard-buffer', [
+    {
+      // LA RICEVUTA DELLA MARCIA, provata nei due versi come ogni altro lettore
+      // di questa cartella (E-GUARDIA4): oggi passa, e una marcia che smettesse
+      // di essere sub proporzionale -- un prefiltro che non seguisse piu' il
+      // bersaglio, una LOD che tornasse a nominare il pixel della tela -- non
+      // passerebbe, che e' esattamente il difetto che rende inutile il
+      // bersaglio ridotto senza rendere rosso nulla.
+      what: 'the march measured today, which must NOT be called a defect',
+      caught: marchIsSubProportional(0.75) && marchIsSubProportional(0.5),
+    },
+    {
+      what: 'a march that stopped following the target\'s pixel and costs its share whole',
+      caught: !marchIsSubProportional(0.75, 21.902 * 0.5625 - 9.480 + 0.01),
+    },
+    {
+      what: 'and a half side whose march costs a quarter of the native, which is the same defect',
+      caught: !marchIsSubProportional(0.5, 11.115 * 0.25 - 2.310 + 0.01),
+    },
+    {
+      what: 'a scale nobody measured is not asserted about',
+      caught: marchIsSubProportional(0.6, 1e6),
+    },
     {
       what: 'a normalised format promoted into the shipping ladder is caught',
       caught: !shippedCarryLight(formats.map((f) => (f.name === 'RGBA8' ? { ...f, shipped: true } : f)))
@@ -521,6 +581,11 @@ for (const tier of campoScales) {
   report.check(earth < scene,
     `and at the tier ${tier.id} it costs less of the frame than the scene's own pixel does`,
     `${earth.toFixed(1)} bytes per frame pixel against ${scene.toFixed(1)}`);
+  report.check(marchIsSubProportional(tier.campoScale),
+    `and what the march costs at ${tier.campoScale} of a side is no more than the share of `
+    + 'pixels it was given',
+    `${(100 * (AT_TODAY[tier.campoScale] || {}).share).toFixed(1)} % of the native march `
+    + `against ${(100 * tier.campoScale * tier.campoScale).toFixed(1)} % of the pixels`);
 }
 
 // ------------------------------------------------ the two directions, in light

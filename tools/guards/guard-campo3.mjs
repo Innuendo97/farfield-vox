@@ -456,19 +456,46 @@ report.check(/renderer\.setCampoScale\(hub\.setCampoScale\(tier\.campoScale \?\?
 
 // =================================================================== LE RICEVUTE
 //
-// AT_TODAY. La scheda per passata di questa unita', alla posa P, tier alto,
-// 1920x869, macchina CARICA -- sette server altrui e due dozzine di Chrome, che
-// e' il motivo per cui cio' che si tiene qui e' il RAPPORTO fra due bracci
-// misurati di seguito nella STESSA apertura, e non il numero assoluto.
-const AT_TODAY = { prima: 26.51, dopo: 8.08, ricomposizione: 1.72 };
+// AT_TODAY, 2026-09-08 (U-PERF-6). La scheda per passata alla posa FITTATA, tier
+// alto, 1920x869, prima persona, velo tolto, tre giri da 90 letture, SCRIVANIA
+// SCARICA -- e alla scala che il tier alto spedisce davvero, che e' TRE QUARTI
+// (D-C3-1) e non il mezzo su cui U-CAMPO-3 aveva scritto questa riga.
+//
+// I numeri di prima erano 26,51 -> 8,08 + 1,72 = 37%, presi a MEZZO lato su una
+// macchina CARICA (sette server altrui e due dozzine di Chrome). Erano giusti
+// per quello che erano e sbagliati come ricevuta del mondo: il mondo a mezzo
+// lato lo disegna solo il tier basso.
+const AT_TODAY = { scala: 0.75, prima: 21.902, dopo: 9.480, ricomposizione: 1.114 };
 const quota = (AT_TODAY.dopo + AT_TODAY.ricomposizione) / AT_TODAY.prima;
-report.check(quota < 0.45,
-  'e cio che il banco ha letto: la terra a meta costa meno della meta di se stessa',
+// IL TETTO E' UNA LEGGE DELLA SCALA E NON UN NUMERO, la stessa che tiene
+// guard-cammino: un bersaglio a frazione `s` di lato porta `s*s` dei pixel e
+// non puo' costarne piu' di `s*s` piu' un decimo. A tre quarti fa 0,66 contro i
+// 0,48 letti. Un numero fisso a 0,45 -- tarato sul mezzo lato -- avrebbe
+// dichiarato DIFETTO la scala che si spedisce, che e' il modo in cui una
+// guardia stantia costringe a spegnerla invece che a crederle.
+const CEILING = AT_TODAY.scala * AT_TODAY.scala + 0.10;
+report.check(quota <= CEILING,
+  `e cio che il banco ha letto: la terra a ${AT_TODAY.scala} di lato costa al piu' `
+  + `${CEILING.toFixed(2)} del disegno nativo`,
   `${AT_TODAY.prima} -> ${AT_TODAY.dopo} + ${AT_TODAY.ricomposizione} di `
   + `ricomposizione = ${(100 * quota).toFixed(0)}% del disegno di prima`);
 
 if (process.argv.includes('--self')) {
   const casi = [];
+  // LA RICEVUTA E' UN PREDICATO CON UN NOME, non un letterale scritto una volta
+  // e riletto per anni (E-GUARDIA4): il --self la chiama sulle stesse letture
+  // piegate nei due versi, cosi' che il giorno in cui la scala si muove la riga
+  // si muova con lei invece di restare vera per un mondo che non c'e' piu'.
+  const quotaDi = (card) => (card.dopo + card.ricomposizione) / card.prima;
+  const passa = (card) => quotaDi(card) <= card.scala * card.scala + 0.10;
+  casi.push({ what: 'la scheda di oggi, che NON deve essere chiamata difetto',
+    caught: passa(AT_TODAY) });
+  casi.push({ what: 'la terra rimessa a piena risoluzione dentro il bersaglio ridotto',
+    caught: !passa({ ...AT_TODAY, dopo: AT_TODAY.prima - AT_TODAY.ricomposizione }) });
+  casi.push({ what: 'la stessa quota letta su una scheda a MEZZO lato, dove e un difetto',
+    caught: !passa({ ...AT_TODAY, scala: 0.5 }) });
+  casi.push({ what: 'e una ricomposizione che da sola mangia il risparmio',
+    caught: !passa({ ...AT_TODAY, ricomposizione: 6.0 }) });
   let stretto = 0;
   for (const [a, b] of SLOPES) {
     const d = [0.97, 0.97 + a, 0.97 + b, 0.97 + a + b];
