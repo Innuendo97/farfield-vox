@@ -182,6 +182,44 @@ const RECORDER = () => {
     return out;
   });
 
+  // WHAT EACH VERTEX STAGE WRITES, AND WHETHER IT USED A GIVEN CALL.
+  //
+  // WHY THIS EXISTS. Some properties of a shader are invisible in a picture and
+  // invisible in a link status too. «The weather multiplies the TINT and never
+  // the LAMP» is one, and guard-zone owes it. On the frame it cannot be
+  // separated: the bloom, the grade and the tone curve are all non-linear, so
+  // the same lamp under a brighter tint lands on a different pixel. Measured on
+  // this desk, the near bed's lamp reads 50.98 with the zone as it is and 42.37
+  // with it neutralised, and the FAR bed moves the other way, 44.53 -> 46.11 --
+  // neither is a lamp being dimmed by the weather, both are the curve.
+  //
+  // So it is asked of the COMPILED SOURCE -- the exact string the driver was
+  // handed, after every chunk had been spliced into it -- and it is asked as a
+  // DATAFLOW question rather than as a line of text: for each statement that
+  // writes a name, did its right-hand side mention this call? A guard built on
+  // that survives any rewrite of the expression, which is the whole of
+  // E-IGIENE. What comes back is names and booleans and never the source, for
+  // the reason stated above the census.
+  window.__quadroWrites = (token) => seen.map((record, index) => {
+    const gl = record.gl;
+    const out = { index, uniforms: [], varyings: [], writes: [] };
+    for (const shader of record.shaders) {
+      try {
+        if (gl.getShaderParameter(shader, gl.SHADER_TYPE) !== gl.VERTEX_SHADER) continue;
+        const source = sources.get(shader) || '';
+        out.uniforms = [...source.matchAll(/^\s*uniform\s+\w+\s+(\w+)/gm)].map((m) => m[1]);
+        out.varyings = [...source.matchAll(/^\s*(?:varying|out)\s+\w+\s+(\w+)/gm)].map((m) => m[1]);
+        const bare = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+        for (const statement of bare.split(';')) {
+          const m = /(?:^|[\s{}()])([A-Za-z_]\w*)\s*(\*=|\+=|-=|\/=|=)(?!=)([\s\S]*)$/.exec(statement);
+          if (!m) continue;
+          out.writes.push({ lhs: m[1], op: m[2], uses: m[3].includes(token) });
+        }
+      } catch { /* the program was disposed of */ }
+    }
+    return out;
+  });
+
   // THE INJECTION SEAT, for the guard's own self test. It compiles a throwaway
   // program on a throwaway context -- the app's own context is never touched --
   // and because the prototype is what is wrapped, the recorder picks it up like
@@ -247,6 +285,7 @@ export async function openWorld({
     async tierId() { return page.evaluate(() => window.farfield.quality.tier.id); },
     async stats() { return page.evaluate(() => window.farfield.renderer.stats()); },
     async programs() { return page.evaluate(() => window.__quadroPrograms()); },
+    async writes(token) { return page.evaluate((t) => window.__quadroWrites(t), token); },
     async inject(duplicate) { return page.evaluate((d) => window.__quadroInject(d), duplicate); },
     async children() {
       return page.evaluate(() => window.farfield.scene.children.map((c) => c.name || '(anon)'));
