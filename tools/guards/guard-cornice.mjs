@@ -377,6 +377,46 @@ report.check(worstLine.degrees < LINE_RUN,
 // --------------------------------------------------------------------------
 const source = read('src/world/distant.js');
 
+// ==========================================================================
+// HOW THIS FILE READS A SOURCE, AND WHY NOT LETTER BY LETTER.
+//
+// Several legs below can only be asked of the frame's own code: whether the
+// lake is one disc at the boundary's level, whether the ring runs from the
+// shore outward, whether the cut happens off the walker's thread, whether the
+// air is read from the seat. There is no exported value for any of those --
+// they are call sites -- so the source is read, and U-GUARDIA-3 censused this
+// file for reading it TOO LITERALLY (residuo 3): whole call expressions with
+// their argument spelling and their quote style baked in. A line break after
+// `new Worker(` was enough to turn one of them red on a frame nobody had
+// touched, which is the state of affairs that gets a guard switched off.
+//
+// So the readers ask for NAMES inside a paren-balanced argument list. A comma
+// moved, an argument list broken over three lines, single quotes turned to
+// double: none of those is a change to the frame, and none of them moves a
+// verdict any more. What still moves one is a different geometry, a different
+// worker, a different seat -- which is what these legs are for.
+// ==========================================================================
+
+/** Whether a name appears as a whole identifier. */
+const mentions = (text, word) => new RegExp(`(?<![\\w.$])${word}(?![\\w$])`).test(text);
+
+/** The argument list of every call to a name, by balancing its parentheses. */
+function argsOf(text, name) {
+  const out = [];
+  for (const found of text.matchAll(new RegExp(`(?<![\\w$])${name}\\s*\\(`, 'g'))) {
+    let depth = 0;
+    const open = found.index + found[0].length - 1;
+    for (let i = open; i < text.length; i++) {
+      if (text[i] === '(') depth++;
+      else if (text[i] === ')') {
+        depth--;
+        if (depth === 0) { out.push(text.slice(open + 1, i)); break; }
+      }
+    }
+  }
+  return out;
+}
+
 // THE FAR SHORE IS WHERE THE REFERENCE READS IT.
 //
 // R6 §1 fixed the one distance the picture actually gives out here: the far
@@ -502,9 +542,19 @@ const BUDGET = {
 // pixels. So the wedges are the hills', where the geometry is.
 const wedgeSpan = 360 / SPEC.rings.sectors;
 const inLens = Math.ceil(POSE_VOX_DAY.fov / wedgeSpan) + 2 + 1;
-const laysARing = (text) => /new RingGeometry\(shore, reach/.test(text)
-  && /CONFINE\.waterAt - 2/.test(text)
-  && /lake\.frustumCulled = false/.test(text);
+// AND IT IS ASKED BY NAME AND NOT BY SPACING, which is U-GUARDIA-3's residue 3
+// on this file. What stood here was /new RingGeometry\(shore, reach/ and
+// /CONFINE\.waterAt - 2/: a comma moved, an argument list broken over two lines
+// or the two written as `- 2.0` and the leg goes red on a frame that has not
+// changed. The property is that the ring runs FROM the shore TO the reach and
+// is never culled, and those are three names and a subtraction, none of which
+// is a matter of layout. `argsOf` below is the paren-balanced reader the same
+// argument produced in guard-stabilita; it is copied rather than shared because
+// tools/guards/lib.mjs is the one file eight branches all edit at once.
+const laysARing = (text) => argsOf(text, 'RingGeometry')
+  .some((a) => mentions(a, 'shore') && mentions(a, 'reach'))
+  && /CONFINE\s*\.\s*waterAt\s*-\s*2(?:\.0+)?(?![\d.])/.test(text)
+  && /lake\s*\.\s*frustumCulled\s*=\s*false/.test(text);
 report.check(SPEC.rings.sectors + 1 <= BUDGET.drawsAt && laysARing(source),
   `it is drawn in at most ${BUDGET.drawsAt} calls, and in ${inLens} through the judging lens`,
   `${SPEC.rings.sectors} wedges of ${wedgeSpan} degrees, plus one ring of water `
@@ -583,8 +633,16 @@ report.check(deliversNothing,
 // the main thread is not a slow frame: the first harness that photographed this
 // world was handed a crashed tab, and E-CONF1 spent a unit buying the first
 // frame down to 1.1 s by moving exactly this class of work onto a worker.
-const cutsOffThread = (text) => /new Worker\(new URL\('\.\/distant-worker\.js'/.test(text)
-  && /type: 'module'/.test(text);
+// AND THIS ONE IS ASKED OF THE CALL AND NOT OF THE LINE. It used to be
+// /new Worker\(new URL\('\.\/distant-worker\.js'/ -- one string, quote style
+// and all, that a line break after `new Worker(` is enough to break -- with the
+// module type looked for ANYWHERE in the file rather than in that call. Read
+// through the Worker's own arguments it is both looser about layout and
+// stricter about meaning: the worker is this file's own, addressed relative to
+// the module, and started as a module.
+const cutsOffThread = (text) => argsOf(text, 'Worker')
+  .some((a) => /distant-worker\.js/.test(a) && mentions(a, 'URL')
+    && /type\s*:\s*['"]module['"]/.test(a));
 report.check(cutsOffThread(source),
   'and it is cut off the thread the walker is on, so the first frame stays the one E-CONF1 bought',
   'distant-worker.js, one message, buffers transferred and the thread terminated');
@@ -600,13 +658,13 @@ report.check(cutsOffThread(source),
 // on, and the day the two disagree the join between the meadow and the hills is
 // a line. So the seat's own function has to be what colours a fragment, and no
 // gaussian of this file's own may stand anywhere in the source.
-const readsTheSeat = (text) => /from '\.\/air\.js'/.test(text)
+const readsTheSeat = (text) => /from\s*['"]\.\/air\.js['"]/.test(text)
   && /fogUniforms\(\)/.test(text)
   && /throughAir\(/.test(text)
   && !/FALLBACK_AIR_GLSL/.test(text)
   && !/SEAT_HAS_DISTANT_AIR/.test(text)
   && !/AIR\.DISTANT_AIR_GLSL/.test(text)
-  && !/uniform vec3 uAirBeta/.test(text);
+  && !/uniform\s+vec3\s+uAirBeta(?![\w$])/.test(text);
 report.check(readsTheSeat(source),
   'and its air is the seat\'s whole law: throughAir, and no fallback standing behind it',
   'fogUniforms() and throughAir() from air.js; no beta, no turn and no gaussian here');
@@ -1306,6 +1364,27 @@ if (process.argv.includes('--self')) {
       caught: cutsOffThread(source),
     },
     {
+      // AND THE CASE THAT SAYS THE PIN IS GONE: the same call, broken over
+      // four lines and written with double quotes, is the same call.
+      what: 'and the same worker started over four lines, in double quotes, is still it',
+      caught: cutsOffThread([
+        'const worker = new Worker(',
+        '  new URL(',
+        '    "./distant-worker.js",',
+        '    import.meta.url,',
+        '  ),',
+        '  { type: "module" },',
+        ');',
+      ].join('\n')),
+    },
+    {
+      what: 'and a module type written somewhere else in the file no longer answers for it',
+      caught: !cutsOffThread([
+        "const opts = { type: 'module' };",
+        "const worker = new Worker(new URL('./sky-worker.js', import.meta.url), opts);",
+      ].join('\n')),
+    },
+    {
       // The count that replaced the clock, exercised the way the clock never
       // could be: a cut a third larger is a cut the worker was never timed on,
       // and it is caught on every machine and at every hour of the day.
@@ -1328,6 +1407,14 @@ if (process.argv.includes('--self')) {
     {
       what: 'and the frame that ships reads air.js',
       caught: readsTheSeat(source),
+    },
+    {
+      what: 'and the seat imported in double quotes is the same seat',
+      caught: readsTheSeat([
+        'import { fogUniforms, throughAir } from "./air.js";',
+        'const u = fogUniforms();',
+        'throughAir(x);',
+      ].join('\n')),
     },
     {
       what: 'the grain quietened over the whole compass, which would smooth every hillside',
@@ -1503,6 +1590,29 @@ if (process.argv.includes('--self')) {
     {
       what: 'and the frame that ships lays a ring from inside the meadow\'s own shore',
       caught: laysARing(source),
+    },
+    {
+      // The pin, gone: the same ring over three lines, with the shore spelled
+      // as a float and the cull set through another statement.
+      what: 'and the same ring laid over three lines, with the shore written as a float',
+      caught: laysARing([
+        'const shore = CONFINE . waterAt - 2.0;',
+        'const disc = new RingGeometry(',
+        '  shore,',
+        '  reach,',
+        '  96,',
+        '  1,',
+        ');',
+        'lake . frustumCulled = false;',
+      ].join('\n')),
+    },
+    {
+      what: 'and a ring that starts somewhere other than the shore is still caught',
+      caught: !laysARing([
+        'const shore = CONFINE.waterAt - 2;',
+        'const disc = new RingGeometry(0, reach, 96, 1);',
+        'lake.frustumCulled = false;',
+      ].join('\n')),
     },
   ]);
 }
