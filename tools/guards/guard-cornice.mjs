@@ -10,6 +10,11 @@ import {
   BANDS, FRAME, FREE_SHOULDER, GAP_HALF, MARCH, NEAR, MIDDLE, FAR, PALE,
   TOLERANCE, highestRead, inFrame, onCompass, skylineBearings,
 } from '../../assets-src/distant/fit-cornice.mjs';
+import { AIR_NEAR, HEIGHT_FOG } from '../../src/core/sky.js';
+import {
+  AIR_BETA, AIR_PALE, AIR_TURN_METRES, FOG_LOW_CAP, FOG_RADIANCE,
+} from '../../src/world/air.js';
+import { renderChain } from '../lighting/render-chain.mjs';
 import { read, readJson, reporter, selfTest } from './lib.mjs';
 
 // GUARD-CORNICE -- THE HORIZON IS THE ONE THE REFERENCE HAS, PER DIRECTION.
@@ -795,6 +800,84 @@ report.check(PAL.length === 6
   'and the palette keeps the classes apart: a shadow under its flank, grass greener than the rock',
   `grass lit [${PAL[SHADE.GRASS_LIT].map((v) => v.toFixed(3)).join(', ')}], `
   + `rock in shadow [${PAL[SHADE.ROCK_SHADE].map((v) => v.toFixed(3)).join(', ')}]`);
+
+// --------------------------------------------------------------------------
+// AND WHAT THAT PALETTE DEVELOPS TO ONCE THE AIR IS IN FRONT OF IT, PER PLANE.
+//
+// THE ONE THING THE SECTION ABOVE CANNOT SEE. `palette()` was solved by
+// U-CORNICE-2 WITH THE AIR SWITCHED OFF, so every check up to here judges a
+// PIGMENT. What the client sees is that pigment veiled by two terms at the
+// plane's own distance and height, and the campaign has now spent two units
+// discovering, separately, that the veil is where the near planes go wrong:
+// U-LUCE-6 on the three betas, U-LUCE-7 on the near end of the colour. Neither
+// of them moved a number, and a measurement nobody carries is a measurement the
+// next unit re-derives. So it is carried here, where the palette is.
+//
+// IT IS AN AT_TODAY AND NOT A TARGET. The gate is drift: these are what this
+// desk measures the delivered colour to be, and a change to the palette, to the
+// air, to the seat or to the grade that moves one of them shows up here as a
+// number instead of as a mood. The reference's own reading is printed beside it
+// and is NOT gated, because the near flank cannot be reached from here — its
+// floor with the pigment at zero already stands 45 levels of blue over the
+// reference, 18 of them the near end's, 8 the low haze ceiling's (E-LUCE2,
+// frozen) and 19 the pale end's, carried inside 227 m by the 700 m turn.
+// Gating it would be gating a plane the arithmetic refuses.
+//
+// THE PLANES ARE R6 §2.3's OWN WINDOWS, at the distance and height the delivered
+// cornice puts them at: the near flank at 227 m and 21 m up, which is where R6's
+// 4.84-degree window falls on the front this world builds; the middle crest at
+// the 400 m and 10 m guard-aria asks its pair at; the pale veil at 1550 m and
+// 45 m. The reference's near flank has TWO readings fourteen L* apart — R6's
+// window (34 / 74 / 92) and U-CORNICE-2's class mask (74 / 104 / 103) — and the
+// second is the one the palette was solved against, so it is the one printed.
+// --------------------------------------------------------------------------
+const AIR_PLANES = [
+  { what: 'near flank', d: 227, h: 21, reference: [74, 104, 103], today: [82, 126, 158] },
+  { what: 'middle crest', d: 400, h: 10, reference: [83, 139, 180], today: [95, 144, 187] },
+  { what: 'pale veil', d: 1550, h: 45, reference: [149, 187, 213], today: [135, 181, 211] },
+];
+const AIR_DRIFT = 2;
+
+/**
+ * The two terms of src/world/air.js in this language, over one pigment.
+ *
+ * Same order as FOG_GLSL and for the same reason: the distance veils the
+ * surface and the low haze veils what comes out of that, because the low haze
+ * is the air nearest the eye. The height integral is shared by both.
+ */
+function veiled(radiance, distance, height) {
+  const eye = POSE_VOX_DAY.position.y;
+  const dy = height - eye;
+  const a = Math.exp(-Math.max(eye, 0) / HEIGHT_FOG.scaleHeight);
+  const b = Math.exp(-Math.max(height, 0) / HEIGHT_FOG.scaleHeight);
+  const mean = Math.abs(dy) < 0.01 ? a : ((a - b) * HEIGHT_FOG.scaleHeight) / dy;
+  const turn = 1 - Math.exp(-distance / AIR_TURN_METRES);
+  const g = Math.min(FOG_LOW_CAP,
+    1 - Math.exp(-((distance * HEIGHT_FOG.densityAtGround * mean) ** 2)));
+  return radiance.map((v, c) => {
+    const tint = AIR_NEAR.getComponent(c) + (AIR_PALE[c] - AIR_NEAR.getComponent(c)) * turn;
+    const f = 1 - Math.exp(-((distance * AIR_BETA[c] * mean) ** 2));
+    return (v + (tint - v) * f) * (1 - g) + FOG_RADIANCE[c] * g;
+  });
+}
+
+const develop = await renderChain();
+const airMisses = [];
+report.line('');
+for (const plane of AIR_PLANES) {
+  const got = develop(veiled(PAL[SHADE.ROCK_SHADE], plane.d, plane.h)).map(Math.round);
+  const drift = got.map((v, c) => v - plane.today[c]);
+  if (drift.some((v) => Math.abs(v) > AIR_DRIFT)) {
+    airMisses.push(`${plane.what} ${got.join('/')} against ${plane.today.join('/')}`);
+  }
+  report.check(drift.every((v) => Math.abs(v) <= AIR_DRIFT),
+    `the rock in shadow through the air at the ${plane.what}, ${plane.d} m out and ${plane.h} m up`,
+    `${got.join(' / ')} (AT_TODAY ${plane.today.join(' / ')}); the reference reads `
+    + `${plane.reference.join(' / ')}, so it is `
+    + `${got.map((v, c) => (v > plane.reference[c] ? '+' : '') + (v - plane.reference[c])).join(' / ')}`);
+}
+report.line('  the near flank is over on all three and no palette closes it: the floor with the '
+  + 'pigment at zero is already over. Owner: the coordinator, D-L6-1');
 
 // --------------------------------------------------------------------------
 // 7. THE CONTRACT V7 IS OWED IS ANSWERED, ON REAL TREADS.
