@@ -534,6 +534,84 @@ function restingLift() {
 
 // --------------------------------------------------------------------- the run
 
+// ==========================================================================
+// LA PORTA UNICA, CHIESTA AL FLUSSO E NON A DUE STATEMENT INTERI.
+//
+// Quel che stava qui appuntava DUE STATEMENT di `src/main.js` alla lettera --
+// «window.setDevPose = (asked) => devPose.place(asked);» e «if (code ===
+// 'KeyP') devPose.place(POSE_TARGET);» -- e U-GUARDIA-3 l'ha censito per
+// primo fra i letterali stantii (residuo 3): mettere le graffe a quell'`if`,
+// che e' la riscrittura piu' innocua che esista, faceva rossa questa guardia.
+// Una guardia che va rossa quando `src/` viene scritto MEGLIO insegna a non
+// scriverlo meglio, ed e' il difetto e non la cura.
+//
+// La proprieta' difesa non e' cambiata di una virgola: c'e' UNA porta, e ogni
+// posa imposta ci passa. Cambia il modo di chiederlo, che adesso e' un flusso
+// in tre domande e non nomina nessuna forma:
+//
+//   1. cio' che `window.setDevPose` riceve NOMINA il seggio -- comunque sia
+//      scritto: una freccia, una funzione con corpo, un riferimento diretto;
+//   2. il ramo che il tasto P prende NOMINA il seggio -- con le graffe o
+//      senza, su una riga o su cinque;
+//   3. e la pagina non posa niente da se': nessuna chiamata a `player.setPose`.
+//
+// Il seggio si nomina per NOME (`devPose.place`), che e' un identificatore e
+// non una formattazione: il giorno che quel nome cambia la gamba deve andare
+// rossa, ed e' esattamente cio' che si vuole da lei.
+// ==========================================================================
+
+/** Il corpo della graffa che si apre a un indice, contandole. */
+function corpoDiGraffa(testo, apre) {
+  let profondita = 0;
+  for (let i = apre; i < testo.length; i++) {
+    if (testo[i] === '{') profondita += 1;
+    else if (testo[i] === '}') {
+      profondita -= 1;
+      if (profondita === 0) return testo.slice(apre + 1, i);
+    }
+  }
+  return '';
+}
+
+/** Da un indice alla fine dello statement, senza farsi tagliare dalle annidate. */
+function statementDa(testo, da) {
+  let profondita = 0;
+  for (let i = da; i < testo.length; i++) {
+    const c = testo[i];
+    if ('([{'.includes(c)) profondita += 1;
+    else if (')]}'.includes(c)) {
+      if (profondita === 0) return testo.slice(da, i);
+      profondita -= 1;
+    } else if (c === ';' && profondita === 0) return testo.slice(da, i);
+  }
+  return testo.slice(da);
+}
+
+/** Cio' che un nome riceve, qualunque forma abbia la parte destra. */
+function riceve(testo, nome) {
+  const re = new RegExp(`${nome.replace(/\./g, '\\s*\\.\\s*')}\\s*=\\s*`);
+  const m = re.exec(testo);
+  return m ? statementDa(testo, m.index + m[0].length) : null;
+}
+
+/** Il ramo che si prende quando una condizione nomina un pezzo: con o senza graffe. */
+function ramoSu(testo, pezzo) {
+  const re = new RegExp(`if\\s*\\([^)]*${pezzo}[^)]*\\)\\s*`, 'g');
+  const m = re.exec(testo);
+  if (!m) return null;
+  const da = re.lastIndex;
+  return testo[da] === '{' ? corpoDiGraffa(testo, da) : statementDa(testo, da);
+}
+
+/** Una porta sola: ogni posa imposta passa dal seggio, e la pagina non ne apre altre. */
+export function oneDoor(testo, seggio = /\bdevPose\s*\.\s*place\s*\(/) {
+  const maniglia = riceve(testo, 'window.setDevPose');
+  const tasto = ramoSu(testo, "'KeyP'");
+  if (maniglia === null || tasto === null) return false;
+  if (!seggio.test(maniglia) || !seggio.test(tasto)) return false;
+  return !/\bplayer\s*\.\s*setPose\s*\(/.test(testo);
+}
+
 if (process.argv.includes('--self')) {
   const solids = cameraSolids();
   const eye = {};
@@ -732,6 +810,56 @@ if (process.argv.includes('--self')) {
       caught: pileSolids(ROCK_PILES.slice(1)).length !== ROCK_PILES.length
         && pileSolids().length === ROCK_PILES.length,
     },
+    // ------------------------------------------------------ LA PORTA UNICA
+    //
+    // La pagina che spedisce passa; poi le quattro riscritture CORRETTE che la
+    // versione a due statement appuntati faceva andare rossa; poi i quattro
+    // modi veri di aprire una seconda porta.
+    {
+      what: 'the page that ships has one door, and the reader finds it',
+      caught: oneDoor(read('src/main.js')),
+    },
+    {
+      what: 'and it still finds it with braces on the key, which is the rewrite that broke the old one',
+      caught: oneDoor("window.setDevPose = (asked) => devPose.place(asked);\n"
+        + "if (code === 'KeyP') {\n  devPose.place(POSE_TARGET);\n}"),
+    },
+    {
+      what: 'and with the handle written as a function with a body instead of an arrow',
+      caught: oneDoor('window.setDevPose = function place(asked) {\n'
+        + '  return devPose.place(asked);\n};\n'
+        + "if (code === 'KeyP') devPose.place(POSE_TARGET);"),
+    },
+    {
+      what: 'and with the whole of it re-indented and re-spaced',
+      caught: oneDoor('  window . setDevPose  =  ( asked )  =>  devPose . place( asked ) ;\n'
+        + "    if ( code === 'KeyP' )   devPose . place( POSE_TARGET ) ;"),
+    },
+    {
+      what: 'and with the key branch grown a guard and a log above the placement',
+      caught: oneDoor('window.setDevPose = (asked) => devPose.place(asked);\n'
+        + "if (code === 'KeyP') {\n  if (!ready) return;\n  devPose.place(POSE_TARGET);\n}"),
+    },
+    {
+      what: 'a key that places the camera itself instead of going through the seat is caught',
+      caught: !oneDoor('window.setDevPose = (asked) => devPose.place(asked);\n'
+        + "if (code === 'KeyP') camera.position.set(0.599, 1.583, 14.215);"),
+    },
+    {
+      what: 'and a handle that goes round it is caught',
+      caught: !oneDoor('window.setDevPose = (asked) => camera.position.copy(asked);\n'
+        + "if (code === 'KeyP') devPose.place(POSE_TARGET);"),
+    },
+    {
+      what: 'and a second door opened anywhere on the page is caught',
+      caught: !oneDoor('window.setDevPose = (asked) => devPose.place(asked);\n'
+        + "if (code === 'KeyP') devPose.place(POSE_TARGET);\n"
+        + 'player.setPose(POSE_TARGET);'),
+    },
+    {
+      what: 'and a page with no key at all is caught, which is the door quietly walled up',
+      caught: !oneDoor('window.setDevPose = (asked) => devPose.place(asked);'),
+    },
   ]);
 }
 
@@ -853,9 +981,7 @@ report.check(posesOff === 0,
 // AND THERE IS ONE DOOR. A seat only ends an argument while it is the only place
 // the argument can be had, so the page is read for a second placement.
 const mainText = read('src/main.js');
-report.check(/window\.setDevPose = \(asked\) => devPose\.place\(asked\);/.test(mainText)
-  && /if \(code === 'KeyP'\) devPose\.place\(POSE_TARGET\);/.test(mainText)
-  && !/player\.setPose\(/.test(mainText),
+report.check(oneDoor(mainText),
   'the P key and window.setDevPose go through that seat and the page places nothing itself',
   'one door, in src/dev/pose.js');
 
