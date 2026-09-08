@@ -826,8 +826,11 @@ report.check(PAL.length === 6
 // reading — the reference's air of those 227 metres included. Any air this world
 // then puts in front of it is the same air counted twice. The distance term now
 // declines to do it (its path has its origin at that plane: AIR_PATH_ORIGIN),
-// and what is left over the reference is 5 / 16 / 33, ALL of it the low haze's
-// ceiling, which is E-LUCE2's and frozen. The note that stood here gave 37 of
+// and what is left over the reference is 4 / 14 / 30, ALL of it the low haze's
+// ceiling -- which is no longer a choice either: D-L8-1 took it from 0.13, "a
+// little past the last window E-LUCE2 fitted", to the haze AT that window on
+// that window's own ray, and this plane is where those two thousandths are worth
+// four levels of blue. The note that stood here gave 37 of
 // the 45 levels of blue to the distance and 8 to the ceiling; it read them with
 // THE PIGMENT AT ZERO, where a ceiling that MIXES replaces nothing and looks
 // cheap. Over the rock in shadow it replaces a blue of 0.104 with a fog of
@@ -842,9 +845,9 @@ report.check(PAL.length === 6
 // second is the one the palette was solved against, so it is the one printed.
 // --------------------------------------------------------------------------
 const AIR_PLANES = [
-  { what: 'near flank', d: 227, h: 21, reference: [74, 104, 103], today: [79, 120, 137] },
-  { what: 'middle crest', d: 400, h: 10, reference: [83, 139, 180], today: [88, 138, 184] },
-  { what: 'pale veil', d: 1550, h: 45, reference: [149, 187, 213], today: [134, 178, 210] },
+  { what: 'near flank', d: 227, h: 21, reference: [74, 104, 103], today: [79, 118, 133] },
+  { what: 'middle crest', d: 400, h: 10, reference: [83, 139, 180], today: [88, 136, 184] },
+  { what: 'pale veil', d: 1550, h: 45, reference: [149, 187, 213], today: [134, 179, 210] },
 ];
 const AIR_DRIFT = 2;
 
@@ -896,7 +899,7 @@ report.line('  the near flank is over on all three and no palette reaches it FRO
 report.line('  in shadow with the air off against that very mask, so the pigment develops to '
   + '74 / 104 / 103 exactly, and every metre of air this world adds');
 report.line('  is the air of the reference counted a second time. The distance term declines to add '
-  + 'it; the 5 / 16 / 33 left over is ALL the low haze');
+  + 'it; the 4 / 14 / 30 left over is ALL the low haze');
 report.line('  ceiling, which is E-LUCE2 and frozen. Closing it means re-solving the palette WITH '
   + 'the air in front of it. Owner: the coordinator, D-L8-1');
 
