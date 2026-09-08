@@ -37,26 +37,79 @@ import { read, reporter, selfTest } from './lib.mjs';
 //   FOR EVERY COLUMN OF THE WORLD, AND EVERY EYE THE RING WAS BUILT TO COVER,
 //   IS THE RING AT THAT COLUMN'S BEARING AT LEAST AS STEEP AS THE COLUMN IS?
 //
-// and it asks it against the LAW -- columnSpec, sampled finer than the coarse
-// cells the ring is built from -- so a mistake in the reduction, in the byte, in
-// the bearing or in the padding fails here instead of in the picture.
+// ===========================================================================
+// U-GUARDIA-3: WHY THIS FILE WAS REWRITTEN, AND WHAT THE DEFECT WAS.
+//
+// This guard shipped four legs and eight injections and, on the tip it was
+// asked on, HALF THE INJECTIONS WENT THROUGH -- E-PERF5's own residue, carried
+// forward through E-LUCE5 and E-CORNICE3 as «guard-orizzonte --self 4/8».
+// Diagnosed here, and it is one cause and not four:
+//
+//   THE WORLD IT MEASURED ITSELF ON HAS NO GROUND ABOVE THE EYE ANY MORE.
+//   Over the whole far window -- 409.6 m square, sampled at a quarter of a
+//   coarse cell -- the law returns 198 columns and the tallest of them stands
+//   at 0.650 m, against an eye at 1.583. The crest at 96 m fell with
+//   U-CORNICE-1 (R6 §3: «cadono cresta a 96 m»), and the plateau that is left
+//   is flat.
+//
+// Every leg of this guard filters its samples by `y <= eye.y` and every
+// injection is a way of writing the ring WRONG FOR GROUND THAT STANDS OVER THE
+// EYE. With no such ground the filter empties the set, `worst` stays at
+// -Infinity, and `worst <= 0` is true. The guard was printing «il peggior
+// campione sta Infinity di pendenza SOTTO l'anello» and going green on
+// nothing: legs 1, 2, 4 and 7 were all VACUOUS, and the four injections that
+// went through were the four that need a hill.
+//
+// THE CURE IS NOT A LOWER THRESHOLD, IT IS GROUND. The property being guarded
+// is a property of the CONSTRUCTION -- of an arc, a bearing, a bias and a
+// padding -- and not of this month's terrain, so the guard now brings its own
+// terrain. A BANCO is a piece of ground made for the question: coarse cells of
+// the size the real ones are, at chosen bearings and distances, standing over
+// the eye, together with the law samples that fill them (their nearest point,
+// their four CORNERS, and a grid across them). Every leg and every injection
+// runs on every banco AND on the world, and what is asserted is what a self
+// test can honestly assert: the guard's own predicate says no to the defect,
+// and yes to the correct ring, on the same ground.
+//
+// Two things follow, and both are deliberate:
+//
+//   THE WORLD IS STILL MEASURED, and it is the terrain that ships -- but the
+//   legs that need a hill say out loud how much they had to bite on. A run
+//   where the world offers nothing NOTEs it instead of going quietly green,
+//   which is the whole of what went wrong here. The world's own emptiness is
+//   not gated: it is not this guard's to move.
+//
+//   THE BANCHI ARE GATED, and they are what makes the guard non-vacuous for
+//   ever after. V5 will put ground back above the eye and the world's legs will
+//   bite again; until then the banchi are the only reason to believe any of it.
 //
 // ===========================================================================
 // THE LEGS
 //
-//   1. CONSERVATIVE, STANDING STILL. Sample the law across the far window at a
-//      quarter of a coarse cell. Every sample that stands above the eye must be
-//      under the ring at its own bearing.
+//   0. THE MODEL IS THE ENGINE'S. Every injection below is the ring written
+//      with one thing wrong, which means there is a second implementation of
+//      campoHorizon in this file. If it drifted, the self test would be putting
+//      defects through a strawman. So the model with NOTHING wrong is compared
+//      against the engine's own ring, bin for bin, on every terrain.
+//   1. CONSERVATIVE, STANDING STILL. Every sample that stands above the eye
+//      must be under the ring at its own bearing.
 //   2. CONSERVATIVE, HAVING WALKED. The same, for an eye moved by up to the
 //      reach the ring declares -- in x, in z and in y, and in every diagonal of
 //      the three -- without rebuilding the ring. This is the leg the padding
-//      exists for, and the one a tidy-up would delete first.
+//      exists for, and the one a tidy-up would delete first. It is asked of the
+//      ring as campoHorizon BUILDS it.
+//   2b. THE SAME STEP, ON THE RING THE FRAGMENT READS -- campoHorizon clamped
+//      to the single bound campo-field.js hands it. The two are not the same
+//      ring and this unit found out why: see the note the run prints. Gated on
+//      the world, measured on the banchi, owner named.
 //   3. NEVER LOOSER THAN THE ONE BOUND. The ring may only ever cut MORE than
 //      the single slope did: a bearing above it would be a regression dressed
 //      as a feature.
 //   4. AND IT ACTUALLY CUTS. A ring that equalled the single bound everywhere
 //      would pass legs 1-3 and buy nothing; the share of bearings strictly
-//      under it, and by how much, is asserted rather than admired.
+//      under it, and by how much, is asserted rather than admired -- on ground
+//      that is not the same in every direction, because on ground that is, the
+//      right answer is a ring that cuts nothing.
 //   5. ONE LAW IN TWO LANGUAGES. The fragment finds its bearing with its own
 //      arithmetic and campoBearingOf finds it with JavaScript. The two literals
 //      that decide it are read out of the shader's source and compared with the
@@ -67,11 +120,11 @@ import { read, reporter, selfTest } from './lib.mjs';
 //   7. AND IT DOES NOT COST THE WALK. This is written on the thread the walker
 //      is on, four times a second, and E-PERF4's whole finding was that the
 //      spikes of a walk are exactly that shape. So the work is COUNTED and
-//      gated as a count -- «what you gate cannot be a clock» -- against what it
-//      does today, with a ceiling that leaves room and no more.
+//      gated as a count -- «what you gate cannot be a clock» -- with a ceiling
+//      that leaves room and no more. The ceiling bites on the far banco, whose
+//      cells stand at the distance the world's own ridge used to.
 // ===========================================================================
 
-const report = reporter('guard-orizzonte -- a ray thrown away could not have hit');
 const injected = process.argv.includes('--self');
 
 const shape = CAMPO_FAR;
@@ -81,6 +134,11 @@ const X0 = origin.cx * shape.tile * shape.cell;
 const Z0 = origin.cz * shape.tile * shape.cell;
 const SPAN = shape.side * shape.cell;
 const N = Math.round(SPAN / cell);
+
+// The tallest ground a byte can carry: campoGroundByte saturates at 255, so a
+// banco cannot ask for a hill higher than this and must not silently get a
+// shorter one.
+const BYTE_CEILING = (255 - CAMPO_BIAS) * VOXEL;
 
 /**
  * The coarse square, as the worker lays it: the tallest ground in each piece,
@@ -114,13 +172,10 @@ function coarseFromLaw() {
   return top;
 }
 
-const coarse = coarseFromLaw();
-const patches = [{ x0: X0, z0: Z0, cell, n: N, top: coarse }];
-
 /**
  * Every place the law puts ground, at a quarter of a coarse cell: the samples
- * the ring has to be true about. Held once, because the sweep runs it for eight
- * eyes and the law is not cheap.
+ * the ring has to be true about. Held once, because the sweep runs it for four
+ * eyes and nine steps each, and the law is not cheap.
  */
 function lawSamples(step) {
   const out = [];
@@ -133,50 +188,11 @@ function lawSamples(step) {
   }
   return out;
 }
-const samples = lawSamples(cell / 4);
 
-/** The single bound of campo-field.js skySlope(), written here to compare. */
-function oneBound(eye) {
-  let worst = -1e9;
-  for (let j = 0; j < N; j += 1) {
-    const az = Z0 + j * cell;
-    const dz = Math.max(az - eye.z, 0, eye.z - (az + cell));
-    for (let i = 0; i < N; i += 1) {
-      const byte = coarse[j * N + i];
-      if (!byte) continue;
-      const ax = X0 + i * cell;
-      const dx = Math.max(ax - eye.x, 0, eye.x - (ax + cell));
-      const y = (byte - CAMPO_BIAS) * VOXEL + CAMPO_BLADE_CEIL;
-      if (y <= eye.y) continue;
-      const d = Math.max(1, Math.hypot(dx, dz));
-      const s = (y - eye.y) / d;
-      if (s > worst) worst = s;
-    }
-  }
-  return Math.max(0, worst) + CAMPO_HORIZON_MARGIN;
-}
-
-/**
- * THE ONE QUESTION. Given a ring built for `built`, and an eye actually at
- * `eye`, the worst amount by which a sample of the law stands ABOVE what the
- * ring says can be there. Nought or less is safe; anything positive is a hole.
- */
-function worstBreach(ring, built, eye, bend = null, over = null) {
-  let worst = -Infinity;
-  let where = null;
-  for (const [x, z, y] of (over || samples)) {
-    if (y <= eye.y) continue;
-    const dx = x - eye.x;
-    const dz = z - eye.z;
-    const d = Math.hypot(dx, dz);
-    if (d < 1e-3) continue;
-    const slope = (y - eye.y) / d;
-    const bin = bend ? bend(dx, dz) : campoBearingOf(dx, dz, ring.length);
-    const breach = slope - ring[bin];
-    if (breach > worst) { worst = breach; where = { x, z, y, slope, bin, has: ring[bin] }; }
-  }
-  return { worst, where, built };
-}
+// ---------------------------------------------------------------------------
+// THE TERRAINS. A terrain is ground the ring has to answer for -- the coarse
+// patches campoHorizon reads, the law samples that fill them, and the eyes it
+// is asked about. The world is one of them and is not privileged.
 
 const EYES = [];
 for (const name of ['target', 'bordo-indietro']) {
@@ -186,231 +202,44 @@ for (const name of ['target', 'bordo-indietro']) {
 EYES.push({ name: 'peggiore (-4, 16)', x: -4, y: 1.7, z: 16 });
 EYES.push({ name: 'centro del mondo', x: CENTRE.x, y: 1.7, z: CENTRE.z });
 
-const R = CAMPO_HORIZON_REACH;
-// Every corner of the box the ring declares it covers, and the middle of it.
-const STEPS = [
-  [0, 0, 0], [R, 0, 0], [-R, 0, 0], [0, 0, R], [0, 0, -R],
-  [R, R, R], [-R, R, -R], [R, R, -R], [-R, R, R],
-];
-
-if (!injected) {
-  let worstStill = -Infinity;
-  let worstWalked = -Infinity;
-  let worstStillAt = null;
-  let worstWalkedAt = null;
-  let ringOverBound = -Infinity;
-  const cutShare = [];
-  const cutDepth = [];
-
-  for (const eye of EYES) {
-    const bound = oneBound(eye);
-    const ring = campoHorizon(new Float32Array(CAMPO_BEARINGS), patches, eye,
-      CAMPO_HORIZON_REACH, bound);
-    // 3/4: the ring against the single bound.
-    let under = 0;
-    let sum = 0;
-    for (let b = 0; b < CAMPO_BEARINGS; b += 1) {
-      ringOverBound = Math.max(ringOverBound, ring[b] - bound);
-      if (ring[b] < bound - 1e-9) under += 1;
-      sum += bound - ring[b];
-    }
-    cutShare.push(under / CAMPO_BEARINGS);
-    cutDepth.push(sum / CAMPO_BEARINGS / Math.max(bound, 1e-9));
-
-    for (const [dx, dy, dz] of STEPS) {
-      const moved = { x: eye.x + dx, y: eye.y + dy, z: eye.z + dz };
-      const { worst, where } = worstBreach(ring, eye, moved);
-      const still = dx === 0 && dy === 0 && dz === 0;
-      if (still && worst > worstStill) { worstStill = worst; worstStillAt = { eye, where }; }
-      if (!still && worst > worstWalked) { worstWalked = worst; worstWalkedAt = { eye, where }; }
-    }
-  }
-
-  report.check(worstStill <= 0, '1. conservativo, da fermi',
-    `il peggior campione sta ${(-worstStill).toFixed(4)} di pendenza SOTTO l'anello`
-    + (worstStillAt && worstStillAt.where
-      ? ` (posa ${worstStillAt.eye.name}, bidone ${worstStillAt.where.bin})` : ''));
-  report.check(worstWalked <= 0, '2. conservativo, dopo un passo',
-    `con l'occhio mosso di ${R} m in ogni verso il margine peggiore resta `
-    + `${(-worstWalked).toFixed(4)}`
-    + (worstWalkedAt && worstWalkedAt.where
-      ? ` (posa ${worstWalkedAt.eye.name}, bidone ${worstWalkedAt.where.bin})` : ''));
-  report.check(ringOverBound <= 1e-6, "3. mai piu' lasco del bound unico",
-    `il bidone piu' alto sta ${ringOverBound.toFixed(6)} sopra la pendenza sola`);
-  const share = Math.min(...cutShare);
-  const depth = Math.min(...cutDepth);
-  report.check(share >= 0.5 && depth >= 0.05, '4. e taglia davvero',
-    `almeno ${(share * 100).toFixed(1)}% dei bidoni sta sotto il bound unico, `
-    + `in media ${(depth * 100).toFixed(1)}% piu' basso`);
-
-  // 5. THE SAME NUMBERING IN BOTH LANGUAGES.
-  //
-  // Asked of the SOURCE and not of the compiled numbers, because the property
-  // that matters is not "these two constants happen to agree today": it is that
-  // the fragment is BUILT OUT OF CAMPO_BEARINGS AND Math.PI, so the day
-  // somebody moves the bin count the two cannot come apart. A shader carrying
-  // 40.74366543 written out by hand would pass a numeric check and fail this
-  // one, which is the right way round.
-  const glsl = read('src/world/voxel/campo-material.js');
-  const wants = [
-    'atan(dir0.z, dir0.x)',
-    '${Math.PI.toFixed(8)}',
-    '${(CAMPO_BEARINGS / (Math.PI * 2)).toFixed(8)}',
-    'clamp(bearing, 0, ${CAMPO_BEARINGS - 1})',
-  ];
-  const missing = wants.filter((w) => !glsl.includes(w));
-  report.check(missing.length === 0, '5. una legge in due lingue',
-    missing.length ? `manca dal frammento: ${missing.join(' | ')}`
-      : "il frammento e' costruito su atan(dir0.z, dir0.x), Math.PI e CAMPO_BEARINGS, "
-        + 'gli stessi tre di campoBearingOf');
-
-  // 6. THE SHAPE OF THE UNIFORM.
-  const vecs = CAMPO_BEARINGS / 4;
-  const declared = glsl.includes(`uniform vec4 uSkyRing[\${CAMPO_BEARINGS / 4}]`);
-  report.check(CAMPO_BEARINGS % 4 === 0 && declared, "6. l'anello e' la forma che il seggio porta",
-    `${CAMPO_BEARINGS} bidoni = ${vecs} vec4, e il materiale li dichiara cosi'`);
-
-  // 7. THE RECEIPT.
-  //
-  // AT_TODAY, taken at the four eyes above: writes per cell above the eye, and
-  // how many cells claimed the whole ring. The ceiling is not a round number --
-  // it is what today does plus a third, which is enough for the ridge V5 will
-  // raise and not enough for a law that starts handing whole rings out.
-  const AT_TODAY = { perAbove: 7.65, whole: 0 };
-  const CEILING = { perAbove: 10.0, whole: 0 };
-  let worstPer = 0;
-  let worstWhole = 0;
-  for (const eye of EYES) {
-    campoHorizon(new Float32Array(CAMPO_BEARINGS), patches, eye, CAMPO_HORIZON_REACH,
-      oneBound(eye));
-    const c = campoHorizonCost();
-    const per = c.writes / Math.max(1, c.above);
-    if (per > worstPer) worstPer = per;
-    if (c.whole > worstWhole) worstWhole = c.whole;
-  }
-  report.check(worstPer <= CEILING.perAbove && worstWhole <= CEILING.whole,
-    '7. e non costa la camminata',
-    `${worstPer.toFixed(2)} scritture per cella sopra l'occhio (oggi ${AT_TODAY.perAbove}, `
-    + `tetto ${CEILING.perAbove}), ${worstWhole} anelli interi (tetto ${CEILING.whole})`);
-
-  report.line(`  ${samples.length} campioni della legge, ${EYES.length} occhi, `
-    + `${STEPS.length} passi ciascuno, ${CAMPO_BEARINGS} bidoni`);
-  report.end();
-}
-
-// ---------------------------------------------------------------------------
-// AND THE OTHER DIRECTION: the guard against defects put into the ring itself.
-//
-// Every one of these is a way the ring could plausibly be written -- three of
-// them are how anybody would write it the first time -- and every one of them
-// leaves a hole in the ground on a bearing nobody has walked to.
-const eye = { x: POSES.target.position.x, y: POSES.target.position.y, z: POSES.target.position.z };
-const bound = oneBound(eye);
-const good = campoHorizon(new Float32Array(CAMPO_BEARINGS), patches, eye,
-  CAMPO_HORIZON_REACH, bound);
-const cases = [];
-
-/** The ring written the way the defect writes it. */
-function bent({ centreOnly = false, reach = CAMPO_HORIZON_REACH, margin = true,
-  inward = false, longWay = false }) {
-  const out = new Float32Array(CAMPO_BEARINGS).fill(0);
-  const eyeLow = eye.y - reach;
-  for (let j = 0; j < N; j += 1) {
-    for (let i = 0; i < N; i += 1) {
-      const byte = coarse[j * N + i];
-      if (!byte) continue;
-      const y = (byte - CAMPO_BIAS) * VOXEL + CAMPO_BLADE_CEIL;
-      if (y <= eyeLow) continue;
-      const ax = X0 + i * cell;
-      const az = Z0 + j * cell;
-      const dx = Math.max(ax - eye.x, 0, eye.x - (ax + cell));
-      const dz = Math.max(az - eye.z, 0, eye.z - (az + cell));
-      const raw = Math.hypot(dx, dz);
-      const d = Math.max(1, raw - reach);
-      const slope = (y - eyeLow) / d + (margin ? CAMPO_HORIZON_MARGIN : 0);
-      if (centreOnly) {
-        // The way anybody writes it first: the cell's CENTRE, one bearing.
-        const b = campoBearingOf(ax + cell * 0.5 - eye.x, az + cell * 0.5 - eye.z);
-        if (slope > out[b]) out[b] = slope;
-        continue;
-      }
-      if (raw <= reach) { out.fill(Math.max(out[0], slope)); continue; }
-      const TAU = Math.PI * 2;
-      const angles = [
-        Math.atan2(az - eye.z, ax - eye.x), Math.atan2(az - eye.z, ax + cell - eye.x),
-        Math.atan2(az + cell - eye.z, ax - eye.x),
-        Math.atan2(az + cell - eye.z, ax + cell - eye.x),
-      ].sort((p, q) => p - q);
-      let gap = -1; let at = 0;
-      for (let k = 0; k < 4; k += 1) {
-        const g = (angles[(k + 1) & 3] - angles[k] + TAU) % TAU;
-        if (g > gap) { gap = g; at = (k + 1) & 3; }
-      }
-      const pad = Math.atan2(reach, raw);
-      const lo = longWay ? angles[0] - pad : angles[at] - pad;
-      const hi = longWay ? angles[3] + pad : angles[at] + (TAU - gap) + pad;
-      const b0 = inward ? Math.ceil((lo + Math.PI) / TAU * CAMPO_BEARINGS) + 1
-        : Math.floor((lo + Math.PI) / TAU * CAMPO_BEARINGS) - 1;
-      const b1 = inward ? Math.floor((hi + Math.PI) / TAU * CAMPO_BEARINGS) - 1
-        : Math.ceil((hi + Math.PI) / TAU * CAMPO_BEARINGS) + 1;
-      if (b1 - b0 >= CAMPO_BEARINGS) { out.fill(Math.max(out[0], slope)); continue; }
-      for (let b = b0; b <= b1; b += 1) {
-        const k = ((b % CAMPO_BEARINGS) + CAMPO_BEARINGS) % CAMPO_BEARINGS;
-        if (slope > out[k]) out[k] = slope;
-      }
-    }
-  }
-  return out;
-}
-
-// (a) the arc collapsed to the cell's centre bearing
-cases.push({
-  what: "l'arco ridotto alla direzione del CENTRO della cella",
-  caught: worstBreach(bent({ centreOnly: true }), eye, eye).worst > 0,
-});
-// (b) no room for the walker's step: the ring is exact standing still and a
-//     hole opens the moment they move
-// ---------------------------------------------------------------------------
-// TWO OF THE DEFECTS CANNOT BE SHOWN ON THIS WORLD, AND THAT IS ITSELF A
-// FINDING RATHER THAN A GAP.
-//
-// The padding for the walker's step and the wrap of the arc at the back of the
-// eye are both properties of the CONSTRUCTION, and on this particular plateau
-// neither is load-bearing: the ridge stands sixty to a hundred metres out, so a
-// step of thirty centimetres moves its bearing by a fifth of a degree and its
-// slope by half a percent, and the conservatism the coarse cell already carries
-// -- a MAXIMUM over 6.4 m, measured from its NEAREST corner -- swallows both.
-// Take the padding out today and the picture does not break.
-//
-// It breaks on the world where it matters, which is a mound beside the walker
-// -- and V5 is going to put ground closer to the eye than this plateau does. So
-// the two are injected on GROUND MADE FOR THEM: one cell of the same size the
-// real ones are, at the distance the real defect needs, and the guard is asked
-// whether it says no. What is being tested is the guard's own predicate, which
-// is the only thing a self test can honestly test.
-// ---------------------------------------------------------------------------
+const WORLD = {
+  name: 'il mondo, dalla legge',
+  world: true,
+  patches: [{ x0: X0, z0: Z0, cell, n: N, top: coarseFromLaw() }],
+  samples: lawSamples(cell / 4),
+  eyes: EYES,
+};
 
 /**
- * One coarse cell, wherever it is wanted, and the samples that fill it --
- * INCLUDING the point of it nearest the eye.
+ * One coarse cell, wherever it is wanted, and the samples that fill it.
  *
- * That last point is the whole reason this helper exists rather than reusing
- * the law's grid. The ring measures a cell from its nearest corner and takes
- * the tallest ground anywhere in it, so a sample drawn from the middle of the
- * cell is always further away and always lower than what the ring allows: it
+ * WHICH POINTS, AND WHY THOSE. The ring measures a cell from its NEAREST corner
+ * and takes the tallest ground anywhere in it, so a sample drawn from the
+ * middle is always further away and always lower than what the ring allows: it
  * carries a slack of its own that would swallow the very defect being injected.
- * The nearest point is where the ring is TIGHT, and it is the only place a
- * missing margin can be seen.
+ * The nearest point is where the ring is TIGHT IN DISTANCE and the four CORNERS
+ * are where it is tight IN BEARING -- the arc is built out of exactly those
+ * four angles, so a quantisation that truncates it inward is only visible from
+ * them. The interior grid is there so that a defect which spares the rim has
+ * nowhere to hide either.
+ *
+ * The corners are drawn a hair inside the cell: a sample exactly on the shared
+ * edge of two cells belongs to both, and this guard is about one.
  */
-function loneCell(cx, cz, height, eyeAt) {
+function loneCell(cx, cz, top, eyeAt) {
   const x0 = Math.floor(cx / cell) * cell;
   const z0 = Math.floor(cz / cell) * cell;
-  const patch = { x0, z0, cell, n: 1, top: Uint8Array.from([campoGroundByte(height)]) };
-  const y = (height + 1) * VOXEL + CAMPO_BLADE_CEIL;
-  const pts = [[
-    Math.min(Math.max(eyeAt.x, x0), x0 + cell),
-    Math.min(Math.max(eyeAt.z, z0), z0 + cell), y,
-  ]];
+  const patch = { x0, z0, cell, n: 1, top: Uint8Array.from([campoGroundByte(top)]) };
+  const y = (top + 1) * VOXEL + CAMPO_BLADE_CEIL;
+  const in0 = 1e-6;
+  const in1 = cell - 1e-6;
+  const pts = [
+    // the nearest point of the cell to the eye
+    [Math.min(Math.max(eyeAt.x, x0), x0 + cell), Math.min(Math.max(eyeAt.z, z0), z0 + cell), y],
+    // and its four corners, which are the four angles the arc is built from
+    [x0 + in0, z0 + in0, y], [x0 + in1, z0 + in0, y],
+    [x0 + in0, z0 + in1, y], [x0 + in1, z0 + in1, y],
+  ];
   for (let b = 0; b < 4; b += 1) {
     for (let a = 0; a < 4; a += 1) {
       pts.push([x0 + (a + 0.5) / 4 * cell, z0 + (b + 0.5) / 4 * cell, y]);
@@ -419,108 +248,724 @@ function loneCell(cx, cz, height, eyeAt) {
   return { patch, pts };
 }
 
-// (b) THE PADDING. A mound two metres from the eye and a metre over it: with the
-//     eye held as a POINT the ring is exact, and the walker's next step opens a
-//     hole in it.
-const near = loneCell(eye.x + 8, eye.z, Math.round((eye.y + 5) / VOXEL) - 1, eye);
-const noPad = campoHorizon(new Float32Array(CAMPO_BEARINGS), [near.patch], eye, 0, Infinity);
-const padded = campoHorizon(new Float32Array(CAMPO_BEARINGS), [near.patch], eye);
-cases.push({
-  what: "nessun margine per il passo del camminatore (reach = 0), e l'occhio si muove",
-  caught: STEPS.some(([dx, dy, dz]) => (dx || dy || dz)
-    && worstBreach(noPad, eye, { x: eye.x + dx, y: eye.y + dy, z: eye.z + dz },
-      null, near.pts).worst > 0)
-    // and the padded ring, on the same ground and the same steps, does not.
-    && STEPS.every(([dx, dy, dz]) => worstBreach(padded, eye,
-      { x: eye.x + dx, y: eye.y + dy, z: eye.z + dz }, null, near.pts).worst <= 0),
-});
-// (c) the bearing read with the axes swapped -- the ring is right and the
-//     fragment looks it up in the wrong place
-cases.push({
-  what: 'il frammento cerca il bidone con gli assi scambiati',
-  caught: worstBreach(good, eye, eye, (dx, dz) => campoBearingOf(dx, dz) === 0
-    ? 0 : campoBearingOf(dz, dx)).worst > 0,
-});
-// (d) the arc truncated INWARD instead of outward -- the quantisation written
-//     the natural way round, which throws away the two bearings at its ends.
-//     (An off-by-one of a single bearing is NOT injected here, and that is a
-//     statement and not an omission: the ring is deliberately widened by one
-//     bearing at each end, so it survives one, and a guard that demanded it
-//     fail would be demanding the padding be taken out.)
-cases.push({
-  what: "l'arco troncato all'INDENTRO invece che all'infuori",
-  caught: worstBreach(bent({ inward: true }), eye, eye).worst > 0,
-});
-// (e) a ring allowed above the single bound is a regression the other legs
-//     would not see
-const loose = Float32Array.from(good, (v) => v + 0.05);
-cases.push({
-  what: 'un bidone lasciato sopra il bound unico',
-  caught: Array.from(loose).some((v) => v > bound + 1e-6),
-});
-// (f) the bias taken off twice -- every ground ten metres under the eye, the
-//     ring collapses to nought, and every ray in the frame is thrown away
-const twice = campoHorizon(new Float32Array(CAMPO_BEARINGS),
-  [{ x0: X0, z0: Z0, cell, n: N, top: Uint8Array.from(coarse,
-    (v) => (v ? Math.max(1, v - CAMPO_BIAS) : 0)) }], eye, CAMPO_HORIZON_REACH, bound);
-cases.push({
-  what: 'il bias della quota tolto due volte',
-  caught: worstBreach(twice, eye, eye).worst > 0,
-});
-// (g) THE WRAP. A cell due west of the eye straddles the cut of atan2, so the
-//     smallest and the largest of its four corner angles are on OPPOSITE sides
-//     of it: taken as a range they describe the whole rest of the circle, and
-//     the ring gets the height written everywhere EXCEPT where the cell is.
-const west = loneCell(eye.x - 40, eye.z, Math.round((eye.y + 6) / VOXEL) - 1, eye);
-function ringOf(patch, longWay) {
-  const out = new Float32Array(CAMPO_BEARINGS).fill(0);
-  const TAU = Math.PI * 2;
-  const y = (patch.top[0] - CAMPO_BIAS) * VOXEL + CAMPO_BLADE_CEIL;
-  const dx = Math.max(patch.x0 - eye.x, 0, eye.x - (patch.x0 + cell));
-  const dz = Math.max(patch.z0 - eye.z, 0, eye.z - (patch.z0 + cell));
-  const raw = Math.hypot(dx, dz);
-  const slope = (y - (eye.y - CAMPO_HORIZON_REACH))
-    / Math.max(1, raw - CAMPO_HORIZON_REACH) + CAMPO_HORIZON_MARGIN;
-  const angles = [
-    Math.atan2(patch.z0 - eye.z, patch.x0 - eye.x),
-    Math.atan2(patch.z0 - eye.z, patch.x0 + cell - eye.x),
-    Math.atan2(patch.z0 + cell - eye.z, patch.x0 - eye.x),
-    Math.atan2(patch.z0 + cell - eye.z, patch.x0 + cell - eye.x),
-  ].sort((p, q) => p - q);
-  let gap = -1; let at = 0;
-  for (let k = 0; k < 4; k += 1) {
-    const g = (angles[(k + 1) & 3] - angles[k] + TAU) % TAU;
-    if (g > gap) { gap = g; at = (k + 1) & 3; }
+/**
+ * A BANCO: cells placed by bearing and distance from one eye, at a height over
+ * it. The bearing is the ring's own -- atan2(dz, dx) -- so that a banco can be
+ * written to straddle the cut of atan2 on purpose.
+ */
+function banco(name, eye, places) {
+  const patches = [];
+  const samples = [];
+  for (const { bearing, distance, rise } of places) {
+    if (eye.y + rise > BYTE_CEILING) {
+      throw new Error(`banco ${name}: ${(eye.y + rise).toFixed(1)} m `
+        + `is over the ground byte's own ceiling of ${BYTE_CEILING.toFixed(1)} m`);
+    }
+    const a = bearing * Math.PI / 180;
+    const one = loneCell(eye.x + Math.cos(a) * distance, eye.z + Math.sin(a) * distance,
+      Math.round((eye.y + rise) / VOXEL) - 1, eye);
+    patches.push(one.patch);
+    samples.push(...one.pts);
   }
-  const pad = Math.atan2(CAMPO_HORIZON_REACH, raw);
-  const lo = longWay ? angles[0] - pad : angles[at] - pad;
-  const hi = longWay ? angles[3] + pad : angles[at] + (TAU - gap) + pad;
-  const b0 = Math.floor((lo + Math.PI) / TAU * CAMPO_BEARINGS) - 1;
-  const b1 = Math.ceil((hi + Math.PI) / TAU * CAMPO_BEARINGS) + 1;
-  for (let b = b0; b <= b1; b += 1) {
-    const k = ((b % CAMPO_BEARINGS) + CAMPO_BEARINGS) % CAMPO_BEARINGS;
-    if (slope > out[k]) out[k] = slope;
+  return { name, patches, samples, eyes: [{ ...eye, name: 'la posa fittata' }] };
+}
+
+const AT = { x: POSES.target.position.x, y: POSES.target.position.y, z: POSES.target.position.z };
+
+const spread = (from, to, step) => {
+  const out = [];
+  for (let b = from; b <= to; b += step) out.push(b);
+  return out;
+};
+
+// THE THREE BANCHI, and each one is written for a different half of the
+// argument. Together they carry ground above the eye at wide arcs, at narrow
+// ones, across the cut of atan2, and on one side of the walker only.
+const BANCHI = [
+  // WIDE ARCS AND ONE SIDE ONLY. Cells eleven metres out subtend most of thirty
+  // degrees each, which is twenty bearings: this is where an arc collapsed to a
+  // centre, truncated inward, or looked up with the axes swapped leaves a hole.
+  // And it is a quadrant and not a ring, so leg 4 has something to cut.
+  banco('banco vicino -- una cresta di lato, ad archi larghi', AT,
+    spread(20, 160, 20).map((bearing) => ({ bearing, distance: 11, rise: 4 }))),
+  // NARROW ARCS, ACROSS THE CUT OF atan2. A hundred and twenty metres out a
+  // cell is three bearings wide, which is where the receipt of leg 7 is a real
+  // ceiling; and bearing 180 is where atan2 wraps, which is the defect that
+  // writes the height into the whole ring EXCEPT where the cell is.
+  banco('banco lontano -- la cresta oltre il taglio di atan2', AT,
+    spread(150, 210, 5).map((bearing) => ({ bearing, distance: 120, rise: 9 }))),
+  // ONE MOUND BESIDE THE WALKER. Close and high, which is the only geometry the
+  // padding for the step is load-bearing on -- and the geometry V5 is going to
+  // put back beside the eye.
+  banco('banco del monticello -- uno solo, vicino e alto', AT,
+    [{ bearing: 0, distance: 8, rise: 5 }]),
+];
+
+const TERRAINS = [WORLD, ...BANCHI];
+
+const shortName = (terrain) => terrain.name.split(' --')[0];
+
+// ---------------------------------------------------------------------------
+// THE ARITHMETIC THE LEGS ARE WRITTEN IN.
+
+/** The single bound of campo-field.js skySlope(), written here to compare. */
+function oneBound(patches, eye) {
+  let worst = -1e9;
+  for (const patch of patches) {
+    const { x0, z0, cell: c, n, top } = patch;
+    for (let j = 0; j < n; j += 1) {
+      const az = z0 + j * c;
+      const dz = Math.max(az - eye.z, 0, eye.z - (az + c));
+      for (let i = 0; i < n; i += 1) {
+        const byte = top[j * n + i];
+        if (!byte) continue;
+        const ax = x0 + i * c;
+        const dx = Math.max(ax - eye.x, 0, eye.x - (ax + c));
+        const y = (byte - CAMPO_BIAS) * VOXEL + CAMPO_BLADE_CEIL;
+        if (y <= eye.y) continue;
+        const d = Math.max(1, Math.hypot(dx, dz));
+        const s = (y - eye.y) / d;
+        if (s > worst) worst = s;
+      }
+    }
+  }
+  return Math.max(0, worst) + CAMPO_HORIZON_MARGIN;
+}
+
+/**
+ * THE ONE QUESTION. Given a ring, and an eye actually at `eye`, the worst
+ * amount by which a sample of the law stands ABOVE what the ring says can be
+ * there. Nought or less is safe; anything positive is a hole.
+ *
+ * `tested` is the half this guard did not have, and the whole of why it went
+ * green on nothing: how many samples the question was actually asked of. A
+ * verdict of «safe» over nought samples is not a verdict.
+ */
+function worstBreach(ring, eye, samples, bend = null) {
+  let worst = -Infinity;
+  let where = null;
+  let tested = 0;
+  for (const [x, z, y] of samples) {
+    if (y <= eye.y) continue;
+    const dx = x - eye.x;
+    const dz = z - eye.z;
+    const d = Math.hypot(dx, dz);
+    if (d < 1e-3) continue;
+    tested += 1;
+    const slope = (y - eye.y) / d;
+    const bin = bend ? bend(dx, dz) : campoBearingOf(dx, dz, ring.length);
+    const breach = slope - ring[bin];
+    if (breach > worst) { worst = breach; where = { x, z, y, slope, bin, has: ring[bin] }; }
+  }
+  return { worst, where, tested };
+}
+
+/**
+ * THE RING, MODELLED -- the engine's own construction, with one thing wrong.
+ *
+ * This is a second implementation of campoHorizon and it is dangerous for
+ * exactly that reason, so leg 0 compares it against the engine on every terrain
+ * with no defect set. Each flag is one way the ring could plausibly be written,
+ * and three of them are how anybody would write it the first time.
+ *
+ *   centreOnly  the arc collapsed to the bearing of the cell's centre
+ *   reach       how far the eye may wander; 0 is «no padding for the step»
+ *   margin      the slope margin the single bound has always carried
+ *   inward      the quantisation rounded INTO the arc instead of out of it
+ *   longWay     the arc taken between the smallest and the largest of the four
+ *               corner angles, which straddles the cut of atan2
+ *   halfBias    the ground byte with CAMPO_BIAS taken off a second time
+ */
+function ringOf(terrain, eye, {
+  centreOnly = false, reach = CAMPO_HORIZON_REACH, margin = true,
+  inward = false, longWay = false, halfBias = false,
+} = {}) {
+  const bins = CAMPO_BEARINGS;
+  const out = new Float32Array(bins).fill(0);
+  const TAU = Math.PI * 2;
+  const eyeLow = eye.y - reach;
+  for (const patch of terrain.patches) {
+    const { x0, z0, cell: c, n, top } = patch;
+    for (let j = 0; j < n; j += 1) {
+      for (let i = 0; i < n; i += 1) {
+        const shipped = top[j * n + i];
+        if (!shipped) continue;
+        const byte = halfBias ? Math.max(1, shipped - CAMPO_BIAS) : shipped;
+        const y = (byte - CAMPO_BIAS) * VOXEL + CAMPO_BLADE_CEIL;
+        if (y <= eyeLow) continue;
+        const ax = x0 + i * c;
+        const az = z0 + j * c;
+        const dx = Math.max(ax - eye.x, 0, eye.x - (ax + c));
+        const dz = Math.max(az - eye.z, 0, eye.z - (az + c));
+        const raw = Math.hypot(dx, dz);
+        const d = Math.max(1, raw - reach);
+        const slope = (y - eyeLow) / d + (margin ? CAMPO_HORIZON_MARGIN : 0);
+        if (centreOnly) {
+          // The way anybody writes it first: the cell's CENTRE, one bearing.
+          const b = campoBearingOf(ax + c * 0.5 - eye.x, az + c * 0.5 - eye.z, bins);
+          if (slope > out[b]) out[b] = slope;
+          continue;
+        }
+        if (raw <= reach) {
+          for (let b = 0; b < bins; b += 1) if (slope > out[b]) out[b] = slope;
+          continue;
+        }
+        const a = [
+          Math.atan2(az - eye.z, ax - eye.x), Math.atan2(az - eye.z, ax + c - eye.x),
+          Math.atan2(az + c - eye.z, ax - eye.x), Math.atan2(az + c - eye.z, ax + c - eye.x),
+        ];
+        let lo;
+        let hi;
+        if (longWay) {
+          const sorted = [...a].sort((p, q) => p - q);
+          lo = sorted[0];
+          hi = sorted[3];
+        } else {
+          // The engine's own: offsets from the first corner, each wrapped into
+          // (-pi, pi], so an arc narrower than half a turn cannot straddle the
+          // cut and the smallest and largest offsets are its two ends.
+          let lowOff = 0;
+          let highOff = 0;
+          for (let k = 1; k < 4; k += 1) {
+            let d0 = a[k] - a[0];
+            if (d0 > Math.PI) d0 -= TAU;
+            else if (d0 < -Math.PI) d0 += TAU;
+            if (d0 < lowOff) lowOff = d0;
+            if (d0 > highOff) highOff = d0;
+          }
+          lo = a[0] + lowOff;
+          hi = a[0] + highOff;
+        }
+        const swing = Math.atan2(reach, raw);
+        lo -= swing;
+        hi += swing;
+        const b0 = inward ? Math.ceil((lo + Math.PI) / TAU * bins) + 1
+          : Math.floor((lo + Math.PI) / TAU * bins) - 1;
+        const b1 = inward ? Math.floor((hi + Math.PI) / TAU * bins) - 1
+          : Math.ceil((hi + Math.PI) / TAU * bins) + 1;
+        if (b1 - b0 >= bins) {
+          for (let b = 0; b < bins; b += 1) if (slope > out[b]) out[b] = slope;
+          continue;
+        }
+        for (let b = b0; b <= b1; b += 1) {
+          const k = ((b % bins) + bins) % bins;
+          if (slope > out[k]) out[k] = slope;
+        }
+      }
+    }
   }
   return out;
 }
-cases.push({
-  what: "l'arco preso fra il minimo e il massimo dei quattro angoli (il giro lungo)",
-  caught: worstBreach(ringOf(west.patch, true), eye, eye, null, west.pts).worst > 0
-    && worstBreach(ringOf(west.patch, false), eye, eye, null, west.pts).worst <= 0,
-});
+
+/** The engine's own ring for a terrain and an eye, unclamped unless asked. */
+const engineRing = (terrain, eye, reach = CAMPO_HORIZON_REACH, ceiling = Infinity) =>
+  campoHorizon(new Float32Array(CAMPO_BEARINGS), terrain.patches, eye, reach, ceiling);
+
+const R = CAMPO_HORIZON_REACH;
+
+// EVERY EYE THE RING DECLARES IT ANSWERS FOR, AND NOT ONE MORE.
+//
+// THIS IS A DEFECT THIS UNIT FOUND IN THE GUARD RATHER THAN IN THE RING, and it
+// was invisible for the same reason the other four were: with no ground above
+// the eye there was nothing for an over-strict step to break on. The steps
+// shipped here were the corners of a CUBE of half-side `reach` -- (±R, ±R, ±R)
+// -- which is 0.424 m of horizontal travel where campoHorizon pads by 0.300.
+// Put on ground that stands over the eye, that asks the ring to be true about
+// an eye it never promised to cover, and leg 2 goes red on a correct ring.
+//
+// WHAT THE RING ACTUALLY PROMISES, read off its own arithmetic: the slope is
+// taken from an eye lowered by `reach` (eyeLow) and nearer by `reach` (d = raw
+// - reach), and the arc is widened by atan2(reach, raw). Those three are
+// simultaneous, so what is covered is a CYLINDER: horizontal travel up to
+// `reach` in any direction, together with a rise or a fall up to `reach`.
+//
+// So the steps are that cylinder -- its axis, its rim at eight bearings, and
+// both lids -- and the horizontal ones are scaled to a RADIUS of R rather than
+// laid on a square. src/world/voxel/campo-field.js rebuilds the ring when the
+// eye has travelled 0.25 m horizontally or 0.25 m in height, so the 0.30 the
+// ring pads by covers the travel it will actually see by a fifth; that coupling
+// lives in a file this guard cannot import offline and is NOTEd rather than
+// gated (owner: the field, U-CAMPO).
+const STEPS = [[0, 0, 0]];
+for (let k = 0; k < 8; k += 1) {
+  const a = k * Math.PI / 4;
+  for (const dy of [-R, 0, R]) STEPS.push([Math.cos(a) * R, dy, Math.sin(a) * R]);
+}
+STEPS.push([0, R, 0], [0, -R, 0]);
+
+// ---------------------------------------------------------------------------
+// LEGS 5 AND 6 AS PREDICATES, so the self test can put a defect through the
+// same code the run uses rather than through a story about it.
+
+const GLSL_SOURCE = 'src/world/voxel/campo-material.js';
+
+// Asked of the SOURCE and not of the compiled numbers, because the property
+// that matters is not "these two constants happen to agree today": it is that
+// the fragment is BUILT OUT OF CAMPO_BEARINGS AND Math.PI, so the day somebody
+// moves the bin count the two cannot come apart. A shader carrying 40.74366543
+// written out by hand would pass a numeric check and fail this one, which is
+// the right way round -- and the self test injects exactly that shader.
+const WANTS = [
+  'atan(dir0.z, dir0.x)',
+  '${Math.PI.toFixed(8)}',
+  '${(CAMPO_BEARINGS / (Math.PI * 2)).toFixed(8)}',
+  'clamp(bearing, 0, ${CAMPO_BEARINGS - 1})',
+];
+
+/** What the fragment is missing of the terms campoBearingOf is written in. */
+const twoLanguages = (glsl) => WANTS.filter((w) => !glsl.includes(w));
+
+/** Whether the material declares the ring as the vec4s the fragment reads. */
+const ringShape = (glsl) => CAMPO_BEARINGS % 4 === 0
+  && glsl.includes('uniform vec4 uSkyRing[${CAMPO_BEARINGS / 4}]');
+
+// ===========================================================================
+
+if (!injected) {
+  const report = reporter('guard-orizzonte -- a ray thrown away could not have hit');
+
+  // LEG 0 -- the model the injections go through is the engine's.
+  let modelGap = 0;
+  for (const terrain of TERRAINS) {
+    for (const eye of terrain.eyes) {
+      const mine = ringOf(terrain, eye, {});
+      const theirs = engineRing(terrain, eye);
+      for (let b = 0; b < CAMPO_BEARINGS; b += 1) {
+        modelGap = Math.max(modelGap, Math.abs(mine[b] - theirs[b]));
+      }
+    }
+  }
+  report.check(modelGap === 0, "0. il modello delle iniezioni e' l'anello del motore",
+    `su ${TERRAINS.length} terreni il divario peggiore fra i due anelli e' ${modelGap}`);
+
+  // LEGS 1-4, terrain by terrain, and every one of them says how much it bit on.
+  let banchiTested = 0;
+  const benchExposure = [];
+  for (const terrain of TERRAINS) {
+    let worstStill = -Infinity;
+    let worstWalked = -Infinity;
+    let worstClamped = -Infinity;
+    let stillAt = null;
+    let walkedAt = null;
+    let clampedAt = null;
+    let ringOverBound = -Infinity;
+    let tested = 0;
+    const cutShare = [];
+    const cutDepth = [];
+
+    for (const eye of terrain.eyes) {
+      const bound = oneBound(terrain.patches, eye);
+      // TWO RINGS, AND THE DIFFERENCE BETWEEN THEM IS A FINDING OF THIS UNIT.
+      // `read` is what the fragment actually reads: campoHorizon clamped to the
+      // single bound campo-field.js hands it. `free` is what campoHorizon
+      // BUILDS, before the clamp. See the note under leg 2b.
+      const read = engineRing(terrain, eye, CAMPO_HORIZON_REACH, bound);
+      const free = engineRing(terrain, eye, CAMPO_HORIZON_REACH);
+      // 3/4: the ring against the single bound.
+      let under = 0;
+      let sum = 0;
+      for (let b = 0; b < CAMPO_BEARINGS; b += 1) {
+        ringOverBound = Math.max(ringOverBound, read[b] - bound);
+        if (read[b] < bound - 1e-9) under += 1;
+        sum += bound - read[b];
+      }
+      cutShare.push(under / CAMPO_BEARINGS);
+      cutDepth.push(sum / CAMPO_BEARINGS / Math.max(bound, 1e-9));
+
+      for (const [dx, dy, dz] of STEPS) {
+        const moved = { x: eye.x + dx, y: eye.y + dy, z: eye.z + dz };
+        const still = dx === 0 && dy === 0 && dz === 0;
+        if (still) {
+          const seen = worstBreach(read, moved, terrain.samples);
+          tested += seen.tested;
+          if (seen.worst > worstStill) { worstStill = seen.worst; stillAt = { eye, where: seen.where }; }
+          continue;
+        }
+        const walked = worstBreach(free, moved, terrain.samples);
+        if (walked.worst > worstWalked) { worstWalked = walked.worst; walkedAt = { eye, where: walked.where }; }
+        const clamped = worstBreach(read, moved, terrain.samples);
+        if (clamped.worst > worstClamped) { worstClamped = clamped.worst; clampedAt = { eye, where: clamped.where }; }
+      }
+    }
+    if (!terrain.world) banchiTested += tested;
+
+    const margin = (v) => (Number.isFinite(v) ? `${(-v).toFixed(4)} di pendenza SOTTO l'anello`
+      : "NESSUN CAMPIONE SOPRA L'OCCHIO: non e' un verdetto");
+    report.line('');
+    report.line(`  ${terrain.name}`);
+    report.line(`    ${terrain.patches.length} riquadri, ${terrain.samples.length} campioni, `
+      + `${terrain.eyes.length} occhi, ${tested} campioni sopra l'occhio`);
+    report.check(worstStill <= 0, '1. conservativo, da fermi',
+      `il peggior campione sta ${margin(worstStill)}`
+      + (stillAt && stillAt.where ? ` (posa ${stillAt.eye.name}, bidone ${stillAt.where.bin})` : ''));
+    report.check(worstWalked <= 0, "2. conservativo, dopo un passo (l'anello come campoHorizon lo costruisce)",
+      `con l'occhio mosso di ${R} m in ogni verso il peggiore sta ${margin(worstWalked)}`
+      + (walkedAt && walkedAt.where ? ` (posa ${walkedAt.eye.name}, bidone ${walkedAt.where.bin})` : ''));
+
+    // LEG 2b -- THE SAME STEP, ON THE RING THE FRAGMENT ACTUALLY READS.
+    //
+    // Gated on the world and measured on the banchi, and the reason is written
+    // out in the note below: the exposure is campo-field.js's, not this file's,
+    // and it is not reachable from a worktree that owns tools/guards only.
+    const exposed = worstClamped > 0;
+    if (terrain.world) {
+      report.check(!exposed, '2b. e anche col soffitto del bound unico addosso',
+        `${margin(worstClamped)}`
+        + (clampedAt && clampedAt.where ? ` (posa ${clampedAt.eye.name}, bidone ${clampedAt.where.bin})` : ''));
+    } else {
+      report.line(`    2b. col soffitto del bound unico addosso: ${margin(worstClamped)}`
+        + `${exposed ? '  <-- SCOPERTO' : ''}`);
+      if (exposed) benchExposure.push({ terrain, worst: worstClamped, at: clampedAt });
+    }
+
+    report.check(ringOverBound <= 1e-6, "3. mai piu' lasco del bound unico",
+      `il bidone piu' alto sta ${ringOverBound.toFixed(6)} sopra la pendenza sola`);
+
+    // LEG 4 ONLY WHERE IT MEANS ANYTHING. On ground that stands nowhere -- or
+    // that stands equally in every direction -- the correct ring cuts nothing,
+    // and a gate that demanded otherwise would be demanding a hole.
+    const share = Math.min(...cutShare);
+    const depth = Math.min(...cutDepth);
+    if (tested > 0 && !terrain.world) {
+      report.check(share >= 0.5 && depth >= 0.05, '4. e taglia davvero',
+        `almeno ${(share * 100).toFixed(1)}% dei bidoni sta sotto il bound unico, `
+        + `in media ${(depth * 100).toFixed(1)}% piu' basso`);
+    } else {
+      report.line(`    4. taglia il ${(share * 100).toFixed(1)}% dei bidoni, `
+        + `${(depth * 100).toFixed(1)}% piu' basso -- non gateato su questo terreno`);
+    }
+  }
+
+  if (WORLD.samples.every(([, , y]) => y <= WORLD.eyes[0].y)) {
+    const tallest = Math.max(...WORLD.samples.map((s) => s[2]), 0);
+    report.note("IL MONDO NON HA PIU' TERRA SOPRA L'OCCHIO, e questo e' il numero: su "
+      + `${WORLD.samples.length} campioni della legge nella finestra lontana (${SPAN} m di `
+      + `lato, passo ${(cell / 4).toFixed(2)} m) ZERO stanno sopra l'occhio -- la piu' alta `
+      + `e' a ${tallest.toFixed(3)} m contro ${WORLD.eyes[0].y.toFixed(3)} della posa `
+      + 'fittata. La cresta a 96 m e\' caduta con U-CORNICE-1 (R6 §3) e l\'altopiano che '
+      + 'resta e\' piatto: su QUESTO terreno le gambe 1, 2, 4 e 7 non hanno nulla da '
+      + 'mordere, ed e\' esattamente perche\' nessuno se ne accorgeva che questa guardia '
+      + 'lasciava passare quattro iniezioni su otto (E-PERF5, E-LUCE5, E-CORNICE3). I '
+      + 'banchi qui sopra sono la terra che il guard si porta. Non e\' gateato: la terra '
+      + 'del mondo non e\' di questa guardia. Proprietari: U-CORNICE (le colline oltre '
+      + 'l\'acqua) e U-CAMPO (l\'altopiano).');
+  }
+
+  report.check(banchiTested > 0, "e i banchi hanno terra sopra l'occhio da mordere",
+    `${banchiTested} campioni sopra l'occhio sui ${BANCHI.length} banchi`);
+
+  // THE SECOND FINDING OF THIS UNIT, AND IT IS NOT THIS FILE'S TO FIX.
+  //
+  // campoHorizon takes a padding for the walker's step -- it lowers the eye by
+  // `reach` and brings it `reach` nearer -- and then campo-field.js hands it a
+  // CEILING which is skySlope(eye), computed at the EXACT eye with no padding
+  // at all, and the last line of campoHorizon clamps the ring down to it. On
+  // the steepest bearing of the world the padding is therefore thrown away, and
+  // all that is left to carry the step is the 0.02 the single bound adds by
+  // hand.
+  //
+  // WHERE THAT STOPS BEING ENOUGH IS A DIVISION. A walker who drops by `reach`
+  // raises the slope to ground at distance d by reach/d, with no help from the
+  // horizontal at all, so the margin covers the drop only while
+  // d >= reach / margin. Both numbers are the engine's own, so the distance is
+  // computed here rather than stated: 0.30 / 0.02 = 15.0 m.
+  //
+  // It has never bitten because the nearest ground above the eye has always
+  // stood sixty metres out or more -- campo-field.js says exactly that: «a
+  // quarter of a metre of parallax on a ridge sixty metres away, which the
+  // margin above covers many times over». It bites the day V5 puts a mound
+  // beside the walker, which is E-PERF5's own residue («margine dell'anello da
+  // rimisurare quando V5 mette terra vicino all'occhio») now measured instead
+  // of predicted. The world's leg 2b above is GATED, so this goes red on its
+  // own the day the world grows that ground.
+  const CROSS = CAMPO_HORIZON_REACH / CAMPO_HORIZON_MARGIN;
+  if (benchExposure.length) {
+    report.note('IL SOFFITTO DEL BOUND UNICO BUTTA VIA IL MARGINE DEL PASSO, misurato: '
+      + `campoHorizon si prende ${CAMPO_HORIZON_REACH} m di margine per il passo del `
+      + 'camminatore e poi campo-field.js gli passa come soffitto skySlope(eye), che e\' '
+      + `calcolato all'occhio ESATTO; l'ultima riga di campoHorizon lo ritaglia li' sotto. `
+      + `Resta solo il ${CAMPO_HORIZON_MARGIN} che il bound unico aggiunge a mano, e quello `
+      + `copre una discesa di ${CAMPO_HORIZON_REACH} m soltanto oltre `
+      + `${CAMPO_HORIZON_REACH}/${CAMPO_HORIZON_MARGIN} = ${CROSS.toFixed(1)} m dall'occhio `
+      + '(il termine di quota da solo, reach/d). Sui banchi con terra piu\' vicina di cosi\' '
+      + `il campione peggiore SFONDA l'anello: `
+      + benchExposure.map(({ terrain, worst }) => `${shortName(terrain)} +${worst.toFixed(4)}`).join(', ')
+      + '. Sul mondo NON sfonda e la gamba 2b e\' gateata li\': l\'unica terra sopra '
+      + 'l\'occhio che questo mondo avra\' e\' quella che V5 mettera\', e il giorno che la '
+      + 'mette questa guardia diventa rossa da sola. NON E\' RIPARABILE DA QUI: la cura sta '
+      + 'in src/world/voxel/campo-field.js (skySlope prenda lo stesso occhio imbottito che '
+      + 'campoHorizon prende, o il soffitto porti il proprio margine). E\' il residuo di '
+      + 'E-PERF5 «margine dell\'anello da rimisurare quando V5 mette terra vicino '
+      + 'all\'occhio», ora misurato invece che previsto. Proprietario: U-CAMPO (il campo).');
+  }
+
+  // LEG 5 -- the same numbering in both languages.
+  report.line('');
+  const glsl = read(GLSL_SOURCE);
+  const missing = twoLanguages(glsl);
+  report.check(missing.length === 0, '5. una legge in due lingue',
+    missing.length ? `manca dal frammento: ${missing.join(' | ')}`
+      : "il frammento e' costruito su atan(dir0.z, dir0.x), Math.PI e CAMPO_BEARINGS, "
+        + 'gli stessi tre di campoBearingOf');
+
+  // LEG 6 -- the shape of the uniform.
+  report.check(ringShape(glsl), "6. l'anello e' la forma che il seggio porta",
+    `${CAMPO_BEARINGS} bidoni = ${CAMPO_BEARINGS / 4} vec4, e il materiale li dichiara cosi'`);
+
+  // LEG 7 -- THE RECEIPT.
+  //
+  // Writes per cell above the eye, and how many cells claimed the whole ring.
+  // The ceiling is not a round number -- it is what a cell at the distance of a
+  // real crest costs, plus room, and not enough for a law that starts handing
+  // whole rings out. It is gated on the FAR banco because that is where the
+  // world's own ridge stood and where this number is a ceiling rather than a
+  // triviality; every terrain's reading is printed beside it.
+  const CEILING = { perAbove: 10.0, whole: 0 };
+  const receipts = [];
+  for (const terrain of TERRAINS) {
+    let worstPer = 0;
+    let worstWhole = 0;
+    let above = 0;
+    for (const eye of terrain.eyes) {
+      engineRing(terrain, eye, CAMPO_HORIZON_REACH, oneBound(terrain.patches, eye));
+      const c = campoHorizonCost();
+      above += c.above;
+      const per = c.writes / Math.max(1, c.above);
+      if (per > worstPer) worstPer = per;
+      if (c.whole > worstWhole) worstWhole = c.whole;
+    }
+    receipts.push({ terrain, worstPer, worstWhole, above });
+  }
+  const far = receipts.find((r) => shortName(r.terrain) === 'banco lontano');
+  report.check(far.worstPer <= CEILING.perAbove && far.worstWhole <= CEILING.whole,
+    '7. e non costa la camminata',
+    `${far.worstPer.toFixed(2)} scritture per cella sopra l'occhio sul banco lontano `
+    + `(tetto ${CEILING.perAbove}), ${far.worstWhole} anelli interi (tetto ${CEILING.whole})`);
+  // AND NO TERRAIN MAY HAND OUT A WHOLE RING while the eye stands outside every
+  // cell of it: one of those is 256 writes, and a law that starts producing
+  // them shows up here before it shows up in a walk.
+  report.check(receipts.every((r) => r.worstWhole === 0),
+    "e nessun terreno regala l'anello intero",
+    receipts.map((r) => `${shortName(r.terrain)} ${r.worstWhole}`).join(', '));
+  for (const r of receipts) {
+    report.line(`    ${shortName(r.terrain).padEnd(22)} ${r.worstPer.toFixed(2)} scritture `
+      + `per cella sopra l'occhio, ${r.above} celle sopra`);
+  }
+
+  report.line('');
+  report.line(`  ${TERRAINS.length} terreni, ${CAMPO_BEARINGS} bidoni, `
+    + `${STEPS.length} passi per occhio`);
+  report.end();
+}
+
+// ---------------------------------------------------------------------------
+// AND THE OTHER DIRECTION: the guard against defects put into the ring itself.
+//
+// Every one of these is a way the ring could plausibly be written, and every
+// one of them leaves a hole in the ground on a bearing nobody has walked to.
+//
+// THE FORM OF EVERY CASE IS THE SAME, and it is the form that makes a self test
+// worth anything: the guard's predicate must say NO to the defect and YES to
+// the correct ring, ON THE SAME GROUND. A case that only showed the defect
+// failing would not distinguish a working instrument from one that says no to
+// everything -- and a case that had no ground to say it on is what this file
+// used to ship. `inject` walks the terrains and names the one where both halves
+// hold, so a defect that is load-bearing on no ground this guard has says so
+// out loud instead of being quietly dropped.
+
+const cases = [];
+
+/** Is the correct ring safe on this terrain, at this eye, over these steps? */
+function safe(terrain, eye, steps) {
+  const ring = engineRing(terrain, eye);
+  return steps.every(([dx, dy, dz]) => worstBreach(ring,
+    { x: eye.x + dx, y: eye.y + dy, z: eye.z + dz }, terrain.samples).worst <= 0);
+}
+
+/**
+ * A defect, put on every terrain, and caught when SOME terrain both breaks
+ * under it and is safe without it.
+ *
+ * @param {string} what   the defect, in words
+ * @param {(terrain, eye) => Float32Array} build  the ring as the defect writes it
+ * @param {{bend: Function, steps: number[][]}} how  a wrong bearing lookup, and
+ *        which eyes to ask from
+ */
+function inject(what, build, { bend = null, steps = [[0, 0, 0]] } = {}) {
+  let on = null;
+  for (const terrain of TERRAINS) {
+    for (const eye of terrain.eyes) {
+      const ring = build(terrain, eye);
+      const breaks = steps.some(([dx, dy, dz]) => worstBreach(ring,
+        { x: eye.x + dx, y: eye.y + dy, z: eye.z + dz }, terrain.samples, bend).worst > 0);
+      if (breaks && safe(terrain, eye, steps)) { on = shortName(terrain); break; }
+    }
+    if (on) break;
+  }
+  cases.push({ what: `${what}${on ? `  [${on}]` : ''}`, caught: Boolean(on) });
+}
+
+// (a) the arc collapsed to the cell's centre bearing
+inject("l'arco ridotto alla direzione del CENTRO della cella",
+  (t, eye) => ringOf(t, eye, { centreOnly: true }));
+
+// (b) THE PADDING. No room for the walker's step: the ring is exact standing
+//     still and a hole opens the moment they move.
+inject("nessun margine per il passo del camminatore (reach = 0), e l'occhio si muove",
+  (t, eye) => ringOf(t, eye, { reach: 0 }), { steps: STEPS });
+
+// (c) the bearing read with the axes swapped -- the ring is right and the
+//     fragment looks it up in the wrong place
+inject('il frammento cerca il bidone con gli assi scambiati',
+  (t, eye) => engineRing(t, eye), { bend: (dx, dz) => campoBearingOf(dz, dx) });
+
+// (d) the arc truncated INWARD instead of outward -- the quantisation written
+//     the natural way round, which throws away the bearings at its ends. (An
+//     off-by-one of a SINGLE bearing is not injected, and that is a statement
+//     and not an omission: the ring is deliberately widened by one bearing at
+//     each end, so it survives one, and a guard that demanded it fail would be
+//     demanding the padding be taken out. This one rounds in by two.)
+inject("l'arco troncato all'INDENTRO invece che all'infuori",
+  (t, eye) => ringOf(t, eye, { inward: true }));
+
+// (e) THE WRAP. A cell straddling the cut of atan2 has its smallest and its
+//     largest corner angle on OPPOSITE sides of it: taken as a range they
+//     describe the whole rest of the circle, and the ring gets the height
+//     written everywhere EXCEPT where the cell is. The far banco is written
+//     across that cut on purpose.
+inject("l'arco preso fra il minimo e il massimo dei quattro angoli (il giro lungo)",
+  (t, eye) => ringOf(t, eye, { longWay: true }));
+
+// (f) the bias taken off twice -- every ground ten metres under the eye, the
+//     ring collapses to nought, and every ray in the frame is thrown away
+inject('il bias della quota tolto due volte',
+  (t, eye) => ringOf(t, eye, { halfBias: true }));
+
+// THE SLOPE MARGIN IS NOT INJECTED, AND THAT IS A FINDING RATHER THAN A GAP.
+//
+// CAMPO_HORIZON_MARGIN cannot be load-bearing, structurally: the ring's own
+// slope is taken from an eye lowered by `reach` and a distance shortened by
+// `reach`, so it is STRICTLY above the true slope of any sample from the exact
+// eye before the margin is added at all. Measured on the three banchi, the
+// worst sample stands under the ring by 0.0721 / 0.0028 / 0.1041 with the
+// margin taken out and 0.0921 / 0.0228 / 0.1241 with it in. So it is slack on
+// top of slack -- worth having (at 120 m it is 89% of what is left), and a
+// guard that claimed to catch its removal would be claiming something false.
+// It is stated here instead, which is what the campaign's own method asks for.
+
+// (g) A RING ALLOWED ABOVE THE SINGLE BOUND, which is a regression the legs
+//     above would not see: it is not a hole, it is the ring buying nothing.
+//     Put through leg 3's own predicate rather than through a breach.
+{
+  let on = null;
+  for (const terrain of TERRAINS) {
+    for (const eye of terrain.eyes) {
+      const bound = oneBound(terrain.patches, eye);
+      const good = engineRing(terrain, eye, CAMPO_HORIZON_REACH, bound);
+      const loose = Float32Array.from(good, (v) => v + 0.05);
+      const over = (ring) => Array.from(ring).some((v) => v > bound + 1e-6);
+      if (over(loose) && !over(good)) { on = shortName(terrain); break; }
+    }
+    if (on) break;
+  }
+  cases.push({ what: `un bidone lasciato sopra il bound unico  [${on}]`, caught: Boolean(on) });
+}
 
 // (h) the swing of the walker's step measured against the CLAMPED distance
 //     instead of the raw one -- which for the cells a metre away opens the arc
-//     to a third of a turn each and turns the ring into a fill
-const wide = new Float32Array(CAMPO_BEARINGS);
-campoHorizon(wide, patches, eye, 3.0, bound);
-const wideCost = campoHorizonCost();
-campoHorizon(wide, patches, eye, CAMPO_HORIZON_REACH, bound);
-const trueCost = campoHorizonCost();
-cases.push({
-  what: "il margine del passo allargato, e la ricevuta dell'anello lo dice",
-  caught: wideCost.writes / Math.max(1, wideCost.above)
-    > trueCost.writes / Math.max(1, trueCost.above) * 1.3,
-});
+//     to a third of a turn each and turns the ring into a fill. Caught on the
+//     RECEIPT, which is leg 7's own instrument.
+{
+  const t = BANCHI[0];
+  const eye = t.eyes[0];
+  engineRing(t, eye, 3.0);
+  const wide = campoHorizonCost();
+  engineRing(t, eye, CAMPO_HORIZON_REACH);
+  const tight = campoHorizonCost();
+  cases.push({
+    what: "il margine del passo allargato, e la ricevuta dell'anello lo dice",
+    caught: wide.writes / Math.max(1, wide.above)
+      > tight.writes / Math.max(1, tight.above) * 1.3,
+  });
+}
+
+// (i) THE DEFECT THIS FILE SHIPPED: a verdict read off nought samples. Every
+//     leg above filters by «above the eye», so a terrain with no such ground
+//     makes all of them true of the empty set -- which is how four injections
+//     went through for three sessions. The predicate that has to say no is
+//     worstBreach's own count, and it is asserted here so that no rewrite can
+//     quietly go back to calling an empty set a pass.
+{
+  const t = BANCHI[0];
+  const eye = t.eyes[0];
+  const overhead = { ...eye, y: 400 };          // an eye above every hill there is
+  const empty = worstBreach(engineRing(t, overhead), overhead, t.samples);
+  const full = worstBreach(engineRing(t, eye), eye, t.samples);
+  cases.push({
+    what: "un terreno senza terra sopra l'occhio, e il verdetto letto lo stesso",
+    caught: empty.tested === 0 && empty.worst === -Infinity && full.tested > 0,
+  });
+}
+
+// (j) LEG 2b ITSELF: the ring clamped to a ceiling taken at the EXACT eye,
+//     which is what campo-field.js hands campoHorizon. The leg has to say no on
+//     ground nearer than reach/margin and yes past it -- otherwise the day V5
+//     puts a mound beside the walker the guard stays green through it. Both
+//     halves are asserted, on the two banchi that sit either side of the 15 m
+//     the note above computes.
+{
+  const clampedWalk = (t) => {
+    const eye = t.eyes[0];
+    const read = engineRing(t, eye, CAMPO_HORIZON_REACH, oneBound(t.patches, eye));
+    return STEPS.some(([dx, dy, dz]) => worstBreach(read,
+      { x: eye.x + dx, y: eye.y + dy, z: eye.z + dz }, t.samples).worst > 0);
+  };
+  const near = BANCHI.find((t) => shortName(t) === 'banco del monticello');
+  const far = BANCHI.find((t) => shortName(t) === 'banco lontano');
+  cases.push({
+    what: "il soffitto preso all'occhio esatto, e la terra vicina che ci sfonda dentro",
+    caught: clampedWalk(near) && !clampedWalk(far),
+  });
+}
+
+// (k) THE MODEL DRIFTING FROM THE ENGINE. Leg 0 is what keeps every injection
+//     above honest, so it gets an injection of its own: the model with one
+//     thing wrong must not read as the engine's ring.
+{
+  const t = BANCHI[0];
+  const eye = t.eyes[0];
+  const gapOf = (ring) => {
+    const theirs = engineRing(t, eye);
+    let worst = 0;
+    for (let b = 0; b < CAMPO_BEARINGS; b += 1) worst = Math.max(worst, Math.abs(ring[b] - theirs[b]));
+    return worst;
+  };
+  cases.push({
+    what: "il modello delle iniezioni scostato dal motore",
+    caught: gapOf(ringOf(t, eye, { inward: true })) > 0 && gapOf(ringOf(t, eye, {})) === 0,
+  });
+}
+
+// (l), (m), (n) the two legs read off the shader's source, injected INTO THE
+//     TEXT the run reads rather than described beside it.
+{
+  const glsl = read(GLSL_SOURCE);
+  const clean = twoLanguages(glsl).length === 0;
+  cases.push({
+    what: 'il frammento che cerca il bidone con atan(dir0.x, dir0.z)',
+    caught: clean
+      && twoLanguages(glsl.replace('atan(dir0.z, dir0.x)', 'atan(dir0.x, dir0.z)')).length > 0,
+  });
+  cases.push({
+    what: 'il numero dei bidoni scritto a mano nel frammento invece che interpolato',
+    caught: clean && twoLanguages(glsl.replace('${(CAMPO_BEARINGS / (Math.PI * 2)).toFixed(8)}',
+      (CAMPO_BEARINGS / (Math.PI * 2)).toFixed(8))).length > 0,
+  });
+  cases.push({
+    what: "il seggio dell'anello dichiarato con una taglia sua",
+    caught: ringShape(glsl) && !ringShape(glsl.replace(
+      'uniform vec4 uSkyRing[${CAMPO_BEARINGS / 4}]', 'uniform vec4 uSkyRing[64]')),
+  });
+}
 
 selfTest('guard-orizzonte', cases);
