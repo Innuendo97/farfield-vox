@@ -2,6 +2,18 @@
 //
 //   node tools/lighting/check-suns.mjs            everything
 //   node tools/lighting/check-suns.mjs --sources  only what AUTHORS a bake
+//   node tools/lighting/check-suns.mjs --root=DIR ask the same of another tree
+//
+// --root EXISTS SO THAT THIS CHECK CAN BE SEEN TO FAIL, which is the only thing
+// it was missing. Everything below resolves from the repository root: the seat,
+// the roster of waivers, each consumer's manifest and the Python door. That
+// made guard-suns the one guard in tools/guards/ with no --self at all -- to
+// make this say no, a defect has to be written into a file, and a guard that
+// edits the thing it measures is measuring the edit (and a crash between the
+// bending and the putting back leaves a bent seal on disk). With the root as an
+// argument the injection is a temporary directory holding copies, and nothing
+// in the delivery is ever touched. It is the argument, and nothing else here,
+// that U-GUARDIA-4 opened this file for.
 //
 // The defect it exists for is measured in s2-analisi1/RAPPORTO.md section 1.3:
 // the sky drew a sun at elevation 34, azimuth -9.5, and the three bake scripts
@@ -42,11 +54,25 @@
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { PROD_SUN } from '../clouds/cloud-pieces.mjs';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
   angleBetween, readSun, REPO_ROOT, SUN_SEAT, SUN_SEAT_FIELD, sunVector,
 } from './sun.mjs';
+
+// THE TREE THIS RUN IS ASKING ABOUT. Its own by default, so every existing
+// caller keeps the behaviour it had; another one when --root says so, and then
+// EVERY door below goes through it -- the manifests, the roster, the Python and
+// the cloud generator alike. A root that re-pointed some of them and not the
+// rest would be a check reading two trees at once, which is the shape of the
+// defect this file exists for.
+const ROOT_FLAG = process.argv.find((a) => a.startsWith('--root='));
+const ROOT = ROOT_FLAG ? resolve(ROOT_FLAG.slice('--root='.length)) : REPO_ROOT;
+
+// The cloud generator is a CONSUMER like the manifests, so it is loaded from
+// the root rather than imported from beside this file: a static import would be
+// the one door that always answered about the delivery.
+const { PROD_SUN } = await import(pathToFileURL(join(ROOT, 'tools/clouds/cloud-pieces.mjs')).href);
 
 // Declared, not discovered: half a degree is finer than any bake in this
 // project can resolve (the sun disc is tens of degrees wide) and coarser than
@@ -61,9 +87,9 @@ const check = (ok, what, detail) => {
   if (!ok) failed++;
 };
 
-const read = (path) => JSON.parse(readFileSync(join(REPO_ROOT, path), 'utf8'));
+const read = (path) => JSON.parse(readFileSync(join(ROOT, path), 'utf8'));
 
-const SEAT = readSun();
+const SEAT = readSun(ROOT);
 const SEAT_VEC = sunVector(SEAT.elevation, SEAT.azimuth);
 
 // EVERY CONSUMER THIS GUARD CAN PRESENT, by the file that carries the sun.
@@ -119,6 +145,10 @@ const checkOff = (id, ok, what, detail) => {
 
 console.log(`the seat: ${SUN_SEAT} ${SUN_SEAT_FIELD} `
   + `-> elevation ${SEAT.elevation}, azimuth ${SEAT.azimuth}, tolerance ${TOLERANCE} deg`);
+// Said out loud, and only when it is not the delivery: a run that answered
+// about another tree and did not say so would be the most expensive kind of
+// green there is.
+if (ROOT !== REPO_ROOT) console.log(`  --root: this run asks about ${ROOT}`);
 if (sourcesOnly) console.log('  --sources: the delivered light maps are NOT checked');
 console.log(`  ${WAIVERS.size} declared waiver${WAIVERS.size === 1 ? '' : 's'} `
   + 'in tools/lighting/sun-waivers.json');
@@ -186,7 +216,7 @@ console.log('\nthe two languages mean the same by elevation and bearing');
   let ours = null;
   try {
     ours = JSON.parse(execFileSync('python', ['-c', script], {
-      cwd: REPO_ROOT, encoding: 'utf8',
+      cwd: ROOT, encoding: 'utf8',
     }));
   } catch (error) {
     // No interpreter on the path is not a disagreement. Blender brings its own
@@ -229,8 +259,8 @@ console.log('\nthe seats that author a bake');
 // the defect would come back in — a new authoring seat with a sun written into
 // it — and an empty list is where such a seat gets added.
 for (const path of []) {
-  if (!existsSync(join(REPO_ROOT, path))) continue;
-  const source = readFileSync(join(REPO_ROOT, path), 'utf8');
+  if (!existsSync(join(ROOT, path))) continue;
+  const source = readFileSync(join(ROOT, path), 'utf8');
   const literal = /^SUN_(ELEVATION|BEARING)\s*=\s*[-\d.]/m.exec(source);
   check(!literal, `${path} states no sun of its own`,
     literal ? `declares "${literal[0].trim()}"` : 'reads the seat');
@@ -271,7 +301,7 @@ if (!sourcesOnly) {
     ['assets-src/terrain/terrain.json', 'the ground and the stair'],
   ];
   for (const [path, what] of baked) {
-    if (!existsSync(join(REPO_ROOT, path))) {
+    if (!existsSync(join(ROOT, path))) {
       check(false, what, `${path} is missing`);
       continue;
     }
