@@ -1,4 +1,4 @@
-import { read, readJson, reporter, selfTest } from './lib.mjs';
+import { braceBody, read, readJson, reporter, selfTest } from './lib.mjs';
 
 // THE PIXEL THE WORLD IS DRAWN INTO, THE RANGE IT HAS TO CARRY, AND THE FLOOR IT
 // HAS TO CLOSE.
@@ -55,11 +55,56 @@ const POST = 'src/core/post.js';
 const QUALITY = 'src/core/quality.js';
 const CUBE = 'public/assets/grade-lut.png';
 
+// ==========================================================================
+// HOW THIS FILE READS A SOURCE, AFTER U-GUARDIA-3'S CENSUS.
+//
+// Every reader below used to end its slice on a piece of FORMATTING: the
+// tables closed at the first `\n];` -- a bracket at column nought -- and
+// `allocateCampo` closed at the first `\n  }`, which is a brace at exactly two
+// spaces of indent. Indent one of those blocks by two more spaces, which is
+// what wrapping it in anything would do, and the slice runs to the end of the
+// file or stops at the wrong place, and the verdict is a coincidence either
+// way. And `clearedToNothing` was worse than a slice: it demanded that two
+// STATEMENTS BE ADJACENT, `\s*\n\s*` between them and nothing else, so a
+// comment written between the clear and the bind -- the single most likely
+// edit anybody would ever make there -- turned this guard red on a frame that
+// had not changed.
+//
+// So a block is now closed by its own BRACKET, counted, and the two statements
+// are asked in the only way that is actually the property: does the clear to
+// nought happen BEFORE the bind, with nothing putting it back in between. That
+// survives any number of lines written between them, which is what it should
+// always have done.
+// ==========================================================================
+
+/** The span a bracket opens at, closed by counting its own kind. */
+function bracketBody(text, from, open = '[', close = ']') {
+  const at = text.indexOf(open, from);
+  if (at < 0) return '';
+  let depth = 0;
+  for (let i = at; i < text.length; i++) {
+    if (text[i] === open) depth++;
+    else if (text[i] === close) {
+      depth--;
+      if (depth === 0) return text.slice(at + 1, i);
+    }
+  }
+  return text.slice(at + 1);
+}
+
+/** The body of a function, taken for its name and closed by its own braces. */
+function bodyOf(text, name) {
+  const at = text.indexOf(`function ${name}(`);
+  if (at < 0) return null;
+  const open = text.indexOf('{', text.indexOf(')', at));
+  return open < 0 ? null : braceBody(text, open);
+}
+
 /** The formats post.js knows how to ask a driver for, as it states them. */
 export function formatsOf(text) {
-  const open = text.indexOf('const TARGET_FORMATS = [');
+  const open = text.indexOf('const TARGET_FORMATS =');
   if (open < 0) return [];
-  const body = text.slice(open, text.indexOf('\n];', open));
+  const body = bracketBody(text, open);
   const found = [];
   const entry = /name:\s*'([A-Za-z0-9_]+)'[\s\S]*?bytes:\s*(\d+)[\s\S]*?highDynamicRange:\s*(true|false)[\s\S]*?shipped:\s*(true|false)/g;
   for (let m = entry.exec(body); m; m = entry.exec(body)) {
@@ -75,9 +120,9 @@ export function formatsOf(text) {
 
 /** What each tier asks for: its name, its sample count and its pixel. */
 export function tiersOf(text) {
-  const open = text.indexOf('export const TIERS = [');
+  const open = text.indexOf('export const TIERS =');
   if (open < 0) return [];
-  const body = text.slice(open, text.indexOf('\n];', open));
+  const body = bracketBody(text, open);
   const found = [];
   const entry = /id:\s*'([a-z]+)'[\s\S]*?samples:\s*(\d+),[\s\S]*?sceneFormat:\s*'([A-Za-z0-9_]+)'/g;
   for (let m = entry.exec(body); m; m = entry.exec(body)) {
@@ -97,27 +142,45 @@ export function tiersOf(text) {
  * put back at the frame's own pixel.
  */
 export function campoBufferOf(text) {
-  const open = text.indexOf('function allocateCampo() {');
-  if (open < 0) return null;
-  const body = text.slice(open, text.indexOf('\n  }', open));
+  const body = bodyOf(text, 'allocateCampo');
+  if (body === null) return null;
   return {
-    format: (/format: ([A-Za-z0-9]+)/.exec(body) || [])[1] ?? null,
-    type: (/type: ([A-Za-z0-9]+)/.exec(body) || [])[1] ?? null,
-    nearest: /minFilter: NearestFilter/.test(body) && /magFilter: NearestFilter/.test(body),
-    // AND IT IS CLEARED TO NOTHING. three's own clear alpha is ONE whenever the
-    // canvas is opaque, so a target left to the default arrives with every texel
-    // already claiming to be ground -- and the recomposition, reading a coverage
-    // of one where no ray found anything, paints the whole sky black. That is
-    // not a hypothetical: it is what the first frame this pass ever drew did.
-    clearedToNothing: /gl\.setClearAlpha\(0\);\s*\n\s*gl\.setRenderTarget\(campoTarget\);/.test(text),
+    format: (/format:\s*([A-Za-z0-9]+)/.exec(body) || [])[1] ?? null,
+    type: (/type:\s*([A-Za-z0-9]+)/.exec(body) || [])[1] ?? null,
+    nearest: /minFilter:\s*NearestFilter/.test(body) && /magFilter:\s*NearestFilter/.test(body),
+    clearedToNothing: clearedToNothing(text),
   };
+}
+
+/**
+ * Whether the ground's target is bound with the clear alpha already at nought.
+ *
+ * AND IT IS AN ORDER AND NOT AN ADJACENCY. three's own clear alpha is ONE
+ * whenever the canvas is opaque, so a target left to the default arrives with
+ * every texel already claiming to be ground -- and the recomposition, reading a
+ * coverage of one where no ray found anything, paints the whole sky black. That
+ * is not a hypothetical: it is what the first frame this pass ever drew did.
+ *
+ * What that costs is one property: WHEN THE TARGET IS BOUND, THE CLEAR ALPHA IS
+ * NOUGHT. So the last `setClearAlpha` written before the bind is the one that
+ * has to say nought, and how many lines stand between them is nobody's
+ * business. The reader that stood here demanded the two statements touch, which
+ * made a comment written between them a red.
+ */
+export function clearedToNothing(text) {
+  const bare = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  const bind = bare.indexOf('setRenderTarget(campoTarget)');
+  if (bind < 0) return false;
+  const before = [...bare.slice(0, bind).matchAll(/setClearAlpha\(\s*([^)]*?)\s*\)/g)];
+  const last = before[before.length - 1];
+  return Boolean(last) && Number(last[1]) === 0;
 }
 
 /** What each tier asks the ground's pixel to be, as a fraction of a side. */
 export function campoScalesOf(text) {
-  const open = text.indexOf('export const TIERS = [');
+  const open = text.indexOf('export const TIERS =');
   if (open < 0) return [];
-  const body = text.slice(open, text.indexOf('\n];', open));
+  const body = bracketBody(text, open);
   const found = [];
   const entry = /id:\s*'([a-z]+)'[\s\S]*?campoScale:\s*([\d.]+)/g;
   for (let m = entry.exec(body); m; m = entry.exec(body)) {
@@ -126,12 +189,33 @@ export function campoScalesOf(text) {
   return found;
 }
 
+/** The ground's buffer has the fourth channel the scene's has not. */
+export const groundCarriesCoverage = (campo) => Boolean(campo)
+  && campo.format === 'RGBAFormat' && campo.type === 'HalfFloatType';
+
 /** Bytes of colour per pixel OF THE FRAME that a buffer of this shape costs. */
 export const bytesPerFramePixel = (bytes, scale, samples) => bytes * scale * scale
   * Math.max(1, samples);
 
-/** Whether the grade still takes the cube's own black off its own answer. */
-export const cubeIsAnchored = (text) => /vec3 black = texture2D\(tLut,[\s\S]{0,200}?\(graded - black\) \/ max\(1\.0 - black/.test(text);
+/**
+ * Whether the grade still takes the cube's own black off its own answer.
+ *
+ * THE NAME IS DISCOVERED, NOT PINNED. What stood here matched one expression
+ * with `black` written into it three times and a two hundred character window
+ * between the halves: renaming the local, breaking the line, writing `1.` for
+ * `1.0` or letting the expression grow past the window all turned it red on a
+ * grade that had not moved. What the anchor IS, is a value sampled out of the
+ * cube that is then both SUBTRACTED from the graded colour and used to
+ * renormalise it -- so the reader takes every name the cube is sampled into and
+ * asks which of them is used in both ways. A rename comes through; dropping
+ * either half does not.
+ */
+export function cubeIsAnchored(text) {
+  const bare = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  const sampled = [...bare.matchAll(/\b([A-Za-z_]\w*)\s*=\s*texture2D\(\s*tLut\b/g)].map((m) => m[1]);
+  return sampled.some((name) => new RegExp(`graded\\s*-\\s*${name}\\b`).test(bare)
+    && new RegExp(`\\b1(?:\\.\\d*)?\\s*-\\s*${name}\\b`).test(bare));
+}
 
 // --------------------------------------------------------- the synthetic scene
 //
@@ -205,18 +289,34 @@ const corner = [cube.data[0], cube.data[1], cube.data[2]];
 if (process.argv.includes('--self')) {
   const formats = formatsOf(postText);
   const qualityText = read(QUALITY);
+  // THE TABLES ARE BENT AS VALUES AND NO LONGER AS TEXT. Every one of these
+  // used to be a `replace` of a block of source with its indentation written
+  // into the search string, so a table re-indented by two spaces turned the
+  // injection into a silent no-op and the case into a coincidence. What is
+  // read out of the source is a LIST; a list is what a defect is written into.
+  const shippedCarryLight = (rows) => rows.filter((f) => f.shipped).every((f) => f.highDynamicRange);
+  const tiersDrawIntoLight = (rows, table) => rows
+    .every((t) => (table.find((f) => f.name === t.sceneFormat) || {}).highDynamicRange);
+  // AND THE SAME SOURCE RE-INDENTED, so that the readers are shown to survive
+  // exactly what they used to be broken by: every line pushed in by four
+  // spaces, which is what wrapping a table in anything at all would do.
+  const reindent = (text) => text.replace(/^/gm, '    ');
   selfTest('guard-buffer', [
     {
       what: 'a normalised format promoted into the shipping ladder is caught',
-      caught: !formatsOf(postText.replace(
-        "name: 'RGBA8',\n    bytes: 4,\n    highDynamicRange: false,\n    shipped: false,",
-        "name: 'RGBA8',\n    bytes: 4,\n    highDynamicRange: false,\n    shipped: true,",
-      )).filter((f) => f.shipped).every((f) => f.highDynamicRange),
+      caught: !shippedCarryLight(formats.map((f) => (f.name === 'RGBA8' ? { ...f, shipped: true } : f)))
+        && shippedCarryLight(formats),
+    },
+    {
+      what: 'and a brand new normalised pixel added to the ladder is caught too',
+      caught: !shippedCarryLight([...formats,
+        { name: 'RGBA4', bytes: 2, highDynamicRange: false, shipped: true }]),
     },
     {
       what: 'a tier switched to RGBA8 is caught',
-      caught: !tiersOf(qualityText.replace("sceneFormat: 'R11F_G11F_B10F'", "sceneFormat: 'RGBA8'"))
-        .every((t) => (formats.find((f) => f.name === t.sceneFormat) || {}).highDynamicRange),
+      caught: !tiersDrawIntoLight(
+        tiersOf(qualityText).map((t) => ({ ...t, sceneFormat: 'RGBA8' })), formats,
+      ) && tiersDrawIntoLight(tiersOf(qualityText), formats),
     },
     {
       // THE INJECTION TURNED ROUND WITH THE ANSWER. It used to drop a tier from
@@ -224,10 +324,20 @@ if (process.argv.includes('--self')) {
       // a tier quietly RAISED -- which is the same lever spent in the other
       // direction, and the same 1.4 ms.
       what: 'a tier whose multisampling was quietly raised to four is caught',
-      caught: tiersOf(qualityText.replace(
-        '    samples: 2,\n    sceneFormat:',
-        '    samples: 4,\n    sceneFormat:',
-      )).some((t) => t.samples !== 2),
+      caught: tiersOf(qualityText).map((t, i) => (i === 0 ? { ...t, samples: 4 } : t))
+        .some((t) => t.samples !== 2),
+    },
+    {
+      // THE CASE THAT SAYS THE SLICES ARE NO LONGER PINNED TO A COLUMN. Both
+      // tables closed on a bracket at column nought and `allocateCampo` on a
+      // brace at two spaces; indented, all three used to come back empty or
+      // wrong, and an empty table is a guard that agrees with everything.
+      what: 'while both tables and the ground\'s buffer, re-indented by four spaces, read the same',
+      caught: formatsOf(reindent(postText)).length === formats.length
+        && tiersOf(reindent(qualityText)).length === tiersOf(qualityText).length
+        && campoScalesOf(reindent(qualityText)).length === campoScalesOf(qualityText).length
+        && campoBufferOf(reindent(postText)).format === campoBufferOf(postText).format
+        && formats.length > 0 && tiersOf(qualityText).length > 0,
     },
     {
       what: "RGBA8 is caught losing the sun's disc",
@@ -247,12 +357,34 @@ if (process.argv.includes('--self')) {
     },
     {
       what: "the ground's buffer stripped of its fourth channel is caught",
-      caught: campoBufferOf(postText.replace('format: RGBAFormat,\n      type: HalfFloatType,',
-        'format: RGBFormat,\n      type: HalfFloatType,')).format !== 'RGBAFormat',
+      caught: !groundCarriesCoverage({ ...campoBufferOf(postText), format: 'RGBFormat' })
+        && groundCarriesCoverage(campoBufferOf(postText)),
+    },
+    {
+      what: 'and one dropped to eight bits a channel, which loses the range and not the channel',
+      caught: !groundCarriesCoverage({ ...campoBufferOf(postText), type: 'UnsignedByteType' }),
     },
     {
       what: 'and left to the clear alpha three gives an opaque canvas',
-      caught: !campoBufferOf(postText.replace('gl.setClearAlpha(0);', '')).clearedToNothing,
+      caught: !clearedToNothing(postText.replace(/gl\.setClearAlpha\(0\);/, '')),
+    },
+    {
+      what: 'and put back to one before the bind, which is the same defect written out',
+      caught: !clearedToNothing(postText.replace(/gl\.setClearAlpha\(0\);/, 'gl.setClearAlpha(1);')),
+    },
+    {
+      // AND THIS IS THE CASE THAT SAYS THE ADJACENCY IS GONE: four lines of
+      // comment and a statement written between the clear and the bind, which
+      // is the likeliest edit anybody will ever make there, and which used to
+      // turn this guard red on a frame that had not changed.
+      what: 'while five lines written between the clear and the bind change nothing',
+      caught: clearedToNothing(postText.replace(/gl\.setClearAlpha\(0\);/,
+        'gl.setClearAlpha(0);\n        // three clears an opaque canvas to an alpha of one, and the\n'
+        + '        // coverage of this target lives in that very channel, so the\n'
+        + '        // clear above is not tidiness: it is the whole of the mask.\n'
+        + '        // See the recomposition in campo-material.js.\n'
+        + '        const beforeTheBind = gl.getClearAlpha();'))
+        && clearedToNothing(postText),
     },
     {
       what: 'a tier that stopped stating the ground\'s pixel is caught',
@@ -261,10 +393,21 @@ if (process.argv.includes('--self')) {
     },
     {
       what: 'an anchor taken back out of the grade is caught',
-      caught: !cubeIsAnchored(postText.replace(
-        'return clamp((graded - black) / max(1.0 - black, vec3(1e-4)), 0.0, 1.0);',
-        'return graded;',
-      )),
+      caught: !cubeIsAnchored(postText.replace(/\(\s*graded\s*-\s*(\w+)\s*\)/, '(graded)')),
+    },
+    {
+      what: 'and one that subtracts the black but forgets to renormalise on it',
+      caught: !cubeIsAnchored(postText.replace(/max\(\s*1\.0\s*-\s*(\w+)/, 'max(vec3(1.0)')),
+    },
+    {
+      // THE CASE THAT SAYS THE EXPRESSION IS NO LONGER PINNED: the local
+      // renamed, the line broken in two and `1.0` written `1.`, none of which
+      // is a change to the grade and all three of which used to be a red.
+      what: 'while the same anchor renamed, rewrapped and written 1. instead of 1.0 still passes',
+      caught: cubeIsAnchored(postText
+        .replace(/\bvec3 black =/, 'vec3 foot =')
+        .replace(/\(graded - black\) \/ max\(1\.0 - black, vec3\(1e-4\)\)/,
+          '(graded - foot)\n      / max(1. - foot, vec3(1e-4))')),
     },
     {
       what: 'and the cube it was taken out of does lift the black, so the check bites',
@@ -354,9 +497,9 @@ const campo = campoBufferOf(postText);
 const campoScales = campoScalesOf(read(QUALITY));
 report.check(Boolean(campo), `${POST} states a buffer for the ground`);
 if (campo) {
-  report.check(campo.format === 'RGBAFormat' && campo.type === 'HalfFloatType',
+  report.check(groundCarriesCoverage(campo),
     "the ground's own buffer has the fourth channel the scene's has not",
-    'RGBA16F, which is where the coverage lives');
+    `${campo.format} / ${campo.type}: RGBA16F, which is where the coverage lives`);
   report.check(!formats.find((f) => f.name === 'R11F_G11F_B10F' && f.shipped)?.name
     || /R11F_G11F_B10F[\s\S]{0,900}?no alpha/.test(postText),
     'and the shipped scene pixel still has none, which is the reason for the line above');
