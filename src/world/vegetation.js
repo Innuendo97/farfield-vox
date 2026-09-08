@@ -1379,7 +1379,43 @@ const PALE_STEP = 2.5;
 // flower, and it is a real option that C-TEXTURE §3.6 found in the vanilla
 // flower's own geometry ("shade": false) -- and at one it is a block of stone
 // again.
-const HEAD_SHADE = 0.34;
+//
+// AND IT WAS REFITTED WHEN THE SUN MOVED, WHICH IS THE WHOLE OF WHY IT IS 0.85
+// AND NOT 0.34. The number it replaces was fitted against a light this world no
+// longer has: U-LUCE-4 refitted the sun after it was chosen (elevation 51,
+// azimuth 274), and a bend that says <<take a third of the ladder>> is a
+// statement ABOUT a ladder -- move the ladder and the third is a different
+// flower. Refitted against the target's own reading of the same two faces,
+// through the delivered chain in tools/lighting/render-chain.mjs -- seat, AgX
+// and the grade cube, the road guard-fiori already takes for the white lid:
+//
+//   bend     the white lid       the white side      the step
+//   0.34     L* 66.0 C 12.7      L* 61.6 C 13.2       4.4
+//   0.65     L* 66.0 C 12.7      L* 55.3 C 13.6      10.7
+//   0.85     L* 66.0 C 12.7      L* 49.3 C 14.0      16.7   <- delivered
+//   1.00     L* 66.0 C 12.7      L* 42.2 C 16.0      23.8
+//   target   L* 67.6 C 12.9      L* 50.7 C 13.0      16.9
+//
+// BOTH faces land and not one: the lid was already there -- it is the face the
+// gate holds -- and at 0.85 the side arrives beside it, 1.4 L* off the target's.
+// Read as the thing the note above argues in, the encoded luminance of the
+// bright face over the dark one, this world's head now climbs 1.98 where the
+// target's climbs 1.97. The ladder was 2.3 times too steep under the old sun; it
+// is 1.4 times too steep under this one, and that is why a third becomes five
+// sixths without anything else moving.
+//
+// AND THE FRAME CANNOT SAY SO, WHICH IS DECLARED HERE. On the delivered frame at
+// the fitted pose the same step reads 1.8 L* before and 4.8 after -- not 4.4 and
+// 16.7 -- and the reason is not the light. After U-FIORI-7 fitted the SIZE
+// (D-F7-1 = A: a head of 5.2 cm where the target's measures 9.4) one of our
+// heads at 5.75 m covers SIX rows of pixels -- measured, rows 870 to 875 --
+// against the nineteen the target's covers at 5.84 m, six of lid and thirteen of
+// side. At six rows the two bands are one pixel apart; and the lantern puts its
+// own maximum in the MIDDLE of the head, because the halo is centred on the lamp
+// and the lamp is inside the bud, so the vertical profile of one of our heads is
+// a hump and not a staircase. The step is a fact about the OBJECT and it is
+// fitted where the object is.
+const HEAD_SHADE = 0.85;
 
 // THE FLOWER IS A LANTERN NOW, AND THIS IS THE WHOLE OF WHAT THAT MEANS.
 //
@@ -1699,11 +1735,12 @@ const GLOW_NIGHT = 3.0;
  *   reading is <<una testa bianca/blu SOLIDA con un lume dentro>>, and a blue
  *   head that is not blue has failed it before any other number is looked at.
  *
- *   AND THE FAR FAMILY THEN NEEDS NO NUMBER OF ITS OWN. Past the exchange ring a
- *   head is one quad carrying the MEAN of this term over the skin it stands in
- *   for -- and normalised, that mean IS this constant, for either kind. The seam
+ *   AND THE FAR FAMILY CARRIES THE SAME MEAN. Past the exchange ring a head is
+ *   one quad carrying the MEAN of this term over the skin it stands in for --
+ *   and normalised, that mean IS the constant below, for either kind. The seam
  *   the ring was ratified on closes by construction instead of by two uniforms
- *   agreeing.
+ *   agreeing; the quad reads the number of the FAMILY it is drawing, on the flag
+ *   it already carries.
  *
  * THE NUMBER ITSELF IS A MEASUREMENT AND IS SWEPT IN THE FRAME, like GLOW_DAY
  * before it, against two ends that are both defects: too little and the head is
@@ -1711,8 +1748,41 @@ const GLOW_NIGHT = 3.0;
  * up, passes the top of the post chain's bloom shoulder and goes white). The
  * verbale carries the sweep. It multiplies uGlow, so the night moves it without
  * a second number.
+ *
+ * AND IT IS ONE NUMBER PER FAMILY, WHICH IS D-F7-2 = B AND NOT A SECOND OPINION.
+ *
+ * WHY IT HAD TO SPLIT. The normalisation above makes the two kinds carry the
+ * same MEAN through their walls, and that was the right answer to the question
+ * it was asked -- four lamps against one. It is not an answer to the second
+ * question, which is that the two pigments do not survive the same amount of
+ * warm light. The halo is the LAMP's pigment, which is warm; a white head under
+ * it stays white and gets warmer, a blue head under it stops being blue. Probed
+ * on the delivered frame, one metre from a shut head, on its own side wall where
+ * no lamp shows through (fondazione/fiori8/unmetro.mjs):
+ *
+ *   the halo the blue carries    its side           its whole head
+ *   0.22 (the white's)           L* 50.6 C  3.8     B-R  15.3
+ *   0.16                         L* 48.3 C  2.7     B-R  22.1
+ *   0.10  <- delivered           L* 45.8 C  4.9     B-R  30.2
+ *   0.06                         L* 43.8 C  7.6     B-R  36.9
+ *   0.00                         L* 40.2 C 13.3     B-R  49.8
+ *
+ * At the white's own halo the blue head reads NEUTRAL -- three and a half of
+ * chroma, which is a grey cube with a light in it -- and that is the reading
+ * E-DECISIONI15 fails before any other number is looked at. At 0.10 it is blue
+ * again by the measure the sweep in guard-fiori was chosen on (B-R doubles), the
+ * white is untouched at the 0.22 the committente ratified (D-F6), and the day
+ * costs nothing: one more uniform on a material that had one.
+ *
+ * AND WHAT 0.10 DOES NOT BUY, SAID HERE. The target's blue side reads a chroma
+ * of 26.9 and this does not get there: at nought -- no halo at all -- the frame
+ * gives 13.3, and the delivered chain with no halo in it at all gives 19.6. The
+ * rest is not the halo's: our cyan pigment lands ten L* BRIGHTER than the
+ * target's (its side reads L* 32.0 against our 42.7 through the chain), and in
+ * this tone curve a brighter colour is a less saturated one. The lever is
+ * CYAN_OF_PALE below, which is a ratified pigment and the coordinator's.
  */
-const HALO_DAY = 0.22;
+const HALO_DAY = { bianco: 0.22, ciano: 0.10 };
 
 /**
  * THE FLOWERS THAT ARE OPEN, AND THE HALF OF E-DECISIONI9.1 THAT WAS OWED.
@@ -2177,7 +2247,7 @@ export function flowerCensus() {
     // these; it never reads this file as text and never holds a second copy.
     lantern: {
       dayOpen: DAY_OPEN, alpha: PETAL_ALPHA, throat: THROAT, lidRim: LID_RIM,
-      glowDay: GLOW_DAY, glowNight: GLOW_NIGHT, halo: HALO_DAY,
+      glowDay: GLOW_DAY, glowNight: GLOW_NIGHT, halo: { ...HALO_DAY },
       bianco: {
         side: CORE_SIDE, reach: { ...CORE_REACH }, stems: 1, stem: STAMEN_STEM,
         hole: { ...HOLE_WHITE, shutHalf: holeHalf('bianco', 0), openHalf: holeHalf('bianco', 1) },
@@ -3184,12 +3254,64 @@ function farGeometry() {
   return geometry;
 }
 
+/**
+ * WHERE A KIND'S LAMPS STAND ON ITS OWN QUAD, in units of the head's own edge.
+ *
+ * The far family paints the lamp and the halo it throws; both of them are facts
+ * about WHERE the lamp is, and a head does not change shape when it changes
+ * size, so the seats divide by the nominal edge once here and the quad reads
+ * them at any size. x is the lamp's own half-side, y how far off centre it sits
+ * -- nought for a white flower's one lamp, a third of an edge for each of a blue
+ * one's four. Off lampSeats(), which is the one producer of both.
+ *
+ * AND z IS THE DEPTH, WHICH IS THE TERM A FLAT QUAD WOULD FORGET. The lamp is
+ * INSIDE the bud and the eye sees the wall in front of it, so a point of that
+ * wall is never at nought from the lamp however square on it is: it is half a
+ * head away, through the head. Without that term the middle of the quad would be
+ * driven to the lamp's own value -- brighter, over its own mean, than anything
+ * the solid's term reaches anywhere on its skin, which is a step at the exchange
+ * ring the other way round. guard-fiori holds exactly that comparison.
+ */
+function lampOnQuad(kind) {
+  const seat = lampSeats(kind);
+  return new Vector3(seat.half / HEAD_NOMINAL, Math.abs(seat.xz[0][0]) / HEAD_NOMINAL, 0.5);
+}
+
+/**
+ * THE HALO'S OWN SHAPE ON A QUAD, written once and included twice so the vertex
+ * that normalises it and the fragment that paints it cannot disagree.
+ *
+ * It is the solid's law -- one at a lamp, falling with the square of the
+ * distance from it, summed over the lamps -- read on the plane of the quad
+ * instead of over the shell. Four seats always: a white flower's four coincide
+ * at the centre, which multiplies the sum by four and cancels in the mean below.
+ * What is lost against the solid's version is the DEPTH of the head, and at the
+ * range this family draws at there is no depth to see.
+ */
+const FAR_HALO_GLSL = /* glsl */`
+  float haloOnQuad(vec2 p, vec3 lamp) {
+    float r2 = lamp.x * lamp.x;
+    float z2 = lamp.z * lamp.z;   // the head's own depth, through which the lamp shines
+    vec2 d = abs(p) - vec2(lamp.y);
+    vec2 e = abs(p) + vec2(lamp.y);
+    return r2 / (r2 + z2 + d.x * d.x + d.y * d.y)
+      + r2 / (r2 + z2 + d.x * d.x + e.y * e.y)
+      + r2 / (r2 + z2 + e.x * e.x + d.y * d.y)
+      + r2 / (r2 + z2 + e.x * e.x + e.y * e.y);
+  }
+`;
+
 const FAR_VERTEX = /* glsl */`
   attribute vec4 aFlower;   // world x, y, z of the HEAD'S CENTRE, and its size
   attribute vec2 aLook;     // nought for white and one for cyan, and the tint
 
-  varying vec3 vTint;
+  varying vec3 vTint;    // the SIDE of the head, which is most of its silhouette
+  varying vec3 vLid;     // and its lid, which is the face in the light
+  varying float vLidShare;  // how much of the silhouette, from the top down, is lid
+  varying float vUp;     // where a corner is up the quad: nought foot, one top
   varying vec3 vEmit;
+  varying vec2 vQuad;    // where a corner is on the quad, -0.5 to 0.5 both ways
+  varying vec3 vLamp;    // this kind's lamp, in the quad's OWN units
   varying vec3 vAirKeep;
   varying vec3 vAirAdd;
 
@@ -3200,7 +3322,13 @@ const FAR_VERTEX = /* glsl */`
   // WHAT SHARE OF A SHUT HEAD ITS OWN LAMP FILLS, one per kind, off the boxes.
   uniform float uShareWhite;
   uniform float uShareCyan;
-  uniform float uHalo;
+  // WHAT THE HALO AVERAGES OVER A SHUT HEAD'S SKIN, per kind: D-F7-2 = B.
+  uniform float uHaloWhite;
+  uniform float uHaloCyan;
+  // AND WHERE ITS LAMPS STAND, per kind, in units of the head's own edge:
+  // x the lamp's half-side, y how far off centre it sits.
+  uniform vec3 uLampWhite;
+  uniform vec3 uLampCyan;
   uniform float uPetalAlpha;
   uniform vec2 uCentre;
   uniform float uRing;      // the exchange ring: the solids' own radius
@@ -3214,6 +3342,7 @@ const FAR_VERTEX = /* glsl */`
   ${FOG_GLSL}
   ${ZONE_GLSL}
   ${SWAP_GLSL}
+  ${FAR_HALO_GLSL}
 
   void main() {
     float reach = length(aFlower.xz - uCentre);
@@ -3250,9 +3379,12 @@ const FAR_VERTEX = /* glsl */`
     //   COLOUR. Each of those three terms is one face of the head, and this
     //   world's faces are not interchangeable: a SIDE and the lid are lit by
     //   headLight() for THEIR OWN normals -- the same four lines the solid uses
-    //   -- so the quad carries their average weighted by exactly the areas
-    //   above: the head's own colour at this distance, from the one producer,
-    //   with nothing added and no constant of its own.
+    //   -- so the quad carries them weighted by exactly the areas above: the
+    //   head's own colour at this distance, from the one producer, with nothing
+    //   added and no constant of its own. Since U-FIORI-8 it carries them
+    //   STACKED rather than mixed -- lid over side, the boundary at the lid's own
+    //   share of the silhouette -- so the weighted mean is the same number and the
+    //   head has a face in the light again. See the note over vLid below.
     //
     //   AND THE THREE FACES ARE ALL PALE NOW, which is E-DECISIONI15 arriving
     //   here. The head used to carry the pistil's band ON its sides and this
@@ -3282,9 +3414,37 @@ const FAR_VERTEX = /* glsl */`
     // two colours it mixes between are equal.
     vec3 pale = mix(uPale, uCyan, aLook.x);
     vec3 warm = mix(uPistil, uCyanPistil, aLook.x);
+
+    // AND THE QUAD IS NOT ONE COLOUR ANY MORE, WHICH IS THE LAST OF THE SIZE.
+    //
+    // The average above is the head's own colour and it is right; painting the
+    // WHOLE quad with it is what was wrong. A shut head at thirteen metres is a
+    // lid in the light over a side in its own shade -- 16.9 L* apart, measured on
+    // both pictures -- and a detector with a local threshold finds the lid and
+    // loses the side. That is the last of the size gap U-FIORI-7 could not close:
+    // at 13 m the target's head reads FOUR pixels and ours read six, not because
+    // ours is bigger (it is smaller: 5.2 cm against 9.4) but because ours passed
+    // the threshold over its whole silhouette while the target's passes it over a
+    // quarter of it.
+    //
+    // So the two faces are kept apart and stacked the way the head stacks them:
+    // the lid on top, the side under it, and the boundary at exactly the share of
+    // the silhouette the lid is -- share.y / area, the same weight the average
+    // above gives it. The MEAN over the quad is therefore unchanged to the last
+    // digit, which is what keeps the exchange ring closed: a head crossing inward
+    // meets a solid of the same total light, only arranged as the solid arranges
+    // it. Nothing is added: no triangle, no draw, one interpolated float.
+    vec3 lid = pale * headLight(vec3(0.0, 1.0, 0.0));
+    // The two sides the eye can see, weighted as they are seen -- and this is
+    // what the quad is MOSTLY made of, so it keeps the name the flat average
+    // had. Their sum can go to nought looking straight down, where the head IS
+    // its lid, so the divide is floored and the branchless answer there is the
+    // lid itself.
+    float flanks = share.x + share.z;
     vec3 head = (pale * headLight(alongX) * share.x
-      + pale * headLight(vec3(0.0, 1.0, 0.0)) * share.y
-      + pale * headLight(alongZ) * share.z) / area;
+      + pale * headLight(alongZ) * share.z) / max(flanks, 1e-4);
+    head = mix(lid, head, step(1e-4, flanks));
+    vLidShare = share.y / area;
 
     // AND THE HALO IS COOKED INTO THIS QUAD'S OWN COLOUR, which is the half of
     // this family E-DECISIONI15 adds. A shut head at this range is a lamp behind
@@ -3301,8 +3461,49 @@ const FAR_VERTEX = /* glsl */`
     // over, so it carries the MEAN of that term over the skin the solid would
     // have shown -- integrated off the same boxes, once, in haloMean(). Without
     // it a head would go warm crossing the ring inward, which is a step in colour
-    // on exactly the object this family was ratified on.
-    vec3 halo = warm * uGlow * (lampShare * (1.0 - uPetalAlpha) + uHalo);
+    // on exactly the object this family was ratified on. And it is per family
+    // since D-F7-2 = B, on the same flag, for the same reason the share is.
+    float haloMean = mix(uHaloWhite, uHaloCyan, aLook.x);
+
+    // AND THE LAMP IS IN THE MIDDLE OF THE HEAD, WHICH THE MEAN FORGOT.
+    //
+    // Both terms above are lights that leave one small lamp inside the bud, and
+    // both were painted FLAT over the whole quad. On the near side of the ring
+    // they are not flat at all: the solid evaluates the same law per pixel and a
+    // head is bright where the lamp is behind it and cool at its corners -- which
+    // is the reading E-DECISIONI16 asked for and the reason that law exists. A
+    // quad that spreads the mean to its own rim is a head with a skirt, and the
+    // skirt is what a finder with a local threshold measures instead of the head:
+    // measured on the delivered frame at thirteen metres, with this term driven
+    // to nought the blobs go from 23 pixels to 15 and the step over the meadow
+    // from 27 L* to 18, which is the target's own 22.6.
+    //
+    // So the quad carries the SHAPE as well as the mean. haloOnQuad() is the
+    // solid's own law read on the quad's plane, and it is divided by its own mean
+    // over the quad, sampled on the same law: what the quad emits IN TOTAL is
+    // exactly what it emitted before, only put where the lamp is. The exchange
+    // ring therefore does not move -- neither in warmth, which is the mean, nor
+    // in peak, because the sum is at most four at the lamp against the eleven
+    // times its own mean the solid's term reaches on the cup's floor.
+    //
+    // The mean is sampled 9 by 9 and not integrated: over the whole range of
+    // bearings a walker can take, that grid reads the true mean to better than
+    // seven parts in a thousand (measured, both kinds, in the verbale), which is
+    // two orders under anything the ring was ever read at.
+    vec3 lamp = mix(uLampWhite, uLampCyan, aLook.x) / sqrt(area);
+    float mediaHalo = 0.0;
+    for (int i = 0; i < 9; i++) {
+      for (int j = 0; j < 9; j++) {
+        mediaHalo += haloOnQuad(vec2((float(i) + 0.5) / 9.0 - 0.5,
+          (float(j) + 0.5) / 9.0 - 0.5), lamp);
+      }
+    }
+    mediaHalo /= 81.0;
+    vLamp = lamp;
+    // Divided HERE and not at the varying, so that what leaves this shader as
+    // the head's own light is one expression and a gate can read it as one:
+    // guard-zone holds that the zone multiplies the tint and never the lamp.
+    vec3 halo = warm * uGlow * (lampShare * (1.0 - uPetalAlpha) + haloMean) / mediaHalo;
 
     float size = aFlower.w * sqrt(area) * keep * trim;
 
@@ -3320,7 +3521,17 @@ const FAR_VERTEX = /* glsl */`
     // NO ADDITIVE BLEND AND NO SECOND OPINION ABOUT THE HOUR: the halo above is
     // the SAME uniform the near family reads, times the same alpha, and it is
     // added to the surface rather than drawn as a second pass.
+    //
+    // The ground's own zone and this head's tint multiply BOTH faces, because
+    // they are facts about where the head stands and not about which way a face
+    // points: a lid and a side of one head are never in two different zones.
     vTint = head * aLook.y * zoneAt(aFlower.xz);
+    vLid = lid * aLook.y * zoneAt(aFlower.xz);
+    // Where this corner is up the quad: nought at the foot, one at the top. The
+    // quad is squared to the VIEW plane, so its own y is the screen's up, which
+    // is what makes a lid on top of a side the right way round from anywhere.
+    vUp = position.y + 0.5;
+    vQuad = position.xy;
     vEmit = halo;
     airTerms(length(cameraPosition - aFlower.xyz), aFlower.y, vAirKeep, vAirAdd);
 
@@ -3332,20 +3543,39 @@ const FAR_FRAGMENT = /* glsl */`
   precision highp float;
 
   varying vec3 vTint;
+  varying vec3 vLid;
+  varying float vLidShare;
+  varying float vUp;
   varying vec3 vEmit;
+  varying vec2 vQuad;
+  varying vec3 vLamp;
   varying vec3 vAirKeep;
   varying vec3 vAirAdd;
 
   uniform float uHeadAlpha;
 
+  ${FAR_HALO_GLSL}
+
   void main() {
+    // THE LID ON TOP AND THE SIDE UNDER IT, at the boundary the head itself puts
+    // between them. vLidShare is the lid's share of the silhouette's AREA, and
+    // the quad has one width, so it is also the share of its HEIGHT: cutting
+    // there leaves the quad's mean exactly the average the head's three faces
+    // make, which is what keeps the exchange ring closed. It is a step and not a
+    // ramp because a cube's own edge is a step; at four pixels a ramp would be
+    // the flat colour again.
+    vec3 face = vUp > 1.0 - vLidShare ? vLid : vTint;
     // AND THIS QUAD PASSES WHAT A HEAD PASSES, which is what keeps the exchange
     // one flower. A shut head presents TWO panels along any line of sight, so it
     // passes (1 - alpha) squared -- four hundredths at the delivered alpha -- and
     // this family is given exactly that rather than being left opaque: a solid
     // quad where the solids are 96 per cent opaque is a step in the frame at the
     // ring, and the ring is the one number this family was ratified on.
-    vec3 col = vTint * vAirKeep + vAirAdd + vEmit * vAirKeep;
+    // AND THE LAMP'S LIGHT WHERE THE LAMP IS: the same law the solid on the near
+    // side of the ring evaluates, over the same seats, normalised in the vertex
+    // by its own mean over this quad -- so the quad's total warmth is what it has
+    // always been and the ring stays shut.
+    vec3 col = face * vAirKeep + vAirAdd + vEmit * haloOnQuad(vQuad, vLamp) * vAirKeep;
     gl_FragColor = vec4(col, uHeadAlpha);
   }
 `;
@@ -3396,8 +3626,16 @@ function createFarFlowers({ height, lightScale, pigments, ring, swapBand, hour }
       uShareCyan: { value: pistilShare('ciano') },
       // AND WHAT THE HALO AVERAGES OVER THAT HEAD'S OWN SKIN, per kind, off the
       // same boxes: the term the near family evaluates per pixel, integrated
-      // where a quad cannot evaluate it.
-      uHalo: { value: HALO_DAY },
+      // where a quad cannot evaluate it. Two numbers since D-F7-2 = B, picked on
+      // the flag this family already carries, so a blue quad crossing the ring
+      // inward meets a blue solid at the same warmth and not at the white's.
+      uHaloWhite: { value: HALO_DAY.bianco },
+      uHaloCyan: { value: HALO_DAY.ciano },
+      // AND WHERE THAT HALO IS CENTRED, per kind, off the same seats the solid
+      // hangs its lamps on: the quad carries the term's SHAPE and not only its
+      // mean, so a head is bright where its lamp is instead of wearing a skirt.
+      uLampWhite: { value: lampOnQuad('bianco') },
+      uLampCyan: { value: lampOnQuad('ciano') },
       uPetalAlpha: { value: PETAL_ALPHA },
       // A head passes what TWO panels pass, which is what this quad has to pass
       // if the exchange is to stay invisible. Derived from the one alpha rather
@@ -3698,10 +3936,15 @@ function createFlowers({ height, lightScale, pigments, hour }) {
         // reading is <<una testa bianca/blu SOLIDA con un lume dentro>>: a blue
         // head that has stopped being blue has failed it. Divided, both kinds
         // carry the same light through their walls and each keeps its own
-        // colour -- and the far family's quad, which carries the MEAN, needs no
-        // per-kind number at all, because the mean is this constant by
+        // colour -- and the far family's quad, which carries the MEAN, reads the
+        // same per-family number, because the mean IS that number by
         // construction.
-        uHalo: { value: HALO_DAY / haloMean(kind) },
+        //
+        // AND THE MEAN IS PER FAMILY SINCE D-F7-2 = B: the division answers four
+        // lamps against one, and the number it divides answers the other half --
+        // that a warm halo a white head merely warms is a halo a blue head does
+        // not survive. Both are read off HALO_DAY, one line, either kind.
+        uHalo: { value: HALO_DAY[kind] / haloMean(kind) },
         // The two ends of this kind's hole, in metres at the nominal size, off the
         // one function that knows the law.
         uHoleShut: { value: holeHalf(kind, 0) },
