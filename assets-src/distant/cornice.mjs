@@ -41,10 +41,15 @@
 //    pixels, 0.25 to 0.40 degrees, on the near flank, on the middle crest and
 //    on the palest ridge alike. That is not four measurements that happen to
 //    agree, it is a law: a cube grows with its distance, s(D) = D * tan(0.30)
-//    = D / 190. One metre at 185, two at 400, four at 820, eight at 1550 --
-//    which is exactly the ladder of rings below, and the reason the cubes are
-//    powers of two rather than the 1/2/5/10 the prototype ran: 5 m at 535 m is
-//    0.54 degrees, half again over the band, and R6 said so itself.
+//    = D / 190. One and three tenths at 250, two at 400, four at 820, eight at
+//    1550 -- which is exactly the ladder of rings below.
+//
+//    THE FIRST OF THOSE FOUR MOVED WITH D-C1-1 = B. The near crown stood at 185
+//    with its foot at 170, which is thirty metres of climb over fifteen: a
+//    slope of two, and measured, a wall in stripes -- the skyline's treads came
+//    out at fifteen pixels against the reference's three. At 250, with the foot
+//    where the picture puts it, the front is eighty metres long and the slope
+//    is one half; the cube that serves it grows to 1.3 by the same law.
 //
 // 3. THAT THE HILLS STAND IN THE WATER. The far shore reads at -2.3 degrees,
 //    which with the surface at -4.74 m puts it at about 160 m; there is no
@@ -63,19 +68,20 @@
 // ===========================================================================
 // WHAT IS NOT DECIDED HERE.
 //
-// THE FINE MATTER IS U-CORNICE-2's. This file carries TWO classes -- rock and
-// grass -- with the palette R6 inverted out of the picture's own chain, and the
-// rock line and the slope that separate them. The patches, the spires as real
-// cubes, the cube trees on the treads and the lamp seats are the next unit's,
-// and the seats they will stand on are already here (`ridgeLampSeats`) because
-// the contract that names them is V7's and may not change its name.
+// THE AIR IS THE COORDINATOR'S, AND IT IS NOW ASKED FOR IN FULL. src/world/air.js
+// is a frozen seat and this file does not own a fog. While the seat carried no
+// distance term, `air` in ./cornice.json held R6's measurement of one and
+// src/world/distant.js carried a declared fallback shaped like it. E-LUCE4
+// published the whole law -- `throughAir`, two terms, per channel -- so the
+// fallback is deleted and the frame reads the seat. What this file still knows
+// about the air is nothing at all, which is the correct amount.
 //
-// THE AIR IS THE COORDINATOR'S. src/world/air.js is a frozen seat and this file
-// does not own a fog. What it carries is the DISTANCE the air will be asked
-// about and the shape R6 measured it to have, in `air` below, so that the frame
-// can hand a per-channel term to the same function the meadow uses the moment
-// air.js publishes one. Until then the fallback is written where it can be
-// read, in src/world/distant.js, and it is marked as a fallback.
+// WHAT THE COLOUR OF A FACE IS, IS STILL NOT DECIDED HERE. This file carries the
+// two classes -- rock and grass -- the rock line and the slope that separate
+// them, and the broken rock that stands on the crest; the six radiances they
+// are painted with live in ./cornice.json and are solved through the delivered
+// chain by fondazione/lav/c2-tavolozza.mjs of U-CORNICE-2, because a radiance
+// is a pre-image of a pixel and only the frame knows the map.
 
 // THROUGH `pure.js` AND NOT THROUGH THE FILES THAT DEFINE THEM, which is the
 // house's own rule and is written over that file: it is the seat that carries
@@ -523,11 +529,17 @@ export function quietAt(spec, ridge, bearingDeg) {
  * @param {object} spec
  * @param {number} x  metres, world
  * @param {number} z  metres, world
+ * @param {object} [out]  a box to fill instead of allocating one
  */
-export function hillAt(spec, x, z) {
+export function hillAt(spec, x, z, out) {
   const dx = x - CENTRE.x;
   const dz = z - CENTRE.z;
-  const r = Math.hypot(dx, dz);
+  // sqrt AND NOT hypot, AND IT IS SEVEN HUNDRED THOUSAND CALLS. `Math.hypot`
+  // guards against an overflow that cannot happen here -- the world is two
+  // thousand metres across -- and costs three times what the square root does:
+  // 38 ns against 13, measured, on a cut that asks for this seven hundred
+  // thousand times.
+  const r = Math.sqrt(dx * dx + dz * dz);
   const bearing = Math.atan2(dx, -dz);
   const bearingDeg = bearing / DEG;
   let rise = 0;
@@ -535,6 +547,20 @@ export function hillAt(spec, x, z) {
   let ridge = -1;
   for (let k = 0; k < spec.ridges.length; k++) {
     const entry = spec.ridges[k];
+    // A RIDGE THAT CANNOT REACH THIS RADIUS IS NOT ASKED ABOUT.
+    //
+    // The hump is exp(-2.2 t^2), so three widths out it is two parts in a
+    // thousand million of the crown -- a hundred nanometres on the tallest
+    // ridge in the world. The bound uses the ridge's NOMINAL radius with its
+    // own wave allowed for, so it can be taken before `reachAt` and before the
+    // table lookup inside it.
+    //
+    // It is a third of the cut, and the cut has a ceiling: past 1150 m only the
+    // palest ridge can be there at all, so the outer ring was evaluating four
+    // crowns, four profiles and four exponentials per cell to add nought to
+    // three of them, on a hundred and sixty thousand cells.
+    if (r < entry.radius * (1 - entry.reach) - 3 * entry.widthIn
+      || r > entry.radius * (1 + entry.reach) + 3 * entry.width) continue;
     const crown = reachAt(entry, bearing, spec.waves);
     // NARROW IN FRONT AND WIDE BEHIND, WHICH IS WHERE THE LAKE COMES FROM.
     //
@@ -595,11 +621,122 @@ export function hillAt(spec, x, z) {
   // continued because a cone run to two kilometres says -107 m, which would put
   // every hill in the world on a plinth of its own making.
   const base = basinProfile(Math.min(r, spec.basinHold));
-  return {
-    r, bearing, bearingDeg, ridge, local,
-    base,
-    y: base + Math.max(0, shaped),
-  };
+  const y = base + Math.max(0, shaped);
+  // AND IT WILL FILL A BOX THE CALLER ALREADY HAS. Seven hundred thousand
+  // objects is seven hundred thousand allocations and the collections that
+  // follow them; the mesher walks a lattice and has one box to spare, and the
+  // fitter and the guards -- which ask this a few thousand times -- go on
+  // getting a fresh one and never know.
+  if (out) {
+    out.r = r;
+    out.bearing = bearing;
+    out.bearingDeg = bearingDeg;
+    out.ridge = ridge;
+    out.local = local;
+    out.base = base;
+    out.y = y;
+    return out;
+  }
+  return { r, bearing, bearingDeg, ridge, local, base, y };
+}
+
+// ------------------------------------------------------------------ the crown
+//
+// THE CUBES THAT STAND ON THE TERRACE, AND WHY THE SKYLINE NEEDS THEM.
+//
+// THIS IS THE RESIDUE (1) OF U-CORNICE-1, AND MOVING THE CREST DID NOT CLOSE
+// IT. The reference's near right hill steps its skyline every three pixels with
+// risers of seven -- one cube up or down at half a cube of arc. Terraces alone
+// cannot do that at any slope: a terrace plane is horizontal, so the silhouette
+// stays on one row until the crest crosses the next rung, and with the crest
+// climbing five degrees over nine of bearing that is a step every eleven pixels
+// however wide the treads are. Measured, both ways: at a slope of two the
+// treads read fifteen pixels, and at a slope of one half -- the crown out at
+// 250 m, D-C1-1 = B -- they read fourteen.
+//
+// What the reference has there is not a staircase, it is BROKEN ROCK. R6 §2.4
+// counted it: forty-nine per cent rock in shadow and twenty lit, the rock high
+// and on the steep, the grass on the low treads. R6 §4.1 said the same thing
+// from the other side, as the one thing its own prototype got wrong -- «il
+// prototipo ha righe di letti regolari: mattoni. Il target e' irregolare: pezze
+// di roccia, ciuffi, guglie» -- and named the cure: V5's own machine, the
+// weighted draw that made the painted cornice's spires two to seven courses
+// tall, carried onto real cubes.
+//
+// So: above the rock line, a share of the cells carry one to a few cubes MORE
+// than their terrace, drawn from a weighted ladder on the cube lattice itself.
+// The wavelength is one cube by construction, which is the only scale that can
+// step a silhouette at half a cube of arc; the amplitude is one to three cubes,
+// which is the reference's own p50 to p90 of seven to twelve pixels; and the
+// tall end of the draw is the spire E-V5b left behind as a placeholder, now
+// standing as the cubes it always said it was.
+//
+// AND IT IS ON THE NEAR RIDGE ALONE, WHICH THE PICTURE SAYS TWICE.
+//
+// R6 §2.2 read the middle plane as well as the near one, and it is a different
+// hill: risers of four pixels on a cube of four, with treads of EIGHT AND A
+// HALF, against three on the near right. That is a crest quantised to its own
+// cube and nothing else standing on it -- smooth, at that distance, which is
+// what four hundred metres of air does to broken rock.
+//
+// The picture said it the second time when the crown was first put on every
+// ring. A crown of three courses is three times its own cube wherever it
+// stands, so at 820 m it is a pinnacle twelve metres tall on a footprint of
+// four, and a share of them scattered along a broad flat crest is a PICKET
+// FENCE with sky between the palings. Rendered, both gaps between the monoliths
+// filled with a pale grey skyline of thin towers -- the «citta' grigia» of
+// E-OCCHIO1, which is the exact defect the painted spires were retired for. The
+// share and the ladder are therefore PER RING.
+//
+// AND THAT IS ALSO WHERE THE SPIRES COME BACK. In the right-hand gap the
+// reference shows a row of grey rock pinnacles at +3.7 degrees standing over a
+// crest at +2.2 -- a degree and a half, which at the middle ridge's four
+// hundred metres is ten metres, five of its own cubes. E-V5b drew them as a
+// placeholder on a painted quad and R6 §7 handed them to this unit as real
+// cubes. So the middle ring carries a crown too: a FIFTIETH of its cells, with
+// a ladder that reaches five courses. Rare, because a share like the near
+// ridge's would be the picket fence again; tall, because that is the height
+// the picture reads them at.
+
+// IT IS UNDER THE FIT AND NOT OVER IT. `groundTop` carries it, so the skyline
+// the fitter solves against and the skyline the guard measures are both the one
+// with the crown on -- the trace was read off a picture that HAS this rock in
+// it, and fitting a bare terrace and then dropping rock on top of it would put
+// every reading out by the height of the rock.
+//
+// AND IT COSTS ALMOST NOTHING TO DRAW. A crown stands high, so its top face is
+// over the eye's ceiling and is never built (see EYE_CEILING in
+// ../../src/world/distant-mesh.js); what is built is the riser, which is the
+// silhouette itself.
+
+/**
+ * How many cubes of broken rock stand on the terrace at one place.
+ *
+ * @param {object} spec
+ * @param {number} x  metres, world
+ * @param {number} z  metres, world
+ * @param {number} ring  which ring the place is built in
+ * @param {number} relative  how high the place stands as a share of its ridge
+ * @returns {number} courses of crown, nought where the ground is grass
+ */
+export function crownAt(spec, x, z, ring, relative) {
+  const crown = spec.crown;
+  if (!crown || relative <= spec.matter.rockLine) return 0;
+  const band = crown.rings[ring];
+  if (!band || !band.share) return 0;
+  const cube = spec.rings.cubes[ring];
+  const ix = Math.floor(x / cube);
+  const iz = Math.floor(z / cube);
+  if (hash2(ix + crown.seed, iz) >= band.share) return 0;
+  const u = hash2(ix, iz + crown.seed);
+  const weights = band.courses;
+  const total = weights.reduce((a, b) => a + b, 0);
+  let acc = 0;
+  for (let i = 0; i < weights.length; i++) {
+    acc += weights[i];
+    if (u * total < acc) return i + 1;
+  }
+  return weights.length;
 }
 
 /**
@@ -627,7 +764,9 @@ export function groundTop(spec, x, z, ladders) {
   if (h.y <= water) return null;
   const cube = spec.rings.cubes[ring];
   const ladder = ladders[ring];
-  return water + ladder[bedIndex(ladder, h.y - water)] + cube;
+  const relative = (h.y - h.base) / Math.max(1, h.local);
+  return water + ladder[bedIndex(ladder, h.y - water)] + cube
+    + crownAt(spec, x, z, ring, relative) * cube;
 }
 
 /**
@@ -791,6 +930,68 @@ export function planeAt(spec, eye, bearingDeg, ridge, lads, step = 2) {
     if (e > best) { best = e; at = d; }
   }
   return { elevation: best, at };
+}
+
+// ----------------------------------------------------------- the traced eye
+//
+// A HAND-DRAWN LINE IS NOT A RAY, AND ONCE THE CREST IS BROKEN ROCK THE
+// DIFFERENCE IS THE WHOLE TOLERANCE.
+//
+// R6 §1 says how the trace was made and why it had to be made that way: cloud
+// and pale hill do not separate by colour in this picture, so the skyline was
+// drawn BY HAND on a three-times grid at three quarters of a degree of bearing,
+// with error bars of half a degree. A line drawn like that through a jagged
+// silhouette follows its mean, not whichever cube happens to stand under the
+// pencil.
+//
+// While the crest was a fitted table under a quiet grain that hardly moved, a
+// single ray and the trace were the same measurement and the difference did not
+// show. With the crown on, the silhouette steps a cube -- a third of a degree at
+// 250 m, more than half at 400 -- between one bearing and the next, which is
+// the property the reference has and the unit was asked to reproduce. Compared
+// ray by ray against a smoothed line, a world that matched the picture exactly
+// would still read half a degree out wherever the pencil passed between two
+// cubes: measured, nine readings of eighty-three, all of them within one cube
+// of their reading.
+//
+// So a reading is compared with the skyline over the trace's OWN knot. It is
+// not a loosening of the tolerance -- the tolerance stays half a degree, and
+// the guard reads it at the same span the fit solves it at -- it is asking the
+// world the question the picture answers.
+
+/** The bearing width one knot of the trace covers (R6 §1). */
+export const TRACE_SPAN = 0.75;
+
+/** How many rays make up one traced reading. */
+const TRACE_RAYS = 5;
+
+/**
+ * One plane's edge, or the skyline, read the way the trace was drawn: the mean
+ * over one knot of bearing rather than the value along one ray.
+ *
+ * @param {object} spec
+ * @param {{x:number,y:number,z:number}} eye
+ * @param {number} bearingDeg
+ * @param {number|null} ridge  which of spec.ridges, or null for the skyline
+ * @param {object} lads
+ * @param {number} step  metres between samples
+ */
+export function tracedAt(spec, eye, bearingDeg, ridge, lads, step = 2) {
+  let sum = 0;
+  let seen = 0;
+  let at = 0;
+  for (let i = 0; i < TRACE_RAYS; i++) {
+    const b = bearingDeg + TRACE_SPAN * (i / (TRACE_RAYS - 1) - 0.5);
+    const read = ridge === null || ridge === undefined
+      ? skylineAt(spec, eye, b, lads, step)
+      : planeAt(spec, eye, b, ridge, lads, step);
+    if (read.elevation < -80) continue;
+    sum += read.elevation;
+    seen += 1;
+    // The middle ray's own distance, which is what «at» means everywhere else.
+    if (i === (TRACE_RAYS - 1) / 2 || !at) at = read.at;
+  }
+  return seen ? { elevation: sum / seen, at } : { elevation: -90, at: 0 };
 }
 
 /**
