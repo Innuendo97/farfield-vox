@@ -1241,8 +1241,16 @@ const lab = (rgb) => {
   const X = (0.4124 * lin[0] + 0.3576 * lin[1] + 0.1805 * lin[2]) / 0.95047;
   const Y = 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
   const Z = (0.0193 * lin[0] + 0.1192 * lin[1] + 0.9505 * lin[2]) / 1.08883;
-  return { L: 116 * f(Y) - 16, C: Math.hypot(500 * (f(X) - f(Y)), 200 * (f(Y) - f(Z))) };
+  const A = 500 * (f(X) - f(Y)); const B = 200 * (f(Y) - f(Z));
+  return { L: 116 * f(Y) - 16, C: Math.hypot(A, B),
+    h: (Math.atan2(B, A) * 180 / Math.PI + 360) % 360 };
 };
+/**
+ * THE ANGLE BETWEEN TWO HUES, and why it is not a subtraction. A hue is a
+ * bearing on a circle: 359 and 1 are two degrees apart and not three hundred and
+ * fifty-eight. Every hue read in this file goes through here.
+ */
+const scartoTinta = (a, b) => { const d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; };
 const BERSAGLIO_LID = { L: 67.6, C: 12.9 };
 const lid = lab(composite(faceColour([0, 1, 0], luce, [pale.x, pale.y, pale.z])));
 report.check(Math.abs(lid.L - BERSAGLIO_LID.L) <= 5,
@@ -1322,12 +1330,12 @@ report.check(scala >= 1.6 && scala <= 2.4,
 // THROUGH THE SAME CHAIN AND WITH THE SAME BEND. faceColour() is affine, so the
 // bend is written here exactly as it is written for the pale twenty lines up, on
 // the cyan albedo instead. Nothing here holds a second opinion about the sun.
-const BERSAGLIO_BLU = { lid: { L: 50.5, C: 32.6 }, fianco: { L: 32.0, C: 26.9 } };
+const BERSAGLIO_BLU = { lid: { L: 50.5, C: 32.6 }, fianco: { L: 32.0, C: 26.9, h: 265.5 } };
 /** La luminanza di un pigmento, che e' la sola forma in cui i due si confrontano. */
 const lumaDi = (v) => 0.2126 * v.x + 0.7152 * v.y + 0.0722 * v.z;
-const piegataBlu = (n, ombra) => {
-  const su = faceColour([0, 1, 0], luce, [cyan.x, cyan.y, cyan.z]);
-  const via = faceColour(n, luce, [cyan.x, cyan.y, cyan.z]);
+const piegataBlu = (n, ombra, a = cyan) => {
+  const su = faceColour([0, 1, 0], luce, [a.x, a.y, a.z]);
+  const via = faceColour(n, luce, [a.x, a.y, a.z]);
   return su.map((v, i) => v + (via[i] - v) * ombra);
 };
 const lidBlu = lab(composite(faceColour([0, 1, 0], luce, [cyan.x, cyan.y, cyan.z])));
@@ -1336,27 +1344,126 @@ const fiancoBlu = (() => {
   return { L: q.reduce((t, f) => t + f.L, 0) / q.length,
     C: q.reduce((t, f) => t + f.C, 0) / q.length };
 })();
+/**
+ * LA TINTA DEL FIANCO, PRESA SUL COLORE MEDIO E NON SULLA MEDIA DELLE TINTE.
+ *
+ * Le due righe sopra mediano L* e croma faccia per faccia, che per un livello e
+ * per una lunghezza va bene. Per una TINTA non va: quattro angoli si mediano
+ * male, e intorno allo zero si mediano storti. I quattro fianchi si mediano
+ * dove sono ancora colori -- dopo la catena, in sRGB -- e la terna si legge una
+ * volta sola, alla fine.
+ */
+const tintaFianco = (a = cyan) => {
+  const q = FIANCHI.map((n) => composite(piegataBlu(n, censo.headShade, a)));
+  return lab([0, 1, 2].map((i) => q.reduce((s, c) => s + c[i], 0) / q.length));
+};
+const bluFianco = tintaFianco();
+/**
+ * LA CROMA DEL FIANCO alla maniera della gamba del livello -- media di L* e di
+ * croma faccia per faccia -- cosi' che il rapporto gateato e il rapporto
+ * iniettato escano dalla STESSA aritmetica e non da due che si somigliano.
+ */
+const cromaDelFianco = (a = cyan) => {
+  const q = FIANCHI.map((n) => lab(composite(piegataBlu(n, censo.headShade, a))));
+  return q.reduce((t, f) => t + f.C, 0) / q.length;
+};
+/**
+ * UNA TINTA RIPORTATA AL LIVELLO DEL CIANO CONSEGNATO, che e' l'unico modo di
+ * iniettare una TINTA: una terna cambiata a mano cambierebbe insieme il livello
+ * e la direzione, e la gamba che scattasse non direbbe quale delle due.
+ */
+const alLivello = (x, y, z) => {
+  const k = lumaDi(cyan) / lumaDi({ x, y, z });
+  return { x: x * k, y: y * k, z: z * k };
+};
 report.check(Math.abs(fiancoBlu.L - BERSAGLIO_BLU.fianco.L) <= 3,
   "and the blue head's side is the level the target's blue side is",
   `L* ${fiancoBlu.L.toFixed(1)} against ${BERSAGLIO_BLU.fianco.L}, at a CYAN_OF_PALE of `
   + `${(lumaDi(cyan) / lumaDi(pale)).toFixed(4)}; on the frame itself the same side reads `
-  + 'L* 32.4 at one metre and 31.8 at four (U-FIORI-9, the sweep this was fitted on)');
+  + 'L* 33.2 at one metre and 32.6 at four (U-FIORI-10, the sweep the hue was fitted on)');
 report.check(Math.abs(lidBlu.L - BERSAGLIO_BLU.lid.L) <= 5,
   'and its lid comes with it, because a level is one number for the whole head',
   `L* ${lidBlu.L.toFixed(1)} against ${BERSAGLIO_BLU.lid.L}`);
-// AND IT IS STILL A BLUE AND NOT A GREY, which is the half of the target's
-// reading this pigment does NOT reach and which is gated wide rather than
-// silently dropped: the target's blue side carries 2.07 times the croma of its
-// own white side, ours carries what is printed, and a pigment that fell to the
-// white's croma would be the grey cube E-DECISIONI15 fails before any other
-// number is looked at.
+
+// ------------------------------------------ AND THE BLUE HEAD'S OWN HUE
+//
+// THE HALF OF THE TARGET'S BLUE THAT NOBODY HAD MEASURED. Every gate above holds
+// a LEVEL or a LENGTH -- L* and croma -- and a colour has a third number. Until
+// U-FIORI-10 the target's blue had never been asked for its hue, so a pigment
+// could carry the target's croma pointing anywhere on the circle and no guard
+// would say a word. Read off the target's own blue specimen with the instrument
+// that reads ours (fondazione/fiori10/bersaglio-facce.mjs, the same crop the
+// affiancato has used since U-FIORI-8), its side reads hue 265.5 -- and the same
+// probe reproduces the ratified pair beside it, L* 33.8 and croma 25.4 against
+// the hand probe's 32.0 and 26.9, which is what says the instrument is reading
+// the same thing the hand read.
+//
+// AND THE GATE HAS TEETH, WHICH IS THE POINT OF PUTTING IT HERE. What shipped
+// before this session sat at hue 251, fourteen degrees out. The ray U-FIORI-9
+// priced and recommended -- the hue pushed toward pure cyan -- lands at 253,
+// twelve and a half out. BOTH are red on this leg. A croma gate alone would have
+// passed either of them, and that is exactly how a blue head ends up carrying
+// the right amount of the wrong colour.
+//
+// AND THE BAND IS THE TEN THE ORDER ASKED FOR, WHICH TOOK WALKING TO GET. On the
+// frame the hue and the croma pull against each other -- ten degrees of hue cost
+// thirteen points of croma -- and the strip where both the ten and the croma
+// floor hold is TWO THOUSANDTHS wide in green over blue. Read off the ends of the
+// sweep, a straight slope puts the two crossings in the wrong order and the strip
+// looks empty; walked step by step it is there, and what ships stands in the
+// middle of it. The frontier is printed at the foot of this report.
+report.check(scartoTinta(bluFianco.h, BERSAGLIO_BLU.fianco.h) <= 10,
+  "and the blue head's side is the HUE the target's blue side is",
+  `${bluFianco.h.toFixed(1)} degrees against the target's ${BERSAGLIO_BLU.fianco.h}, `
+  + `${scartoTinta(bluFianco.h, BERSAGLIO_BLU.fianco.h).toFixed(1)} out; what shipped before `
+  + 'U-FIORI-10 -- that hue at that level -- was 14.4 out, and the pure-cyan ray U-FIORI-9 '
+  + 'priced and recommended is 12.5 out, so this leg is red on both of them');
+
+// AND IT IS STILL A BLUE AND NOT A GREY -- the leg that used to be wide, and is
+// now gated on the target's own number.
+//
+// WHAT IT USED TO SAY. At least 1.3 times the white's croma, with the target's
+// own 2.07 printed beside it and not held to. That was honest while the croma
+// had no lever; it has one now, so the floor becomes the target's own figure:
+// the blue's side must carry at least the croma advantage over its own white
+// that the target's blue carries over its own white. A pigment that fell back to
+// the white's croma is the grey cube E-DECISIONI15 fails before any other number.
+//
+// AND WHY THE CEILING IS NOT THE TARGET'S NUMBER TOO, WHICH IS THE ONE THING ON
+// THIS LEG THAT MUST NOT BE READ QUICKLY. The order was to gate this at 2.07
+// plus or minus a fifth. It cannot be, and the measurement that says so is
+// U-FIORI-10's, taken on both footings at once:
+//
+//                          blue side croma   white side croma   ratio
+//     through this chain          39.1              14.0         2.80
+//     on the delivered frame      24.5              24.5         1.00
+//     the target's own frame      25.4              12.5         2.03
+//
+// The chain has no lantern and neither has the target, and on that footing the
+// WHITE agrees to within a point and a half -- 14.0 against 12.5. The frame has
+// our lantern and the target has none, and the lantern is warm: it takes the
+// blue's croma DOWN from 39.1 to 24.5 and pushes the white's UP from 14.0 to
+// 24.5. So on the frame our blue lands the target's blue almost exactly, 24.5
+// against 25.4, and the ratio still reads 1.00 -- because the denominator has
+// doubled, not because the numerator is wrong. Gating the pigment at 2.07 would
+// forbid the very pigment that lands the frame; gating the frame at 2.07 would
+// fail on a white whose croma is the lantern's, which is E-DECISIONI15/16 and
+// not this pigment.
+//
+// So the floor is the target's own ratio and the ceiling is half again over it,
+// which is the whole of the lantern's appetite as this unit measured it: the
+// frame keeps 63 per cent of the blue's croma and 175 per cent of the white's.
+// Both numbers are printed on the line, on all three footings, so that no
+// session after this one mistakes one of them for another again.
 const cromaRel = fiancoBlu.C / fianco.C;
-report.check(cromaRel >= 1.3,
-  "and it is still a blue: its side carries more croma than the white's does",
+const RAPP_BERSAGLIO = BERSAGLIO_BLU.fianco.C / BERSAGLIO_FIANCO.C;
+report.check(cromaRel >= RAPP_BERSAGLIO && cromaRel <= RAPP_BERSAGLIO * 1.5,
+  "and it is still a blue: its side carries the croma advantage the target's blue carries",
   `${cromaRel.toFixed(2)} times, croma ${fiancoBlu.C.toFixed(1)} against the white's `
-  + `${fianco.C.toFixed(1)}; the target's pair is ${(BERSAGLIO_BLU.fianco.C / BERSAGLIO_FIANCO.C).toFixed(2)} `
-  + `(${BERSAGLIO_BLU.fianco.C} against ${BERSAGLIO_FIANCO.C}) -- the gap is CYAN_HUE's `
-  + 'and is priced in the verbale of U-FIORI-9, and not this level.');
+  + `${fianco.C.toFixed(1)}; the target's pair is ${RAPP_BERSAGLIO.toFixed(2)} `
+  + `(${BERSAGLIO_BLU.fianco.C} against ${BERSAGLIO_FIANCO.C}) and the band is that to half `
+  + 'again -- on the FRAME the same two read 24.5 and 24.5, a ratio of 1.00, because the '
+  + "lantern halves the blue's croma and doubles the white's");
 
 // ---------------------------------------- the far family, and what it now paints
 //
@@ -1608,25 +1715,45 @@ report.line('                              passes 1.4 per cent instead of 4.0');
 report.line('    the brightest pixel       171 of 255 on a white, 164 on a blue');
 report.line('    pixels over 235           none, on either flower, at any glow up to 2.6');
 report.line('');
-report.line('  U-FIORI-9, and these are the two fits this file now carries.');
+report.line('  AND THE TWO SWEPT NUMBERS BELOW ARE READ AGAIN AT EVERY RUN. A number taken');
+report.line('  one night at the bench and never looked at since is not a receipt; these are');
+report.line('  the fits this file carries, and the one under them that it does NOT reach.');
 report.line('');
 report.line('  THE BLUE PIGMENT, on the delivered frame at the fitted pose, first person,');
-report.line('  veil off, on the side wall of a shut blue head (fondazione/fiori9/fianco.mjs);');
-report.line('  the same head and the same viewing angle at both distances:');
-report.line('    CYAN_OF_PALE   side L* at 1 m   at 4 m    side croma at 1 m / 4 m');
-report.line('    0.612  before        45.1        44.1        5.4 / 5.4');
-report.line('    0.490                40.9        39.9        5.5 / 5.4');
-report.line('    0.398                36.9        36.2        5.4 / 5.4');
-report.line('    0.337                33.9        33.2        5.3 / 5.3');
-report.line('    0.310  delivered     32.4        31.8        5.2 / 5.3');
-report.line('    0.276                30.2        29.7        5.1 / 5.3');
-report.line('    the target                       32.0                    26.9');
-report.line('      -- the LEVEL lands and the CROMA does not move at all: thirteen levels of');
-report.line('         darkening buy three tenths of croma. Where the croma goes, measured in');
-report.line('         three places: 5.2 on the frame, 13.3 with the halo driven to nought,');
-report.line('         19.6 through the chain, which has neither halo nor bloom -- and the');
-report.line('         chain caps a legal cyan at 19 to 20 at ANY level. The lever left is');
-report.line("         CYAN_HUE, which is a ratified pigment and the coordinator owns it.");
+report.line('  veil off, on the side wall of the same shut blue head at both distances');
+report.line('  (fondazione/fiori10/spazza-tinta.mjs). TWO fits, one after the other:');
+report.line('');
+report.line('  1. THE LEVEL, fitted by U-FIORI-9 and still standing. CYAN_OF_PALE against');
+report.line('     the side L* at 1 m and 4 m, at the hue of the time:');
+report.line('    0.612  before        45.1        44.1     croma 5.4 / 5.4');
+report.line('    0.398                36.9        36.2           5.4 / 5.4');
+report.line('    0.310                32.4        31.8           5.2 / 5.3');
+report.line('    0.276                30.2        29.7           5.1 / 5.3');
+report.line('      -- the LEVEL landed and the CROMA did not move at all: thirteen levels of');
+report.line("         darkening bought three tenths. The level was never the croma's lever.");
+report.line('');
+report.line('  2. THE HUE, fitted by U-FIORI-10, which is the lever that was left. Red is');
+report.line('     nought and blue carries the level, so the one free number is green over');
+report.line("     blue; the target's own side, read with THIS instrument, is L* 33.8,");
+report.line('     croma 25.4, hue 265.5:');
+report.line('    green/blue   croma 1 m / 4 m   hue 1 m / 4 m   hue off the target');
+report.line('    0.270        26.7 / 25.1       277.5 / 275.7     12.0 / 10.1');
+report.line('    0.290        25.2 / 23.8       276.0 / 274.1     10.5 / 8.5');
+report.line('    0.2985       24.9 / 23.4       275.6 / 273.5     10.1 / 8.0');
+report.line('    0.300  <-    24.5 / 23.3       275.2 / 273.4      9.7 / 7.9');
+report.line('    0.3005       24.3 / 23.1       275.0 / 273.2      9.5 / 7.7');
+report.line('    0.302        24.3 / 22.8       275.0 / 272.8      9.5 / 7.3');
+report.line('    0.313        24.0 / 22.5       274.3 / 272.1      8.8 / 6.6');
+report.line('    before       5.2 / 5.3         223   / 211      42   / 55');
+report.line("      -- the croma is landed within a point of the target's own, from five times");
+report.line('         out. And the two demands pull against each other: the croma floor of 23');
+report.line('         is reached at a green/blue of about 0.3010 and the hue ceiling of 275.5');
+report.line('         at about 0.2990, so the strip where BOTH hold is two thousandths wide.');
+report.line('         Read off the ends of the sweep a straight slope puts those two');
+report.line('         crossings in the wrong order and the strip looks empty; walked step by');
+report.line('         step it is there. The bench is exact -- asked the same configuration');
+report.line('         twice it returned the same digits both times -- so a strip this narrow');
+report.line('         is a place one may stand, and the delivery stands in the middle of it.');
 report.line('');
 report.line('  THE HALO OF THE FAR QUAD, thirteen metres out, on the two clean-meadow');
 report.line('  windows of R1 1.1 (fondazione/fiori9/spazza-alone.mjs), against the same');
@@ -1805,6 +1932,30 @@ if (process.argv.includes('--self')) {
     { what: 'a blue lamp painted past an albedo',
       caught: canale(cyanPistil.clone()
         .multiplyScalar(1.02 * SOFFITTO / canale(cyanPistil))) > SOFFITTO },
+    // LE TRE INIEZIONI DEL PIGMENTO CIANO DI U-FIORI-10, e sono tre perche' le
+    // gambe nuove sono tre e un'iniezione sola ne coprirebbe una.
+    //
+    // Tutte e tre sono DERIVATE dal pigmento consegnato e non scritte a mano,
+    // che e' la lezione che U-FIORI-9 ha pagato: la sua iniezione del pistillo
+    // blu moltiplicava «per tre» e mori' in silenzio appena il livello scese.
+    // Qui ognuna e' costruita a partire da cio' che il file dichiara adesso,
+    // quindi nessuna scade quando il livello o la tinta si rifittano.
+    { what: 'a cyan pushed past a legal albedo',
+      caught: canale(cyan.clone().multiplyScalar(1.02 * SOFFITTO / canale(cyan)))
+        > SOFFITTO },
+    // La tinta che il file portava fino a U-FIORI-10, rimessa al livello di
+    // adesso: e' un ciano legale, e' freddo, ha la croma giusta -- e punta
+    // quattordici gradi fuori. E' il difetto che nessuna gamba di questo file
+    // sapeva vedere prima che la tinta del bersaglio fosse misurata.
+    { what: "a cyan carrying the right croma in the wrong direction",
+      caught: scartoTinta(tintaFianco(alLivello(0.34, 0.73, 1.00)).h,
+        BERSAGLIO_BLU.fianco.h) > 10 },
+    // E il grigio: il ciano ripreso con la tinta del PALLIDO, che e' un pigmento
+    // legale del livello giusto e della croma del bianco. E' il cubo grigio con
+    // la lampada dentro che E-DECISIONI15 boccia prima di ogni altro numero.
+    { what: "a blue head fallen to the white's own croma",
+      caught: !(cromaDelFianco(alLivello(pale.x, pale.y, pale.z)) / fianco.C
+        >= RAPP_BERSAGLIO) },
     { what: 'a lamp that starts coming out before the day is over',
       caught: !(senzaSoglia(LANT.dayOpen) === 0 && senzaSoglia(LANT.dayOpen * 0.99) === 0
         && senzaSoglia(1) === 1) },
