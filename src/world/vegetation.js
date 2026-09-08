@@ -1901,14 +1901,77 @@ const PALE_HUE = new Vector3(1.000, 1.090, 0.500);
 const PISTIL_HUE = new Vector3(1.472, 0.961, 0.031);
 const PISTIL_OF_PALE = 0.679;
 /**
- * The cyan's own hue, from its own pixels, at the level its luminance step asks
- * for. It is not a ratio to the meadow for the reason above -- and it cannot be
- * a ratio to the white either, because the census could not find one cyan head
- * standing on sunlit ground to compare with one: they are all in the bank. So
- * its hue is its own and its level is 2.21/3.61 of the white's, which are the
- * two things measured.
+ * THE CYAN'S HUE IS FITTED ON THE FRAME NOW, AND IT IS FITTED IN TWO DIRECTIONS
+ * AND NOT ALONG ONE.
+ *
+ * What stood here was 0.34 / 0.73 / 1.00, the hue of the target's blue read off
+ * its own pixels. It is a true reading of that picture and it does not survive
+ * this chain, for the same reason its LEVEL did not (see CYAN_OF_PALE below):
+ * measured on the delivered frame at the fitted pose, first person and veil off,
+ * on the side wall of the same shut blue head U-FIORI-9 fitted the level on, it
+ * lands the side at a croma of 5.2 at one metre and 5.3 at four, against the
+ * 25.4 the target's own side reads with the same instrument. The level was ten
+ * levels out and is now landed; the croma was five times out and this is it.
+ *
+ * WHAT THE TARGET ACTUALLY ASKS, MEASURED WITH THE BENCH'S OWN INSTRUMENT. The
+ * ratified numbers for the target's blue side (L* 32.0, croma 26.9) came from a
+ * hand probe that picked its rows by eye. Read instead with the very function
+ * that reads ours -- lid is the top quarter of the silhouette, side is the
+ * bottom third, mean of the non-green pixels -- the same specimen reads L* 33.8,
+ * croma 25.4, and hue 265.5 degrees. The first two confirm the hand probe. The
+ * THIRD had never been taken, and without it the target says how much croma it
+ * wants and not in which direction, which is why what follows is a fit in two
+ * directions and not a push along one.
+ *
+ * AND THAT IS THE CORRECTION TO THE SWEEP THIS INHERITED. U-FIORI-9 priced one
+ * ray -- the hue pushed toward pure cyan, which is where croma is cheapest --
+ * and read the croma climbing. Followed to its end that ray lands the side at
+ * hue 253 through the chain and 245 on the frame -- twelve and a half degrees
+ * off the target one way and twenty the other, on a target that had not yet
+ * been measured. Croma is not the only thing a hue carries.
+ *
+ * THE FIT, AND WHY THE RED CHANNEL IS ZERO. Swept on the FRAME at both distances
+ * over the plane of legal pigments -- thirteen triples at one metre to map the
+ * surface, then the ridge walked step by step at both -- the three demands come
+ * out one-dimensional, and the free parameter is the ratio of green to blue.
+ * Red only makes it worse in both directions at once: a tenth of red costs a
+ * point of croma AND adds five degrees of hue, away from the target and not
+ * toward it. So red is nought, blue carries the level, and green is the one
+ * number that was fitted:
+ *
+ *     green/blue   croma at 1 m / 4 m    hue at 1 m / 4 m   off the target's 265.5
+ *     0.270            26.7 / 25.1          277.5 / 275.7       12.0 / 10.1
+ *     0.290            25.2 / 23.8          276.0 / 274.1       10.5 / 8.5
+ *     0.2985           24.9 / 23.4          275.6 / 273.5       10.1 / 8.0
+ *     0.300  <-        24.5 / 23.3          275.2 / 273.4        9.7 / 7.9
+ *     0.3005           24.3 / 23.1          275.0 / 273.2        9.5 / 7.7
+ *     0.302            24.3 / 22.8          275.0 / 272.8        9.5 / 7.3
+ *     0.313            24.0 / 22.5          274.3 / 272.1        8.8 / 6.6
+ *
+ * AND THE WINDOW IS TWO THOUSANDTHS WIDE, WHICH IS WHY IT WAS WALKED AND NOT
+ * INTERPOLATED. The croma asked for is 27 +/- 4, so 23 is its floor and at four
+ * metres that floor is reached at about 0.3010. The hue asked for is the
+ * target's +/- 10, so 275.5 is its ceiling and at one metre that is reached at
+ * about 0.2990. Both hold between those two and nowhere else, and the surface
+ * is not straight enough for a slope taken across the whole sweep to find it --
+ * read off the ends, the same two crossings come out in the wrong order and the
+ * window looks empty. It is not empty; it is narrow. What is delivered sits in
+ * the middle of it, spending 9.7 degrees of the ten and standing 0.3 of croma
+ * over the floor at the distance where the floor bites.
+ *
+ * THE BENCH IS EXACT, WHICH IS WHAT MAKES A WINDOW THIS NARROW A PLACE ONE MAY
+ * STAND. Asked the same configuration twice in two different passes, it
+ * returned L* 33.31, croma 25.23, hue 275.99 both times, and L* 33.29, croma
+ * 24.92, hue 275.61 both times -- digit for digit. So the kink between 0.302
+ * and 0.308 in the table above is curvature of the surface and not noise, and
+ * the two crossings above are where they are read to be.
+ *
+ * WHAT IT ALL BUYS, IN ONE NUMBER. At the delivered triple the side reads a
+ * croma of 24.5 at one metre against the 25.4 the target's own side reads with
+ * the same instrument. That is the whole distance this pigment was asked to
+ * travel -- it started at 5.2 -- and it is closed to nine tenths.
  */
-const CYAN_HUE = new Vector3(0.34, 0.73, 1.00);
+const CYAN_HUE = new Vector3(0.000, 0.300, 1.000);
 /**
  * AND ITS LEVEL IS FITTED ON THE FRAME NOW, WHICH IS THE CORRECTION.
  *
@@ -1924,24 +1987,39 @@ const CYAN_HUE = new Vector3(0.34, 0.73, 1.00);
  * FITTED AT TWO DISTANCES, BECAUSE ONE WOULD NOT PROVE IT. The sweep was read at
  * one metre (fifty rows of head, where a side is a band) and at four (fourteen
  * rows, where the lantern begins to spread over it), at the same viewing angle,
- * and it is LINEAR in the level: 0.45 of today's number gives L* 30.2 / 29.7 and
- * 0.55 gives 33.9 / 33.2. At 0.310 the side reads L* 32.2 at one metre and 31.7
- * at four, both inside the +/- 3 asked for.
+ * and it is LINEAR in the level: 0.45 of the old number gave L* 30.2 / 29.7 and
+ * 0.55 gave 33.9 / 33.2. At 0.310, and at the hue of the time, the side read
+ * L* 32.4 at one metre and 31.8 at four, both inside the +/- 3 asked for.
  *
- * AND THE CROMA DOES NOT COME WITH IT, WHICH IS SAID HERE AND MEASURED. The
- * target's side reads a croma of 26.9; ours reads 5.4 and it does NOT move over
- * the whole sweep -- 5.4 at the old level, 5.3 at the new, 5.1 at 0.45. The level
- * is not the croma's lever, and this is the measurement that overturns the note
- * U-FIORI-8 left here ("a brighter colour is a less saturated one"): through this
- * chain, darkening a cyan by thirteen levels moves its croma by three tenths.
- * Where the croma goes is in the verbale, in three named places: the lantern
- * (croma 5.4 with it, 13.3 with the halo at nought), the frame's own bloom (19.6
- * through the chain, which has neither), and the tone curve, which caps a legal
- * cyan at 19 to 20 at ANY level. The lever that is left is CYAN_HUE, and it is a
- * ratified pigment: the numbers are priced in the verbale and the choice is the
- * coordinator's.
+ * AND THE CROMA DOES NOT COME WITH THE LEVEL, WHICH IS WHAT THAT SWEEP PROVED.
+ * The target's side reads a croma of 26.9; at the old hue ours read 5.4 and it
+ * did NOT move over the whole sweep -- 5.4 at the old level, 5.3 at this one,
+ * 5.1 at 0.45. Thirteen levels of darkening bought three tenths of croma. The
+ * level is not the croma's lever and never was; CYAN_HUE above is, and it has
+ * now been fitted.
+ *
+ * AND FITTING IT MOVED THIS NUMBER, WHICH WAS NOT A LIBERTY BUT AN ARITHMETIC.
+ * The hue above is a DIRECTION at unit luminance and this number is the length
+ * of the vector along it, so the two of them together decide whether the cyan is
+ * still a pigment. At the fitted hue the blue channel is the tallest of the
+ * three, and it reaches one -- the ceiling that makes an albedo an albedo -- at
+ * a level of 0.3010. Left at 0.310 the cyan would come out 0.000 / 0.309 /
+ * 1.030, which is not a colour a surface can have. So the level came down, and
+ * it came down to 0.282 rather than to 0.3010 so that the pigment stands 6.3 per
+ * cent clear of the ceiling instead of on it: a level that sits exactly on a
+ * ceiling is a level that the next retune of the meadow's own albedo pushes
+ * through it, silently, which is the shape of the expired injection U-FIORI-9
+ * found and the shape this file does not want back.
+ *
+ * WHAT IT COSTS AND WHAT IT BUYS, ON THE FRAME AND AT BOTH DISTANCES. The side
+ * reads L* 33.2 at one metre and 32.6 at four, against the 32.4 and 31.8 the old
+ * pigment read and the 32.0 the target's own side reads: the level this session
+ * inherited is still landed, inside the same +/- 3, and it is landed at a croma
+ * of 24.5 and 23.3 instead of 5.2 and 5.3, and at a hue of 275.2 and 273.4
+ * instead of 223 and 211. Against the target's own 25.4 and 265.5, read with the
+ * same instrument, that is the whole of what this pigment was for.
  */
-const CYAN_OF_PALE = 0.310;
+const CYAN_OF_PALE = 0.282;
 
 /**
  * The four pigments, built from the seat at first ask.
