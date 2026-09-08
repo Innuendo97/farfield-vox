@@ -82,6 +82,25 @@ export const FITTED = { density: 0.0059, scaleHeight: 42 };
 //     Red and green come out on R6's own two numbers to three digits.
 //   * THE TURN, 700 m, and the PALE END the colour turns into.
 //
+// AND THE ONE THING THE LINE ABOUT THE BETAS DOES NOT SAY, WHICH COST A UNIT ITS
+// FIT. R6 §2.3's column is a RELATIVE scale: its near flank in shadow is
+// 0 / 0 / 0 and its pale far hills are 1 / 1 / 1, so 0.25 / 0.44 / 0.62 is the
+// fraction of the way from the near flank to the pale veil and not the fraction
+// of air between the eye and the crest. This guard pins the ABSOLUTE fraction,
+// which is what the shipped triple produces; it now PRINTS the relative one
+// beside it, so that the two are never again read as the same number.
+//
+// AND IT PRINTS RATHER THAN GATES IT, deliberately. U-LUCE-6 refitted the triple
+// on the relative reading — 0.001776 / 0.002521 / 0.003257 — and measured what
+// it does: with the hill's pigment at zero the air alone stands OVER the
+// reference on all three channels at the middle crest, which is a plane no
+// palette can then reach, and the near flank the refit exists to clear takes
+// more air rather than less. A guard that gated the relative number would gate
+// a triple the picture rejects; a guard that hid it would let the confusion back
+// in. So the number is on the report and the choice is the coordinator's. The
+// reasoning, and what the near flank's floor is actually made of, is written
+// over AIR_BETA in the door.
+//
 // AND WHAT THIS GUARD STILL DOES NOT ASSERT: the COLOUR of either end. The near
 // end is the ramp itself, read at twenty degrees by the door in src/core/sky.js;
 // the far end is kept as a ratio to the light the sky hands the ground. Both
@@ -133,6 +152,28 @@ export function airAt(distance, height, eyeHeight = 1.7, law = DISTANCE,
     const f = 1 - Math.exp(-((distance * beta * mean) ** 2));
     return 1 - (1 - f) * (1 - g);
   });
+}
+
+// WHERE R6'S OWN COLUMN IS READ, so that the relative fraction is asked of two
+// PLACES and not of two adjectives. The crest is the pair this file already asks
+// airAt() at; the near flank is 227 m out and 21 m up, which is where R6's window
+// on the near flank in shadow — its 0 / 0 / 0 — falls on the front this world
+// builds (the shore at 180 m, the slope 0.54, the window at 4.84 degrees).
+export const R6_PLANES = { near: [227, 21], crest: [400, 10] };
+
+/**
+ * The veil at one plane MEASURED FROM ANOTHER, which is the quantity R6 §2.3
+ * publishes and the quantity a triple of betas is fitted on or is not.
+ *
+ * The low haze CANCELS out of it: past seventy metres it stands at its ceiling
+ * on both planes, so the same grey leaves the numerator and the denominator.
+ * That is why a refit against this column is a refit of the betas alone, and
+ * also why this column can say nothing about the ceiling.
+ */
+export function relativeAt(from, to, eyeHeight = 1.7, law = DISTANCE, fitted = FITTED) {
+  const f = airAt(...from, eyeHeight, law, fitted);
+  const t = airAt(...to, eyeHeight, law, fitted);
+  return t.map((v, c) => (v - f[c]) / (1 - f[c]));
 }
 
 /** The density the seat states, at the ground. */
@@ -239,6 +280,19 @@ if (process.argv.includes('--self')) {
       caught: airAt(400, 10).every((v, c) => Math.abs(v - [0.25, 0.44, 0.62][c]) < 0.02),
     },
     {
+      what: 'the relative reading is the RELATIVE one and not the absolute one again',
+      caught: relativeAt(R6_PLANES.near, R6_PLANES.crest)
+        .every((v, c) => v < airAt(...R6_PLANES.crest)[c] - 0.05),
+    },
+    {
+      what: 'and the low haze leaves the relative reading, as the ceiling makes it',
+      caught: (() => {
+        const other = { ...DISTANCE, lowCap: 0.05 };
+        return relativeAt(R6_PLANES.near, R6_PLANES.crest, 1.7, other)
+          .every((v, c) => Math.abs(v - relativeAt(R6_PLANES.near, R6_PLANES.crest)[c]) < 1e-9);
+      })(),
+    },
+    {
       what: 'and leave the walk of E-LUCE2 where it was measured, inside sixty metres',
       caught: Math.abs(airAt(60, 1.0)[1] - 0.11) < 0.02
         && Math.abs(airAt(35, 1.0)[1] - 0.04) < 0.02,
@@ -280,8 +334,22 @@ const crest = airAt(400, 10);
 const near = [35, 60].map((d) => airAt(d, 1.0)[1]);
 report.line('');
 report.check(crest.every((v, c) => Math.abs(v - [0.25, 0.44, 0.62][c]) < 0.02),
-  'the two together put on the middle crest the air the reference shows there',
+  'the two together put on the middle crest, FROM THE EYE, the fractions R6 tabulates',
   `${crest.map((v) => v.toFixed(2)).join(' / ')} against 0.25 / 0.44 / 0.62 at 400 m, 10 m up`);
+
+// AND THE SAME CREST MEASURED FROM THE NEAR FLANK, which is the scale R6's
+// column is actually built on. Printed and not gated: see the note over
+// DISTANCE for the measurement that says why, and AIR_BETA in the door for what
+// the near flank's floor is made of.
+const relative = relativeAt(R6_PLANES.near, R6_PLANES.crest);
+report.line(`  the same crest measured from the near flank at ${R6_PLANES.near.join(' m, ')} m up, `
+  + 'which is the scale R6 §2.3 tabulates on');
+report.line(`  reads ${relative.map((v) => v.toFixed(2)).join(' / ')} against its 0.25 / 0.44 / 0.62. `
+  + 'A triple fitted on THAT comes to 0.001776 / 0.002521 / 0.003257 and');
+report.line('  was measured and rejected: it puts the air alone over the reference on all three '
+  + 'channels at the crest, which is a plane no palette then reaches, and');
+report.line('  leaves more air on the near flank rather than less. The near flank\'s own floor is '
+  + '37 levels of blue this term\'s and 8 the ceiling\'s. Owner: the coordinator');
 report.check(Math.abs(near[1] - 0.11) < 0.02 && Math.abs(near[0] - 0.04) < 0.02,
   'and leave the walk inside sixty metres where E-LUCE2 measured it',
   `${near[0].toFixed(3)} at 35 m and ${near[1].toFixed(3)} at 60 m, `
