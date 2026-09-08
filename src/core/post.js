@@ -2076,8 +2076,14 @@ function identityLut(size = LUT_SIZE) {
 // world costs, and a cost folded into the pass it stands beside is not a cost
 // anybody can quote. On a frame drawn whole it is an exact nought, because the
 // field is then drawn inside `scene`, where it always was.
+// THE THRESHOLD AND THE BLUR ARE TWO STAGES AND NOT ONE. They are one pass and
+// a chain of ten, they scale with different things -- the threshold with the
+// frame, the chain with its own pyramid -- and read together they hid which of
+// the two a post budget was actually spending. `bloom` keeps its name and now
+// means the threshold alone; the down and up chain is `sfocatura`.
 const CLOCK_STAGES = [
-  'prepass', 'campo', 'scene', 'depth', 'soft', 'bloom', 'probe', 'eye', 'rays', 'composite',
+  'prepass', 'campo', 'scene', 'depth', 'soft', 'bloom', 'sfocatura', 'probe', 'eye', 'rays',
+  'composite',
 ];
 
 /**
@@ -3805,6 +3811,7 @@ export function createPostPipeline(gl) {
         prefilter.uniforms.uKnee.value = params.bloomKnee;
         draw(prefilter, bloomTargets[0]);
 
+        if (slot) clock.begin(slot, 'sfocatura');
         for (let i = 1; i < bloomTargets.length; i++) {
           const source = bloomTargets[i - 1];
           down.uniforms.tSource.value = source.texture;
