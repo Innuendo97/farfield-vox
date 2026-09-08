@@ -86,59 +86,59 @@ export const FOG_RADIANCE = [0.0648, 0.3903, 0.8946];
 // of it is.
 export const FOG_LOW_CAP = 0.13;
 
-// THE DISTANCE, PER CHANNEL: Rayleigh, on the same shape as the haze.
+// THE DISTANCE, PER CHANNEL: Rayleigh, and now at Rayleigh's own ratio.
 //
-// R6 §4.4 published 0.0011 / 0.0019 / 0.0023, fitted on the reference's middle
-// crest with nothing under it. Under the capped haze the same measured triple
-// of air fractions there — 0.25 red, 0.44 green, 0.62 blue — asks for these,
-// which land on R6's own red and green to three digits. The ratio blue over red
-// is 2.4; pure Rayleigh would be 3.3, and the reference reads 2.5.
+// WHAT THESE ARE FITTED TO, AND ON WHOSE SCALE. R6 §4.4 published a triple read
+// off the reference's middle crest, and R6 §2.3 publishes the column it was read
+// from: the crest veiled 0.25 on red, 0.44 on green, 0.62 on blue. That column
+// is RELATIVE. R6 §2.3 builds it on a scale whose 0 / 0 / 0 is the near flank in
+// shadow and whose 1 / 1 / 1 is the pale far hills, so it is the fraction of the
+// way FROM THE NEAR FLANK to the pale veil, and not the fraction of air between
+// the eye and the crest.
 //
-// AND WHAT THAT TRIPLE OF FRACTIONS IS A FRACTION OF, WHICH THIS FILE USED TO
-// LEAVE UNSAID AND NOW STATES. R6 §2.3 builds its column on a scale of its own:
-// the near flank in shadow is its 0 / 0 / 0 and the pale far hills are its
-// 1 / 1 / 1. So 0.25 / 0.44 / 0.62 is the fraction of the way FROM THE NEAR
-// FLANK to the pale veil, not the fraction of air between the eye and the
-// crest. The two coincide only where the near flank carries no air, and in this
-// world it carries some. U-CORNICE-2 §11 caught that and D-C2-1 ordered the
-// refit; the refit was derived and MEASURED, and the measurement said not to
-// ship it. It is written here because the next reader would otherwise derive it
-// a second time.
+// TWO UNITS READ IT AS THE SECOND AND BOTH LOST THE PICTURE. U-CORNICE-2 §11
+// caught the confusion and D-C2-1 ordered a refit; U-LUCE-6 derived the triple
+// the relative reading asks for UNDER THE OLD SHAPE — 0.001776 / 0.002521 /
+// 0.003257 — and measured that it puts the air alone OVER the reference on all
+// three channels at the crest, which is a plane no palette then reaches, while
+// leaving MORE air on the near flank rather than less. The measurement was right.
+// The conclusion drawn from it — that no triple does both — was right about
+// every triple and wrong about the reason.
 //
-// READ RELATIVELY — the near flank at 227 m and 21 m up, which is where R6's
-// own window sits on the front this world builds, against the crest at the
-// 400 m and 10 m guard-aria already asks the pair at — the column asks for
-// 0.001776 / 0.002521 / 0.003257, sixty per cent over these. What that costs,
-// carried through the delivered chain rather than argued:
+// IT WAS NEVER THE TRIPLE. It was that the LAW had its zero in the wrong place,
+// and the law is now written so that its zero is where R6's column has one: see
+// AIR_PATH_ORIGIN below and the note over FOG_GLSL. Once the origin of the path
+// is the near flank, the relative column and the absolute one are the same
+// column, and R6's three numbers can be read off it with no refit at all. These
+// three ARE that column, inverted through Beer-Lambert over the 174 m of optical
+// path that separate the near flank from the crest:
 //
-//   * THE MIDDLE CREST IS LOST. With the hill's pigment at zero the air alone
-//     puts 85 / 144 / 194 there, against a reference that reads 83 / 139 / 180:
-//     OVER on all three channels. An additive term cannot be subtracted, so a
-//     plane whose floor stands over its target is a plane no palette reaches —
-//     which is U-CORNICE-2's residuo 1 exactly, moved onto a second plane.
-//     These leave that floor under on red and green (−15 / −8) and six over on
-//     blue. Swept over twenty choices of the two planes' distance and height,
-//     the relative triple loses the crest on nineteen of them and this one on
-//     none.
-//   * AND THE NEAR FLANK, WHICH THE REFIT EXISTS TO CLEAR, TAKES MORE AIR AND
-//     NOT LESS: its floor's blue goes from 148 to 159 where the reference in
-//     the same mask reads 103.
+//     beta = -ln(1 - f) / (u_crest - u_origin),   f = 0.25 / 0.44 / 0.62
 //
-// WHY NO TRIPLE DOES BOTH, in one line of arithmetic. Under a gaussian in
-// (distance × beta × the height integral) the near flank carries 0.251 of the
-// crest's exponent, and it is the SHAPE that fixes that ratio, not the fit. For
-// the near flank to be bare while the crest veils 0.62 the exponent would have
-// to be about 5.6 rather than 2. So the near flank's level is not something
-// these three can pay for, and this file's own rule applies: a fitted number
-// must not be spent closing another term's debt.
+// AND THE CHECK NOBODY FITTED THEM TO. Blue over red comes out 3.36. Pure
+// Rayleigh scattering is 3.3. The triple that shipped before stood at 2.36 and
+// R6's own reading of the reference is 2.5 — and the reason the old triple could
+// not get there is arithmetic rather than measurement: under a gaussian in the
+// path it is the SQUARE of the depth that carries the fraction, so a fit against
+// this column can only ever produce the square root of the true ratio, and the
+// square root of 3.36 is 1.83. The shape was hiding the physics in plain sight,
+// and the two numbers that agree here were solved a decade of pages apart.
 //
-// WHO OWNS WHAT IS LEFT, in levels, at the near flank with the pigment at zero.
-// The floor stands 45 over the reference on blue. With the distance term
-// switched off entirely the capped low haze alone still puts 16 / 76 / 111
-// there, which is 8 over: 37 of the 45 are this term's and 8 are the ceiling's,
-// and the ceiling is E-LUCE2's and frozen. guard-pietra reads the same floor
-// from the other side, on a monolith's shadowed face, and names the same owner.
-export const AIR_BETA = [0.001105, 0.001904, 0.002611];
+// WHO OWNS WHAT IS LEFT AT THE NEAR FLANK, in levels, MEASURED ON THE PIGMENT.
+// The plane reads 79 / 120 / 137 against a reference at 74 / 104 / 103. This
+// term's share of that is 0 / 0 / 0, because the law is zero at that plane by
+// construction, and the whole 5 / 16 / 33 is the low haze's CEILING, which is
+// E-LUCE2's and frozen.
+//
+// AND THAT IS NOT WHAT THIS FILE USED TO SAY. It said 37 of 45 levels of blue
+// were this term's and 8 the ceiling's, and it said it from a reading taken with
+// THE PIGMENT AT ZERO — a floor of 148 against a target of 103. A floor is the
+// ADDITIVE half of the air; the ceiling is not additive, it is a MIX, and what a
+// mix costs depends on how dark the surface it stands in front of is. At pigment
+// zero it replaces nothing and looks cheap; over the rock in shadow it replaces
+// a blue of 0.104 with a fog of 0.895 and costs 33. The two owners were the
+// right two and their sizes were the wrong way round.
+export const AIR_BETA = [0.001653, 0.003331, 0.005559];
 
 // THE FAR END OF THE COLOUR, and it is PALER THAN THE SKY.
 //
@@ -149,10 +149,45 @@ export const AIR_BETA = [0.001105, 0.001904, 0.002611];
 // than chosen, and it agrees with them to a tenth of a level.
 export const AIR_PALE = [0.198800, 0.603064, 1.196391];
 
-// AND HOW FAR IT TAKES TO GET THERE. R6's own D2: the colour is a third of the
-// way from the near blue to the pale veil at three hundred metres and nine
-// tenths of the way by sixteen hundred, which is where its four hill planes are.
-export const AIR_TURN_METRES = 700;
+// WHERE THE PATH IS MEASURED FROM, and this is the one number the shape is.
+//
+// THE AIR OF THE FIRST 227 METRES IS ALREADY IN THE PIGMENT. U-CORNICE-2 solved
+// the cornice's palette WITH THE AIR SWITCHED OFF, against the class mask of the
+// reference's near flank — so `palette()`'s rock in shadow develops to
+// 74 / 104 / 103, which is that plane's reading in the reference, air of the
+// reference included. The pigment is not a mineral: it is what that plane LOOKS
+// LIKE from here. Putting this world's own air in front of it a second time is
+// counting the same air twice, and it is measurable: 21 of the near flank's 55
+// levels of blue used to be exactly that double count.
+//
+// AND R6 SAYS THE SAME THING IN ITS OWN LANGUAGE. R6 §2.3's column of air
+// fractions is built on a scale whose zero is the near flank in shadow. Every
+// number the campaign has about the colour of the distance is measured FROM that
+// plane. So the law's zero belongs there too — not at the eye.
+//
+// IT IS THE NEAR FLANK'S OPTICAL PATH AND NOT ITS DISTANCE. 227 m out and 21 m
+// up, through the height integral both terms share, comes to 175 m of path at
+// the judging eye. Stated as a path rather than as a distance so that a hilltop
+// and the grass at its foot cross it at different distances, which is the whole
+// reason the integral exists.
+//
+// WHAT IT COSTS THE WALK, MEASURED. Inside this origin the distance term is
+// exactly nothing, so everything nearer than about 180 m loses whatever of it
+// used to be there. On the stone, per face of masonry-spec `palette`, the worst
+// is 0.64 L*; on the meadow at sixty metres, which is the furthest window
+// E-LUCE2 fitted the low haze on, the worst is 0.80 L* on a south flank in
+// shadow. Both inside the one L* E-LUCE2's walk is held to. AND IT LANDS CLOSER
+// TO E-LUCE2 THAN BEFORE: the walk's own green fraction reads 0.0393 at 35 m and
+// 0.1112 at 60 m against the 0.04 and 0.11 E-LUCE2 measured, where the shipped
+// air read 0.0433 and 0.1220 — because the distance term was leaking into the
+// window the low haze was fitted on, and now it does not.
+//
+// BEYOND SIXTY METRES THE MEADOW DOES MOVE: −1.3 L* at eighty and −2.0 at a
+// hundred, where the turf ends. Nobody ever fitted the air out there — E-LUCE2's
+// four windows stop at sixty and E-LUCE4 extended a term past them without
+// re-measuring — so this is declared rather than defended, and it is a residual
+// of this unit and not a claim.
+export const AIR_PATH_ORIGIN = 175;
 
 // The pale air the stone and the rocks hand back where they are seen almost
 // edge on. Solved off the brightest stretch of the reference's path, which is
@@ -215,33 +250,54 @@ export const GROUND_EXPOSURE = 1.25;
 //      what a single fraction cannot say at any density.
 //
 // SO THERE ARE TWO TERMS, and they are not a refinement of each other: they are
-// two different pieces of atmosphere.
+// two different pieces of atmosphere. THEY SHARE THE HEIGHT INTEGRAL AND THEY DO
+// NOT SHARE A SHAPE, and the second half of that sentence is what this unit
+// changed.
 //
-//   THE LOW HAZE is the aerosol E-LUCE2 fitted. Its density and its scale height
-//   are untouched, in src/core/sky.js where guard-aria watches them, so the walk
-//   inside sixty metres does not move by a thousandth. What it takes is a
-//   CEILING. A grey term that goes on growing puts 0.35 of red on a hill four
-//   hundred metres out; the reference puts 0.25 there. The ceiling is 0.13,
-//   which is the value the low haze itself reaches a little past the last window
-//   it was fitted on — so the fit is kept exactly where it was measured and
-//   stops exactly where it stopped being measured.
+//   THE LOW HAZE is the aerosol E-LUCE2 fitted. Its density, its scale height
+//   and its gaussian are untouched, in src/core/sky.js where guard-aria watches
+//   them. What it takes is a CEILING. A grey term that goes on growing puts 0.35
+//   of red on a hill four hundred metres out; the reference puts 0.25 there. The
+//   ceiling is 0.13, which is the value the low haze itself reaches a little past
+//   the last window it was fitted on — so the fit is kept exactly where it was
+//   measured and stops exactly where it stopped being measured.
 //
-//   THE DISTANCE is Rayleigh, per channel, towards a colour that TURNS. It has
-//   the same shape as the low haze — a gaussian in (distance x beta x the same
-//   height integral), so a hilltop is still less veiled than the grass at its
-//   foot — and three betas instead of one.
+//   THE DISTANCE is Rayleigh, per channel, towards a colour that turns pale. Its
+//   shape is BEER-LAMBERT over a path whose origin is the near flank, and until
+//   this unit it was a gaussian over a path whose origin was the eye.
 //
-// WHERE THE THREE BETAS COME FROM. R6 §4.4 published 0.0011 / 0.0019 / 0.0023,
-// read off the reference's middle crest. They are re-derived here rather than
-// copied, for one reason and with one visible consequence: the low haze sits
-// UNDER this term now, and R6's triple was solved without anything under it.
-// Solved so that the two TOGETHER land on R6's own measured fractions — 0.25 red,
-// 0.44 green, 0.62 blue, at four hundred metres, on a crest standing ten metres
-// over the water where the height integral is 0.871 — they come to
-// 0.001105 / 0.001904 / 0.002611. Red and green land on R6's own two numbers to
-// three digits, which is the check that the derivation is the same one; blue
-// comes out a seventh higher, because 0.0023 does not reproduce the 0.62 R6
-// measured even with nothing beneath it.
+// WHY THE GAUSSIAN WENT, AND IT IS NOT A TASTE. E-LUCE4 gave this term the low
+// haze's shape "so a hilltop is still less veiled than the grass at its foot".
+// That property is in the HEIGHT INTEGRAL, which the two share and still share;
+// it is not in the exponent. What the exponent does is decide how a column of
+// air extinguishes, and a column of air extinguishes as exp(-tau). E-LUCE2's
+// square was a fit of an AEROSOL near the ground over sixty metres, and lending
+// it to the distance was lending a fit past the window it was fitted in. Three
+// things follow from taking it back, and all three are measured:
+//
+//   1. R6'S COLUMN BECOMES READABLE. Under a square it is the square of the
+//      depth that carries the fraction, so a triple fitted on R6's ratios comes
+//      out at their square root: blue over red 1.83 where Rayleigh is 3.3. Under
+//      Beer-Lambert the same column gives 3.36. See AIR_BETA.
+//   2. THE FAR HALF KEEPS ITS DEPTH. R6 §2.2 asks for four planes readable as
+//      four distances. A steep law saturates: swept over exponents, at the square
+//      the hills at 820 m and the pale hills at 1550 m come to 4 / 2 / 0 levels
+//      apart, which is one plane where the reference has two. At Beer-Lambert
+//      they stand 17 / 13 / 6 apart, which is where the shipped air had them.
+//   3. THE PICTURE IMPROVES ON FIVE PLANES AND NOT ONLY ON THREE. Rock in shadow
+//      through the air, developed: the three planes the fit is against go from
+//      21.06 to 14.12 levels of rms, and R6's five go from 27.27 to 22.88.
+//
+// THE PALE VEIL IS SECOND ORDER, WHICH IS WHY THERE IS NO LONGER A TURN LENGTH.
+// The colour the distance goes out into runs from the sky's own blue — the
+// in-scatter, which is light scattered ONCE — to a pale veil that is light
+// scattered more than once. The weight of the second is the square of the first,
+// so the turn is f.g * f.g and not a second exponential in metres. What leaves
+// with it is AIR_TURN_METRES: 700 m, anchored on two distances that came out of
+// the same air it was describing (U-LUCE-7 residuo 3). The turn now has no
+// length in it, no fitted exponent, and one multiply.
+//
+// AND THAT IS ONE TRANSCENDENTAL FEWER PER FRAGMENT, not one more.
 //
 // THE ORDER OF THE TWO IS PHYSICS AND NOT TASTE. The distance veils the surface;
 // the low haze veils what comes out of that, because the low haze is the air
@@ -249,7 +305,7 @@ export const GROUND_EXPOSURE = 1.25;
 //
 //     colour * (1 - f) * (1 - g)  +  A(d) * f * (1 - g)  +  fog * g
 //
-// with f the per channel distance fraction, g the capped low haze, and A(d) the
+// with f the per channel distance fraction, g the capped low haze, and A the
 // turning colour. airTerms() hands back the two pieces of that so a program can
 // carry them from a vertex shader if it wants to.
 export const FOG_GLSL = /* glsl */`
@@ -283,15 +339,25 @@ export const FOG_GLSL = /* glsl */`
     return min(uAirLaw.x, 1.0 - exp(-depth * depth));
   }
 
-  // The distance, per channel.
+  // The distance, per channel: Beer-Lambert over the path BEYOND the origin.
+  //
+  // uAirLaw.y is that origin, in metres of optical path, and it is where the
+  // reference's near flank stands. Nearer than it this term is exactly nothing,
+  // because the air of those metres is already inside the pigment the cornice's
+  // palette was solved to. See AIR_PATH_ORIGIN.
   vec3 airVeil(float distance, float fragmentHeight) {
-    vec3 depth = distance * uAirBeta * airMean(fragmentHeight);
-    return 1.0 - exp(-depth * depth);
+    float path = max(distance * airMean(fragmentHeight) - uAirLaw.y, 0.0);
+    return 1.0 - exp(-uAirBeta * path);
   }
 
   // And the colour it goes out into, from the low sky's blue to the pale veil.
-  vec3 airTint(float distance) {
-    return mix(uAirNear, uAirPale, 1.0 - exp(-distance / uAirLaw.y));
+  //
+  // The blue is light scattered once and the pale veil is light scattered more
+  // than once, so the weight of the second is the square of the first. There is
+  // no length here and nothing fitted: it is the veil this same air already
+  // computed, squared.
+  vec3 airTint(vec3 veil) {
+    return mix(uAirNear, uAirPale, veil.g * veil.g);
   }
 
   // What is kept of the surface and what is added in front of it, per channel.
@@ -299,7 +365,7 @@ export const FOG_GLSL = /* glsl */`
     vec3 f = airVeil(distance, fragmentHeight);
     float g = fogAmount(distance, fragmentHeight);
     keep = (1.0 - f) * (1.0 - g);
-    add = airTint(distance) * f * (1.0 - g) + uFogColour * g;
+    add = airTint(f) * f * (1.0 - g) + uFogColour * g;
   }
 
   // The whole of it, for the programs that have the fragment's own distance.
@@ -511,7 +577,9 @@ export function fogUniforms() {
     uAirBeta: { value: new Vector3(...AIR_BETA) },
     uAirNear: AIR_NEAR_UNIFORM,
     uAirPale: AIR.uAirPale,
-    uAirLaw: { value: new Vector2(FOG_LOW_CAP, AIR_TURN_METRES) },
+    // The ceiling on the low haze and the origin of the distance's path: the
+    // two numbers of the LAW, as against the colours it runs between.
+    uAirLaw: { value: new Vector2(FOG_LOW_CAP, AIR_PATH_ORIGIN) },
   };
 }
 
