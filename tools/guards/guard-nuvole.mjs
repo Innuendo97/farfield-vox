@@ -265,7 +265,9 @@ const fragment = source.slice(source.indexOf('const CLOUD_FRAGMENT'),
 report.check(!/\btexture2D\b|\bsampler2D\b|\btexture\s*\(/.test(fragment),
   'il frammento non legge nessuna texture', 'zero campionatori (la placca ne aveva due)');
 const fragmentJson = readJson('assets-src/assets.d/v6-cielo-nuvole.json');
-report.check(fragmentJson.assets.length === 0,
+/** The weather asks for no asset at all: the plates and the atlas are gone. */
+const asksNoAsset = (json) => json.assets.length === 0;
+report.check(asksNoAsset(fragmentJson),
   'e il tempo non chiede nessun asset', `${fragmentJson.assets.length} asset dichiarati `
   + '(le placche: cloud-sprites, cloud-cover, cloud-equirect, 2,24 MB di ktx2)');
 
@@ -358,8 +360,12 @@ if (process.argv.includes('--self')) {
       caught: fat.worst > BAND_TOLERANCE },
     { what: 'il cubo cotto a una taglia sola invece che per distanza',
       caught: coarseHi > 0.75 },
+    // USED TO BE `[{ id: 'cloud-sprites' }].length !== 0`, a hand-written array
+    // measured against zero: a constant true that never called the predicate.
+    // (U-GUARDIA-3, E-IGIENE.)
     { what: 'un asset dichiarato di nuovo nel frammento del cielo',
-      caught: [{ id: 'cloud-sprites' }].length !== 0 },
+      caught: !asksNoAsset({ ...fragmentJson, assets: [{ id: 'cloud-sprites' }] })
+        && asksNoAsset(fragmentJson) },
   ]);
 }
 

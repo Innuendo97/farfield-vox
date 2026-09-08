@@ -86,7 +86,12 @@ const MAT_OF = {
   [MATERIAL.PATH]: CAMPO_MATERIAL.PATH,
 };
 
-const injected = process.argv.includes('--inject');
+// THE DEFECT IS INJECTED BY --self TOO, AND THAT IS THE POINT OF THE FLAG.
+// It used to be --inject alone, and tools/guards/all.mjs forwards only the
+// flags it was given: under the campaign's own `guard:all -- --self` this was
+// false, every case below read `injected ? ... : true`, and the whole self
+// test was a row of unconditional passes. (U-GUARDIA-3, E-IGIENE.)
+const injected = process.argv.includes('--inject') || process.argv.includes('--self');
 
 // --------------------------------------------------------------------------
 // 1 and 2. THE TEXEL AND THE COLUMN, BOTH WAYS.

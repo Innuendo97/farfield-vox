@@ -91,9 +91,11 @@ const report = reporter('guard-stabilita -- il prato sta fermo sotto chi cammina
 // niente» — la banda lo mantiene meglio: la grana va avanti e torna indietro col
 // camminatore e nessuna cella cambia due volte. Cio' che manteneva DAVVERO — «da
 // fermi il quadro e' identico al byte» — resta, ed e' la ricevuta piu' sotto.
+/** A tier spreads its LOD front over at least two tenths of a second. */
+const spreadsTheFront = (g) => Boolean(g) && typeof g.lag === 'number' && g.lag >= 200;
 for (const tier of TIERS) {
   const g = tier.groundDetail;
-  report.check(g && typeof g.lag === 'number' && g.lag >= 200,
+  report.check(spreadsTheFront(g),
     `il tier ${tier.id} spande il fronte della LOD su almeno due decimi di secondo`,
     `lag ${g && g.lag} ms, che a 1 m/s e' una banda di ${((g && g.lag) / 1000).toFixed(2)} m`);
   report.check(!(g && 'snap' in g),
@@ -304,8 +306,13 @@ cases.push({ what: 'una striscia della finestra che si costruisce ancora a pezzi
   caught: !(0.648 <= WALK_CEILING.finestra) });
 cases.push({ what: "un braccio che costa piu' di mezzo millisecondo sulla scena",
   caught: !(1.4 <= WALK_CEILING.costoP50) });
+// THE PREDICATE THE RUN USES, so a defect can be put through it. The case
+// below used to read `!(TIERS.every(...) && 100 >= 200)`: the second conjunct
+// is a compile-time false, so the whole thing was `!false` -- unconditionally
+// true, with the tier check inside it dead code that never ran.
+// (U-GUARDIA-3, E-IGIENE.)
 cases.push({ what: 'un tier con una banda troppo stretta per spandersi sui fotogrammi',
-  caught: !(TIERS.every((t) => t.groundDetail.lag >= 200) && 100 >= 200) });
+  caught: !spreadsTheFront({ lag: 100 }) && TIERS.every((t) => spreadsTheFront(t.groundDetail)) });
 cases.push({ what: 'un tier che porta ancora la vecchia isteresi al posto della banda',
   caught: 'snap' in { snap: 0.75, lag: 300 } });
 cases.push({ what: 'una scala che legge l\'orologio',

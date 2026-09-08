@@ -70,7 +70,12 @@ import { read, reporter, selfTest } from './lib.mjs';
 const report = reporter('guard-confine -- the edge of the world is ground');
 
 const DEG = Math.PI / 180;
-const injected = process.argv.includes('--inject');
+// THE DEFECT IS INJECTED BY --self TOO, AND THAT IS THE POINT OF THE FLAG.
+// It used to be --inject alone, and tools/guards/all.mjs forwards only the
+// flags it was given: under the campaign's own `guard:all -- --self` this was
+// false, every case below read `injected ? ... : true`, and the whole self
+// test was a row of unconditional passes. (U-GUARDIA-3, E-IGIENE.)
+const injected = process.argv.includes('--inject') || process.argv.includes('--self');
 
 // THE BODY'S OWN STEP, read from a seat and not written here.
 //
@@ -83,6 +88,11 @@ const injected = process.argv.includes('--inject');
 // the ground and reaching into another session's private literal to prove a
 // point about it would be the second opinion it exists to prevent.
 const STEP = TUNING.ground.maxM;
+
+// What the crest stands at before the hand below moves it. The injection is a
+// mutation of a seat the whole file reads, so the cases that assert the world
+// as it SHIPS have to be able to put it back -- see the self test.
+const CREST_AS_SHIPPED = CONFINE.crest.height;
 
 if (injected) {
   // THE SELF TEST'S OWN HAND, AND IT HAD TO CHANGE WITH THE DIAL. It used to be
@@ -501,6 +511,12 @@ report.check(probe.top !== NO_COLUMN && rimmed.top === NO_COLUMN,
   `at 90 m east: top ${probe.top} with, ${rimmed.top} without`);
 
 if (process.argv.includes('--self')) {
+  // THE WORLD PUT BACK BEFORE THE CONTROL CASES ARE ASKED. `clipped` was
+  // measured during the run above, with the bent crest in place; everything
+  // below that asserts what the world does AS IT SHIPS needs the crest it
+  // ships with. Leaving it bent made the last case -- the one that proves the
+  // shore predicate says YES to the delivered level -- fail on a correct world.
+  CONFINE.crest.height = CREST_AS_SHIPPED;
   selfTest('guard-confine', [
     {
       what: 'a ridge raised past what the picture byte can hold',

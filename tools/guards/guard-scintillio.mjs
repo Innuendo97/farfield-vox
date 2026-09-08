@@ -81,6 +81,10 @@ const X1 = 1700;
  */
 const CUBI = [12.16, 12.37, 11.33, 6.84];
 
+/** Which bands of a row scintillate MORE than the cubes the committente accepted. */
+const overTheCubes = (rows) => rows
+  .map((v, i) => (v > CUBI[i] ? i : -1)).filter((i) => i >= 0);
+
 /**
  * AND WHAT THE PHOTOGRAPH SAYS, which is only about the still camera.
  *
@@ -270,7 +274,7 @@ if (dir && existsSync(dir)) {
     });
     gated = true;
     for (let i = 0; i < BANDS.length; i += 1) {
-      report.check(rows[i] <= CUBI[i],
+      report.check(overTheCubes(rows).every((k) => k !== i),
         `in a slow walk the ${BANDS[i].name} does not scintillate more than the cubes did`,
         `${rows[i].toFixed(2)} against ${CUBI[i].toFixed(2)}`);
     }
@@ -296,8 +300,14 @@ if (process.argv.includes('--self')) {
       caught: selfShaken.filter((_, i) => i !== 1).every((v) => v === 0),
     },
     {
+      // USED TO BE `CUBI.map((v, i) => v + 1 > CUBI[i]).every(Boolean)`, which
+      // is `v + 1 > v`: true for any row of numbers whatsoever, including one
+      // that passes. It now runs the ceiling the way the RUN runs it, over a
+      // walk one level worse than the cubes and over one a hair better.
+      // (U-GUARDIA-3, E-IGIENE.)
       what: 'a walk over the cubes own row is refused',
-      caught: CUBI.map((v, i) => v + 1 > CUBI[i]).every(Boolean),
+      caught: overTheCubes(CUBI.map((v) => v + 1)).length === BANDS.length
+        && overTheCubes(CUBI.map((v) => v - 0.01)).length === 0,
     },
   ]);
 }

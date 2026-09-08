@@ -106,7 +106,15 @@ const ALLOWED = [
   'uPixelScale: { value: 0.002 },',
   'u.uPixelScale.value = size.y > 0 ? 2 * Math.tan(fov / 2) / size.y : 0.002;',
 ];
-const stray = sites.filter(([, l]) => !ALLOWED.includes(l));
+/** Which live lines naming uPixelScale are none of the five declared uses. */
+const strayIn = (text) => text
+  .replace(/\/\/[^\n]*/g, '')
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .split('\n')
+  .map((l, i) => [i + 1, l.trim()])
+  .filter(([, l]) => l.includes('uPixelScale'))
+  .filter(([, l]) => !ALLOWED.includes(l));
+const stray = strayIn(glsl);
 report.check(stray.length === 0,
   'ogni riga viva che nomina uPixelScale misura un pixel e non una distanza',
   stray.length ? stray.map(([n, l]) => `${n}: ${l}`).join(' | ')
@@ -168,8 +176,14 @@ const cases = [];
   const bentText = ladderText.replace('uLodNear', 'uLodNear * uPixelScale');
   cases.push({ what: 'la scala che si rimette uPixelScale dentro',
     caught: /uPixelScale/.test(bentText) });
+  // AND THIS ONE USED TO PROVE NOTHING: it asked whether the ALLOWED array in
+  // this same file contains a string it plainly does not, which is a constant
+  // true that never touched the source or the predicate. It now puts the line
+  // INTO the real source and asks the real predicate. (U-GUARDIA-3, E-IGIENE.)
+  const withStray = glsl.replace('uniform float uPixelScale;',
+    'uniform float uPixelScale;\n  float far = uPixelScale * 24.0;');
   cases.push({ what: 'una riga nuova che legge uPixelScale come una distanza',
-    caught: !ALLOWED.includes('float far = uPixelScale * 24.0;') });
+    caught: strayIn(withStray).length === 1 && strayIn(glsl).length === 0 });
 }
 {
   // (d) una ricevuta che dice zero dove il banco ha letto l'85%
