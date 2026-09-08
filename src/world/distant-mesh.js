@@ -2,6 +2,7 @@ import SPEC from '../../assets-src/distant/cornice.json' with { type: 'json' };
 import {
   CENTRE, checkSpec, crownAt, frontierAt, grainAt, hillAt, isRockAt, ladders,
 } from '../../assets-src/distant/cornice.mjs';
+import { directionOf, turnOf } from './compass.js';
 import { waterLevel } from './voxel/confine.js';
 
 // THE HILLS, CUT INTO CUBES. Arithmetic and typed arrays, and nothing a browser
@@ -62,11 +63,17 @@ export function palette() {
   return [p.grassTop, p.grassLit, p.grassShade, p.rockTop, p.rockLit, p.rockShade];
 }
 
+// THE SUN, ON THE WORLD'S OWN COMPASS AND NOT ON A SECOND COPY OF IT.
+//
+// `matter.sun.azimuth` is a BEARING -- nought at north, positive to the east --
+// so the horizontal half of the vector is the compass's own `directionOf` and
+// the elevation only shortens it. Written out with sines here, it was three
+// lines that agreed with the compass by coincidence rather than by import.
 const SUN = (() => {
-  const rad = Math.PI / 180;
-  const az = SPEC.matter.sun.azimuth * rad;
-  const el = SPEC.matter.sun.elevation * rad;
-  return { x: Math.sin(az) * Math.cos(el), y: Math.sin(el), z: -Math.cos(az) * Math.cos(el) };
+  const el = SPEC.matter.sun.elevation * (Math.PI / 180);
+  const [dx, , dz] = directionOf(SPEC.matter.sun.azimuth);
+  const flat = Math.cos(el);
+  return { x: dx * flat, y: Math.sin(el), z: dz * flat };
 })();
 
 const LIT = 0.15;
@@ -280,7 +287,7 @@ function meshRing(ring, lads, wedges, tally) {
   const quad = (points, shade) => {
     const cx = (points[0][0] + points[2][0]) / 2 - CENTRE.x;
     const cz = (points[0][2] + points[2][2]) / 2 - CENTRE.z;
-    const turn = (Math.atan2(cx, -cz) / Math.PI + 1) / 2;
+    const turn = turnOf(cx, cz);
     const w = wedges[((Math.floor(turn * count) % count) + count) % count];
     room(w, 4);
     const first = w.vertices;

@@ -24,6 +24,8 @@
 // so that a cube stays legible at every distance, and it can only be reproduced
 // by a side that grows with the distance.
 
+import { bearingOf, directionOf } from './compass.js';
+
 export const DEG = Math.PI / 180;
 
 // The apparent step of the cube, in degrees, read off the reference at the
@@ -88,12 +90,10 @@ export function makeCamera(pose, width, height) {
  * only mean a position once it is said where they were read from.
  */
 export function placeMass(mass, eye) {
-  const az = mass.az * DEG; const el = mass.el * DEG;
-  return [
-    eye[0] + Math.sin(az) * Math.cos(el) * mass.D,
-    eye[1] + Math.sin(el) * mass.D,
-    eye[2] - Math.cos(az) * Math.cos(el) * mass.D,
-  ];
+  const el = mass.el * DEG;
+  const [dx, , dz] = directionOf(mass.az);
+  const flat = Math.cos(el) * mass.D;
+  return [eye[0] + dx * flat, eye[1] + Math.sin(el) * mass.D, eye[2] + dz * flat];
 }
 
 // ---------------------------------------------------------------- the noise
@@ -567,7 +567,7 @@ export function skylineRows(camera, elevationAt) {
       dx * camera.right[1] + camera.F * camera.forward[1],
       dx * camera.right[2] + camera.F * camera.forward[2],
     ];
-    const bearing = Math.atan2(d[0], -d[2]) / DEG;
+    const bearing = bearingOf(d[0], d[2]);
     rows[x] = camera.rowOfElev(elevationAt(bearing));
   }
   return rows;
