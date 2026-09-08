@@ -9,8 +9,9 @@ import { createDistance } from '../distant.js';
 //
 // WHAT IT HANGS NOW (E-DECISIONI21, D7 = A). Hills of real cubes beyond the
 // water, four planes of them, fitted per direction against the skyline R6
-// traced off the reference, and ONE disc of water at the level the boundary
-// states. The crest is at nought and the giants are gone.
+// traced off the reference, with broken rock on their crests where the picture
+// shows it, and a RING of water at the level the boundary states, cut into the
+// same wedges the hills are. The crest is at nought and the giants are gone.
 //
 // IT STILL COSTS NO DELIVERY AT ALL -- the hills are a law and a solved table
 // of numbers in the source, not a mesh and not a texture -- which is why this

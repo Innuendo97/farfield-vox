@@ -1,10 +1,9 @@
 import {
-  BufferAttribute, BufferGeometry, CircleGeometry, Group, Mesh, ShaderMaterial, Vector3,
+  BufferAttribute, BufferGeometry, Group, Mesh, RingGeometry, ShaderMaterial, Vector3,
 } from 'three';
 import { SKY_GLSL, SKY_REFLECTION, SKY_REFLECTION_GLSL, SKY_UNIFORMS } from '../core/sky.js';
-import * as AIR from './air.js';
-import { FOG_GLSL, FOG_RADIANCE, fogUniforms } from './air.js';
-import { waterLevel } from './voxel/confine.js';
+import { FOG_GLSL, fogUniforms } from './air.js';
+import { CONFINE, waterLevel } from './voxel/confine.js';
 import SPEC from '../../assets-src/distant/cornice.json' with { type: 'json' };
 import { ladders, ridgeLampSeats } from '../../assets-src/distant/cornice.mjs';
 import { buildHills, palette } from './distant-mesh.js';
@@ -65,92 +64,36 @@ import { buildHills, palette } from './distant-mesh.js';
 // another session's margin, and guard-cornice holds the amended numbers.
 //
 // ===========================================================================
-// THE AIR IS READ FROM ITS SEAT AND IS NOT OWNED HERE.
+// THE AIR COMES FROM ITS SEAT, ALL OF IT, AND THE FALLBACK IS GONE.
 //
-// src/world/air.js is frozen and is the coordinator's. What this file binds is
-// that seat's own LIVE COLOUR, so that an hour -- or a refit -- moves the hills
-// and the meadow together and no band can open between them, which is the one
-// thing the join has never been allowed to get wrong.
+// src/world/air.js is frozen and is the coordinator's. This file binds the
+// seat's own uniforms, so that an hour -- or a refit -- moves the hills and the
+// meadow together and no band can open between them, which is the one thing
+// the join has never been allowed to get wrong.
 //
-// WHAT THE SEAT DOES NOT YET CARRY IS A DISTANCE TERM, and R6 §3.3 measured why
-// that matters out here: `fogAmount` is 0.68 at 185 m, 0.90 at 260 and 0.997 at
-// 420, so evaluating it on these hills would flatten all four planes into one
-// sheet by three hundred metres, where the reference still holds structure at
-// nine hundred. And the reference's air is PER CHANNEL -- blue veils two and a
-// half times faster than red -- and turns colour with distance, from the blue
-// of the low sky to a pale veil that is LIGHTER than the sky itself.
+// WHAT THE SEAT DID NOT CARRY WHEN U-CORNICE-1 SHIPPED WAS A DISTANCE TERM.
+// `fogAmount` alone is 0.68 at 185 m, 0.90 at 260 and 0.997 at 420, so
+// evaluating it out here flattened all four planes into one sheet by three
+// hundred metres where the reference still holds structure at nine hundred; and
+// the reference's air is PER CHANNEL, the blue veiling two and a half times
+// faster than the red, towards a colour that turns from the low sky's blue to a
+// pale veil LIGHTER than the sky itself. So this file carried R6's own
+// measurement of that shape behind an `if`, declared as a fallback, with the
+// name of the door it was waiting for.
 //
-// That law is U-CORNICE-3's to write, D-R6-4 is the committente's to answer,
-// and both belong in air.js. So this file does two things and says which is
-// which: it READS the seat for the colour, and it carries R6's measurement of
-// the per-channel shape as a DECLARED FALLBACK, wired through one `if` so that
-// the day air.js publishes `DISTANT_AIR_GLSL` the fallback stops being used and
-// can be deleted without touching anything else here.
+// E-LUCE4 opened it. `air.js` now states the whole of it -- two terms, the low
+// haze capped at 0.13 and a per-channel distance towards a turning colour, in
+// `throughAir(colour, distance, height)` -- fitted against the same readings
+// R6 published and landing on its red and green to three digits. The fallback,
+// its four uniforms and the `if` over them are DELETED rather than left dark:
+// two laws for one sky is how a band opens between the meadow and the hills,
+// and the second one no longer has an excuse to exist.
 
 // The spec is checked where it is cut -- ./distant-mesh.js does it before a
 // single cell is asked for, and that is the file both the page and the worker
 // reach it through, so asking twice here would be a second opinion about the
 // same numbers.
 const WATER = waterLevel();
-
-// -------------------------------------------------------------- the air door
-
-const SEAT_HAS_DISTANT_AIR = typeof AIR.DISTANT_AIR_GLSL === 'string';
-
-const FOG_LITERAL = FOG_RADIANCE.map((c) => c.toFixed(4)).join(', ');
-
-const FALLBACK_AIR_GLSL = /* glsl */`
-  // NOT THE SEAT'S, AND SAYING SO IS THE POINT OF THE NAME.
-  //
-  // R6 §2.3 measured the reference's own air per channel -- a quarter of it on
-  // red where blue is at nearly two thirds, on the middle crest at four hundred
-  // metres -- and a colour that turns from the low sky's blue to a pale veil at
-  // L* 77, ten above the sky it stands against. This is that measurement, in
-  // the same gaussian form the meadow's fog already has, held here until air.js
-  // states it for the whole world.
-  //
-  // The COLOUR is the seat's, scaled: the ratio below is one at the hour these
-  // constants were read at, so nothing moves today and everything moves
-  // together the moment the sky does.
-  //
-  // AND TWO OF THE FOUR ARE NOT DECLARED HERE, WHICH IS AN INCIDENT AND NOT A
-  // STYLE. This fallback was written against a seat whose FOG_GLSL had one
-  // grey term and no per channel air; U-LUCE-4 gave that seat uAirBeta and
-  // uAirPale of its own, and the merge of the two put both declarations in
-  // one program. GLSL calls that a redefinition, the hills and the lake
-  // stopped compiling, and nothing in the distant frame was drawn. The two
-  // names are taken from FOG_GLSL, which is pasted above this in both
-  // programs; airUniforms() below still binds them to THIS unit's own
-  // numbers, so the picture is the one U-CORNICE-1 measured. The real repair
-  // is the door: the seat has the air now, and connecting it is U-CORNICE-2's
-  // residue, not a compile fix's business.
-  uniform vec3 uAirDeep;
-  uniform float uAirTurn;
-
-  vec3 distantAir(float distance, float height) {
-    vec3 depth = uAirBeta * distance;
-    return 1.0 - exp(-depth * depth);
-  }
-
-  vec3 distantAirColour(float distance) {
-    vec3 measured = mix(uAirDeep, uAirPale, 1.0 - exp(-distance / uAirTurn));
-    return measured * (uFogColour / vec3(${FOG_LITERAL}));
-  }
-`;
-
-const AIR_GLSL = SEAT_HAS_DISTANT_AIR ? AIR.DISTANT_AIR_GLSL : FALLBACK_AIR_GLSL;
-
-function airUniforms() {
-  const seat = fogUniforms();
-  if (SEAT_HAS_DISTANT_AIR) return { ...seat, ...AIR.distantAirUniforms() };
-  return {
-    ...seat,
-    uAirBeta: { value: new Vector3(...SPEC.air.beta) },
-    uAirDeep: { value: new Vector3(...SPEC.air.deep) },
-    uAirPale: { value: new Vector3(...SPEC.air.pale) },
-    uAirTurn: { value: SPEC.air.turn },
-  };
-}
 
 // ------------------------------------------------------------- the two shaders
 
@@ -182,10 +125,8 @@ const HILL_FRAGMENT = /* glsl */`
   varying float vDistance;
   varying float vHeight;
   ${FOG_GLSL}
-  ${AIR_GLSL}
   void main() {
-    gl_FragColor = vec4(mix(vColour, distantAirColour(vDistance),
-      distantAir(vDistance, vHeight)), 1.0);
+    gl_FragColor = vec4(throughAir(vColour, vDistance, vHeight), 1.0);
   }
 `;
 
@@ -226,7 +167,6 @@ const LAKE_FRAGMENT = /* glsl */`
   ${SKY_GLSL}
   ${SKY_REFLECTION_GLSL}
   ${FOG_GLSL}
-  ${AIR_GLSL}
   void main() {
     vec3 view = normalize(vWorld - cameraPosition);
     // Almost flat: enough tilt to break the reflection into the soft horizontal
@@ -240,8 +180,7 @@ const LAKE_FRAGMENT = /* glsl */`
     // it at all. E-V5d said the same thing from the other side. So the sky is a
     // share of this surface and never the whole of it.
     vec3 colour = mix(uWater, sky, uSkyShare);
-    gl_FragColor = vec4(mix(colour, distantAirColour(vDistance),
-      distantAir(vDistance, vHeight)), 1.0);
+    gl_FragColor = vec4(throughAir(colour, vDistance, vHeight), 1.0);
   }
 `;
 
@@ -258,7 +197,7 @@ export function createDistance() {
 
   const material = new ShaderMaterial({
     uniforms: {
-      ...airUniforms(),
+      ...fogUniforms(),
       uPalette: { value: palette().map((c) => new Vector3(...c)) },
     },
     vertexShader: HILL_VERTEX,
@@ -266,14 +205,42 @@ export function createDistance() {
     fog: false,
   });
 
-  // Past the last ring, so the water always meets the sky and never the ground
-  // behind the hills: the disc is the horizon on the bearings the gap opens on.
+  // A RING, AND NOT A DISC THAT REACHES UNDER THE MEADOW.
+  //
+  // U-CORNICE-1 laid a circle of 2300 m at the surface and never culled it, and
+  // measured what that costs at the one pose that looks at the water across the
+  // whole frame: the rim, where the frame went from 37.5 to 41.1 ms -- the only
+  // one of the three poses where the hills LOST. It is its residue (6) and this
+  // is the lever it named.
+  //
+  // Two things were being paid for and neither was seen. The inner circle out
+  // to the meadow's own shore lies UNDER the meadow, which draws every pixel of
+  // that ground and writes its depth -- so on the rim pose, where the near
+  // water fills the bottom of the frame, the card was shading the reflection of
+  // the sky on a surface hidden behind a hillside two metres in front of it.
+  // AND IT IS STILL ONE DRAW, WHICH WAS TRIED THE OTHER WAY FIRST. Cut into the
+  // hills' own sixteen wedges the ring is frustum-culled -- and measured, the
+  // frame's draw count went from seventeen of cornice to thirty-two of them,
+  // because a wedge that spans two kilometres of radius has a bounding sphere a
+  // kilometre wide and the lens is inside most of them. It bought nothing
+  // either: a wedge behind the walker draws no pixels, and a flat ring's whole
+  // cost is the pixels. So the wedges are the hills' -- where the geometry is
+  // -- and the water is one call, as the budget was written for.
+  //
+  // THE INNER EDGE IS ASKED FOR AND NOT TYPED, and it is put two metres INSIDE
+  // the shore rather than on it. `CONFINE.waterAt` is where the fall crosses
+  // the surface on the open bearings; the terraces wade further in on some of
+  // them, and a ring that started exactly at the level's own radius would leave
+  // the width of one riser of daylight between the water and the ground on any
+  // bearing where the shore came in. Two metres inside, the meadow is a metre
+  // of dry ground proud of the water and there is nothing to open.
   const reach = SPEC.rings.frontiers[SPEC.rings.frontiers.length - 1] + 150;
-  const disc = new CircleGeometry(reach, 96);
+  const shore = CONFINE.waterAt - 2;
+  const disc = new RingGeometry(shore, reach, 96, 1);
   disc.rotateX(-Math.PI / 2);
   const lake = new Mesh(disc, new ShaderMaterial({
     uniforms: {
-      ...airUniforms(),
+      ...fogUniforms(),
       ...SKY_UNIFORMS,
       ...SKY_REFLECTION,
       uWater: { value: new Vector3(...SPEC.palette.water) },
@@ -285,16 +252,20 @@ export function createDistance() {
   }));
   lake.name = 'lago';
   lake.position.y = WATER;
+  // IT SURROUNDS THE WALKER, SO THERE IS NOTHING FOR A FRUSTUM TO CULL. One
+  // bounding sphere around a ring two kilometres across is in the lens from
+  // everywhere inside it, and a sphere test that always says yes costs the test.
   lake.frustumCulled = false;
+  const lakeBytes = disc.attributes.position.array.byteLength;
 
   const stats = {
     quads: 0,
     triangles: 0,
-    bytes: disc.attributes.position.array.byteLength,
+    bytes: lakeBytes,
     buildMs: null,
     wedges: 0,
     perRing: [],
-    air: SEAT_HAS_DISTANT_AIR ? 'air.js' : 'R6 fallback, declared',
+    air: 'air.js: throughAir',
     where: 'pending',
   };
 
@@ -350,9 +321,18 @@ export function createDistance() {
     meshes: [hills, lake],
     api: {
       stats,
-      /** How many wedges the card is handed at this moment. */
+      /**
+       * How many objects the cornice OFFERS the card -- not how many it draws.
+       *
+       * The frustum's own culling is decided inside the renderer and never
+       * touches `visible`, so nothing outside it can count what was actually
+       * submitted. What a bench wants is the renderer's own drawCalls with the
+       * cornice on and off, and the difference between the two; this is the
+       * ceiling that difference is read against.
+       */
       drawn() {
-        return hills.children.filter((m) => m.visible).length + (lake.visible ? 1 : 0);
+        if (!hills.visible && !lake.visible) return 0;
+        return (hills.visible ? hills.children.length : 0) + (lake.visible ? 1 : 0);
       },
       setVisible(on) { hills.visible = on; lake.visible = on; },
       /** Whether the hills have arrived from the thread that cuts them. */

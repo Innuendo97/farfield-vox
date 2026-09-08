@@ -1,6 +1,6 @@
 import SPEC from '../../assets-src/distant/cornice.json' with { type: 'json' };
 import {
-  CENTRE, checkSpec, frontierAt, grainAt, hillAt, isRockAt, ladders,
+  CENTRE, checkSpec, crownAt, frontierAt, grainAt, hillAt, isRockAt, ladders,
 } from '../../assets-src/distant/cornice.mjs';
 import { waterLevel } from './voxel/confine.js';
 
@@ -54,16 +54,12 @@ export const SHADE = {
 /** The six radiances, in the order the index above names them. */
 export function palette() {
   const p = SPEC.palette;
-  return [
-    p.grassTop,
-    // A grass flank in the sun is its top damped: the same pigment, less of the
-    // sky on it. One number rather than a seventh measurement nobody took.
-    [p.grassTop[0] * 0.8, p.grassTop[1] * 0.8, p.grassTop[2] * 0.8],
-    p.grassShade,
-    p.rockTop,
-    p.rockLit,
-    p.rockShade,
-  ];
+  // SIX ENTRIES AND NO LONGER FIVE AND A DERIVATION. The lit grass flank used
+  // to be the top damped by a fifth, «one number rather than a seventh
+  // measurement nobody took». It is now taken: it carries fourteen thousand
+  // pixels of the two near flanks, where the top carries six hundred, so the
+  // measured one is the flank and the DERIVED one is the top.
+  return [p.grassTop, p.grassLit, p.grassShade, p.rockTop, p.rockLit, p.rockShade];
 }
 
 const SUN = (() => {
@@ -155,33 +151,67 @@ function ringField(ring, lads) {
   // bed ladder, and skipping on it took a second off the cut.
   const inner = SPEC.rings.frontiers[ring] * (1 - jitter) - cube;
   const outerMost = outer * (1 + jitter) + cube;
+  // ONE BOX FOR SEVEN HUNDRED THOUSAND ANSWERS. The law hands back a fresh
+  // object per call unless it is given one to fill, and on a lattice this size
+  // the allocations and the collections after them are a fifth of the cut.
+  const h = {};
   for (let j = -1; j <= n; j++) {
     for (let i = -1; i <= n; i++) {
       const x = x0 + (i + 0.5) * cube;
       const z = z0 + (j + 0.5) * cube;
       const k = at(i, j);
-      const radius = Math.hypot(x - CENTRE.x, z - CENTRE.z);
+      const rx = x - CENTRE.x;
+      const rz = z - CENTRE.z;
+      const radius = Math.sqrt(rx * rx + rz * rz);
       if (radius < inner || radius > outerMost) {
         H[k] = WATER - 2 * cube;
         M[k] = 0;
         continue;
       }
-      const h = hillAt(SPEC, x, z);
+      hillAt(SPEC, x, z, h);
       smooth[k] = h.y;
-      relative[k] = (h.y - h.base) / Math.max(1, h.local);
+      const rel = (h.y - h.base) / Math.max(1, h.local);
+      relative[k] = rel;
       // DROWNED GROUND IS NOT BUILT, AND THE TEST IS ON THE GROUND AND NOT ON
       // ITS RUNG: the ladder starts at the surface, so a rung of nought is what
       // everything under the water gets, and seating it there draws a cube one
       // metre proud of the lake over the whole bed. See groundTop() in the law
       // for what that measured.
-      if (ringOfPoint(h) !== ring || h.y <= WATER) {
+      if (h.y <= WATER) {
         // Below the lattice's own floor, so a neighbour reads a flank going
         // down to nothing rather than a step up to a hill that is not there.
         H[k] = WATER - 2 * cube;
         M[k] = 0;
         continue;
       }
-      H[k] = WATER + ladder[bedFloor(ladder, h.y - WATER)];
+      const own = ringOfPoint(h);
+      if (own !== ring) {
+        // ANOTHER RING'S GROUND IS STILL GROUND, AND IT IS QUANTISED HERE.
+        //
+        // It used to be dropped to the lattice's floor like drowned water, and
+        // that is a wall of the WHOLE HILL standing at the frontier: two
+        // hundred metres of riser on the pale ring's inner edge, hidden by the
+        // ring in front of it everywhere except where the two ladders disagree
+        // -- and there it showed through as a picket of tall, thin, pale
+        // stripes across both gaps between the monoliths. It is the same defect
+        // as the grey city and it was measured the same way, by looking.
+        //
+        // A neighbour that belongs to another ring is therefore given the SAME
+        // ground on THIS ring's ladder and no material: it emits no face of its
+        // own, and the riser between it and its neighbour here is the step
+        // between two quantisations of one hillside -- at most a cube, which is
+        // the frontier seam R6 §4.1 predicted and sized at four pixels.
+        H[k] = own < 0 ? WATER - 2 * cube
+          : WATER + ladder[bedFloor(ladder, h.y - WATER)];
+        M[k] = 0;
+        continue;
+      }
+      // AND THE BROKEN ROCK STANDS ON THE TERRACE. crownAt() in the law is what
+      // gives the skyline the reference's own three-pixel treads; here it is a
+      // few more cubes on a column, which the greedy pass turns into one taller
+      // riser and no extra quad at all wherever two neighbours draw the same.
+      H[k] = WATER + ladder[bedFloor(ladder, h.y - WATER)]
+        + crownAt(SPEC, x, z, ring, rel) * cube;
       M[k] = 1;
     }
   }
@@ -196,6 +226,43 @@ function ringField(ring, lads) {
     }
   }
   return { n, cube, x0, z0, H, M, at };
+}
+
+// A WEDGE WRITES INTO ITS OWN TYPED ARRAYS AND GROWS THEM BY DOUBLING.
+//
+// It used to push into three plain arrays and convert them at the end. On a
+// hundred and thirty thousand quads that is two million eight hundred thousand
+// pushes and then a copy of every one of them, and measured it was a third of
+// the cut -- the same third the worker was over its own ceiling by. Written
+// straight into the array that ships, there is no conversion at all: `trim`
+// hands back a view of exactly what was written.
+function writer() {
+  return {
+    position: new Float32Array(4096 * 3),
+    shade: new Uint8Array(4096),
+    index: new Uint16Array(8192),
+    vertices: 0,
+    indices: 0,
+  };
+}
+
+/** Room for `more` vertices and the six indices each quad of them needs. */
+function room(w, more) {
+  if ((w.vertices + more) * 3 > w.position.length) {
+    let size = w.position.length;
+    while ((w.vertices + more) * 3 > size) size *= 2;
+    const position = new Float32Array(size);
+    position.set(w.position.subarray(0, w.vertices * 3));
+    w.position = position;
+    const shade = new Uint8Array(size / 3);
+    shade.set(w.shade.subarray(0, w.vertices));
+    w.shade = shade;
+  }
+  if (w.indices + 6 > w.index.length) {
+    const index = new Uint16Array(w.index.length * 2);
+    index.set(w.index.subarray(0, w.indices));
+    w.index = index;
+  }
 }
 
 /**
@@ -214,12 +281,37 @@ function meshRing(ring, lads, wedges, tally) {
     const cx = (points[0][0] + points[2][0]) / 2 - CENTRE.x;
     const cz = (points[0][2] + points[2][2]) / 2 - CENTRE.z;
     const turn = (Math.atan2(cx, -cz) / Math.PI + 1) / 2;
-    const wedge = wedges[((Math.floor(turn * count) % count) + count) % count];
-    const first = wedge.position.length / 3;
-    for (const p of points) wedge.position.push(p[0], p[1], p[2]);
-    for (let c = 0; c < 4; c++) wedge.shade.push(shade);
-    wedge.index.push(first, first + 1, first + 2, first, first + 2, first + 3);
+    const w = wedges[((Math.floor(turn * count) % count) + count) % count];
+    room(w, 4);
+    const first = w.vertices;
+    let o = first * 3;
+    for (const p of points) {
+      w.position[o] = p[0];
+      w.position[o + 1] = p[1];
+      w.position[o + 2] = p[2];
+      o += 3;
+    }
+    for (let c = 0; c < 4; c++) w.shade[first + c] = shade;
+    let k = w.indices;
+    w.index[k] = first;
+    w.index[k + 1] = first + 1;
+    w.index[k + 2] = first + 2;
+    w.index[k + 3] = first;
+    w.index[k + 4] = first + 2;
+    w.index[k + 5] = first + 3;
+    w.indices = k + 6;
+    w.vertices = first + 4;
     tally.quads += 1;
+    // AND THE AREA OF IT, BY CLASS. R6 §2.4 counted the reference's matter as
+    // AREA of the frame and not as number of faces, and a greedy mesher makes
+    // faces of wildly different size: one fused tread can be forty cells of one
+    // riser. Counting quads would call a hillside grass because its grass came
+    // in fewer, larger pieces.
+    const a = Math.hypot(points[1][0] - points[0][0], points[1][1] - points[0][1],
+      points[1][2] - points[0][2]);
+    const b = Math.hypot(points[2][0] - points[1][0], points[2][1] - points[1][1],
+      points[2][2] - points[1][2]);
+    tally.area[shade] += a * b;
   };
 
   // --- the treads
@@ -332,30 +424,34 @@ export function buildHills() {
   const started = Date.now();
   const lads = ladders(SPEC);
   const count = SPEC.rings.sectors;
-  const wedges = Array.from({ length: count }, () => ({ position: [], shade: [], index: [] }));
-  const tally = { quads: 0 };
+  const wedges = Array.from({ length: count }, writer);
+  const tally = { quads: 0, area: new Float64Array(6) };
   const perRing = [];
   for (let ring = 0; ring < SPEC.rings.cubes.length; ring++) {
     const before = tally.quads;
+    const area = Float64Array.from(tally.area);
     meshRing(ring, lads, wedges, tally);
     perRing.push({
       inner: SPEC.rings.frontiers[ring],
       outer: SPEC.rings.frontiers[ring + 1],
       cube: SPEC.rings.cubes[ring],
       quads: tally.quads - before,
+      // Square metres of face, by the class the face carries: what a guard
+      // needs to hold R6's quotas against the ground that is actually built.
+      area: Array.from(tally.area, (v, k) => +(v - area[k]).toFixed(1)),
     });
   }
   const packed = [];
   let bytes = 0;
   for (const wedge of wedges) {
-    if (!wedge.index.length) { packed.push(null); continue; }
-    const vertices = wedge.position.length / 3;
+    if (!wedge.indices) { packed.push(null); continue; }
+    const { vertices } = wedge;
     if (vertices > 65535) {
       throw new Error(`cornice: a wedge carries ${vertices} vertices, past what a 16-bit index holds`);
     }
-    const position = new Float32Array(wedge.position);
-    const shade = new Uint8Array(wedge.shade);
-    const index = new Uint16Array(wedge.index);
+    const position = wedge.position.slice(0, vertices * 3);
+    const shade = wedge.shade.slice(0, vertices);
+    const index = wedge.index.slice(0, wedge.indices);
     bytes += position.byteLength + shade.byteLength + index.byteLength;
     packed.push({ position, shade, index });
   }
