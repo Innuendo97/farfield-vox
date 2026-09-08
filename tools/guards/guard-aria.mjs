@@ -1,4 +1,5 @@
-import { lineOf, read, reporter, selfTest, walk } from './lib.mjs';
+import { lineOf, read, readJson, reporter, selfTest, walk } from './lib.mjs';
+import { rampBend, rampTint } from '../../src/core/sky-ramp.js';
 
 // THE AIR IS FITTED, AND UNTIL NOW NOTHING WATCHED IT.
 //
@@ -39,6 +40,8 @@ import { lineOf, read, reporter, selfTest, walk } from './lib.mjs';
 // That is not a constant of this world — src/world/air.js derives it every
 // frame from the light the sky is handing the ground, so that a different hour
 // moves the air with the sky. A guard that pinned the colour would pin the hour.
+// What it does assert, since U-LUCE-7, is that the near end of that colour is
+// DERIVED and where it is read from: see THE NEAR END OF THE COLOUR below.
 //
 // THE SEAT AND THE DOOR, BOTH, which is the shape of guard-lift and for the
 // same reason. Holding the seat at the fitted pair while some material passed
@@ -101,11 +104,13 @@ export const FITTED = { density: 0.0059, scaleHeight: 42 };
 // reasoning, and what the near flank's floor is actually made of, is written
 // over AIR_BETA in the door.
 //
-// AND WHAT THIS GUARD STILL DOES NOT ASSERT: the COLOUR of either end. The near
-// end is the ramp itself, read at twenty degrees by the door in src/core/sky.js;
-// the far end is kept as a ratio to the light the sky hands the ground. Both
-// move with the hour on purpose, and a guard that pinned either would pin the
-// hour. What is pinned is the SHAPE and the ARITHMETIC.
+// AND WHAT THIS GUARD STILL DOES NOT ASSERT: the two ends as COLOURS. The near
+// end is the ramp itself, read at a declared elevation by the door in
+// src/core/sky.js; the far end is kept as a ratio to the light the sky hands
+// the ground. Both move with the hour on purpose, and a guard that pinned
+// either as a triple would pin the hour. What is pinned is the SHAPE, the
+// ARITHMETIC, and — since U-LUCE-7, below — that the near end is DERIVED from
+// whatever preset arrives and read where it was measured to be read.
 export const DISTANCE = {
   lowCap: 0.13,
   beta: [0.001105, 0.001904, 0.002611],
@@ -175,6 +180,93 @@ export function relativeAt(from, to, eyeHeight = 1.7, law = DISTANCE, fitted = F
   const t = airAt(...to, eyeHeight, law, fitted);
   return t.map((v, c) => (v - f[c]) / (1 - f[c]));
 }
+
+// ------------------------------------------------- THE NEAR END OF THE COLOUR
+//
+// AND NOW THE COLOUR IS WATCHED AFTER ALL — one END of it, and not as a triple.
+//
+// The note above says a guard that pinned the air's colour would pin the hour,
+// and that is still true: the near end is the sky's own ramp and it must move
+// when the preset moves. What is pinned here is that it IS the ramp — that the
+// door in src/core/sky.js DERIVES it, at a declared elevation, from whatever
+// preset it is handed, rather than carrying a triple of its own. A written-down
+// near end is not a wrong colour today; it is a distance still drawing noon on
+// the night the client asked for, and nothing else in the suite would see it.
+//
+// SO THE LEG IS AN INJECTION AND NOT A COMPARISON. A second preset — another
+// ramp, another exposure — is put through the same arithmetic the door runs, and
+// the near end has to follow it. A constant cannot.
+//
+// AND THE ELEVATION IS GATED, because it is the one number in the derivation
+// that is a CHOICE. U-LUCE-7 measured what moving it costs, under the coordinator's
+// D-L6-1 C: the hills are geometrically seen against two to five degrees of sky
+// and not twenty, and reading the ramp down there loses the middle crest — the
+// air alone stands over the reference on green and blue — while the near flank
+// it exists to clear takes MORE air, its floor's blue going 148 to 163 against a
+// reference at 103. The error is monotone in the elevation over the whole ramp
+// and bottoms at the zenith, so the reference is not naming an elevation at all.
+// The measurement is printed below the gate; the reasoning is over AIR_NEAR in
+// the seat.
+export const NEAR_ELEVATION = 20;
+
+/** The elevation the seat declares the near end is read at. */
+export function seatNearElevation(text) {
+  const found = /^export const AIR_NEAR_ELEVATION = ([\d.]+);$/m.exec(text);
+  return found ? Number(found[1]) : null;
+}
+
+/** Whether the door DERIVES the near end from the preset it was handed. */
+export const seatDerivesNear = (text) => (
+  /AIR_NEAR\.set\(\.\.\.rampTint\(ramp, Math\.sin\(AIR_NEAR_ELEVATION \* DEG\), rampBend\(ramp\)\)/
+    .test(text) && /\.map\(\(v, c\) => v \* preset\.exposure\[c\]\)\);/.test(text));
+
+/**
+ * The same arithmetic, in this file, so a second preset can be put through it.
+ *
+ * @param {object} preset an entry of sky.json of the shape day has
+ * @param {number} elevationDeg where on the ramp the near end is read
+ */
+export function nearEnd(preset, elevationDeg = NEAR_ELEVATION) {
+  const sin = Math.sin((elevationDeg * Math.PI) / 180);
+  return rampTint(preset.ramp, sin, rampBend(preset.ramp))
+    .map((v, c) => v * preset.exposure[c]);
+}
+
+/** Another hour, for the injection: a ramp and an exposure that are not the day's. */
+export const OTHER_HOUR = (preset) => ({
+  ...preset,
+  ramp: {
+    ...preset.ramp,
+    horizon: preset.ramp.horizon.map((v) => v * 0.3 + 0.02),
+    zenith: preset.ramp.zenith.map((v) => v * 0.1),
+    mid: preset.ramp.mid ? preset.ramp.mid.map((v) => v * 0.2 + 0.01) : undefined,
+  },
+  exposure: preset.exposure.map((v) => v * 0.4),
+});
+
+/**
+ * Every `uAirNear` written down in a source, and what it is initialised from.
+ *
+ * One hop is resolved: the door names a module-level object so that every
+ * material shares one Vector3, and what has to be true is that the object's
+ * value is the SEAT's AIR_NEAR and not a new one.
+ */
+export function nearInitialisers(path, text) {
+  const found = [];
+  const written = /\buAirNear:\s*([^\n]+)/g;
+  for (let m = written.exec(text); m; m = written.exec(text)) {
+    let from = m[1].trim().replace(/,$/, "");
+    if (/^[A-Za-z_$][\w$]*$/.test(from)) {
+      const hop = new RegExp(`const ${from} = (\\{[^;]*\\});`).exec(text);
+      if (hop) from = hop[1].trim();
+    }
+    found.push({ path, line: lineOf(text, m.index), from });
+  }
+  return found;
+}
+
+/** The one thing a `uAirNear` may be born from: the seat's own vector. */
+export const nearBornFromSeat = ({ from }) => from === '{ value: AIR_NEAR }';
 
 /** The density the seat states, at the ground. */
 export function seatDensity(text) {
@@ -297,6 +389,62 @@ if (process.argv.includes('--self')) {
       caught: Math.abs(airAt(60, 1.0)[1] - 0.11) < 0.02
         && Math.abs(airAt(35, 1.0)[1] - 0.04) < 0.02,
     },
+    {
+      what: 'the near end read down where the hills stand is caught',
+      caught: seatNearElevation('export const AIR_NEAR_ELEVATION = 5;') !== NEAR_ELEVATION,
+    },
+    {
+      what: 'and so is one moved by half a degree',
+      caught: seatNearElevation('export const AIR_NEAR_ELEVATION = 20.5;') !== NEAR_ELEVATION,
+    },
+    {
+      what: 'the seat as it stands reads it where it was measured',
+      caught: seatNearElevation(text) === NEAR_ELEVATION,
+    },
+    {
+      what: 'a near end WRITTEN DOWN instead of derived is caught',
+      caught: !seatDerivesNear('  AIR_NEAR.set(0.0015, 0.1124, 0.5932);'),
+    },
+    {
+      what: 'and one derived from the ramp but not carrying the exposure of the preset',
+      caught: !seatDerivesNear(
+        '  AIR_NEAR.set(...rampTint(ramp, Math.sin(AIR_NEAR_ELEVATION * DEG), rampBend(ramp)));',
+      ),
+    },
+    {
+      what: 'the door as it stands derives it from the preset it was handed',
+      caught: seatDerivesNear(text),
+    },
+    {
+      what: 'INJECTION: another hour moves the near end, which a constant could not',
+      caught: (() => {
+        const day = readJson('assets-src/sky/sky.json').day;
+        const other = nearEnd(OTHER_HOUR(day));
+        return nearEnd(day).some((v, c) => Math.abs(v - other[c]) > 0.01);
+      })(),
+    },
+    {
+      what: 'and the elevation is what selects it: twenty and five are not the same colour',
+      caught: (() => {
+        const day = readJson('assets-src/sky/sky.json').day;
+        return nearEnd(day, 5).some((v, c) => Math.abs(v - nearEnd(day)[c]) > 0.01);
+      })(),
+    },
+    {
+      what: 'a material holding a blue of its own instead of the sky object is caught',
+      caught: nearInitialisers('injected', 'uAirNear: { value: new Vector3(0, 0.11, 0.59) },')
+        .some((u) => !nearBornFromSeat(u)),
+    },
+    {
+      what: 'and one that copies the vector instead of sharing it',
+      caught: nearInitialisers('injected',
+        'const MINE = { value: AIR_NEAR.clone() };\n  uAirNear: MINE,')
+        .some((u) => !nearBornFromSeat(u)),
+    },
+    {
+      what: 'the door as it stands shares the vector the seat writes',
+      caught: nearInitialisers(DOOR, read(DOOR)).every(nearBornFromSeat),
+    },
   ]);
 }
 
@@ -329,6 +477,43 @@ report.check(door.turn === DISTANCE.turn,
 report.check(door.pale !== null && door.pale.every((v, c) => v === DISTANCE.pale[c]),
   'and the pale end develops to the 149/187/213 the reference shows on its far hills',
   door.pale === null ? 'not found' : door.pale.join(' / '));
+
+// ------------------------------------------------- THE NEAR END OF THE COLOUR
+const nearElevation = seatNearElevation(seatText);
+const day = readJson('assets-src/sky/sky.json').day;
+report.line('');
+report.check(nearElevation === NEAR_ELEVATION,
+  `${SEAT} reads the near end of the colour off the ramp at ${NEAR_ELEVATION} degrees`,
+  nearElevation === null ? 'not found' : `${nearElevation}`);
+report.check(seatDerivesNear(seatText),
+  'and DERIVES it from the preset it was handed, with that preset\'s own exposure',
+  'a triple written down here is a distance still drawing noon after the hour has moved');
+const shipped = nearEnd(day, nearElevation ?? NEAR_ELEVATION);
+const injected = nearEnd(OTHER_HOUR(day), nearElevation ?? NEAR_ELEVATION);
+report.check(shipped.some((v, c) => Math.abs(v - injected[c]) > 0.01),
+  'and a second preset put through the same arithmetic moves it, which a constant could not',
+  `${shipped.map((v) => v.toFixed(4)).join(' / ')} against `
+  + `${injected.map((v) => v.toFixed(4)).join(' / ')} for another hour`);
+const nearUniforms = walk('src', SHIPPED).flatMap((path) => nearInitialisers(path, read(path)));
+report.line(`  ${nearUniforms.length} \`uAirNear\` written down in what ships`);
+for (const uniform of nearUniforms) {
+  report.check(nearBornFromSeat(uniform), `${uniform.path}:${uniform.line} uAirNear`,
+    `from ${uniform.from}`);
+}
+
+// AND WHAT READING IT LOWER COSTS, printed and not gated, for the reason the
+// relative triple below is printed: the geometry that asks for it is right and
+// the picture refuses it, and both halves have to stay on the report.
+const lower = nearEnd(day, 5);
+report.line(`  read at five degrees — which is where the near flank at 227 m actually stands, `
+  + `1.21 at the middle crest — it would be`);
+report.line(`  ${lower.map((v) => v.toFixed(4)).join(' / ')} against `
+  + `${shipped.map((v) => v.toFixed(4)).join(' / ')}: measured through the delivered chain that `
+  + `loses the middle crest (the air`);
+report.line('  alone reads 84 / 147 / 199 against the 83 / 139 / 180 of the reference) and puts the near '
+  + 'flank floor at 163 of blue against 148 today');
+report.line('  and 103 in the reference. The error is monotone in the elevation and bottoms at the '
+  + 'zenith: no elevation is named by the reference. D-L6-1');
 
 const crest = airAt(400, 10);
 const near = [35, 60].map((d) => airAt(d, 1.0)[1]);
