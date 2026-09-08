@@ -104,6 +104,29 @@ const WATER = waterLevel();
 // Nothing is quantised, because six is how many there are; and the palette
 // stays a uniform, which is what lets U-CORNICE-2 refit the matter without
 // rebuilding a single vertex of the geometry.
+//
+// AND THAT CHOICE HAS NOW BEEN SPENT A SECOND TIME, WHICH IS THE POINT OF
+// RECORDING IT. U-CORNICE-2 solved these six WITH THE AIR SWITCHED OFF -- the
+// only way it had of isolating the three channels -- so what it shipped was the
+// near flank's own APPEARANCE, the reference's first 227 metres of air included.
+// Every metre this world then put in front of them was that air counted twice.
+// D-L8-2 = B ordered it re-solved the other way round, and U-CORNICE-4 did:
+// the six radiances are what the surface has to EMIT so that the picture falls
+// on the reference with everything the delivered air puts in front of the plane
+// each class is measured on. rms on R6's three planes 12.79 -> 6.42, the near
+// flank exactly on its own class mask, and -- because they are a uniform and
+// nothing else -- not one vertex re-cut, not one byte re-delivered and, on the
+// card's own clock, nothing to pay: every arm of the measurement sits inside the
+// instrument's own scatter (±0.43 ms on a total of 20).
+//
+// WHAT IT COST INSTEAD IS THE BLUE, and that belongs in this file because it is
+// a fact about the AIR and not about the hills. The low haze's ceiling is a MIX:
+// past sixty-three metres it puts 0.0992 of blue in front of every surface out
+// here, and the whole of what the reference shows at the near flank is 0.1040.
+// So a pigment solved with that in front of it has four thousandths of blue left
+// to be blue with, and three of the six come out at nought exactly. The hills'
+// blue is the ceiling's now, not the rock's. That is E-LUCE2's number and
+// D-L8-1's decision, gated in guard-cornice where it can be seen.
 const HILL_VERTEX = /* glsl */`
   attribute float shade;
   uniform vec3 uPalette[6];
@@ -179,6 +202,33 @@ const LAKE_FRAGMENT = /* glsl */`
     // the sky at four degrees and much warmer than it, with no cloud legible in
     // it at all. E-V5d said the same thing from the other side. So the sky is a
     // share of this surface and never the whole of it.
+    //
+    // AND THE SHARE WAS COUNTING THE SKY TWICE, exactly as the hills' palette
+    // was counting the air twice, and for the same reason. R6 solved uWater by
+    // INVERTING the reference's own lake pixel -- «colore invertito dal target,
+    // lin 0,0245 / 0,163 / 0,169» -- which is the water with the sky ALREADY
+    // reflected in it, and then twenty-eight per cent of this sky went on top.
+    // Measured: at 268 m the sky this surface reflects develops to 134/185/219,
+    // so 0.28 of it plus the low haze's ceiling puts the lake at 72/132/173 WITH
+    // BLACK WATER UNDERNEATH -- forty-seven levels of blue over the reference,
+    // with nothing left to take away. U-CORNICE-4 re-solved both halves: the
+    // share is 0.05 and the water is its own colour under it.
+    //
+    // WHY 0.05 AND NOT THE FIT'S OWN ANSWER, said plainly because the fit has
+    // not got one. Between 200 and 500 m the reflected sky moves less than a
+    // degree and a half of elevation, so every share under six per cent delivers
+    // the SAME three numbers once the water is re-solved beneath it: the picture
+    // cannot tell them apart. What decides it is this file's other duty -- the
+    // hour has to move the lake, and a water with no colour of its own is a
+    // mirror wearing a hat. Five per cent is the largest share at which the
+    // solved water still has blue of its own (0.0164); at six it is nought and
+    // the sky is carrying all of it again.
+    //
+    // WHAT IS STILL MISSING, AND IT IS GEOMETRY AND NOT COLOUR. The reference's
+    // water carries a gradient this surface cannot make: its far end is darker
+    // and greener than its near end, because at half a degree of grazing it is
+    // reflecting the FAR SHORE and not the sky. skyReflection() has only the
+    // dome to give it. Declared, not defended.
     vec3 colour = mix(uWater, sky, uSkyShare);
     gl_FragColor = vec4(throughAir(colour, vDistance, vHeight), 1.0);
   }
