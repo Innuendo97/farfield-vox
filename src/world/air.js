@@ -93,6 +93,51 @@ export const FOG_LOW_CAP = 0.13;
 // of air fractions there — 0.25 red, 0.44 green, 0.62 blue — asks for these,
 // which land on R6's own red and green to three digits. The ratio blue over red
 // is 2.4; pure Rayleigh would be 3.3, and the reference reads 2.5.
+//
+// AND WHAT THAT TRIPLE OF FRACTIONS IS A FRACTION OF, WHICH THIS FILE USED TO
+// LEAVE UNSAID AND NOW STATES. R6 §2.3 builds its column on a scale of its own:
+// the near flank in shadow is its 0 / 0 / 0 and the pale far hills are its
+// 1 / 1 / 1. So 0.25 / 0.44 / 0.62 is the fraction of the way FROM THE NEAR
+// FLANK to the pale veil, not the fraction of air between the eye and the
+// crest. The two coincide only where the near flank carries no air, and in this
+// world it carries some. U-CORNICE-2 §11 caught that and D-C2-1 ordered the
+// refit; the refit was derived and MEASURED, and the measurement said not to
+// ship it. It is written here because the next reader would otherwise derive it
+// a second time.
+//
+// READ RELATIVELY — the near flank at 227 m and 21 m up, which is where R6's
+// own window sits on the front this world builds, against the crest at the
+// 400 m and 10 m guard-aria already asks the pair at — the column asks for
+// 0.001776 / 0.002521 / 0.003257, sixty per cent over these. What that costs,
+// carried through the delivered chain rather than argued:
+//
+//   * THE MIDDLE CREST IS LOST. With the hill's pigment at zero the air alone
+//     puts 85 / 144 / 194 there, against a reference that reads 83 / 139 / 180:
+//     OVER on all three channels. An additive term cannot be subtracted, so a
+//     plane whose floor stands over its target is a plane no palette reaches —
+//     which is U-CORNICE-2's residuo 1 exactly, moved onto a second plane.
+//     These leave that floor under on red and green (−15 / −8) and six over on
+//     blue. Swept over twenty choices of the two planes' distance and height,
+//     the relative triple loses the crest on nineteen of them and this one on
+//     none.
+//   * AND THE NEAR FLANK, WHICH THE REFIT EXISTS TO CLEAR, TAKES MORE AIR AND
+//     NOT LESS: its floor's blue goes from 148 to 159 where the reference in
+//     the same mask reads 103.
+//
+// WHY NO TRIPLE DOES BOTH, in one line of arithmetic. Under a gaussian in
+// (distance × beta × the height integral) the near flank carries 0.251 of the
+// crest's exponent, and it is the SHAPE that fixes that ratio, not the fit. For
+// the near flank to be bare while the crest veils 0.62 the exponent would have
+// to be about 5.6 rather than 2. So the near flank's level is not something
+// these three can pay for, and this file's own rule applies: a fitted number
+// must not be spent closing another term's debt.
+//
+// WHO OWNS WHAT IS LEFT, in levels, at the near flank with the pigment at zero.
+// The floor stands 45 over the reference on blue. With the distance term
+// switched off entirely the capped low haze alone still puts 16 / 76 / 111
+// there, which is 8 over: 37 of the 45 are this term's and 8 are the ceiling's,
+// and the ceiling is E-LUCE2's and frozen. guard-pietra reads the same floor
+// from the other side, on a monolith's shadowed face, and names the same owner.
 export const AIR_BETA = [0.001105, 0.001904, 0.002611];
 
 // THE FAR END OF THE COLOUR, and it is PALER THAN THE SKY.
