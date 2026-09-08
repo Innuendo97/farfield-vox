@@ -1,4 +1,5 @@
 import { POSE_VOX_DAY, POSES } from '../../src/core/poses.js';
+import { bearingOfOffAxis, offAxisOf } from '../../src/world/compass.js';
 import { CENTRE, waterLevel } from '../../src/world/voxel/pure.js';
 import {
   checkSpec, crownAt, cubeAt, frontierAt, groundTop as skylineGround, hillAt, isRock,
@@ -607,8 +608,9 @@ const FOCAL = (FRAME_PX.h / 2) / Math.tan((POSE_VOX_DAY.fov / 2) * DEG);
 /** Where a bearing and an elevation land on the judging frame. */
 function project(bearingDeg, elevationDeg) {
   // THE AXIS IS THE ENGINE'S YAW NEGATED, and it is the same three and a half
-  // degrees onCompass() carries every reading across: see the note over it.
-  const t = bearingDeg * DEG + POSE_VOX_DAY.yaw * DEG;
+  // degrees onCompass() carries every reading across: see the note over it, and
+  // the convention over the compass in src/world/contracts.js.
+  const t = offAxisOf(bearingDeg, POSE_VOX_DAY.yaw) * DEG;
   const e = elevationDeg * DEG;
   const pitch = POSE_VOX_DAY.pitch * DEG;
   const X = Math.sin(t) * Math.cos(e);
@@ -622,7 +624,8 @@ function project(bearingDeg, elevationDeg) {
 
 /** The bearing a column of the frame looks along, at the horizon. */
 function bearingOfColumn(col) {
-  return -POSE_VOX_DAY.yaw + Math.atan((col + 0.5 - FRAME_PX.w / 2) / FOCAL) / DEG;
+  const offAxis = Math.atan((col + 0.5 - FRAME_PX.w / 2) / FOCAL) / DEG;
+  return bearingOfOffAxis(offAxis, POSE_VOX_DAY.yaw);
 }
 
 /** numpy's own linear percentile, so these numbers compare with R6's. */

@@ -1,5 +1,7 @@
 import { BufferGeometry, Float32BufferAttribute, Mesh, Vector3 } from 'three';
 import { VOXEL, voxelMaterial, voxelSettings } from './voxel/index.js';
+import { POSE_VOX_DAY } from '../core/poses.js';
+import { bearingGap, bearingOf, bearingOfYaw } from './compass.js';
 import { materialAt } from './contracts.js';
 import { AREA_CENTER, MONOLITHS } from './layout.js';
 
@@ -316,14 +318,31 @@ export function treeSeats() {
 // spacing and no colour is invented here that the picture did not already say.
 //
 // WHERE THEY MAY STAND, AND WHY IT IS A WEDGE. Both target eyes stand within a
-// metre and a half of (-0.58, 14.57) looking very nearly north, and the frame is
-// 35.8 degrees wide either side of that. So a point the pictures CANNOT see is
-// one whose bearing off north, taken from that stand, is wider than the frame
+// metre and a half of (-0.58, 14.57), and the frame is 35.8 degrees wide either
+// side of the axis they look along. So a point the pictures CANNOT see is one
+// whose bearing off that AXIS, taken from that stand, is wider than the frame
 // plus a margin -- or one behind the stand altogether. Every sown tree is
 // checked against the two poses off line and none lands inside either frame.
+//
+// AND THE WEDGE IS ON THE AXIS NOW, NOT ON DUE NORTH, WHICH IS NOT THE SAME
+// THING. It used to be `|x - STAND.x| < tan(40) * ahead` -- symmetric about the
+// world's north -- and the pose does not look north: it looks along the bearing
+// its engine yaw of 1.818 degrees negates, which is 1.818 degrees WEST of it.
+// The wedge was therefore 1.8 degrees off the picture it is meant to describe,
+// tight on the east flank and slack on the west, and the four degrees of margin
+// were the only reason that never showed. It is arithmetic that reads a
+// direction, so it reads it at the world's own seat (src/world/contracts.js).
+//
+// MEASURED, AND IT MOVES NOBODY: the nearest of the nine sown trees stands
+// 48.63 degrees off north and 46.81 off the axis, against a wedge of 40. The
+// delivered population is the same nine before and after -- which is the point.
+// A cull that is right for the wrong reason falls over the first time somebody
+// trims the margin.
 const STAND = { x: -0.58, z: 14.57 };
+/** The bearing the two target eyes look along: the engine's yaw, negated. */
+const FRAME_AXIS = bearingOfYaw(POSE_VOX_DAY.yaw);
 /** Half the frame, 35.8 degrees, and four more so a crown cannot lean in. */
-const HIDDEN_BEYOND = Math.tan(40 * Math.PI / 180);
+const HIDDEN_BEYOND_DEG = 40;
 /** How far out they are sown, in metres from the walkable centre. */
 const SOWN_RADIUS = 20;
 /** One candidate every this many metres, jittered inside its own cell. */
@@ -342,9 +361,9 @@ const SOWN_TAKE = 0.15;
 const BLOCK_CLEAR = 1.4;
 
 function insideFrame(x, z) {
-  const ahead = STAND.z - z;
-  if (ahead <= 0) return false;              // behind the stand: never in frame
-  return Math.abs(x - STAND.x) < HIDDEN_BEYOND * ahead;
+  if (STAND.z - z <= 0) return false;        // behind the stand: never in frame
+  const off = bearingGap(bearingOf(x - STAND.x, z - STAND.z), FRAME_AXIS);
+  return Math.abs(off) < HIDDEN_BEYOND_DEG;
 }
 
 function nearBlock(x, z) {

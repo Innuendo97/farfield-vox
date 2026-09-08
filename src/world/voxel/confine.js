@@ -70,6 +70,7 @@
 // Both quantisations are whole numbers of voxels, so the sum is one: nothing in
 // this world stands at a height that is not a multiple of the cube.
 
+import { bearingRadOf } from '../compass.js';
 import { VOXEL } from './columns.js';
 
 // ----------------------------------------------------------- the basin
@@ -461,9 +462,10 @@ export function confineSurface(x, z, centre) {
   const dx = x - centre.x;
   const dz = z - centre.z;
   const r = Math.hypot(dx, dz);
-  // Bearing from NORTH, which is -z: the whole campaign measures its framings
-  // from there and the gate above is written in the same compass.
-  const bearing = Math.atan2(dx, -dz);
+  // Bearing from NORTH, which is -z, asked for at the world's one seat: the
+  // whole campaign measures its framings from there, the gate above is written
+  // in the same compass, and src/world/contracts.js publishes what that means.
+  const bearing = bearingRadOf(dx, dz);
   return { r, bearing, fall: basinProfile(r), rise: crestRise(r, bearing) };
 }
 
