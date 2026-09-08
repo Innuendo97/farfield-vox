@@ -140,6 +140,39 @@ export const givesTheLayerBack = (text) => {
     || /if\(!campoing\)\{?worldCamera\.layers\.enable\(CAMPO_LAYER\);?\}? ?else ?\{? ?worldCamera\.layers\.disable\(CAMPO_LAYER\)/.test(s);
 };
 
+/**
+ * L'azzeramento del bersaglio, chiesto all'ORDINE e non alla riga sotto.
+ *
+ * Le due gambe che stavano qui volevano tre statement ADIACENTI, con i loro a
+ * capo: un commento scritto fra l'azzeramento e il legame -- che e' la modifica
+ * piu' probabile che ci sia, in un punto del telaio che chiede di essere
+ * spiegato -- le mandava rosse su un fotogramma intatto. La proprieta' non e'
+ * l'adiacenza: e' che l'ULTIMO azzeramento scritto PRIMA che il bersaglio sia
+ * legato dica zero. Fra i due si puo' scrivere quel che si vuole.
+ *
+ * (U-GUARDIA-4 ha tolto la stessa adiacenza da guard-buffer; il predicato e'
+ * ricopiato invece che condiviso perche' lib.mjs e' l'unico file che otto rami
+ * modificano insieme, e un aiuto messo li' e' un conflitto programmato otto
+ * volte.)
+ */
+export function clearedToNothing(text, target) {
+  const bind = text.indexOf(`setRenderTarget(${target})`);
+  if (bind < 0) return false;
+  const before = text.slice(0, bind);
+  const clears = [...before.matchAll(/setClearAlpha\(\s*([^)]*?)\s*\)/g)];
+  if (!clears.length) return false;
+  return Number(clears.at(-1)[1]) === 0;
+}
+
+/** E cio' che era stato messo da parte si rimette, dopo il disegno del mondo. */
+export function putBackAfterTheWorld(text) {
+  const kept = /(\w+)\s*=\s*gl\.getClearAlpha\(\)/.exec(text);
+  if (!kept) return false;
+  const drawn = text.indexOf('render(worldScene, worldCamera)');
+  if (drawn < 0) return false;
+  return new RegExp(`setClearAlpha\\(\\s*${kept[1]}\\s*\\)`).test(text.slice(drawn));
+}
+
 /** Il passaggio esiste solo sotto a uno E con dei posti da marciare. */
 export const passOnlyUnderOne = (text) => /const campoing=campoScale<1&&campoSeats>0/
   .test(shape(text));
@@ -233,9 +266,10 @@ report.check(/name: 'R11F_G11F_B10F',[\s\S]{0,400}?format: RGBFormat/.test(POST)
 // (b) L'AZZERAMENTO. three azzera ad alfa UNO ogni volta che la tela e' opaca,
 // e un bersaglio lasciato al suo default arriva con ogni texel che dichiara di
 // essere terra.
-report.check(/const keptAlpha = gl\.getClearAlpha\(\);\s*\n\s*gl\.setClearAlpha\(0\);\s*\n\s*gl\.setRenderTarget\(campoTarget\);/.test(POST),
-  'il bersaglio della terra si azzera a NIENTE prima del disegno');
-report.check(/gl\.render\(worldScene, worldCamera\);\s*\n\s*gl\.setClearAlpha\(keptAlpha\);/.test(POST),
+report.check(clearedToNothing(POST, 'campoTarget'),
+  'il bersaglio della terra si azzera a NIENTE prima del disegno',
+  'l ULTIMO azzeramento scritto prima di legarlo, comunque siano spaziate le righe');
+report.check(putBackAfterTheWorld(POST),
   'e l azzeramento del resto del mondo si rimette a posto subito dopo');
 report.check(clearsOpaqueToOne(THREE),
   'e la regola di three che lo rende necessario e ancora quella',
@@ -447,7 +481,22 @@ if (process.argv.includes('--self')) {
   casi.push({ what: 'il bersaglio della terra senza il quarto canale',
     caught: !/format: RGBAFormat/.test(alloc.replace('format: RGBAFormat', 'format: RGBFormat')) });
   casi.push({ what: 'l azzeramento lasciato al default di three',
-    caught: !/gl\.setClearAlpha\(0\);/.test(POST.replace('gl.setClearAlpha(0);', '')) });
+    caught: !clearedToNothing(
+      'gl.setRenderTarget(campoTarget);\ngl.render(s, c);', 'campoTarget') });
+  casi.push({ what: 'e uno che azzera a UNO, che e il default travestito da scelta',
+    caught: !clearedToNothing(
+      'gl.setClearAlpha(1);\ngl.setRenderTarget(campoTarget);', 'campoTarget') });
+  casi.push({ what: 'e uno rimesso a uno DOPO l azzeramento e prima del legame',
+    caught: !clearedToNothing(
+      'gl.setClearAlpha(0);\ngl.setClearAlpha(1);\ngl.setRenderTarget(campoTarget);',
+      'campoTarget') });
+  casi.push({ what: 'e un COMMENTO scritto fra l azzeramento e il legame non e un difetto',
+    caught: clearedToNothing(POST.replace('gl.setRenderTarget(campoTarget);',
+      '// perche\' il bersaglio arriva vuoto e non pieno di terra\n'
+      + '      gl.setRenderTarget(campoTarget);'), 'campoTarget') });
+  casi.push({ what: 'e l azzeramento del mondo mai rimesso dopo il disegno',
+    caught: !putBackAfterTheWorld(
+      'const keptAlpha = gl.getClearAlpha();\ngl.render(worldScene, worldCamera);') });
   casi.push({ what: 'la ricomposizione rimessa in fusione NORMALE',
     caught: !/blending: CustomBlending/.test(body.replace('blending: CustomBlending', 'blending: NormalBlending')) });
   casi.push({ what: 'le due maglie in due posti diversi dell ordine',
