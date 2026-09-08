@@ -332,8 +332,58 @@ const seen = STRETCH.map((s) => ({
 }));
 const level = await levels();
 const inBand = (fall) => fall.every((v, k) => v >= FALL[k].low && v <= FALL[k].high);
-const ratio = level.stone.Y / level.earth.Y;
-const under = level.stone.L - level.joint.L;
+const ratio = (l) => l.stone.Y / l.earth.Y;
+const under = (l) => l.stone.L - l.joint.L;
+
+// ==========================================================================
+// THE VERDICTS, EACH ONE WRITTEN ONCE.
+//
+// U-GUARDIA-3 counted at least six cases in the self test below that were
+// INEQUALITIES EVALUATED BY HAND: `!(20.2 >= PIGMENT.chroma)`, `!(1.05 >=
+// PIGMENT.ratio[0])`, `!(0.18 === MANTO.verge.bare)` and their kin. They are
+// not blind -- they do check that a ceiling would refuse a particular number --
+// but they exercise the ARITHMETIC OF THE CASE and never the predicate the run
+// uses, so the day a gate below is rewritten (a band widened, a floor lowered,
+// a comparison inverted) the self test goes on passing on its own copy of the
+// old question. `!(RELIEF.high * 1.5 <= RELIEF.high)` was worse than that: for
+// any positive relief it is `!false`, and `new Set([RELIEF.high]).size > 32` is
+// one compared with thirty-two. Two cases that could not fail.
+//
+// So every gate of this guard is a NAMED PREDICATE from here on, the run calls
+// it, and the self test calls THE SAME ONE with a bent reading handed to it.
+// What is injected is the measurement -- a piece a half taller, a paving of one
+// height, a stone at chroma 20, a joint no darker than its stone -- and the
+// answer comes back through the gate that ships.
+// ==========================================================================
+
+/** No piece stands more than the centimetre the committente named. */
+const standsProud = (lift) => Math.max(...lift) <= RELIEF.high + 1e-9;
+/** And they do not all stand at the same height. */
+const variesInHeight = (h) => h.size > 32;
+/** A stretch lays pieces of the reference's own hand, at the median. */
+const laysThatHand = (s) => pct(s.d, 0.5) >= s.size[0] && pct(s.d, 0.5) <= s.size[1];
+/** And no band of it reaches under what the maps can carry. */
+const overTheMapsFloor = (rows) => rows.every((s) => s.size[0] >= SIZE_FLOOR);
+/** The stone stands its own number of times its own earth, in linear luminance. */
+const overItsEarth = (l) => ratio(l) >= PIGMENT.ratio[0] && ratio(l) <= PIGMENT.ratio[1];
+/** And it is a warm beige, not the grey-olive this paving used to wear. */
+const warmBeige = (l) => l.stone.C >= PIGMENT.chroma;
+/** At the reference's own hue. */
+const atThatHue = (l) => l.stone.h >= PIGMENT.hue[0] && l.stone.h <= PIGMENT.hue[1];
+/** And the pieces stand within a few levels of one another. */
+const closeTogether = (l) => l.stone.sd <= PIGMENT.spread;
+/** And a joint stands its own levels UNDER the stone either side of it. */
+const jointIsDarker = (l) => under(l) >= PIGMENT.jointUnder[0]
+  && under(l) <= PIGMENT.jointUnder[1];
+/** No pigment of the paving is over the ceiling an albedo may reach. */
+const underTheCeiling = (pigments) => pigments
+  .every((p) => p.every((v) => v <= PIGMENT.ceiling + 1e-9));
+/** The bare band beside the stone is ONE number, in two files that never meet. */
+const oneBareBand = (kerb, mat) => kerb === mat;
+/** A file that lays a triangle has learnt how tall a piece is. */
+const namesTheRelief = (text) => /\bRELIEF\b/.test(text);
+/** Every piece carries its own place on the stone's own ramp. */
+const eachItsOwn = (sd) => sd >= IDENTITY.low && sd <= IDENTITY.high;
 
 if (process.argv.includes('--self')) {
   // A paving that stops dead at its own edge: full stone to the last column and
@@ -351,14 +401,38 @@ if (process.argv.includes('--self')) {
   const nominal = thinning(4.0, 7.0);
   SPREAD.from = keep.from;
   SPREAD.to = keep.to;
+  // The delivered reading with one family of it moved, and everything else left
+  // exactly where the chain put it: a defect is ONE thing changed, and a case
+  // that rebuilt the whole reading would be asking about a corridor nobody has.
+  const bent = (moved) => ({
+    stone: { ...level.stone, ...(moved.stone || {}) },
+    earth: { ...level.earth, ...(moved.earth || {}) },
+    joint: { ...level.joint, ...(moved.joint || {}) },
+  });
   selfTest('guard-tasselli', [
     {
       what: 'a paving whose pieces all stand at one height',
-      caught: !(new Set([RELIEF.high]).size > 32),
+      caught: !variesInHeight(new Set(lifts.map(() => 0))),
+    },
+    {
+      what: 'and one whose heights are four, which is a step and not a hand',
+      caught: !variesInHeight(new Set(lifts.map((v, i) => i % 4))),
+    },
+    {
+      what: 'and the paving that ships stands at more heights than that',
+      caught: variesInHeight(heights),
     },
     {
       what: 'a relief taller than the centimetre the committente named',
-      caught: !(RELIEF.high * 1.5 <= RELIEF.high),
+      caught: !standsProud(lifts.map((v, i) => (i === 0 ? RELIEF.high * 1.5 : v))),
+    },
+    {
+      what: 'and one over it by a tenth of a millimetre, which is still over it',
+      caught: !standsProud(lifts.map((v, i) => (i === 0 ? RELIEF.high + 1e-4 : v))),
+    },
+    {
+      what: 'and the relief that ships stands under it',
+      caught: standsProud(lifts),
     },
     {
       what: 'stone that stops dead at the kerb instead of thinning',
@@ -377,44 +451,76 @@ if (process.argv.includes('--self')) {
       // At the middle the old block answered 7.6 cm, which is inside the band a
       // hand asks for; at the far end it answered 18.6 against the reference's
       // 10.0, and a piece of nineteen centimetres at eleven metres is a slab.
+      // AND IT IS THE FAR STRETCH THAT CATCHES IT: the reading is handed to the
+      // stretch's own gate, so a band widened here is a case that starts
+      // failing rather than a case that goes on agreeing with itself.
       what: 'the block back at 0.40 m, whose pieces read 18.6 cm at the far end',
-      caught: !(0.186 <= STRETCH[2].size[1]),
+      caught: !laysThatHand({ ...seen[2], d: seen[2].d.map(() => 0.186) }),
+    },
+    {
+      what: 'and the same stretch at the reference\'s own median passes it',
+      caught: laysThatHand({ ...seen[2], d: seen[2].d.map(() => 0.100) }),
     },
     {
       what: 'pieces finer than the maps can hold',
-      caught: !(0.03 >= SIZE_FLOOR),
+      caught: !overTheMapsFloor(seen.map((s) => ({ ...s, size: [0.03, s.size[1]] }))),
+    },
+    {
+      what: 'and the bands that ship all stand over that floor',
+      caught: overTheMapsFloor(seen),
     },
     {
       what: 'the grey-olive pigment this paving used to wear',
-      caught: !(20.2 >= PIGMENT.chroma) && !(106 <= PIGMENT.hue[1]),
+      caught: !warmBeige(bent({ stone: { C: 20.2 } }))
+        && !atThatHue(bent({ stone: { h: 106 } })),
     },
     {
       what: 'a stone and an earth that stand at the same level',
-      caught: !(1.05 >= PIGMENT.ratio[0]),
+      caught: !overItsEarth(bent({ earth: { Y: level.stone.Y / 1.05 } })),
+    },
+    {
+      what: 'and one four times its earth, which is the other wall of the same band',
+      caught: !overItsEarth(bent({ earth: { Y: level.stone.Y / 4 } })),
     },
     {
       what: 'a joint no darker than the stone it separates',
-      caught: !(1.2 >= PIGMENT.jointUnder[0]),
+      caught: !jointIsDarker(bent({ joint: { L: level.stone.L - 1.2 } })),
+    },
+    {
+      what: 'pieces that all develop to one level, which is a paving of one stone',
+      caught: !closeTogether(bent({ stone: { sd: PIGMENT.spread * 3 } })),
+    },
+    {
+      what: 'and the corridor that ships is none of those five',
+      caught: warmBeige(level) && atThatHue(level) && overItsEarth(level)
+        && jointIsDarker(level) && closeTogether(level),
     },
     {
       what: 'a pigment over the ceiling, which is a light being fixed with a colour',
-      caught: !([1.144, 0.949, 0.585].every((v) => v <= PIGMENT.ceiling)),
+      caught: !underTheCeiling([[1.144, 0.949, 0.585]]),
+    },
+    {
+      what: 'and the three the corridor wears are under it',
+      caught: underTheCeiling([STONE, STONE_PALE, EARTH]),
     },
     {
       what: 'the bare band written down twice and once wrongly',
-      caught: !(0.18 === MANTO.verge.bare),
+      caught: !oneBareBand(0.18, MANTO.verge.bare) && oneBareBand(KERB, MANTO.verge.bare),
     },
     {
       what: 'a mesher that has learnt how tall a piece is',
-      caught: /\bRELIEF\b/.test('import { RELIEF } from "../path.js";'),
+      caught: namesTheRelief('import { RELIEF } from "../path.js";')
+        && GEOMETRY.every((f) => !namesTheRelief(read(f))),
+    },
+    {
+      what: 'an identity spread flat, and one three times what E-V3d measured',
+      caught: !eachItsOwn(0) && !eachItsOwn(IDENTITY.high * 3) && eachItsOwn(identity()),
     },
     {
       what: 'the delivered law is none of those',
-      caught: seen.every((s) => inBand(s.fall)
-        && pct(s.d, 0.5) >= s.size[0] && pct(s.d, 0.5) <= s.size[1])
-        && level.stone.C >= PIGMENT.chroma
-        && ratio >= PIGMENT.ratio[0] && ratio <= PIGMENT.ratio[1]
-        && KERB === MANTO.verge.bare,
+      caught: seen.every((s) => inBand(s.fall) && laysThatHand(s))
+        && warmBeige(level) && overItsEarth(level)
+        && oneBareBand(KERB, MANTO.verge.bare),
     },
   ]);
 }
@@ -422,10 +528,10 @@ if (process.argv.includes('--self')) {
 const report = reporter('guard-tasselli -- the corridor is pieces, and they thin instead of stopping');
 
 // ------------------------------------------------------------------- 1
-report.check(Math.max(...lifts) <= RELIEF.high + 1e-9,
+report.check(standsProud(lifts),
   `no piece stands more than ${(RELIEF.high * 1000).toFixed(0)} mm proud, which is his own number`,
   `the tallest stands ${(Math.max(...lifts) * 1000).toFixed(2)} mm`);
-report.check(heights.size > 32,
+report.check(variesInHeight(heights),
   'and they do not all stand at the same height -- «sporgono in maniera diversa»',
   `${heights.size} distinct heights over ${lifts.length} seats`);
 
@@ -463,12 +569,12 @@ for (const s of seen) {
 }
 for (const s of seen) {
   const d50 = pct(s.d, 0.5);
-  report.check(d50 >= s.size[0] && d50 <= s.size[1],
+  report.check(laysThatHand(s),
     `${s.name.split(' ')[0].padEnd(4)} lays pieces of ${(100 * s.size[0]).toFixed(0)} to `
     + `${(100 * s.size[1]).toFixed(0)} cm at the median, which is the reference's own hand`,
     `${(100 * d50).toFixed(1)} cm`);
 }
-report.check(seen.every((s) => s.size[0] >= SIZE_FLOOR),
+report.check(overTheMapsFloor(seen),
   `and no band of it reaches under ${(100 * SIZE_FLOOR).toFixed(0)} cm, which is what the `
   + 'maps can carry: six texels of the ruler and two and a half of the tone');
 
@@ -479,25 +585,25 @@ report.line(`  through the delivered chain, over the mid stretch: stone L* ${lev
   + `${level.stone.sd.toFixed(1)}) C* ${level.stone.C.toFixed(1)} h ${level.stone.h.toFixed(0)}; `
   + `earth L* ${level.earth.L.toFixed(1)} C* ${level.earth.C.toFixed(1)}; `
   + `joint L* ${level.joint.L.toFixed(1)}`);
-report.check(ratio >= PIGMENT.ratio[0] && ratio <= PIGMENT.ratio[1],
+report.check(overItsEarth(level),
   `the stone stands ${PIGMENT.ratio[0]} to ${PIGMENT.ratio[1]} times its own earth in linear `
   + "luminance, which is the reference's 2.15 and is a ratio no light can move",
-  `${ratio.toFixed(2)}`);
-report.check(level.stone.C >= PIGMENT.chroma,
+  `${ratio(level).toFixed(2)}`);
+report.check(warmBeige(level),
   `and it is a warm beige at chroma ${PIGMENT.chroma} or over, not the grey-olive of 20`,
   `C* ${level.stone.C.toFixed(1)}`);
-report.check(level.stone.h >= PIGMENT.hue[0] && level.stone.h <= PIGMENT.hue[1],
+report.check(atThatHue(level),
   `at hue ${PIGMENT.hue[0]} to ${PIGMENT.hue[1]} degrees, which is the reference's 80`,
   `${level.stone.h.toFixed(0)} degrees`);
-report.check(level.stone.sd <= PIGMENT.spread,
+report.check(closeTogether(level),
   `and the pieces stand within ${PIGMENT.spread} levels of one another, as the reference's own `
   + '3.5 does -- the identity is in the shape and in the joint, not in the level',
   `sd ${level.stone.sd.toFixed(1)} L*`);
-report.check(under >= PIGMENT.jointUnder[0] && under <= PIGMENT.jointUnder[1],
+report.check(jointIsDarker(level),
   `and a joint stands ${PIGMENT.jointUnder[0]} to ${PIGMENT.jointUnder[1]} levels under the stone `
   + 'either side of it, walked to the floor of the slot -- the reference reads 9.7 through a '
   + "picture's own ruler and this paving 8.9 on the same one",
-  `${under.toFixed(1)} L*`);
+  `${under(level).toFixed(1)} L*`);
 report.note('the LEVEL is still not gated here, and what changed is that it is no longer OPEN. '
   + 'The pigment stands at the ceiling this world puts on a pigment (0.900 of red, «as red as a '
   + 'surface may be», gated below) and the corridor developed five levels under the reference at '
@@ -515,11 +621,11 @@ report.note('and what that constant COSTS is a ratio between two surfaces, print
 
 // ------------------------------------------------------------------- 5
 report.line('');
-report.check(KERB === MANTO.verge.bare,
+report.check(oneBareBand(KERB, MANTO.verge.bare),
   'the bare band beside the stone is ONE number: the paving reads where the kerb is seen and the '
   + 'mat writes it, and neither file may import the other',
   `KERB ${KERB} m, MANTO.verge.bare ${MANTO.verge.bare} m`);
-report.check([STONE, STONE_PALE, EARTH].every((p) => p.every((v) => v <= PIGMENT.ceiling + 1e-9)),
+report.check(underTheCeiling([STONE, STONE_PALE, EARTH]),
   `and no pigment of the paving is over ${PIGMENT.ceiling.toFixed(3)}: an albedo over one is the `
   + 'signature of a light being fixed with a colour',
   `pale ${STONE_PALE.map((v) => v.toFixed(3)).join('/')}`);
@@ -527,7 +633,7 @@ report.check([STONE, STONE_PALE, EARTH].every((p) => p.every((v) => v <= PIGMENT
 // ------------------------------------------------------------------- 6
 report.line('');
 const toneSd = identity();
-report.check(toneSd >= IDENTITY.low && toneSd <= IDENTITY.high,
+report.check(eachItsOwn(toneSd),
   `every piece carries its own place on the stone's own ramp, spread `
   + `${(IDENTITY.low * 100).toFixed(0)} to ${(IDENTITY.high * 100).toFixed(0)}% as E-V3d `
   + 'measures it',
@@ -540,7 +646,7 @@ report.check(TUNING.apron.bare.every((v, i) => v > TUNING.reach.bare[i]),
 // ------------------------------------------------------------------- 7
 report.line('');
 for (const file of GEOMETRY) {
-  const names = /\bRELIEF\b/.test(read(file));
+  const names = namesTheRelief(read(file));
   report.check(!names, `${file} does not know how tall a piece is`,
     names ? 'it names RELIEF: the corridor has started growing walls' : 'the relief is drawn');
 }
