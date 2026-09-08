@@ -1308,6 +1308,56 @@ report.check(scala >= 1.6 && scala <= 2.4,
   "and the ladder inside one head is the ladder inside the target's own head",
   `${scala.toFixed(3)} against ${(Ylum(BERSAGLIO_LID.L) / Ylum(BERSAGLIO_FIANCO.L)).toFixed(3)}`);
 
+// ------------------------------------------- AND THE BLUE HEAD'S OWN LEVEL
+//
+// THE SAME QUESTION ASKED OF THE OTHER FAMILY, AND IT WAS NOT ASKED BEFORE. Every
+// gate above holds the PALE head against the target's white one; the cyan had a
+// pigment gate (still an albedo, still cool, warmer pistil than head) and no
+// gate at all on its LEVEL -- so U-FIORI-8 could measure the blue side landing
+// ten levels over the target's and no guard went red. The target's own probe
+// (U-FIORI-7 5) reads its blue head at lid L* 50.5 croma 32.6 and side L* 32.0
+// croma 26.9, and the side is the face this holds, for the same reason the white's
+// side is held: it is most of the silhouette from anywhere a walker stands.
+//
+// THROUGH THE SAME CHAIN AND WITH THE SAME BEND. faceColour() is affine, so the
+// bend is written here exactly as it is written for the pale twenty lines up, on
+// the cyan albedo instead. Nothing here holds a second opinion about the sun.
+const BERSAGLIO_BLU = { lid: { L: 50.5, C: 32.6 }, fianco: { L: 32.0, C: 26.9 } };
+/** La luminanza di un pigmento, che e' la sola forma in cui i due si confrontano. */
+const lumaDi = (v) => 0.2126 * v.x + 0.7152 * v.y + 0.0722 * v.z;
+const piegataBlu = (n, ombra) => {
+  const su = faceColour([0, 1, 0], luce, [cyan.x, cyan.y, cyan.z]);
+  const via = faceColour(n, luce, [cyan.x, cyan.y, cyan.z]);
+  return su.map((v, i) => v + (via[i] - v) * ombra);
+};
+const lidBlu = lab(composite(faceColour([0, 1, 0], luce, [cyan.x, cyan.y, cyan.z])));
+const fiancoBlu = (() => {
+  const q = FIANCHI.map((n) => lab(composite(piegataBlu(n, censo.headShade))));
+  return { L: q.reduce((t, f) => t + f.L, 0) / q.length,
+    C: q.reduce((t, f) => t + f.C, 0) / q.length };
+})();
+report.check(Math.abs(fiancoBlu.L - BERSAGLIO_BLU.fianco.L) <= 3,
+  "and the blue head's side is the level the target's blue side is",
+  `L* ${fiancoBlu.L.toFixed(1)} against ${BERSAGLIO_BLU.fianco.L}, at a CYAN_OF_PALE of `
+  + `${(lumaDi(cyan) / lumaDi(pale)).toFixed(4)}; on the frame itself the same side reads `
+  + 'L* 32.4 at one metre and 31.8 at four (U-FIORI-9, the sweep this was fitted on)');
+report.check(Math.abs(lidBlu.L - BERSAGLIO_BLU.lid.L) <= 5,
+  'and its lid comes with it, because a level is one number for the whole head',
+  `L* ${lidBlu.L.toFixed(1)} against ${BERSAGLIO_BLU.lid.L}`);
+// AND IT IS STILL A BLUE AND NOT A GREY, which is the half of the target's
+// reading this pigment does NOT reach and which is gated wide rather than
+// silently dropped: the target's blue side carries 2.07 times the croma of its
+// own white side, ours carries what is printed, and a pigment that fell to the
+// white's croma would be the grey cube E-DECISIONI15 fails before any other
+// number is looked at.
+const cromaRel = fiancoBlu.C / fianco.C;
+report.check(cromaRel >= 1.3,
+  "and it is still a blue: its side carries more croma than the white's does",
+  `${cromaRel.toFixed(2)} times, croma ${fiancoBlu.C.toFixed(1)} against the white's `
+  + `${fianco.C.toFixed(1)}; the target's pair is ${(BERSAGLIO_BLU.fianco.C / BERSAGLIO_FIANCO.C).toFixed(2)} `
+  + `(${BERSAGLIO_BLU.fianco.C} against ${BERSAGLIO_FIANCO.C}) -- the gap is CYAN_HUE's `
+  + 'and is priced in the verbale of U-FIORI-9, and not this level.');
+
 // ---------------------------------------- the far family, and what it now paints
 //
 // THE QUAD IS NOT ONE COLOUR ANY MORE, AND BOTH OF THE THINGS THAT CHANGED KEEP
@@ -1322,6 +1372,7 @@ report.check(scala >= 1.6 && scala <= 2.4,
 // the ring without a gate seeing it.
 {
   const nom = censo.head.nominal;
+  const squat = censo.head.squat;
   // The lamp on the quad, in units of the head's own edge, off the same seats
   // the solid hangs its lamps on -- lampOnQuad() in vegetation.js, read here
   // from the census rather than copied.
@@ -1374,7 +1425,10 @@ report.check(scala >= 1.6 && scala <= 2.4,
       for (const alt of [0.03, 0.116, 0.30, 0.70]) {
         const piano = Math.sqrt(1 - alt * alt);
         const sh = [Math.abs(Math.sin(az)) * piano, alt, Math.abs(Math.cos(az)) * piano];
-        const area = sh[0] + sh[1] + sh[2];
+        // THE SILHOUETTE OF THE BOX AND NOT OF A CUBE (D-F8-2 = B): the two
+        // flanks carry the head's own squat, the lid does not. Read off the
+        // census, so this gate and the shader hold ONE number.
+        const area = squat * (sh[0] + sh[2]) + sh[1];
         const q = Math.sqrt(area);
         const l = { r: l0.r / q, off: l0.off / q, z: l0.z / q };
         // 1. THE MEAN OF THE HALO. The vertex divides by a nine by nine sample of
@@ -1389,10 +1443,14 @@ report.check(scala >= 1.6 && scala <= 2.4,
         //    three face weights as pure numbers, since the pigment and the light
         //    are common factors and cancel.
         const quotaLid = sh[1] / area;
+        // The squat is NOT in this ratio: both flanks carry it, so it cancels
+        // between the sum and the divide -- which is why the shader leaves it out
+        // of `flanks` and why this gate has to leave it out too, or the two would
+        // agree about nothing.
         const fianchi = sh[0] + sh[2];
         const pesoFianco = fianchi > 1e-4 ? (sh[0] * 1 + sh[2] * 2) / fianchi : 0;
         const impilato = quotaLid * 3 + (1 - quotaLid) * pesoFianco;
-        const piatto = (sh[0] * 1 + sh[1] * 3 + sh[2] * 2) / area;
+        const piatto = (squat * sh[0] * 1 + sh[1] * 3 + squat * sh[2] * 2) / area;
         peggioFacce = Math.max(peggioFacce, Math.abs(impilato - piatto));
         // 3. THE PEAK. The quad's brightest point over its own mean, against the
         //    solid's brightest point over ITS own mean: a quad may be shaped, but
@@ -1422,6 +1480,89 @@ report.check(scala >= 1.6 && scala <= 2.4,
     'and the shaped quad is never driven past the solid it stands in for',
     `brightest over its own mean, ${(piuPicco * 100).toFixed(1)}% of what the solid's own `
     + 'term reaches on the cup floor');
+
+  // ------------------------------------------- 4. THE SILHOUETTE IS A BOX'S
+  //
+  // D-F8-2 = B. The quad's side is the root of the head's own silhouette, and
+  // until this session that silhouette was a CUBE'S -- |vx| + |vy| + |vz| --
+  // while the head the solid on the other side of the ring builds has been squat
+  // by HEAD_SQUAT since U-ERBA-1 (E-ERBA-A's census: 9.4 cm across, 6.8 tall).
+  // Two facts about one object, one of them wrong.
+  //
+  // WHAT IS HELD IS THE ARITHMETIC AND NOT THE NUMBER. The silhouette of a box
+  // with sides a, b, c along x, y, z is a*b*|vz| + b*c*|vx| + a*c*|vy| -- each
+  // face's own area times how square on it is -- so a head a across and a*squat
+  // tall gives squat*(|vx|+|vz|) + |vy|. That is computed here from the census's
+  // own squat, over every bearing and every height a walker's eye can take, and
+  // compared with what a cube would have covered.
+  let piuStretto = 0;
+  let menoStretto = 9;
+  let peggioLid = 9;
+  for (let b = 0; b < 24; b += 1) {
+    const az = (b / 24) * Math.PI / 2;
+    for (const alt of [0.03, 0.116, 0.30, 0.70]) {
+      const piano = Math.sqrt(1 - alt * alt);
+      const v = [Math.abs(Math.sin(az)) * piano, alt, Math.abs(Math.cos(az)) * piano];
+      // La sagoma della SCATOLA, scritta come somma delle tre facce per la loro
+      // area, che e' la definizione e non una parafrasi.
+      const scatola = 1 * squat * v[2] + squat * 1 * v[0] + 1 * 1 * v[1];
+      const cubo = v[0] + v[1] + v[2];
+      const rapporto = Math.sqrt(scatola) / Math.sqrt(cubo);
+      piuStretto = Math.max(piuStretto, rapporto);
+      menoStretto = Math.min(menoStretto, rapporto);
+      // E il coperchio prende PIU' sagoma su una testa squat che su un cubo, che
+      // e' cio' che la faccia in luce guadagna: v[1]/scatola contro v[1]/cubo.
+      peggioLid = Math.min(peggioLid, (v[1] / scatola) / (v[1] / cubo));
+    }
+  }
+  report.check(Math.abs(squat - 6.3 / 8.2) < 1e-9,
+    "the far quad is squat by the head's own squat and not by a number of its own",
+    `${squat.toFixed(4)}, which is E-ERBA-A's 6.3 over 8.2 -- the same constant the `
+    + 'solid on the near side of the ring is built to');
+  report.check(piuStretto < 1 && menoStretto > 0.85,
+    'so the quad draws the silhouette of a squat head and never of a cube',
+    `${((1 - piuStretto) * 100).toFixed(1)} to ${((1 - menoStretto) * 100).toFixed(1)}% narrower `
+    + `than the cube it drew before, over every bearing and every height a walker's eye can `
+    + `take (${((1 - piuStretto * piuStretto) * 100).toFixed(1)} to `
+    + `${((1 - menoStretto * menoStretto) * 100).toFixed(1)}% less area)`);
+  report.check(peggioLid > 1,
+    'and the lid takes more of it, which is what a squat head shows and a cube does not',
+    `at worst ${peggioLid.toFixed(3)} times the share a cube gave it`);
+
+  // ------------------------------- 5. AND THE HALO THINS WITH THE DISTANCE
+  //
+  // D-F8-1 = B, and the only gate that stands between it and a step at the
+  // exchange ring. Three things have to hold and none of them is a taste: the
+  // factor is EXACTLY one at the ring, it never rises with the distance, and it
+  // never reaches nought -- because a head with no halo at all is a head that
+  // disappears, measured: at nought, 13 of the 29 heads the right-hand window
+  // holds at thirteen metres fall under the finder's threshold.
+  const HF = LANT.haloFar;
+  const anello = censo.reach.ring;
+  const fattore = (d) => {
+    const t = Math.min(1, Math.max(0, (d - anello) / HF.span));
+    return 1 + (HF.floor - 1) * (t * t * (3 - 2 * t));
+  };
+  report.check(HF.floor > 0 && HF.floor < 1,
+    "the far quad's halo thins with the distance, and never to nothing",
+    `${HF.floor} of it survives past ${(anello + HF.span).toFixed(1)} m; at nought a head `
+    + 'stops being a lantern and the finder loses it');
+  report.check(Math.abs(fattore(anello) - 1) < 1e-12
+    && Math.abs(fattore(anello - 1) - 1) < 1e-12,
+    'and it is exactly whole AT the ring, so the exchange has no step of warmth in it',
+    `${fattore(anello).toFixed(12)} at ${anello} m -- and the frame says the same: the band `
+    + 'from 6.6 to 8.3 m reads L* 19.59 drawn as quads and 19.56 drawn as solids');
+  const salite = [];
+  let ultimo = 2;
+  for (let d = anello; d <= censo.reach.far + 4; d += 0.05) {
+    const f = fattore(d);
+    if (f > ultimo + 1e-12) salite.push(d);
+    ultimo = f;
+  }
+  report.check(salite.length === 0,
+    'and it only ever thins, so no head brightens as a walker leaves it',
+    `no rise over ${anello} to ${(censo.reach.far + 4).toFixed(0)} m; at 13 m the factor is `
+    + `${fattore(13).toFixed(3)} and at the reach ${fattore(censo.reach.far).toFixed(3)}`);
 }
 
 // -------------------------------------------------------- the contract
@@ -1466,6 +1607,44 @@ report.line('    the alpha, at that halo   R-B 44 at 0.88 against 49 at 0.80, an
 report.line('                              passes 1.4 per cent instead of 4.0');
 report.line('    the brightest pixel       171 of 255 on a white, 164 on a blue');
 report.line('    pixels over 235           none, on either flower, at any glow up to 2.6');
+report.line('');
+report.line('  U-FIORI-9, and these are the two fits this file now carries.');
+report.line('');
+report.line('  THE BLUE PIGMENT, on the delivered frame at the fitted pose, first person,');
+report.line('  veil off, on the side wall of a shut blue head (fondazione/fiori9/fianco.mjs);');
+report.line('  the same head and the same viewing angle at both distances:');
+report.line('    CYAN_OF_PALE   side L* at 1 m   at 4 m    side croma at 1 m / 4 m');
+report.line('    0.612  before        45.1        44.1        5.4 / 5.4');
+report.line('    0.490                40.9        39.9        5.5 / 5.4');
+report.line('    0.398                36.9        36.2        5.4 / 5.4');
+report.line('    0.337                33.9        33.2        5.3 / 5.3');
+report.line('    0.310  delivered     32.4        31.8        5.2 / 5.3');
+report.line('    0.276                30.2        29.7        5.1 / 5.3');
+report.line('    the target                       32.0                    26.9');
+report.line('      -- the LEVEL lands and the CROMA does not move at all: thirteen levels of');
+report.line('         darkening buy three tenths of croma. Where the croma goes, measured in');
+report.line('         three places: 5.2 on the frame, 13.3 with the halo driven to nought,');
+report.line('         19.6 through the chain, which has neither halo nor bloom -- and the');
+report.line('         chain caps a legal cyan at 19 to 20 at ANY level. The lever left is');
+report.line("         CYAN_HUE, which is a ratified pigment and the coordinator owns it.");
+report.line('');
+report.line('  THE HALO OF THE FAR QUAD, thirteen metres out, on the two clean-meadow');
+report.line('  windows of R1 1.1 (fondazione/fiori9/spazza-alone.mjs), against the same');
+report.line('  meadow drawn as SOLIDS over the same band -- which is the honest denominator,');
+report.line('  because a quad stands in for a solid. Heads found / blob width, span 8 m:');
+report.line('    floor      cm-sx            cm-dx');
+report.line('    1.00       38  5 px         29  5 px    <- the law off');
+report.line('    0.50       34  5            29  5');
+report.line('    0.40       33  5            29  4');
+report.line('    0.35       33  5            29  4        <- delivered');
+report.line('    0.30       31  4            30  4        <- 89% of the solid: the knee');
+report.line('    0.25       27  5            27  4');
+report.line('    0.00       26  5            13  5        <- 13 of 29 heads gone');
+report.line('    solids     35  6            29  5');
+report.line('    the target 28  5            31  4');
+report.line('      -- and the reading that frames it: drawn as SOLIDS the same band reads 6');
+report.line('         and 5 px wide, which is what the quad read before this. The gap to the');
+report.line("         target at thirteen metres belongs to the FLOWER and not to the stand-in.");
 report.note('these are readings of a FRAME and are printed rather than gated: the exposure, '
   + 'the tone curve and the meadow\'s own level are three of their four terms and none of '
   + 'the three is this file\'s');
@@ -1616,8 +1795,16 @@ if (process.argv.includes('--self')) {
       caught: !(0 >= 6) },
     { what: 'a blue head whose lamp is its own colour',
       caught: !(0 > 0.1 && caldo(cyan) > 4 * caldo(cyan)) },
+    // Il fattore e' DERIVATO e non scelto, e la ragione e' un difetto che questa
+    // iniezione ha lasciato passare: era «per tre», e quando U-FIORI-9 ha
+    // scurito il ciano di meta' (CYAN_OF_PALE 0,612 -> 0,310) il triplo del
+    // pistillo del blu non arrivava piu' al soffitto e l'iniezione moriva senza
+    // che nessuno lo chiedesse. Un'iniezione che dipende dal LIVELLO di cio' che
+    // inietta e' un'iniezione a scadenza: questa e' spinta di preciso appena
+    // oltre il soffitto, qualunque livello abbia il pigmento.
     { what: 'a blue lamp painted past an albedo',
-      caught: canale(cyanPistil.clone().multiplyScalar(3)) > SOFFITTO },
+      caught: canale(cyanPistil.clone()
+        .multiplyScalar(1.02 * SOFFITTO / canale(cyanPistil))) > SOFFITTO },
     { what: 'a lamp that starts coming out before the day is over',
       caught: !(senzaSoglia(LANT.dayOpen) === 0 && senzaSoglia(LANT.dayOpen * 0.99) === 0
         && senzaSoglia(1) === 1) },
@@ -1746,6 +1933,29 @@ if (process.argv.includes('--self')) {
       caught: !(Math.abs(0.02) < 1e-12) },
     { what: 'a far quad driven brighter, on its own mean, than the solid it stands for',
       caught: !(1.9 <= 1) },
+    // U-FIORI-9: il livello del blu, la sagoma squat del quad, l'alone del quad
+    // scalato con la distanza. Ognuno di questi passava ogni gate del file prima
+    // di questa sessione -- il primo per undici sessioni.
+    { what: "a blue head ten levels over the target's own blue side, which is what shipped",
+      caught: !(Math.abs((BERSAGLIO_BLU.fianco.L + 10) - BERSAGLIO_BLU.fianco.L) <= 3) },
+    { what: "a blue head as dark as the target's but as grey as the white beside it",
+      caught: !(fianco.C / fianco.C >= 1.3) },
+    { what: 'a far quad drawing the silhouette of a CUBE, which is 8 per cent too wide',
+      caught: !(Math.abs(1 - 6.3 / 8.2) < 1e-9) },
+    { what: "a far quad squat by a number of its own instead of the head's",
+      caught: !(Math.abs(0.9 - 6.3 / 8.2) < 1e-9) },
+    { what: 'a far quad whose halo does not thin at all, which is the skirt of U-FIORI-8',
+      caught: !(1 > 0 && 1 < 1) },
+    { what: 'a far quad with no halo left at all, where 13 heads of 29 disappear',
+      caught: !(0 > 0 && 0 < 1) },
+    { what: 'a halo that has begun to thin BEFORE the ring, which is a step at the exchange',
+      caught: (() => {
+        const t = Math.min(1, Math.max(0, (censo.reach.ring - (censo.reach.ring - 2))
+          / LANT.haloFar.span));
+        return !(Math.abs(1 + (LANT.haloFar.floor - 1) * (t * t * (3 - 2 * t)) - 1) < 1e-12);
+      })() },
+    { what: 'a halo that gets STRONGER with the distance, so a head lights up as you leave it',
+      caught: !(1.4 > 0 && 1.4 < 1) },
     { what: 'a contract that answers differently twice',
       caught: impronta(campo) !== impronta(campo.slice(1)) },
     { what: 'a signature with a field taken out of it',
