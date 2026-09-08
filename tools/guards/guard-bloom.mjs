@@ -45,27 +45,99 @@ import { lineOf, read, readJson, reporter, selfTest } from './lib.mjs';
 
 const POST = 'src/core/post.js';
 
+// ==========================================================================
+// THE THREE READERS BELOW PINNED TEXT, AND TWO OF THEM PINNED WHOLE STATEMENTS.
+//
+// U-GUARDIA-3 named this file in its census of stale literals (residuo 3), and
+// it was right about all three of them:
+//
+//   * THE TIERS were found at the exact string «const BLOOM_TIERS = {» and cut
+//     at the first «};» after it. One space taken out round the equals and the
+//     reader finds nothing; a nested object that closes before the outer one
+//     does and it silently reads half of them. Neither is a change to the
+//     chain, and the second kind does not even go red.
+//   * THE UP PASS was the exact expression «draw(up, bloomTargets[i - 1])». A
+//     renamed loop variable, a renamed pass, or «i-1» written without its
+//     spaces breaks it, and not one of the three touches the property.
+//   * THE THREE KNOBS were taken from the FIRST match anywhere in a four
+//     thousand line file, so a second object that happened to name one of them
+//     would answer in the shipped one's place.
+//
+// All three are asked structurally now: braces are COUNTED rather than guessed
+// at, the up pass is a DATAFLOW question -- does the loop that walks the chain
+// from the top read level i and draw into a level BELOW it -- and the knobs
+// come out of the one object that declares all three. What the self test adds
+// is the case that proves the pin is gone: the same property written
+// differently still passes.
+// ==========================================================================
+
+/** The body of the brace that opens at an index, by counting the braces. */
+function braceBody(text, open) {
+  let depth = 0;
+  for (let i = open; i < text.length; i++) {
+    if (text[i] === '{') depth += 1;
+    else if (text[i] === '}') {
+      depth -= 1;
+      if (depth === 0) return text.slice(open + 1, i);
+    }
+  }
+  return '';
+}
+
+/** The object literal a name is declared as, however that declaration is written. */
+function declaredObject(source, name) {
+  const head = new RegExp(`\\b${name}\\s*=\\s*(?:Object\\.freeze\\s*\\(\\s*)?\\{`).exec(source);
+  if (!head) return null;
+  return braceBody(source, source.indexOf('{', head.index));
+}
+
 /** The tiers as the file declares them, with the reach each one works out to. */
 export function tiers(source) {
-  const at = source.indexOf('const BLOOM_TIERS = {');
-  if (at < 0) return null;
-  const body = source.slice(at, source.indexOf('};', at));
+  const body = declaredObject(source, 'BLOOM_TIERS');
+  if (body === null) return null;
   const out = {};
   const re = /'?([A-Za-z-]+)'?\s*:\s*\{\s*first:\s*([0-9]+)\s*,\s*levels:\s*([0-9]+)\s*\}/g;
-  let hit;
-  while ((hit = re.exec(body))) {
+  let hit = re.exec(body);
+  while (hit) {
     const first = Number(hit[2]);
     const levels = Number(hit[3]);
     out[hit[1]] = { first, levels, reach: first * (2 ** (levels - 1)) };
+    hit = re.exec(body);
   }
   return out;
 }
 
-/** The three numbers of the source, as the shipped `params` declares them. */
+/**
+ * The three numbers of the source, as the shipped `params` declares them.
+ *
+ * FROM THE OBJECT THAT DECLARES ALL THREE and not from the first line of the
+ * file that happens to spell one of the names. The three are handed to the
+ * uniforms together and are only meaningful together, so the seat is the object
+ * that carries the three: found by walking out from a mention of one of them to
+ * the brace that encloses it, and accepted only if the other two are in there
+ * with it.
+ */
 export function knobs(source) {
+  const names = ['bloomThreshold', 'bloomKnee', 'bloomStrength'];
+  const bodies = [];
+  const re = /\bbloomStrength\s*:/g;
+  let hit = re.exec(source);
+  while (hit) {
+    let depth = 0;
+    for (let i = hit.index; i >= 0; i--) {
+      if (source[i] === '}') depth += 1;
+      else if (source[i] === '{') {
+        if (depth === 0) { bodies.push(braceBody(source, i)); break; }
+        depth -= 1;
+      }
+    }
+    hit = re.exec(source);
+  }
+  const seat = bodies.find((b) => names.every((n) => new RegExp(`\\b${n}\\s*:`).test(b)));
   const pick = (name) => {
-    const hit = new RegExp(`${name}:\\s*([0-9.]+)`).exec(source);
-    return hit ? Number(hit[1]) : null;
+    if (!seat) return null;
+    const found = new RegExp(`\\b${name}\\s*:\\s*(-?[0-9.]+)`).exec(seat);
+    return found ? Number(found[1]) : null;
   };
   return {
     threshold: pick('bloomThreshold'),
@@ -85,11 +157,41 @@ export function knobs(source) {
  * overwrites: every pass is built with NoBlending and the up loop draws level i
  * into level i-1. If either of those changes, the reach above stops meaning
  * what this file says it means.
+ *
+ * ASKED AS A FLOW AND NOT AS A LINE. The loop is found by the ONE thing about
+ * it that is the property -- it walks the chain of bloom targets -- and inside
+ * it what is asked is where the pixels come from and where they go: read at the
+ * loop's own index, drawn one level DOWN from it. The names of the loop
+ * variable and of the pass do not enter into it, and neither does the spacing
+ * of the subtraction.
  */
 export function overwrites(source) {
-  const noBlend = /blending:\s*NoBlending/.test(source);
-  const upWrites = /draw\(up,\s*bloomTargets\[i - 1\]\)/.test(source);
-  return noBlend && upWrites;
+  if (!/blending\s*:\s*NoBlending/.test(source)) return false;
+  // The chain is walked TWICE -- down, halving, and back up -- and the two
+  // loops are mirror images: the down pass reads level i-1 and draws into i,
+  // the up pass reads i and draws into i-1. So the loop is picked by the
+  // direction it runs in and not by where it stands in the file: an old reader
+  // that took the first loop over the chain would have been describing the
+  // DOWN pass and calling it the up one.
+  const re = /for\s*\(([^)]*\bbloomTargets\b[^)]*)\)\s*\{/g;
+  const loops = [];
+  let m = re.exec(source);
+  while (m) {
+    loops.push({ header: m[1], body: braceBody(source, m.index + m[0].length - 1) });
+    m = re.exec(source);
+  }
+  const down = loops.filter((l) => /\b(?:let|var)\s+\w+\s*=\s*bloomTargets\s*\.\s*length/.test(l.header)
+    && /--|-=\s*1/.test(l.header));
+  if (down.length !== 1) return false;
+  const k = /\b(?:let|var)\s+(\w+)\s*=/.exec(down[0].header);
+  if (!k) return false;
+  const at = (index) => new RegExp(`\\bbloomTargets\\s*\\[\\s*${index}\\s*\\]`);
+  // It reads the level it is standing on...
+  if (!at(k[1]).test(down[0].body)) return false;
+  // ...and every draw out of it goes into the level BELOW that one.
+  const draws = [...down[0].body.matchAll(/\bdraw\s*\(([^;]*?)\)\s*;/g)].map((d) => d[1]);
+  if (draws.length === 0) return false;
+  return draws.every((args) => at(`${k[1]}\\s*-\\s*1`).test(args));
 }
 
 // -------------------------------------------------------------- il righello
@@ -276,6 +378,27 @@ const INK_FLOOR = 4.0;
 // by sweep: at 2.0 the panels have lost half their halo and at 3.0 all of it.
 const THRESHOLD_CEILING = 2.0;
 
+// The two verdicts of the frame legs, named so that the self test can hand them
+// a reading instead of comparing two numbers of its own. What stood in those
+// cases -- `Math.abs(18.5 - 15.5) > FACE_SPILL`, `!(2.74 >= INK_FLOOR)` -- was
+// arithmetic done in the case: it moves when a band moves and never when the
+// leg that uses the band is rewritten, which is the shape U-GUARDIA-3 counted
+// as a tautology in guard-tasselli and guard-pietra.
+/** No face in shadow is lifted more than the halo is allowed to lift one. */
+const facesHold = (rows) => rows.every((r) => Math.abs(r.spill) <= FACE_SPILL);
+/** The panels keep their halo: the bloom still adds its levels to the ink. */
+const inkKeepsItsHalo = (kept) => kept >= INK_FLOOR;
+
+// The up loop as the delivery writes it, kept here as the SHAPE the injections
+// bend rather than as the text the reader matches: the reader never sees this
+// string, and the cases below rename, respace and re-brace it precisely to show
+// that it does not have to.
+const UP_LOOP = 'for (let i = bloomTargets.length - 1; i > 0; i--) {\n'
+  + '  const source = bloomTargets[i];\n'
+  + '  up.uniforms.tSource.value = source.texture;\n'
+  + '  draw(up, bloomTargets[i - 1]);\n'
+  + '}';
+
 if (process.argv.includes('--self')) {
   const source = read(POST);
   selfTest('guard-bloom', [
@@ -293,27 +416,54 @@ if (process.argv.includes('--self')) {
     },
     {
       what: 'a threshold raised into the band the engraved cyan lives in is caught',
-      caught: knobs('bloomThreshold: 3.00,').threshold > THRESHOLD_CEILING,
+      caught: knobs('const params = { bloomStrength: 0.11, bloomThreshold: 3.00, '
+        + 'bloomKnee: 0.30 };').threshold > THRESHOLD_CEILING,
+    },
+    {
+      what: 'and a seat that names only one of the three is no seat: the reader answers nothing',
+      caught: knobs('uGlowThreshold: { value: bloomThreshold }, bloomStrength: 9,')
+        .threshold === null,
     },
     {
       what: 'an up pass that added instead of replacing is caught',
-      caught: !overwrites('blending: NormalBlending,\ndraw(up, bloomTargets[i - 1]);'),
+      caught: !overwrites(`blending: NormalBlending,\n${UP_LOOP}`),
     },
     {
       what: 'and one that wrote into the wrong level is caught',
-      caught: !overwrites('blending: NoBlending,\ndraw(up, bloomTargets[i]);'),
+      caught: !overwrites(`blending: NoBlending,\n${UP_LOOP.replace('[i - 1]', '[i]')}`),
     },
     {
-      what: 'a face lifted three levels by the halo is caught',
-      caught: Math.abs(18.5 - 15.5) > FACE_SPILL,
+      what: 'and a chain with no up loop at all, which is a reach nobody can name',
+      caught: !overwrites('blending: NoBlending,\n// no loop here'),
+    },
+    {
+      // ------------------------------------------------------------------
+      // THE CASE THE OLD READERS COULD NOT HAVE PASSED, and the reason all
+      // three were rewritten: the same chain WRITTEN DIFFERENTLY. Every one of
+      // these four is a change somebody could make tomorrow without touching
+      // the property, and every one of them turned this guard red before.
+      what: 'and the same chain rewritten -- renamed, respaced, frozen, reordered -- still passes',
+      caught: overwrites(`blending:NoBlending,\n${UP_LOOP
+        .replace(/\bi\b/g, 'k').replace('[k - 1]', '[k-1]').replace('up,', 'upPass,')}`)
+        && tiers('const BLOOM_TIERS=Object.freeze({\n'
+          + '  half: { first: 2, levels: 3 },\n'
+          + '  wide: { nested: { first: 9, levels: 9 } },\n'
+          + '});').half.reach === REACH
+        && knobs('const other = { bloomThreshold: 9.0 };\n'
+          + 'const params = { bloomStrength: 0.11, bloomThreshold: 0.72, bloomKnee: 0.30 };')
+          .threshold === 0.72,
+    },
+    {
+      what: 'a face lifted three levels by the halo is caught, through the leg that gates it',
+      caught: !facesHold([{ spill: 3.0 }]) && facesHold([{ spill: FACE_SPILL }]),
     },
     {
       what: 'a panel whose halo has been switched off with the spill is caught',
-      caught: !(2.74 >= INK_FLOOR),
+      caught: !inkKeepsItsHalo(2.74),
     },
     {
       what: 'and one whose halo has been spread so wide it is no longer a halo is caught',
-      caught: !(3.09 >= INK_FLOOR),
+      caught: !inkKeepsItsHalo(3.09),
     },
     {
       what: 'the delivered chain is none of those',
@@ -344,7 +494,7 @@ report.check(knob.threshold !== null && knob.threshold <= THRESHOLD_CEILING,
   `${knob.threshold} against a ceiling of ${THRESHOLD_CEILING}`);
 report.check(overwrites(source),
   'the up pass REPLACES the level below it, which is what makes the reach the width of the whole halo',
-  `NoBlending at line ${lineOf(source, source.indexOf('blending: NoBlending'))}`);
+  `NoBlending at line ${lineOf(source, /blending\s*:\s*NoBlending/.exec(source).index)}`);
 
 // ------------------------------------------------------- what a frame says
 report.line('');
@@ -376,7 +526,7 @@ if (pietra && pietra.length === 2) {
   report.check(rows.length >= 3, 'the shadowed faces of the palette are readable in both frames',
     `${rows.length} of ${SHADOW.length}`);
   const worst = rows.reduce((w, r) => (Math.abs(r.spill) > Math.abs(w.spill) ? r : w), rows[0]);
-  report.check(rows.every((r) => Math.abs(r.spill) <= FACE_SPILL),
+  report.check(facesHold(rows),
     `no face in shadow is lifted more than ${FACE_SPILL} L* by the halo`,
     rows.map((r) => `${r.key} ${r.spill >= 0 ? '+' : ''}${r.spill.toFixed(2)}`).join('  '));
   report.note(`the worst of them is ${worst.key} at ${worst.spill.toFixed(2)} L* `
@@ -391,7 +541,7 @@ if (lettura && lettura.length === 2) {
   report.check(on !== null && off !== null,
     'the engraved strokes are readable in both frames of the reading pose');
   const kept = on - off;
-  report.check(kept >= INK_FLOOR,
+  report.check(inkKeepsItsHalo(kept),
     `the panels keep their halo: the bloom still adds at least ${INK_FLOOR} levels one to three `
     + 'pixels out from a stroke',
     `${kept.toFixed(2)} levels`);
