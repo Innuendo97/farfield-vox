@@ -48,6 +48,52 @@ const STONE_SPECS = stoneSpecs(MASONRY);
 // sank into a stair the walker was standing on is two opinions about one floor,
 // and the picture would be the one that was wrong.
 
+// ----------------------------------------------------------- the compass
+//
+// WHICH WAY IS NORTH, ONCE, FOR THE WHOLE WORLD.
+//
+// THE CONVENTION, WRITTEN DOWN SO THAT NOBODY HAS TO INFER IT AGAIN:
+//
+//   A BEARING is `atan2(x, -z)`. Nought at NORTH, which is -Z. Positive toward
+//   the EAST, which is +X. Degrees unless the name says radians.
+//
+//   A CAMERA'S YAW is the engine's, `atan2(-x, -z)`, and it is the EXACT
+//   NEGATIVE of the bearing it looks along -- at every angle, not only near
+//   nought. `bearing = -yaw`.
+//
+//   A BEARING READ OFF THE REFERENCE PICTURE is neither: R6 recorded every
+//   traced reading as «the angle right of the camera's axis PLUS the engine
+//   yaw», so on this compass the same feature stands at that number LESS TWICE
+//   THE YAW -- 3.636 degrees at the fitted pose.
+//
+// WHY IT IS A CONTRACT AND NOT A HABIT. It was a habit, and the habit was
+// wrong. The two conventions agree at yaw nought, which is where anybody
+// checking by eye would check, and they part company by twice the yaw
+// everywhere else; U-CORNICE-2 found the whole near ridge fitted three and a
+// half degrees off because a per-direction reading crossed between them with
+// nothing written down. So the arithmetic is one leaf module, the convention is
+// this paragraph, and every direction in this world is asked for through the
+// names below.
+//
+// THE SEAT IS ./compass.js AND THE DOOR IS HERE, which is the shape
+// `basinProfile` is re-exported in further down, for the same reason twice
+// over: the compass has to be reachable from the law that lays the columns,
+// which THIS file already imports, so it cannot live in this file without an
+// import cycle; and it has to be reachable from a fitter and a guard that must
+// not load a mesher to ask which way is north.
+//
+// WHAT IS DELIBERATELY NOT HERE. `atan2(z, x)` -- from +X, anticlockwise -- is
+// a different angle and a legitimate one: frustum sectors, angular widths,
+// radial noise. Nothing is ever fitted against a photograph through it, and
+// tools/guards/guard-orizzonte.mjs holds its two hundred and fifty six
+// directions in that convention ON PURPOSE, because they have to agree with a
+// fragment written the same way. Turning those would break the one agreement
+// they exist to hold.
+export {
+  bearingGap, bearingOf, bearingOfFrameRead, bearingOfOffAxis, bearingOfYaw,
+  bearingRadOf, directionOf, frameReadOfBearing, offAxisOf, turnOf, yawOfBearing,
+} from './compass.js';
+
 // ------------------------------------------------------------ the ground
 //
 // THE GROUND IS THE CARPET NOW, AND THIS SEAT HAD NOT NOTICED. Until this unit
