@@ -500,6 +500,155 @@ async function show(page, hidden, keepOnly) {
   }, { off: hidden || [], only: keepOnly });
 }
 
+// ===========================================================================
+// THE VISITOR'S OWN PAGE, WHICH IS A DIFFERENT MACHINE FROM THE ONE ABOVE.
+//
+// WHY IT EXISTS, AND WHAT IT COST TO FIND OUT (E-SUOLO1). openWorld opens
+// `?dev`, and the first three things it does after the ground arrives are to
+// ask for a TIER BY HAND, to place the walker in FIRST person, and to stand him
+// on the fitted pose. Every one of those is a handle a visitor does not have,
+// and the first of them is not merely absent from a visitor's page -- it
+// REPAIRS it. The tier's fraction of the ground reached a field that did not
+// exist when the tier was settled; asking for another tier settles it a second
+// time, on a world that now has a field in it, and the defect goes away in the
+// act of being measured. So the committente opened http://localhost:4329
+// without `?dev` and saw the SKY where the meadow is, on a tip whose guards
+// were 45 out of 45.
+//
+// SO THIS OPENS THE PAGE THE VISITOR IS DELIVERED AND TOUCHES NOTHING. No
+// `?dev`, so `window.farfield` is never defined and there is no scene to reach
+// into, no pose to impose and no person to place: the walker stands where he
+// arrives, in the THIRD person this world arrives in, and the only thing that
+// happens to the page is the one thing a visitor does -- a click on «Clicca per
+// esplorare».
+//
+// THE ONE HANDLE THE VISITOR'S PAGE DOES PUBLISH is `window.voxcampo`, set by
+// src/world/layers/v1-suolo.js beside `window.voxsuolo` and behind no flag at
+// all. Its ready() is the very predicate hub.groundReady() answers with, so
+// waiting on it here is the same wait main.js makes the veil do, taken from
+// outside. It is used to WAIT and never to repair: nothing below sets a scale,
+// a tier or a uniform.
+//
+// AND THE TIER IS PINNED THROUGH THE STORE, WHICH IS NOT A HANDLE BUT A STATE.
+// A visitor who has been here before has an answer about this machine in
+// localStorage, and main.js's calibrate() then never runs the benchmark at all
+// -- so nothing re-settles the tier, and the defect above is PERMANENT for that
+// visitor. A first visit is a coin toss instead: the bench lands on `alto`
+// often enough, `alto` carries a different fraction of the ground from the
+// `medio` the page starts on, and settling that second tier is exactly the
+// second settle that repairs it. Measured on this desk: the same page red and
+// green on two consecutive openings, with nothing changed but how busy the
+// machine was. A smoke whose colour depends on the load is not a smoke, so the
+// leg photographs the RETURNING visitor, which is both the deterministic case
+// and the one the committente was in.
+
+/** The committente's own window, which is where the defect was reported. */
+export const VISITOR = { width: 1892, height: 845 };
+
+/**
+ * The page as it is delivered, walked into, and nothing else.
+ *
+ * @param {object} how  port, viewport, and how long to wait for the meadow
+ */
+export async function openVisitor({
+  chromium, port, width = VISITOR.width, height = VISITOR.height, groundTimeoutMs = 180000,
+}) {
+  const browser = await chromium.launch({
+    headless: true,
+    args: ['--use-angle=d3d11', '--use-gl=angle', '--enable-gpu', '--ignore-gpu-blocklist'],
+  });
+  const page = await browser.newPage({ viewport: { width, height } });
+
+  const noise = [];
+  page.on('pageerror', (error) => noise.push(error.message.slice(0, 300)));
+  page.on('console', (message) => {
+    if (message.type() === 'error') noise.push(message.text().slice(0, 300));
+  });
+
+  const visitor = {
+    page,
+    noise,
+    width,
+    height,
+    driver: 'unknown',
+    /** What the menu says about who is being looked at, read off the DOM. */
+    async person() {
+      return page.evaluate(() => {
+        const label = [...document.querySelectorAll('.menu-item-label')]
+          .find((n) => n.textContent.trim() === 'Figura');
+        if (!label) return '(no menu)';
+        const note = label.parentElement.querySelector('.menu-item-note');
+        // setFigura in src/ui/menu.js writes the person into this one node, and
+        // spells first person out; third person is the body's own name alone.
+        return /^Prima persona/.test(note.textContent) ? 'prima' : 'terza';
+      });
+    },
+    /** What the world settled the ground's fraction at, read and not set. */
+    async campo() {
+      return page.evaluate(() => (window.voxcampo
+        ? { scale: window.voxcampo.scale(), resolve: window.voxcampo.resolve.visible }
+        : null));
+    },
+    async close() { await browser.close(); },
+  };
+
+  try {
+    // A RETURNING VISITOR, WHICH IS A STATE AND NOT A HANDLE: this is the two
+    // lines main.js's own menu writes when a walker picks a quality by hand,
+    // and what a second visit finds waiting for it. See the note above for why
+    // a first visit cannot be the thing a guard stands on.
+    await page.addInitScript(({ w, h }) => {
+      try {
+        window.localStorage.setItem('farfield.quality', JSON.stringify({
+          tier: 'medio', choice: 'auto', benchMs: 10, pixels: w * h,
+        }));
+      } catch { /* a browser that refuses to remember re-benches, and says so */ }
+    }, { w: width, h: height });
+
+    // `?intro=0` AND NOTHING ELSE. It is not a development flag -- see
+    // wantsIntro() in src/main.js, «the switch a visitor who wants the world
+    // and not the ceremony can use» -- so isDevMode() is false, window.farfield
+    // is undefined and this is the visitor's page in every respect that
+    // matters. What it buys is the twenty seconds of opening scene, which this
+    // leg is not measuring and cannot afford.
+    await page.goto(`http://127.0.0.1:${port}/?intro=0`, { waitUntil: 'load' });
+    await page.waitForFunction(
+      () => window.voxcampo && window.voxcampo.ready(),
+      null, { timeout: groundTimeoutMs, polling: 250 },
+    );
+
+    // THE ONE THING A VISITOR DOES. «Clicca per esplorare» is a click in the
+    // middle of the page and there is no other way past it -- and no way at all
+    // from a guard that is not allowed a handle.
+    await page.mouse.click(width / 2, height / 2);
+    // The meadow keeps streaming under the walker for a second or two after
+    // ready(), and the veil dissolves over two and a half. Both are the
+    // visitor's own arrival and neither is worth photographing halfway.
+    await page.waitForTimeout(4000);
+
+    visitor.driver = await page.evaluate(() => {
+      const canvas = document.createElement('canvas');
+      const gl = canvas.getContext('webgl2');
+      const info = gl && gl.getExtension('WEBGL_debug_renderer_info');
+      return info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : 'unknown';
+    });
+  } catch (error) {
+    await browser.close().catch(() => {});
+    const said = noise.length ? ` -- the page said: ${noise.slice(0, 2).join(' | ')}` : '';
+    throw new Error(`${error.message}${said}`);
+  }
+
+  return visitor;
+}
+
+/** One plate of the visitor's page, taken where the page put him. */
+export async function visitorPlate(visitor, sharp, { settleMs = 600 } = {}) {
+  await visitor.page.waitForTimeout(settleMs);
+  const png = await visitor.page.screenshot({ type: 'png' });
+  const { data, info } = await sharp(png).raw().toBuffer({ resolveWithObject: true });
+  return { data, channels: info.channels, width: info.width, height: info.height };
+}
+
 /**
  * One plate: the frame as it stands, in raw pixels.
  *
@@ -565,4 +714,48 @@ export function bandLuma(a, band) {
     }
   }
   return { mean: count ? sum / count : 0, min: low, max: high };
+}
+
+/**
+ * How much of a band of ONE plate is the sky's own colour, by hue alone.
+ *
+ * THE MEASURE THAT NEEDS NO SECOND PLATE, WHICH IS THE WHOLE REASON IT EXISTS.
+ * bandDiff above takes the frame twice with a family switched off, and switching
+ * a family off is a reach into window.farfield.scene -- a handle the VISITOR'S
+ * page does not have and must never be given, because the moment a guard can
+ * reach into that page it is no longer measuring that page. So the ground band
+ * is read against the one thing that is true of this world's sky and of nothing
+ * else that can fill a band of it: BLUE IS THE DOMINANT CHANNEL, by a margin.
+ * The meadow is green, the path is tan, the masonry and the rocks are grey, and
+ * the flowers are white or blue on a green bed and never fill anything.
+ *
+ * THE MARGINS ARE MEASURED AND NOT GUESSED. At the committente's own window,
+ * over the bottom fifth of the frame, 319 748 pixels: with the meadow drawn the
+ * band is 92.8% green-dominant at a mean of (51, 80, 28) and the blue-dominant
+ * pixels that remain -- the blue flower beds -- clear red by a median of seven
+ * steps; with the meadow missing it is 90.8% blue-dominant at a mean of
+ * (132, 177, 201), clearing red by a median of thirty. Twenty and twelve fall
+ * between the two distributions and not inside either, and the floor of a
+ * hundred and ten keeps a night that has not been built yet from reading as
+ * sky. The two readings this separates are 0.1% and 88.0%.
+ *
+ * @returns {number} the share of the band that is unmistakably sky
+ */
+export function bandSky(a, band) {
+  const { width, height, channels } = a;
+  const from = Math.round(band[0] * height);
+  const to = Math.round(band[1] * height);
+  let sky = 0;
+  let total = 0;
+  for (let y = from; y < to; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * channels;
+      const r = a.data[i];
+      const g = a.data[i + 1];
+      const b = a.data[i + 2];
+      total++;
+      if (b > r + 20 && b > g + 12 && b > 110) sky++;
+    }
+  }
+  return total ? sky / total : 0;
 }

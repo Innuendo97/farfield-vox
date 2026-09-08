@@ -4,7 +4,8 @@ import {
   chunkUniforms, duplicateUniforms, refsIn, sourcesOfWorld, templates,
 } from './lib/glsl-doppie.mjs';
 import {
-  POSE_P, bandDiff, bandLuma, openWorld, plate, serveRepo, toolsPresent,
+  POSE_P, VISITOR, bandDiff, bandLuma, bandSky, openVisitor, openWorld, plate,
+  serveRepo, toolsPresent, visitorPlate,
 } from './lib/quadro.mjs';
 
 // GUARD-PROGRAMMI -- EVERY PROGRAM OF THIS WORLD COMPILES, LINKS, AND DRAWS.
@@ -69,14 +70,46 @@ import {
 //      is E-LUCE5 caught a second time, from the other end, by a leg that would
 //      have failed even if the program had linked and returned black.
 //
+//   4. AND THE VISITOR'S PAGE HAS IT TOO, WHICH IS NOT THE SAME QUESTION.
+//      E-SUOLO1, and it is the second incident this file is the answer to.
+//
+//      The committente opened http://localhost:4329 with no `?dev`, in his own
+//      window, in the third person this world arrives in, and there was SKY
+//      where the meadow is. This guard was 45 out of 45 on that tip -- and it
+//      was not wrong, it was somewhere else: legs 1 to 3 measure `?dev`, and
+//      the first three things openWorld does there are ask for a TIER BY HAND,
+//      place the walker in FIRST person, and stand him on the fitted pose.
+//
+//      THE FIRST OF THOSE DOES NOT MERELY DIFFER FROM THE VISITOR'S PAGE. IT
+//      REPAIRS IT. The tier's fraction of the ground was settled at
+//      src/main.js:373 and the field it governs is built at :642, so the number
+//      reached a world with no field in it and nothing carried it across; the
+//      post chain took the field's own buffer on the strength of that answer
+//      and dropped the ground out of the world's pass, and the mesh that was to
+//      put it back stayed invisible. Asking for another tier settles the lever
+//      a SECOND time, on a world that now has a field -- so the defect went
+//      away in the act of being measured, and every plate this guard took was
+//      of a world it had just healed.
+//
+//      So this leg opens the page the visitor is DELIVERED and touches nothing
+//      in it: no `?dev`, no window.farfield, no pose, no person, no tier. It
+//      passes «Clicca per esplorare» the way a visitor does, with a click, and
+//      counts how much of the bottom of the frame is sky. It is the only leg
+//      here whose measurement takes ONE plate, because the two-plate trick the
+//      others stand on needs a handle into the scene that this page must never
+//      be given -- see bandSky in lib/quadro.mjs.
+//
 // ===========================================================================
 // WHAT IT COSTS AND WHAT --fast BUYS.
 //
 // Measured on this desk, tier alto, 960x540, against a server already up: the
 // world is walkable at ~9 s, the census is read at ~12 s, the twelve plates of
-// the smoke land at ~21 s. Starting a server of its own adds ~3 s. That is
-// inside the minute `npm run guard:all` is allowed, so the smoke is ON by
-// default -- a smoke that has to be asked for is a smoke nobody runs.
+// the smoke land at ~21 s, and LEG 4's single plate of the visitor's page --
+// its own browser, its own load, the meadow waited for and a click -- lands at
+// ~40 s. The smoke is still ON by default: E-SUOLO1 is the second incident in
+// this file's short life where a green suite shipped a world with a family
+// missing from it, and both times what was missing was missing from the page
+// nobody was photographing. Twenty seconds is what that costs.
 //
 //   --fast   drops the plates and keeps leg 0 and the compiler. The census is
 //            the leg that cannot be got any other way; the picture can also be
@@ -164,6 +197,13 @@ const LAZY = [
 const ORIZZONTE = [0.33, 0.65];
 const SUOLO = [0.75, 1.00];
 
+// AND THE BAND LEG 4 READS, WHICH IS ITS OWN BECAUSE THE FRAMING IS ITS OWN.
+// The visitor is not on pose P: he is where the page puts him, in third person,
+// with his own body in the middle of the lower frame. 0.80..1.00 is ground and
+// body at that framing and never horizon, in a window of 845 rows -- and the
+// body is dark cloth and stone, which is not sky by any reading.
+const SUOLO_VIS = [0.80, 1.00];
+
 // THE FOUR DIRECTIONS, as turns off the fitted bearing. The fit is one camera
 // looking one way and the cornice is a RING; a horizon that closes in front of
 // the visitor and opens a hole behind him is not a horizon. Four is what fits
@@ -195,6 +235,13 @@ const FLOORS = {
   fondale: 0.15,
 };
 
+// AND LEG 4's ONE FLOOR, on the same rule and with the same arithmetic behind
+// it: the share of the visitor's ground band that is NOT sky. Measured on this
+// desk at the committente's own window -- 99.9% with the meadow drawn, 12.0%
+// with it missing -- so half of the worst reading is a floor that cannot fire
+// on a picture that merely changed and cannot fail to fire on E-SUOLO1.
+const VISITOR_FLOOR = { suolo: 0.50 };
+
 // AT_TODAY, taken at the tip this file was written on (b672f45 + this commit),
 // tier alto, 960x540, ANGLE/D3D11 on AMD Radeon integrated. Per bearing: the
 // share of the horizon band that is not sky, the share of it the fondale is
@@ -210,6 +257,10 @@ const AT_TODAY = {
   90: { orizzonte: 0.775, fondale: 0.769, suolo: 1.000, luma: 38.8 },
   180: { orizzonte: 0.915, fondale: 0.381, suolo: 1.000, luma: 49.4 },
   270: { orizzonte: 0.719, fondale: 0.711, suolo: 1.000, luma: 54.1 },
+  // Leg 4's own reading, taken the day E-SUOLO1 was closed: the visitor's page
+  // at 1892x845, third person, cured. The same plate before the cure read
+  // 0.120, which is the number this leg exists to refuse.
+  visitatore: { suolo: 0.999 },
 };
 
 // The children of the scene that are the distant frame, by name. Two names and
@@ -283,6 +334,31 @@ export function smokeVerdict(readings, floors) {
   return fails;
 }
 
+/**
+ * The verdict of leg 4, over the one reading the visitor's page gives up.
+ *
+ * Pure, like the two above, so the self test can put E-SUOLO1's own numbers
+ * through it with no browser in the room.
+ *
+ * @param {object} reading {suolo, persona}
+ * @param {object} floors
+ */
+export function visitorVerdict(reading, floors) {
+  const fails = [];
+  if (reading.suolo < floors.suolo) {
+    fails.push(`the visitor's ground band is ${(reading.suolo * 100).toFixed(1)}% world,`
+      + ` floor ${floors.suolo * 100}% -- the page a visitor is handed has sky where the meadow is`);
+  }
+  // THE PERSON IS PART OF THE READING AND NOT A SEPARATE LEG. What was reported
+  // was the THIRD person view, and a page that quietly arrived in first person
+  // would be photographing a framing nobody is delivered -- green, and about
+  // the wrong picture.
+  if (reading.persona !== 'terza') {
+    fails.push(`the visitor's page arrived in ${reading.persona} person: this world arrives in third`);
+  }
+  return fails;
+}
+
 // ===========================================================================
 
 const started = Date.now();
@@ -312,6 +388,32 @@ if (missing.length && SELF) {
 
 let server = null;
 let world = null;
+let visitor = null;
+
+/**
+ * Leg 4, whole: the visitor's page, opened, walked into, and read once.
+ *
+ * IT IS ITS OWN BROWSER AND THAT IS DELIBERATE. The world above has had a tier
+ * asked of it by hand, a person placed and a pose imposed, and every one of
+ * those is the thing this leg exists NOT to have done. A second context in the
+ * same browser would still be a second page, but the separation is worth saying
+ * out loud in a file whose whole subject is a measurement that healed what it
+ * measured.
+ *
+ * @returns {object} {suolo, persona, campo, driver} -- and campo is REPORTED and
+ *   never judged: it is the world's own half of E-SUOLO1's lever, carried into
+ *   the failure message so that a red run names the state instead of the pixel.
+ */
+async function measureVisitor(port) {
+  visitor = await openVisitor({ chromium, port });
+  const seen = await visitorPlate(visitor, sharp);
+  return {
+    suolo: 1 - bandSky(seen, SUOLO_VIS),
+    persona: await visitor.person(),
+    campo: await visitor.campo(),
+    driver: visitor.driver,
+  };
+}
 
 /** Everything the page can tell us, taken once and used by both modes. */
 async function measure({ smoke }) {
@@ -468,6 +570,45 @@ if (SELF) {
       caught: smokeVerdict([{ turn: 0, orizzonte: 1, fondale: 1, suolo: 0, luma: 60 }], FLOORS)
         .some((line) => line.includes('ground band')),
     });
+
+    // ---- LEG 4's verdict, put through E-SUOLO1's OWN NUMBERS.
+    //
+    // Not an imitation of them: 0.120 and 0.999 are the two readings this desk
+    // took off the visitor's page at 1892x845, before the cure and after it,
+    // and they are what the floor has to separate. A self test written against
+    // rounder numbers would be a test of the arithmetic and not of the choice.
+    cases.push({
+      what: 'the visitor\'s page as measured after the cure passes leg 4 (0.999)',
+      caught: visitorVerdict({ suolo: 0.999, persona: 'terza' }, VISITOR_FLOOR).length === 0,
+    });
+    cases.push({
+      what: 'E-SUOLO1 as it was actually measured is caught (0.120 of the band is world)',
+      caught: visitorVerdict({ suolo: 0.120, persona: 'terza' }, VISITOR_FLOOR)
+        .some((line) => line.includes('sky where the meadow is')),
+    });
+    cases.push({
+      what: 'and a visitor\'s page that quietly arrived in first person is caught too',
+      caught: visitorVerdict({ suolo: 0.999, persona: 'prima' }, VISITOR_FLOOR)
+        .some((line) => line.includes('third')),
+    });
+    // AND E-SUOLO1 ITSELF, PHOTOGRAPHED RATHER THAN DESCRIBED. The sweep above
+    // already took a plate of this world with everything but the sky and the
+    // weather switched off, which is precisely the frame the committente was
+    // handed: a ground band with no ground in it. So the leg's own measure and
+    // the leg's own floor are run over TWO REAL FRAMES, one with the meadow and
+    // one without, and what is asserted is that they come out on opposite sides
+    // of the floor. There is no constant in this case to get wrong.
+    const withGround = 1 - bandSky(taken.plates.full[0], SUOLO_VIS);
+    const without = 1 - bandSky(taken.plates.skies[0], SUOLO_VIS);
+    cases.push({
+      what: `a real frame whose ground is switched off fails leg 4 (${(without * 100).toFixed(1)}% world)`,
+      caught: visitorVerdict({ suolo: without, persona: 'terza' }, VISITOR_FLOOR)
+        .some((line) => line.includes('sky where the meadow is')),
+    });
+    cases.push({
+      what: `and the same frame with its ground passes it (${(withGround * 100).toFixed(1)}% world)`,
+      caught: visitorVerdict({ suolo: withGround, persona: 'terza' }, VISITOR_FLOOR).length === 0,
+    });
   }
 
   await world.close();
@@ -576,7 +717,39 @@ if (!/D3D11|Metal|OpenGL/i.test(world.driver) || /SwiftShader/i.test(world.drive
   report.note(`the frame was drawn by ${world.driver}: the floors were measured on a real driver`);
 }
 
+// THE DEVELOPMENT PAGE IS SHUT BEFORE THE VISITOR'S IS OPENED. Two headless
+// contexts holding the same GPU is a measurement about a busy machine, and the
+// one thing this leg must not be is another reading of how loaded the desk is.
 await world.close();
+
+// LEG 4 -- and the page the VISITOR is handed has the ground in it.
+if (FAST) {
+  report.note('--fast: the visitor\'s page was not opened either, so E-SUOLO1 goes through');
+} else {
+  let vis = null;
+  try {
+    vis = await measureVisitor(server.port);
+  } catch (error) {
+    report.check(false, 'the visitor\'s page loads and its meadow arrives', error.message);
+  }
+  if (vis) {
+    const at = AT_TODAY.visitatore;
+    const held = vis.campo
+      ? `campo a ${vis.campo.scale} di lato, ricomposizione ${vis.campo.resolve ? 'visibile' : 'nascosta'}`
+      : 'nessun window.voxcampo sulla pagina';
+    report.line(`  visitatore ${VISITOR.width}x${VISITOR.height}, ${vis.persona} persona,`
+      + ` ground ${(vis.suolo * 100).toFixed(1)}% world (${(at.suolo * 100).toFixed(1)} today) -- ${held}`);
+    const fails = visitorVerdict(vis, VISITOR_FLOOR);
+    report.check(fails.length === 0,
+      'the page a visitor is delivered has the meadow on the screen, with no handle touched',
+      fails.join(' | '));
+    if (visitor.noise.length) {
+      report.note(`the visitor's page logged ${visitor.noise.length} error(s): ${visitor.noise.slice(0, 2).join(' | ')}`);
+    }
+  }
+  if (visitor) await visitor.close().catch(() => {});
+}
+
 await server.stop();
 
 report.end(`${((Date.now() - started) / 1000).toFixed(1)} s, server ${server.borrowed ? `borrowed on ${server.port}` : `started on ${server.port}`}`);
