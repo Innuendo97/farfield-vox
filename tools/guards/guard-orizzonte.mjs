@@ -1,7 +1,7 @@
 import {
   CAMPO_BEARINGS, CAMPO_BIAS, CAMPO_BLADE_CEIL, CAMPO_FAR, CAMPO_HORIZON_MARGIN,
   CAMPO_HORIZON_REACH, CENTRE, VOXEL, campoBearingOf, campoCoarseSpan, campoFarOrigin,
-  campoGroundByte, campoHorizon, campoHorizonCost, columnSpec,
+  campoGroundByte, campoHorizon, campoHorizonCost, campoSkyBound, columnSpec,
 } from '../../src/world/voxel/pure.js';
 import { POSES } from '../../src/core/poses.js';
 import { read, reporter, selfTest } from './lib.mjs';
@@ -99,9 +99,12 @@ import { read, reporter, selfTest } from './lib.mjs';
 //      exists for, and the one a tidy-up would delete first. It is asked of the
 //      ring as campoHorizon BUILDS it.
 //   2b. THE SAME STEP, ON THE RING THE FRAGMENT READS -- campoHorizon clamped
-//      to the single bound campo-field.js hands it. The two are not the same
-//      ring and this unit found out why: see the note the run prints. Gated on
-//      the world, measured on the banchi, owner named.
+//      to the single bound campo-field.js hands it. U-GUARDIA-3 found the two
+//      were not the same ring: the ceiling was taken at the exact eye and the
+//      clamp cut off the padding leg 2 exists for, so this was gated on the
+//      world (where nothing stands above the eye to break on) and only measured
+//      on the banchi. U-CAMPO-4 gave the ceiling the same padded eye the ring
+//      takes -- campoSkyBound -- and this is now GATED ON EVERY TERRAIN.
 //   3. NEVER LOOSER THAN THE ONE BOUND. The ring may only ever cut MORE than
 //      the single slope did: a bearing above it would be a regression dressed
 //      as a feature.
@@ -308,8 +311,27 @@ const shortName = (terrain) => terrain.name.split(' --')[0];
 // ---------------------------------------------------------------------------
 // THE ARITHMETIC THE LEGS ARE WRITTEN IN.
 
-/** The single bound of campo-field.js skySlope(), written here to compare. */
-function oneBound(patches, eye) {
+/**
+ * THE SINGLE BOUND campo-field.js HANDS campoHorizon AS ITS CEILING.
+ *
+ * IT IS THE ENGINE'S OWN AND NOT A COPY. It used to be written out here, and
+ * this file already carries one second implementation (ringOf) that leg 0 has
+ * to spend a whole leg keeping honest; a second one, with nothing to compare it
+ * against, is how leg 2b below could go green on a ceiling the field does not
+ * actually pass. Since U-CAMPO-4 the arithmetic is campoSkyBound in
+ * src/world/voxel/campo.js and skySlope() is four words that call it, so what
+ * this leg clamps with is what the fragment reads.
+ */
+const oneBound = (patches, eye) => campoSkyBound(patches, eye, CAMPO_HORIZON_REACH);
+
+/**
+ * AND THE CEILING AS IT WAS BEFORE U-CAMPO-4: taken at the EXACT eye, with no
+ * padding for the walker's step. This is a DEFECT and it is here to be
+ * injected -- case (j) of the self test puts it under leg 2b and requires the
+ * leg to say no to it on ground nearer than reach/margin. It is the shape the
+ * field shipped for three sessions, so it is written out rather than described.
+ */
+function exactBound(patches, eye) {
   let worst = -1e9;
   for (const patch of patches) {
     const { x0, z0, cell: c, n, top } = patch;
@@ -604,19 +626,21 @@ if (!injected) {
 
     // LEG 2b -- THE SAME STEP, ON THE RING THE FRAGMENT ACTUALLY READS.
     //
-    // Gated on the world and measured on the banchi, and the reason is written
-    // out in the note below: the exposure is campo-field.js's, not this file's,
-    // and it is not reachable from a worktree that owns tools/guards only.
+    // GATED ON EVERY TERRAIN SINCE U-CAMPO-4, and the banchi are the half that
+    // means anything. It was gated on the world alone and only MEASURED on the
+    // banchi, because when U-GUARDIA-3 wrote it the exposure was real and the
+    // cure sat in a file that unit did not own: the ceiling campo-field.js
+    // handed campoHorizon was taken at the EXACT eye, so the clamp on the ring's
+    // last line cut off the whole 0.30 m of padding leg 2 exists for, and the
+    // banchi went +0.0988 and +0.0841 THROUGH the ring. The world has no ground
+    // above the eye, so it read as a pass there and the gate bit on nothing.
+    // The ceiling now carries the same padded eye the ring does (campoSkyBound),
+    // the exposure is gone, and the leg is asserted where it can actually fail.
     const exposed = worstClamped > 0;
-    if (terrain.world) {
-      report.check(!exposed, '2b. e anche col soffitto del bound unico addosso',
-        `${margin(worstClamped)}`
-        + (clampedAt && clampedAt.where ? ` (posa ${clampedAt.eye.name}, bidone ${clampedAt.where.bin})` : ''));
-    } else {
-      report.line(`    2b. col soffitto del bound unico addosso: ${margin(worstClamped)}`
-        + `${exposed ? '  <-- SCOPERTO' : ''}`);
-      if (exposed) benchExposure.push({ terrain, worst: worstClamped, at: clampedAt });
-    }
+    report.check(!exposed, '2b. e anche col soffitto del bound unico addosso',
+      `${margin(worstClamped)}`
+      + (clampedAt && clampedAt.where ? ` (posa ${clampedAt.eye.name}, bidone ${clampedAt.where.bin})` : ''));
+    if (exposed && !terrain.world) benchExposure.push({ terrain, worst: worstClamped, at: clampedAt });
 
     report.check(ringOverBound <= 1e-6, "3. mai piu' lasco del bound unico",
       `il bidone piu' alto sta ${ringOverBound.toFixed(6)} sopra la pendenza sola`);
@@ -654,49 +678,42 @@ if (!injected) {
   report.check(banchiTested > 0, "e i banchi hanno terra sopra l'occhio da mordere",
     `${banchiTested} campioni sopra l'occhio sui ${BANCHI.length} banchi`);
 
-  // THE SECOND FINDING OF THIS UNIT, AND IT IS NOT THIS FILE'S TO FIX.
+  // THE FINDING OF U-GUARDIA-3, CLOSED BY U-CAMPO-4 -- AND THE ALARM THAT STAYS.
   //
-  // campoHorizon takes a padding for the walker's step -- it lowers the eye by
-  // `reach` and brings it `reach` nearer -- and then campo-field.js hands it a
-  // CEILING which is skySlope(eye), computed at the EXACT eye with no padding
-  // at all, and the last line of campoHorizon clamps the ring down to it. On
-  // the steepest bearing of the world the padding is therefore thrown away, and
-  // all that is left to carry the step is the 0.02 the single bound adds by
-  // hand.
+  // campoHorizon takes a padding for the walker's step: it lowers the eye by
+  // `reach` and brings it `reach` nearer. campo-field.js used to hand it a
+  // CEILING taken at the EXACT eye, and the last line of campoHorizon clamps
+  // the ring down to it, so on the steepest bearing the padding was thrown
+  // straight back away and all that was left to carry the step was the 0.02 the
+  // single bound adds by hand.
   //
-  // WHERE THAT STOPS BEING ENOUGH IS A DIVISION. A walker who drops by `reach`
-  // raises the slope to ground at distance d by reach/d, with no help from the
-  // horizontal at all, so the margin covers the drop only while
+  // WHERE THAT STOPPED BEING ENOUGH IS A DIVISION. A walker who drops by
+  // `reach` raises the slope to ground at distance d by reach/d, with no help
+  // from the horizontal at all, so the margin covers the drop only while
   // d >= reach / margin. Both numbers are the engine's own, so the distance is
-  // computed here rather than stated: 0.30 / 0.02 = 15.0 m.
+  // computed here rather than stated: 0.30 / 0.02 = 15.0 m. The banchi that sit
+  // inside it went +0.0988 and +0.0841 THROUGH the ring the fragment reads.
   //
-  // It has never bitten because the nearest ground above the eye has always
-  // stood sixty metres out or more -- campo-field.js says exactly that: «a
-  // quarter of a metre of parallax on a ridge sixty metres away, which the
-  // margin above covers many times over». It bites the day V5 puts a mound
-  // beside the walker, which is E-PERF5's own residue («margine dell'anello da
-  // rimisurare quando V5 mette terra vicino all'occhio») now measured instead
-  // of predicted. The world's leg 2b above is GATED, so this goes red on its
-  // own the day the world grows that ground.
+  // THE CEILING IS NOW campoSkyBound, of the same padded eye, so it is a
+  // maximum OF the ring's own slopes and the clamp cannot cut one of them. What
+  // follows is kept as an ALARM and not as a diagnosis: it prints only if a
+  // banco breaches again, which is the shape a regression here would take.
   const CROSS = CAMPO_HORIZON_REACH / CAMPO_HORIZON_MARGIN;
   if (benchExposure.length) {
-    report.note('IL SOFFITTO DEL BOUND UNICO BUTTA VIA IL MARGINE DEL PASSO, misurato: '
+    report.note('IL SOFFITTO DEL BOUND UNICO BUTTA VIA IL MARGINE DEL PASSO, di nuovo: '
       + `campoHorizon si prende ${CAMPO_HORIZON_REACH} m di margine per il passo del `
-      + 'camminatore e poi campo-field.js gli passa come soffitto skySlope(eye), che e\' '
-      + `calcolato all'occhio ESATTO; l'ultima riga di campoHorizon lo ritaglia li' sotto. `
-      + `Resta solo il ${CAMPO_HORIZON_MARGIN} che il bound unico aggiunge a mano, e quello `
+      + 'camminatore, e il soffitto che gli arriva non se lo porta. Un soffitto preso '
+      + `all'occhio ESATTO lascia solo il ${CAMPO_HORIZON_MARGIN} del bound unico, e quello `
       + `copre una discesa di ${CAMPO_HORIZON_REACH} m soltanto oltre `
       + `${CAMPO_HORIZON_REACH}/${CAMPO_HORIZON_MARGIN} = ${CROSS.toFixed(1)} m dall'occhio `
       + '(il termine di quota da solo, reach/d). Sui banchi con terra piu\' vicina di cosi\' '
       + `il campione peggiore SFONDA l'anello: `
       + benchExposure.map(({ terrain, worst }) => `${shortName(terrain)} +${worst.toFixed(4)}`).join(', ')
-      + '. Sul mondo NON sfonda e la gamba 2b e\' gateata li\': l\'unica terra sopra '
-      + 'l\'occhio che questo mondo avra\' e\' quella che V5 mettera\', e il giorno che la '
-      + 'mette questa guardia diventa rossa da sola. NON E\' RIPARABILE DA QUI: la cura sta '
-      + 'in src/world/voxel/campo-field.js (skySlope prenda lo stesso occhio imbottito che '
-      + 'campoHorizon prende, o il soffitto porti il proprio margine). E\' il residuo di '
-      + 'E-PERF5 «margine dell\'anello da rimisurare quando V5 mette terra vicino '
-      + 'all\'occhio», ora misurato invece che previsto. Proprietario: U-CAMPO (il campo).');
+      + '. E\' la regressione di U-CAMPO-4: campoSkyBound (src/world/voxel/campo.js) deve '
+      + 'prendere lo stesso occhio imbottito che campoHorizon prende, e skySlope() in '
+      + 'src/world/voxel/campo-field.js deve restare le quattro parole che lo chiamano. '
+      + 'Radice: E-PERF5 «margine dell\'anello da rimisurare quando V5 mette terra vicino '
+      + 'all\'occhio». Proprietario: U-CAMPO (il campo).');
   }
 
   // LEG 5 -- the same numbering in both languages.
@@ -907,16 +924,18 @@ inject('il bias della quota tolto due volte',
   });
 }
 
-// (j) LEG 2b ITSELF: the ring clamped to a ceiling taken at the EXACT eye,
-//     which is what campo-field.js hands campoHorizon. The leg has to say no on
-//     ground nearer than reach/margin and yes past it -- otherwise the day V5
-//     puts a mound beside the walker the guard stays green through it. Both
-//     halves are asserted, on the two banchi that sit either side of the 15 m
-//     the note above computes.
+// (j) LEG 2b ITSELF, AND IT IS THE REGRESSION TEST OF U-CAMPO-4. The defect is
+//     a ceiling taken at the EXACT eye -- what campo-field.js handed
+//     campoHorizon for three sessions -- and the leg has to say NO to it on
+//     ground nearer than reach/margin, YES to it past that distance (where the
+//     0.02 of the single bound still covers a 0.30 m drop on its own), and YES
+//     to the padded ceiling the field hands today. Three halves, because two
+//     would let a leg that says no to everything pass, and a leg that is right
+//     about the defect but wrong about the cure is how the repair gets undone.
 {
-  const clampedWalk = (t) => {
+  const clampedWalk = (t, ceilingOf) => {
     const eye = t.eyes[0];
-    const read = engineRing(t, eye, CAMPO_HORIZON_REACH, oneBound(t.patches, eye));
+    const read = engineRing(t, eye, CAMPO_HORIZON_REACH, ceilingOf(t.patches, eye));
     return STEPS.some(([dx, dy, dz]) => worstBreach(read,
       { x: eye.x + dx, y: eye.y + dy, z: eye.z + dz }, t.samples).worst > 0);
   };
@@ -924,7 +943,9 @@ inject('il bias della quota tolto due volte',
   const far = BANCHI.find((t) => shortName(t) === 'banco lontano');
   cases.push({
     what: "il soffitto preso all'occhio esatto, e la terra vicina che ci sfonda dentro",
-    caught: clampedWalk(near) && !clampedWalk(far),
+    caught: clampedWalk(near, exactBound)
+      && !clampedWalk(far, exactBound)
+      && !clampedWalk(near, oneBound),
   });
 }
 
