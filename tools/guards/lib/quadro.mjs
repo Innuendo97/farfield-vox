@@ -1,8 +1,11 @@
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 // THE ONE MACHINE IN THIS REPOSITORY THAT ACTUALLY DRAWS A FRAME FOR A GUARD.
 //
@@ -70,6 +73,52 @@ async function answers(port, ms = 1500) {
   }
 }
 
+// ---------------------------------- THE DEPENDENCY CACHE, AND WHOSE IT IS NOT
+//
+// A DEFECT THIS FILE SHIPPED, FOUND BY MEASUREMENT AND CLOSED HERE.
+//
+// node_modules is ONE DIRECTORY for the whole campaign: every worktree reaches
+// C:\workspace-project\farfield-vox\node_modules through a link, which is
+// E-OPS2 for the build cache and is the same fact one floor down. Vite puts its
+// pre-bundled dependencies in <root>/node_modules/.vite, resolves that link,
+// and keys the cache on a hash that INCLUDES THE ROOT -- so a server raised in
+// one worktree finds the cache of another, calls it stale, DELETES it and
+// writes its own in its place, under whatever pages the other worktrees are
+// serving right now.
+//
+// Measured, on this desk, with two servers up and traffic on both: over ninety
+// seconds of a guard raising and stopping four servers the shared configHash
+// went c56c26a6 -> 2ee108e2 -> (absent) -> b56446f9 -> c56c26a6 -> dcd5f463,
+// with the metadata file gone entirely for a window each time, and each
+// neighbour took a request timeout out of it. Neither neighbour DIED of it --
+// that was measured too, and it is why the ports that die are not this file's
+// doing -- but a guard that raises a server for every measure was rewriting the
+// dependencies of seven other sessions all day long.
+//
+// So the guard's server keeps its cache OUT of the shared tree, in a directory
+// keyed by the real path of this worktree: it is stable across runs, so nothing
+// is re-optimised needlessly, and it is nobody else's. E-OPS2 proposed exactly
+// this remedy for the build cache -- «keyed by the real path» -- and this is the
+// same remedy for the other one.
+//
+// It is reached with --config rather than by writing anything into the
+// worktree: a one-line module that re-exports the delivery's own configuration
+// with a cache directory added. The world the guard photographs stays the world
+// the repository ships, down to every plugin.
+const GUARD_CACHE = join(tmpdir(), 'farfield-quadro',
+  createHash('sha1').update(REPO_ROOT).digest('hex').slice(0, 12));
+
+function ownCacheConfig() {
+  mkdirSync(GUARD_CACHE, { recursive: true });
+  const path = join(GUARD_CACHE, 'vite.guard.config.mjs');
+  writeFileSync(path,
+    '// Written by tools/guards/lib/quadro.mjs. The delivery\'s own configuration,\n'
+    + '// with a dependency cache that is not the one seven other worktrees share.\n'
+    + `import delivered from ${JSON.stringify(pathToFileURL(join(REPO_ROOT, 'vite.config.js')).href)};\n`
+    + `export default { ...delivered, cacheDir: ${JSON.stringify(join(GUARD_CACHE, '.vite'))} };\n`);
+  return path;
+}
+
 /**
  * The development server, either one that is already up or one of our own.
  *
@@ -90,6 +139,7 @@ export async function serveRepo(port = null) {
   const child = spawn(process.execPath, [
     join(REPO_ROOT, 'node_modules', 'vite', 'bin', 'vite.js'),
     '--port', String(chosen), '--strictPort', '--host', '127.0.0.1',
+    '--config', ownCacheConfig(),
   ], { cwd: REPO_ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
 
   let log = '';
