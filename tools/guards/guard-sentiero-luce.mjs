@@ -148,7 +148,7 @@ const SHADE = /uShade[A-Z]|tShade/;
 // thing this guard exists for -- a fragment that decides for itself where the
 // sun is -- because `zoneAt` does not know where the sun is either: it is a
 // picture of the ground, in XZ, painted offline and gated by guard-zone.
-const ZONE = /zoneAt\s*\(|uZone|tZone/;
+const ZONE = /zoneAt\s*\(|uZone\b|tZone\b/;
 
 export function lightsTheJoint(source) {
   const bad = [];
