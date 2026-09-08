@@ -1,7 +1,7 @@
 import {
   LIGHT_SCALE, MEADOW_ALBEDO, encodedLum, faceTerms, readLight, renderChain,
 } from '../lighting/render-chain.mjs';
-import { read, reporter, selfTest } from './lib.mjs';
+import { braceBody, read, reporter, selfTest } from './lib.mjs';
 
 // GUARD-PRATO -- THE WELL BETWEEN THE CUBES, AND THE GROUND UNDER A THINNING MAT.
 //
@@ -43,38 +43,130 @@ const MATERIAL = 'src/world/voxel/material.js';
 
 // ---------------------------------------------------------------- the shape
 //
-// The sentences the fragment has to keep saying. They are matched as text
-// because that is what they are -- there is no way to ask a compiled shader
-// whether it still believes the ground is in the mat -- and each one is the
-// exact line a tidying-up would delete.
+// THE SEVEN SENTENCES, ASKED AS DATAFLOW AND NO LONGER AS TYPOGRAPHY.
+//
+// WHAT STOOD HERE AND WHY IT WAS A TRAP. Seven regular expressions, each one an
+// ENTIRE GLSL statement written out -- `bool inMat = hit.blade || matRung >
+// 0.5;` and its six brothers -- with the head of this section saying so
+// plainly: «each one is the exact line a tidying-up would delete». It is also
+// the exact line a tidying-up would REWRITE, and a rewrite that keeps every
+// promise would have turned this guard red with the fragment perfectly correct:
+// swap the two terms of the `||`, wrap one of them in parentheses, break the
+// line, and the sentence is gone. Worse, four of the seven self tests injected
+// their defect by `String.replace` of the very regex they were also matching,
+// so they proved the replacement worked and not that the READER did -- the same
+// trap U-GUARDIA-3 took out of guard-zone.
+//
+// WHAT REPLACES IT. The question this guard actually has is a DATAFLOW one --
+// «does the sentence that decides `inMat` still look at `matRung`, or has it
+// gone back to asking only `hit.blade`?» -- and that is asked of the statement
+// that WRITES a name, over the names its right-hand side mentions. It is the
+// same question tools/guards/lib/quadro.mjs puts to a compiled vertex shader
+// («for each statement that writes a name, did its right-hand side mention this
+// call?») and it is put here to the fragment's own text, because this guard
+// runs under plain node on purpose and a fragment is not a stage quadro can
+// interrogate. What survives such a reader is every rewrite of the expression,
+// which is the whole of E-IGIENE.
+//
+// AND IT IS STILL A GATE AND NOT A SEARCH. A name that must be mentioned and a
+// name that must NOT be are both stated, so «the ground back out in the open»
+// is caught by the absence of `matRung` and «the bounce off the ladder» by the
+// absence of `sky` -- the two defects that shipped -- rather than by a comma
+// moving.
+
+/**
+ * Every statement of a source that writes a name, and what its right-hand side
+ * mentions.
+ *
+ * Comments out, split on the semicolon, and the left-hand side taken as the
+ * last name before the assignment. A declaration (`float rung = ...`) and a
+ * plain assignment (`thinMat = ...`) come out the same, which is what is
+ * wanted: what is guarded is where a value comes from, not how it was declared.
+ */
+export function writesOf(text) {
+  const bare = text.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/.*$/gm, ' ');
+  const out = [];
+  for (const statement of bare.split(';')) {
+    const m = /(?:^|[\s{}()])([A-Za-z_]\w*)\s*(=)(?!=)([\s\S]*)$/.exec(statement);
+    if (m) out.push({ lhs: m[1], rhs: m[3] });
+  }
+  return out;
+}
+
+// A write whose right-hand side asks NOTHING is not a decision, it is a seat
+// being set aside: `bool thinMat = false;` three lines before the sentence that
+// actually decides it. What counts as asking something is any name that is not
+// a keyword, a type or a number, which is the whole of GLSL's own vocabulary
+// for «a constant».
+const EMPTY_HANDED = /^(true|false|vec[234]|mat[234]|ivec[234]|float|int|bool|uint)$/;
+const asksSomething = (rhs) => [...rhs.matchAll(/[A-Za-z_]\w*/g)]
+  .some((m) => !EMPTY_HANDED.test(m[0]));
+
+/**
+ * The body of one function of a source, by its name.
+ *
+ * The sentences below all live in the fragment's own `shade()`, and a name
+ * written there has nothing to do with the same name written in `main()` --
+ * `base` is both the well's pair here and a lattice corner there. Naming the
+ * function is the coarsest pin there is and the only one this reader keeps: it
+ * survives every rewrite of what is inside it.
+ */
+export function functionBody(text, name) {
+  const at = new RegExp(`\\b${name}\\s*\\([^)]*\\)\\s*\\{`).exec(text);
+  return at ? braceBody(text, at.index + at[0].length - 1) : '';
+}
+
+/**
+ * Does the sentence that decides this name mention these, and not those?
+ *
+ * ONE sentence: a name decided in two places is two answers to one question,
+ * and the day they disagree nobody can say which one the frame took.
+ */
+export function decidedBy(text, { lhs, needs = [], forbids = [] }) {
+  const written = writesOf(text)
+    .filter((w) => w.lhs === lhs && asksSomething(w.rhs));
+  if (written.length !== 1) return false;
+  const { rhs } = written[0];
+  const mentions = (name) => new RegExp(`(^|[^\\w.])${name.replace(/\./g, '\\.')}(?![\\w])`)
+    .test(rhs);
+  return needs.every(mentions) && !forbids.some(mentions);
+}
+
 const SHAPE = [
   {
     what: 'the mat over a column is read off the fetch that carried the height',
-    re: /float\s+matRung\s*=\s*bladeSubOf\(hit\.tex\)\s*\*\s*uBladeUnit\s*\/\s*uCell\s*;/,
+    lhs: 'matRung',
+    needs: ['bladeSubOf', 'hit.tex', 'uBladeUnit', 'uCell'],
   },
   {
     what: 'and the ground standing in the mat is in the mat, not out in the open',
-    re: /bool\s+inMat\s*=\s*hit\.blade\s*\|\|\s*matRung\s*>\s*0\.5\s*;/,
+    lhs: 'inMat',
+    needs: ['hit.blade', 'matRung'],
   },
   {
     what: 'the mat shades only as deep as the mat is tall (a cut bank is not a well)',
-    re: /float\s+rung\s*=\s*min\(\s*floor\(max\(0\.0,\s*canopy\s*-\s*hit\.p\.y\)\s*\/\s*uCell\)\s*,\s*floor\(matRung\)\s*\)\s*;/,
+    lhs: 'rung',
+    needs: ['min', 'canopy', 'uCell', 'matRung'],
   },
   {
     what: 'a blade keeps its foot’s fall and the ground takes the well’s own pair',
-    re: /vec2\s+base\s*=\s*!inMat\s*\?\s*vec2\(0\.0,\s*1\.0\)\s*:\s*\(hit\.blade\s*\?\s*uBase\s*:\s*uWell\)\s*;/,
+    lhs: 'base',
+    needs: ['inMat', 'hit.blade', 'uBase', 'uWell'],
   },
   {
     what: 'and the bounce falls down the same ladder (R1 S2)',
-    re: /float\s+bounce\s*=\s*hit\.blade\s*\?\s*uBounce\s*\*\s*sky\s*:\s*0\.0\s*;/,
+    lhs: 'bounce',
+    needs: ['hit.blade', 'uBounce', 'sky'],
   },
   {
     what: 'where the mat thins the ground is soil, at the floor of the tint band',
-    re: /thinMat\s*=\s*family\s*==\s*0\s*&&\s*matRung\s*<\s*0\.5\s*;/,
+    lhs: 'thinMat',
+    needs: ['family', 'matRung'],
   },
   {
     what: 'and that soil is drawn with its own family and not the verge’s earth',
-    re: /vec3\s+albedo\s*=\s*\(thinMat\s*\?\s*uAlbedoSoil\s*:\s*earth\s*\?\s*uAlbedoEarth\s*:\s*uAlbedo\)/,
+    lhs: 'albedo',
+    needs: ['thinMat', 'uAlbedoSoil', 'uAlbedoEarth', 'uAlbedo'],
   },
 ];
 
@@ -194,7 +286,11 @@ function main() {
 
   r.line('');
   r.line('  THE SHAPE OF THE WELL, read off the fragment:');
-  for (const { what, re } of SHAPE) r.check(re.test(campo), what);
+  const shade = functionBody(campo, 'shade');
+  for (const leg of SHAPE) {
+    r.check(decidedBy(shade, leg), leg.what,
+      `${leg.lhs} is decided by ${leg.needs.join(', ')}`);
+  }
 
   r.line('');
   r.line('  THE TWO PAIRS, and the point is that they are two:');
@@ -261,35 +357,92 @@ function TINT_FLOOR_OF(pigment) {
 
 // --------------------------------------------------------------- self-test
 //
-// Every assertion above, against the defect it exists to catch. The shape ones
-// are injected by putting the OLD line back -- which is the defect, exactly as
-// it shipped before this unit -- and the numeric ones by moving the literal.
+// Every assertion above, against the defect it exists to catch.
+//
+// AND EVERY SHAPE CASE THREE WAYS, WHICH IS THE PART THAT CHANGED. What stood
+// here injected each defect by `String.replace` of the very expression the
+// reader was also matching, and then asked only whether SOME sentence had
+// broken -- so a case proved that a replacement had happened, never that the
+// reader could tell one sentence from another. Now each one names the sentence
+// it bends, asserts that THAT sentence is the one that goes red, and is
+// followed by the case that matters most: THE SAME SENTENCE REWRITTEN -- terms
+// swapped, parentheses added, a temporary introduced, the line broken -- which
+// must stay green. That third case is the one this guard would have failed with
+// the fragment perfectly correct, and it is the reason a session tidying a
+// shader used to have to come and edit a guard.
 function self() {
   const campo = read(CAMPO);
   const pigment = read(PIGMENT);
   const cases = [];
-  const brokeAll = (text) => SHAPE.filter(({ re }) => !re.test(text)).length;
+  const leg = (lhs) => SHAPE.find((x) => x.lhs === lhs);
+  // One sentence of the fragment on its own: what the reader is handed, so a
+  // case says which sentence it is about instead of «one of the seven».
+  const only = (text) => (spec) => decidedBy(text, spec);
 
-  // the gate goes back to hit.blade alone: the ground leaves the mat
   cases.push({
     what: 'the ladder gated on hit.blade alone (the shipped defect, put back)',
-    caught: brokeAll(campo.replace(/bool\s+inMat\s*=\s*hit\.blade\s*\|\|\s*matRung\s*>\s*0\.5\s*;/,
-      'bool inMat = hit.blade;')) > 0,
+    caught: !only('bool inMat = hit.blade;')(leg('inMat')),
+  });
+  cases.push({
+    what: 'and the SAME sentence with the two terms swapped and parenthesised is not a defect',
+    caught: only('bool inMat = (matRung > 0.5) || hit.blade;')(leg('inMat'))
+      && only('bool inMat =\n    hit.blade\n    || matRung > 0.5;')(leg('inMat')),
   });
   cases.push({
     what: 'the cap on the mat’s reach removed, so a cut bank goes black',
-    caught: brokeAll(campo.replace(/float\s+rung\s*=\s*min\([\s\S]*?\)\s*;/,
-      'float rung = floor(max(0.0, canopy - hit.p.y) / uCell);')) > 0,
+    caught: !only('float rung = floor(max(0.0, canopy - hit.p.y) / uCell);')(leg('rung')),
+  });
+  cases.push({
+    what: 'and the same cap written with the two arguments the other way round',
+    caught: only('float rung = min(floor(matRung), floor(max(0.0, canopy - hit.p.y) / uCell));')(leg('rung')),
   });
   cases.push({
     what: 'the bounce no longer falling down the ladder',
-    caught: brokeAll(campo.replace(/float\s+bounce\s*=\s*hit\.blade\s*\?\s*uBounce\s*\*\s*sky\s*:\s*0\.0\s*;/,
-      'float bounce = hit.blade ? uBounce : 0.0;')) > 0,
+    caught: !only('float bounce = hit.blade ? uBounce : 0.0;')(leg('bounce')),
+  });
+  cases.push({
+    what: 'and the same bounce with the product written the other way about',
+    caught: only('float bounce = hit.blade ? sky * uBounce : 0.0;')(leg('bounce')),
   });
   cases.push({
     what: 'the thinning mat drawing the meadow’s own albedo again',
-    caught: brokeAll(campo.replace(/vec3\s+albedo\s*=\s*\(thinMat\s*\?\s*uAlbedoSoil\s*:\s*earth\s*\?\s*uAlbedoEarth\s*:\s*uAlbedo\)/,
-      'vec3 albedo = (earth ? uAlbedoEarth : uAlbedo)')) > 0,
+    caught: !only('vec3 albedo = (earth ? uAlbedoEarth : uAlbedo) * tint;')(leg('albedo')),
+  });
+  cases.push({
+    what: 'and the same choice unfolded over three lines, which is how one is made readable',
+    caught: only('vec3 albedo = (thinMat\n      ? uAlbedoSoil\n      : (earth ? uAlbedoEarth : uAlbedo)) * tint;')(leg('albedo')),
+  });
+  cases.push({
+    what: 'the ground taken out of the well: base decided by the blade alone',
+    caught: !only('vec2 base = !hit.blade ? vec2(0.0, 1.0) : uBase;')(leg('base')),
+  });
+  cases.push({
+    what: 'the mat read off a fetch of its own instead of the one that carried the height',
+    caught: !only('float matRung = bladeSubOf(uv) * uBladeUnit / uCell;')(leg('matRung')),
+  });
+  cases.push({
+    what: 'the thinning decided without the mat, which makes every open cell soil',
+    caught: !only('thinMat = family == 0;')(leg('thinMat')),
+  });
+  cases.push({
+    what: 'a sentence written TWICE, which is two answers to one question',
+    caught: !decidedBy(`${functionBody(campo, 'shade')}
+bool inMat = hit.blade || uCell > 0.0;`,
+      leg('inMat')),
+  });
+  cases.push({
+    what: 'and the seven sentences the fragment ships are none of those',
+    caught: SHAPE.every((spec) => decidedBy(functionBody(campo, 'shade'), spec)),
+  });
+  cases.push({
+    what: 'and a seat set aside beforehand is not a second answer: bool thinMat = false',
+    caught: decidedBy('bool thinMat = false; thinMat = family == 0 && matRung < 0.5;',
+      leg('thinMat')),
+  });
+  cases.push({
+    what: 'and the same name written in another function is not this function’s answer',
+    caught: decidedBy(functionBody(campo, 'shade'), leg('base'))
+      && !decidedBy(functionBody(campo, 'main'), leg('base')),
   });
   cases.push({
     what: 'the two pairs folded into one number',
