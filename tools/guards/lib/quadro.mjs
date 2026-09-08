@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -111,11 +111,17 @@ const GUARD_CACHE = join(tmpdir(), 'farfield-quadro',
 function ownCacheConfig() {
   mkdirSync(GUARD_CACHE, { recursive: true });
   const path = join(GUARD_CACHE, 'vite.guard.config.mjs');
-  writeFileSync(path,
-    '// Written by tools/guards/lib/quadro.mjs. The delivery\'s own configuration,\n'
+  const want = '// Written by tools/guards/lib/quadro.mjs. The delivery\'s own configuration,\n'
     + '// with a dependency cache that is not the one seven other worktrees share.\n'
     + `import delivered from ${JSON.stringify(pathToFileURL(join(REPO_ROOT, 'vite.config.js')).href)};\n`
-    + `export default { ...delivered, cacheDir: ${JSON.stringify(join(GUARD_CACHE, '.vite'))} };\n`);
+    + `export default { ...delivered, cacheDir: ${JSON.stringify(join(GUARD_CACHE, '.vite'))} };\n`;
+  // ONLY IF IT DIFFERS. A development server WATCHES its own configuration file
+  // and restarts when it moves, taking the page with it; rewriting identical
+  // bytes still moves the clock on the file, so a guard that raised a second
+  // server would have been asking for a reload it did not need.
+  let have = null;
+  try { have = readFileSync(path, 'utf8'); } catch { have = null; }
+  if (have !== want) writeFileSync(path, want);
   return path;
 }
 
