@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -120,6 +120,47 @@ function ownCacheConfig() {
 }
 
 /**
+ * The server does not hand a world over while it is still rebuilding its cache.
+ *
+ * AND THIS IS A DEFECT THAT WAS ALREADY THERE, made visible by giving the guard
+ * a cache of its own. When the pre-bundled dependencies are rebuilt, the
+ * development server tells the page to RELOAD -- and a reload takes with it
+ * everything a guard installed on `window`: guard-zone's own blinding handle
+ * (`window.__zone`) went with it and the guard died on the next call with
+ * «cannot read properties of undefined», measured on a cold cache and never on
+ * a warm one. Sharing seven other worktrees' cache had been hiding it by
+ * accident, because somebody else had usually warmed it first.
+ *
+ * So the server waits for the cache to be WRITTEN AND TO STOP MOVING before it
+ * says it is up. On a warm cache that is three quarters of a second; on a cold
+ * one it is however long the optimiser needs, which is time the guard would have
+ * paid anyway -- paid before the page exists instead of underneath it.
+ */
+async function cacheSettled(ms = 90000) {
+  const meta = join(GUARD_CACHE, '.vite', 'deps', '_metadata.json');
+  const deadline = Date.now() + ms;
+  let last = null;
+  let still = 0;
+  while (Date.now() < deadline) {
+    let stamp = null;
+    try {
+      const { mtimeMs, size } = statSync(meta);
+      stamp = `${mtimeMs}:${size}`;
+    } catch { stamp = null; }
+    if (stamp !== null && stamp === last) {
+      still += 1;
+      if (still >= 3) return true;
+    } else {
+      still = 0;
+      last = stamp;
+    }
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((settle) => { setTimeout(settle, 250); });
+  }
+  return false;
+}
+
+/**
  * The development server, either one that is already up or one of our own.
  *
  * ITS OWN PORT BY DEFAULT, AND THE REASON IS THE CAMPAIGN'S SHAPE. Eight
@@ -160,7 +201,11 @@ export async function serveRepo(port = null) {
   while (Date.now() < deadline) {
     if (child.exitCode !== null) throw new Error(`vite exited: ${log.slice(-400)}`);
     // eslint-disable-next-line no-await-in-loop
-    if (await answers(chosen)) return { port: chosen, borrowed: false, pid: child.pid, stop };
+    if (await answers(chosen)) {
+      // eslint-disable-next-line no-await-in-loop
+      await cacheSettled();
+      return { port: chosen, borrowed: false, pid: child.pid, stop };
+    }
     // eslint-disable-next-line no-await-in-loop
     await new Promise((settle) => { setTimeout(settle, 250); });
   }
