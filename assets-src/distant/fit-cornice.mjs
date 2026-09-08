@@ -71,6 +71,8 @@
 
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+
+import { bearingOfFrameRead } from '../../src/world/compass.js';
 import {
   CENTRE, DEG, cubeAt, hillAt, ladders, planeAt, ridgeCeiling, skylineAt, tracedAt,
   waterLine,
@@ -220,10 +222,17 @@ export const FRAME = { yaw: 1.818, halfAngle: 35.81 };
  *
  * SO THE HILLS U-CORNICE-1 FITTED FACE THREE AND A HALF DEGREES OFF, and every
  * per-direction reading of this unit and that one was registered through the
- * wrong sign. It is one conversion and it lives here, at the one boundary
- * between what was read off a picture and what the law is asked about.
+ * wrong sign.
+ *
+ * AND THE ARITHMETIC IS NO LONGER THIS FILE'S. U-CORNICE-2 put the conversion
+ * here, at the one boundary this unit crossed; the sign is the WORLD's, so
+ * D-C2-2 = B moved it to src/world/compass.js and published it through
+ * src/world/contracts.js, where the convention is written out. What is left
+ * here is the BINDING: the world's function, tied to the yaw of THE pose this
+ * reference was traced at. A reading is meaningless without the pose it was
+ * read at, and that pairing is what this line is.
  */
-export const onCompass = (read) => read - 2 * FRAME.yaw;
+export const onCompass = (read) => bearingOfFrameRead(read, FRAME.yaw);
 
 /** Whether a bearing READ OFF THE FRAME is inside the picture. */
 export function inFrame(bearingDeg) {

@@ -92,6 +92,7 @@
 // world -- two centres would put the water's edge at one radius and the hills'
 // feet at another, and the difference between them is a ring of ground standing
 // over its own lake.
+import { bearingRadOf } from '../../src/world/compass.js';
 import { CENTRE, basinProfile, waterLevel } from '../../src/world/voxel/pure.js';
 
 export const DEG = Math.PI / 180;
@@ -540,7 +541,7 @@ export function hillAt(spec, x, z, out) {
   // 38 ns against 13, measured, on a cut that asks for this seven hundred
   // thousand times.
   const r = Math.sqrt(dx * dx + dz * dz);
-  const bearing = Math.atan2(dx, -dz);
+  const bearing = bearingRadOf(dx, dz);
   const bearingDeg = bearing / DEG;
   let rise = 0;
   let local = 0;
