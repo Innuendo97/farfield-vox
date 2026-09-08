@@ -176,8 +176,9 @@ export function setSkyPreset(preset) {
   // AND THE ONE COLOUR OUTSIDE THIS BLOCK THAT IS STILL THE PRESET'S. Written
   // here because this is the door, and derived rather than written down because
   // a distance that kept its own blue would go on being noon after the preset
-  // had moved. See AIR_NEAR below for what it is and why it is read at twenty
-  // degrees.
+  // had moved. tools/guards/guard-aria.mjs holds that derivation by injection —
+  // a hand-written triple here is caught. See AIR_NEAR below for what it is,
+  // why it is read where it is, and what was measured against reading it lower.
   AIR_NEAR.set(...rampTint(ramp, Math.sin(AIR_NEAR_ELEVATION * DEG), rampBend(ramp))
     .map((v, c) => v * preset.exposure[c]));
   return SKY_UNIFORMS;
@@ -195,15 +196,62 @@ const DEG = Math.PI / 180;
 // of the low sky, which is blue, and it ends as a pale veil. src/world/air.js
 // carries the far end and the turn; this is the near end.
 //
-// TWENTY DEGREES IS NOT A ROUND NUMBER. It is where R4 §1.8 read the reference's
-// own sky against ours band by band, and it is high enough to be clear of the
-// horizon glow and low enough to be the sky a hill at four hundred metres is
-// seen against.
+// TWENTY DEGREES USED TO BE JUSTIFIED BY TWO THINGS AND NEITHER IS STANDING.
+// It was where R4 §1.8 read the reference's own sky against ours band by band,
+// and R4 §1.8 fell with E-LUCE4 — every one of its readings came through the
+// arrival veil still in the page at an imposed pose. And it was said to be "low
+// enough to be the sky a hill at four hundred metres is seen against", which
+// the trigonometry of this world contradicts: from the fitted eye at 1.583 m
+// the near flank at 227 m and 21 m up is seen at 4.89 degrees, the middle crest
+// at 400 m and 10 m up at 1.21, the far veil at 1550 m at 1.60. The hills are
+// seen against two to five degrees of sky, not twenty.
+//
+// SO IT WAS MEASURED, AND THE NUMBER DID NOT MOVE. What follows is what reading
+// the ramp at the hills' own elevation costs, developed through the delivered
+// chain, with the pigment held at the palette U-CORNICE-2 solved:
+//
+//   * AT FIVE DEGREES THE MIDDLE CREST IS LOST. With the hill's pigment at zero
+//     the air alone puts 84 / 147 / 199 there against a reference that reads
+//     83 / 139 / 180: OVER on green and blue. An additive term cannot be
+//     subtracted, so a plane whose floor stands over its target is a plane no
+//     palette reaches. It is the same failure the relative beta triple was
+//     rejected for in U-LUCE-6, one term further in.
+//   * AND THE NEAR FLANK, WHICH THE MOVE EXISTS TO CLEAR, TAKES MORE AIR AND
+//     NOT LESS: the blue of its floor goes from 148 to 163 where the reference
+//     in the same mask reads 103.
+//   * THE ERROR IS MONOTONE IN THE ELEVATION AND ITS MINIMUM IS THE ZENITH.
+//     Over the near flank, the middle crest and the far veil it runs 28.2
+//     levels at the horizon, 21.1 here, 17.7 at eighty-four degrees, where the
+//     ramp has stopped changing. A fit whose optimum sits on the far edge of
+//     its parameter is not identifying that parameter: the reference is not
+//     naming an elevation, it is asking for a DARKER near end, and the darkest
+//     the ramp has is its zenith.
+//
+// WHY THE GEOMETRY DOES NOT DECIDE IT, since it is the argument that will be
+// made again. This colour is never seen on its own: the fraction it multiplies
+// is nought at nought distance, so it is the zero-distance intercept of a
+// colour that is already 0.277 of the way to the pale veil by the time the near
+// flank is reached. And the paleness of a low sky is the AEROSOL, which this
+// model carries in the other two colours — FOG_RADIANCE and AIR_PALE. Reading
+// the ramp down where the aerosol lives puts it in a second time, and the near
+// flank pays for it twice.
+//
+// WHAT THE NEAR FLANK'S FLOOR IS ACTUALLY MADE OF, in levels of blue, since
+// this is the plane the campaign keeps coming back to. It stands 45 over the
+// reference. Eighteen of those are this colour's, all the way down to a near
+// end of NOUGHT — which no elevation of the ramp reaches. Eight are the low
+// haze's ceiling, which is E-LUCE2's. The remaining nineteen are the PALE END's,
+// carried inside 227 m by the 700 m turn in src/world/air.js. And the colour the
+// flank asks for is not on this ramp at any elevation: the reference wants it
+// nearly neutral, chroma 12 in U-CORNICE-2's mask and 17 in R6's own window,
+// and the lowest chroma the whole ramp can deliver there is 19, at a hue 51
+// degrees away.
 //
 // AND IT IS DERIVED AND NOT WRITTEN DOWN, which is the whole point of putting it
 // here: the day and the night hand this door two different ramps, and the air
 // each of them fades into is each ramp's own. A constant here would be a
-// distance that stayed at noon.
+// distance that stayed at noon. guard-aria injects a second preset and checks
+// that this colour follows it.
 export const AIR_NEAR_ELEVATION = 20;
 export const AIR_NEAR = new Vector3();
 
