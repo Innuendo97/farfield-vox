@@ -1,6 +1,9 @@
 import { POSE_TARGET } from '../../src/core/poses.js';
 import { reporter, selfTest } from './lib.mjs';
 import {
+  chunkUniforms, duplicateUniforms, refsIn, sourcesOfWorld, templates,
+} from './lib/glsl-doppie.mjs';
+import {
   POSE_P, bandDiff, bandLuma, openWorld, plate, serveRepo, toolsPresent,
 } from './lib/quadro.mjs';
 
@@ -27,6 +30,21 @@ import {
 //
 // ===========================================================================
 // WHAT IT ASKS, AND WHY EACH LEG IS THERE.
+//
+//   0. AND THE HALF OF IT THAT IS FREE (D-C2-3). The defect above is a NAME
+//      DECLARED TWICE IN ONE PROGRAM, and that much is visible in the sources
+//      that MAKE the program -- no browser, no GPU, a tenth of a second. So it
+//      is asked FIRST, before the world is even opened; it is asked under
+//      --fast; and it is asked on a machine with no playwright on it, where
+//      everything below this line SKIPs. The arithmetic is in
+//      lib/glsl-doppie.mjs, and run over src/world/distant.js as it stood at
+//      0a39c3f^ it names both broken programs, both uniforms and both chunks
+//      that collided.
+//      It does NOT replace the compiler: a driver catches redefinitions this
+//      cannot see -- a name built by string arithmetic, a chunk reached through
+//      a function this does not follow. And the compiler does not replace it
+//      either, because this one answers before the browser is up, on a laptop
+//      with no GPU, in the second after the merge instead of the minute.
 //
 //   1. EVERY PROGRAM THE PAGE LINKS, LINKED. The recorder in lib/quadro.mjs is
 //      installed before three.js has a context, so no program can be built
@@ -60,10 +78,11 @@ import {
 // inside the minute `npm run guard:all` is allowed, so the smoke is ON by
 // default -- a smoke that has to be asked for is a smoke nobody runs.
 //
-//   --fast   drops the plates and keeps the compiler. The census is the leg
-//            that cannot be got any other way; the picture can also be read off
-//            a bench plate by a human. If a machine is ever too slow for the
-//            whole thing, this is the half to keep.
+//   --fast   drops the plates and keeps leg 0 and the compiler. The census is
+//            the leg that cannot be got any other way; the picture can also be
+//            read off a bench plate by a human. If a machine is ever too slow
+//            for the whole thing, this is the half to keep. Leg 0 is not part
+//            of the trade: it costs a tenth of a second and always runs.
 //   --port=N reuse a development server that is already up on N instead of
 //            starting one. Nothing else in this guard has a port in it.
 
@@ -270,8 +289,20 @@ const started = Date.now();
 const { chromium, sharp, missing } = toolsPresent();
 const SELF = flags.includes('--self');
 
+// THE STATIC LEG IS ASKED BEFORE ANYTHING ELSE AND OUTSIDE EVERY CONDITION.
+// It needs no browser, no server and no GPU, so a machine that cannot run the
+// census still gets it -- and a run that is going to SKIP still reports it.
+const doubles = SELF ? [] : duplicateUniforms(sourcesOfWorld());
+
 if (missing.length && !SELF) {
   const report = reporter('guard-programmi -- every program compiles, links and draws');
+  report.check(doubles.length === 0,
+    '0. nessuna uniform dichiarata due volte fra i sorgenti concatenati',
+    doubles.length ? `${doubles.length} programmi` : 'letto senza driver, su tutti i sorgenti di src/');
+  for (const bad of doubles) {
+    report.line(`        ${bad.file}:${bad.line} [${bad.program}] ${bad.clashes.join(', ')}`);
+  }
+  if (doubles.length) report.end();
   report.skip(`no ${missing.join(' and ')} on this machine: the census needs a browser and the smoke needs a decoder`);
 }
 if (missing.length && SELF) {
@@ -324,6 +355,72 @@ if (SELF) {
   // is the instrument and not a story about it. The second switches the hills
   // and the lake off and puts the frame back through the smoke.
   const cases = [];
+
+  // ---- LEG 0's own injections, into the REAL sources and not an imitation.
+  //
+  // The defect is put where it actually shipped: inside a template literal that
+  // already splices a chunk, declaring by hand a name that chunk declares. The
+  // literal and the name are FOUND rather than written down, so no rewrite of
+  // any shader in this tree can turn these into no-ops -- which is how a self
+  // test quietly stops testing anything.
+  const clean = sourcesOfWorld();
+  cases.push({
+    what: 'i sorgenti come stanno non dichiarano nessuna uniform due volte',
+    caught: duplicateUniforms(clean).length === 0,
+  });
+
+  const spot = (() => {
+    for (const [file, text] of clean) {
+      for (const t of templates(text)) {
+        for (const ref of refsIn(t.body)) {
+          const declares = chunkUniforms(clean, ref);
+          if (declares.length) return { file, text, at: t.at, ref, name: declares[0] };
+        }
+      }
+    }
+    return null;
+  })();
+
+  cases.push({
+    what: spot
+      ? `una uniform del pezzo ${spot.ref} ridichiarata a mano nel programma che lo innesta `
+        + `(${spot.file.split('/').pop()}, ${spot.name})`
+      : 'nessun programma di questo albero innesta un pezzo con uniform: niente da iniettare',
+    caught: Boolean(spot) && (() => {
+      const dirty = new Map(clean);
+      dirty.set(spot.file, `${spot.text.slice(0, spot.at + 1)}\n  uniform float ${spot.name};\n`
+        + `${spot.text.slice(spot.at + 1)}`);
+      // Not «exactly one finding»: the literal the defect is put in may itself
+      // be a chunk that several programs splice, and then every one of them is
+      // broken. What is asserted is that this file and this name come back.
+      return duplicateUniforms(dirty).some((f) => f.file === spot.file
+        && f.clashes.some((c) => c.startsWith(`${spot.name} `)));
+    })(),
+  });
+
+  cases.push({
+    what: 'lo stesso pezzo innestato due volte nello stesso programma',
+    caught: Boolean(spot) && (() => {
+      const dirty = new Map(clean);
+      dirty.set(spot.file, `${spot.text.slice(0, spot.at + 1)}\n  \${${spot.ref}}\n`
+        + `${spot.text.slice(spot.at + 1)}`);
+      return duplicateUniforms(dirty).some((f) => f.file === spot.file);
+    })(),
+  });
+
+  cases.push({
+    what: 'e due PROGRAMMI DIVERSI che dichiarano lo stesso nome non sono un difetto',
+    caught: Boolean(spot) && (() => {
+      const dirty = new Map(clean);
+      dirty.set('src/__banco-due-programmi.js', `const A = /* glsl */\`\n  uniform float ${spot.name};\n`
+        + `  \${${spot.ref}}\n\`;\nconst B = /* glsl */\`\n  uniform float ${spot.name};\n\`;\n`);
+      // the first literal DOES clash (it splices the chunk); the second does
+      // not, because nothing is spliced into it. One finding, not two.
+      const found = duplicateUniforms(dirty).filter((f) => f.file === 'src/__banco-due-programmi.js');
+      return found.length === 1 && found[0].program === 'A';
+    })(),
+  });
+
   const taken = await measure({ smoke: !FAST });
 
   cases.push({
@@ -379,6 +476,16 @@ if (SELF) {
 }
 
 const report = reporter('guard-programmi -- every program compiles, links and draws');
+
+// LEG 0 -- the free half, read off the sources with no driver in it. It is
+// printed BEFORE the world is opened, so a tip whose world will not even load
+// still hands back the one answer that cost nothing.
+report.check(doubles.length === 0,
+  '0. nessuna uniform dichiarata due volte fra i sorgenti concatenati',
+  doubles.length ? `${doubles.length} programmi` : 'su tutti i sorgenti di src/, senza driver');
+for (const bad of doubles) {
+  report.line(`        ${bad.file}:${bad.line} [${bad.program}] ${bad.clashes.join(', ')}`);
+}
 
 let taken;
 try {
