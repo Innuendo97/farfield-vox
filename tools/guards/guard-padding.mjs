@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import { ClampToEdgeWrapping, DataTexture, RepeatWrapping } from 'three';
+import { stoneTile } from '../../src/world/voxel/masonry.js';
 import { stoneTileData } from '../../src/world/voxel/pure.js';
 import { read, reporter, selfTest, walk } from './lib.mjs';
 
@@ -55,14 +57,57 @@ const MATERIAL = 'src/world/voxel/masonry.js';
 // the field's own interior stays true if the generator is ever retuned.
 const SEAM_RATIO = 1.5;
 
-/** The convention, as the material states it. */
-export function convention(text) {
+// ==========================================================================
+// THE CONVENTION IS ASKED OF THE TEXTURE AND NO LONGER OF THE TEXT.
+//
+// WHAT WAS WRONG. This file's whole argument is that the convention belongs to
+// the material and is never restated here -- and then it read the material with
+// three regular expressions over its SOURCE:
+//
+//     /wrapS = RepeatWrapping/          /generateMipmaps = true/
+//     /stoneTile\(data, side = (\d+)\)/
+//
+// The last one pins a whole function signature, default parameter and all:
+// rename `data`, add an argument, write `side=512` without the spaces, and the
+// side comes back NaN and every leg below it goes quiet. The first two are the
+// same defect one size smaller -- `texture.wrapS=RepeatWrapping`, or the pair
+// set through an assignment of both at once, and the guard says the stone has
+// stopped wrapping when nothing at all has changed. U-GUARDIA-3 censused this
+// file for exactly that (residuo 3), and it is the shape E-IGIENE names: a
+// guard that goes red at a correct rewrite is a guard somebody switches off.
+//
+// THE CURE IS THAT THERE IS A VALUE TO ASK. `stoneTile()` is exported from the
+// material, it needs no browser and no context, and the texture it hands back
+// carries the whole convention as data: `wrapS`, `wrapT`, `generateMipmaps` and
+// the side of its own image. So the material is now IMPORTED and CALLED, and
+// there is no text left in this reader to go stale. However the material chooses
+// to spell the three assignments, the answer is the same, because the answer is
+// the object it builds.
+// ==========================================================================
+
+/**
+ * The convention, as the material's own texture carries it.
+ *
+ * @param {DataTexture} tile what src/world/voxel/masonry.js stoneTile() returns
+ */
+export function convention(tile) {
   return {
-    wrapping: /wrapS = RepeatWrapping/.test(text) && /wrapT = RepeatWrapping/.test(text),
-    mipmapped: /generateMipmaps = true/.test(text),
-    side: Number((/stoneTile\(data, side = (\d+)\)/.exec(text) || [])[1]),
+    wrapping: tile.wrapS === RepeatWrapping && tile.wrapT === RepeatWrapping,
+    mipmapped: tile.generateMipmaps === true,
+    side: tile.image.width,
+    square: tile.image.width === tile.image.height,
   };
 }
+
+/**
+ * The texture the material makes when nobody tells it how big to make one.
+ *
+ * The side is a DEFAULT, and a default is only observable by not supplying one.
+ * The array handed in is empty on purpose: nothing here is ever uploaded to a
+ * card, and what is being asked of the object is its declared shape and its
+ * sampler, neither of which is read off the pixels.
+ */
+export const materialTile = () => stoneTile(new Uint8Array(0));
 
 /** How far a field jumps at its own seam, against how far it jumps inside. */
 export function seams(data, side, channels = 2) {
@@ -145,12 +190,39 @@ if (process.argv.includes('--self')) {
       broken[o + 1] = broken[o];
     }
   }
-  const stated = convention(read(MATERIAL));
+  const stated = convention(materialTile());
   const clamped = { ...stated, wrapping: false };
+
+  // A texture built the OTHER WAY ROUND: the same three facts, assigned in
+  // another order and through another route, with the side handed in instead of
+  // left at rest. This is the case that says the pin is gone -- a reader over
+  // the source could not tell this apart from the material having changed, and
+  // this one cannot tell it apart from the material at all.
+  const rewritten = Object.assign(
+    new DataTexture(new Uint8Array(0), stated.side, stated.side),
+    { wrapT: RepeatWrapping, generateMipmaps: true, wrapS: RepeatWrapping },
+  );
+  // And the two ways it can really go wrong, as objects and not as prose.
+  const stoppedWrapping = Object.assign(materialTile(), { wrapS: ClampToEdgeWrapping });
+  const lostItsMips = Object.assign(materialTile(), { generateMipmaps: false });
+
   selfTest('guard-padding', [
     {
       what: 'the convention comes out of the material and not out of this file',
-      caught: stated.side === 512 && stated.wrapping && stated.mipmapped,
+      caught: stated.wrapping && stated.mipmapped && stated.square
+        && Number.isInteger(stated.side) && stated.side > 0,
+    },
+    {
+      what: 'and out of the TEXTURE it builds, so the same three facts written another way read the same',
+      caught: JSON.stringify(convention(rewritten)) === JSON.stringify(stated),
+    },
+    {
+      what: 'a material that has stopped wrapping on one axis is caught',
+      caught: !convention(stoppedWrapping).wrapping,
+    },
+    {
+      what: 'and one that has dropped the mip chain the sheet leg sizes its gutter from',
+      caught: !convention(lostItsMips).mipmapped,
     },
     { what: 'the tile as generated wraps on both axes', caught: seams(good, side).every(wraps) },
     { what: 'a tile that has stopped wrapping is caught', caught: !seams(broken, side).every(wraps) },
@@ -185,11 +257,11 @@ if (process.argv.includes('--self')) {
 
 const report = reporter('guard-padding -- the stone tiles, against the convention the material states');
 
-const stated = convention(read(MATERIAL));
+const stated = convention(materialTile());
 report.line(`  ${MATERIAL} samples the stone: ${stated.wrapping ? 'RepeatWrapping' : 'clamped'}`
   + `, ${stated.mipmapped ? 'full mip chain' : 'no mipmaps'}, ${stated.side} square`);
-report.check(Number.isInteger(stated.side) && stated.side > 0,
-  'the material states the side of a tile', `${stated.side}`);
+report.check(Number.isInteger(stated.side) && stated.side > 0 && stated.square,
+  'the material states the side of a tile', `${stated.side} square`);
 
 const sheet = findSheet();
 
