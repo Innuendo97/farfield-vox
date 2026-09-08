@@ -1785,6 +1785,43 @@ const GLOW_NIGHT = 3.0;
 const HALO_DAY = { bianco: 0.22, ciano: 0.10 };
 
 /**
+ * HOW MUCH OF THE HALO A QUAD STILL CARRIES FAR AWAY, AND OVER HOW FAR IT GOES.
+ *
+ * D-F8-1 = B. At thirteen metres a head is four pixels across, and at four pixels
+ * a halo is not read as a halo: it is read as LEVEL. What a finder with a local
+ * threshold then measures is the head plus its skirt -- measured on the delivered
+ * frame, the blob went 5 to 6 px wide and 23 to 28 px in area where the target's
+ * reads 4 to 5 and 7 to 9. So past the exchange ring the halo THINS, and these
+ * two numbers say by how much and over how far.
+ *
+ * FITTED, AND THE WHOLE CURVE IS IN THE VERBALE. Eighteen configurations at the
+ * judging pose, three spans by six floors, each read on the two clean-meadow
+ * windows of R1 1.1 against the SOLIDS drawn over the same band (the honest
+ * denominator: a quad stands in for a solid, so what it must not lose is what the
+ * solid shows). At this floor the blob lands on the target's own widths -- 5 px
+ * in the left window and 4 in the right, against the target's 5 and 4 -- and
+ * ninety-four and a hundred per cent of the solid's heads survive. The knee is
+ * just below: at 0.30 the left window keeps 89 %, at 0.25 it keeps 77, and at
+ * nought -- no halo at all -- 13 of 29 heads vanish in the right window. There
+ * is a compromise and this is where it sits.
+ *
+ * AND IT IS A SMOOTHSTEP THAT STARTS AT THE RING, which is not a detail: at the
+ * ring the factor is exactly one, so a head crossing inward meets a solid at
+ * exactly the warmth it had, and smoothstep leaves with zero slope, so the first
+ * metres past it hardly move either. The exchange E-CAMPO2 measured to the
+ * hundredth of a per cent is closed by construction and not by a fit.
+ *
+ * WHAT THIS IS NOT. It is not a claim that the quad is wrong far away: drawn as
+ * SOLIDS over the same thirteen-metre band the meadow reads 6 and 5 px wide and
+ * 22 and 19 px of area -- which is what the quad read before this -- so the gap
+ * to the target at that range is the FLOWER'S and not the stand-in's. This law
+ * buys the target's number at the range the campaign is judged at, and it buys it
+ * on the far family alone. The verbale says so in the same words.
+ */
+const FAR_HALO_FLOOR = 0.35;
+const FAR_HALO_SPAN = 8.0;
+
+/**
  * THE FLOWERS THAT ARE OPEN, AND THE HALF OF E-DECISIONI9.1 THAT WAS OWED.
  *
  * <<Il bocciolo e' un cubo che varia di scala (i fiorellini piccoli) ma puo'
@@ -1872,7 +1909,39 @@ const PISTIL_OF_PALE = 0.679;
  * two things measured.
  */
 const CYAN_HUE = new Vector3(0.34, 0.73, 1.00);
-const CYAN_OF_PALE = 2.21 / 3.61;
+/**
+ * AND ITS LEVEL IS FITTED ON THE FRAME NOW, WHICH IS THE CORRECTION.
+ *
+ * What stood here was 2.21 / 3.61 = 0.612, a ratio of two luminances read off the
+ * target's own pixels. It is a true reading of that picture and it does not
+ * survive this chain: measured on the delivered frame at the fitted pose, first
+ * person and veil off, on the side wall of a shut blue head where no lamp shows
+ * through, that pigment lands the side at L* 45.1 at one metre and 44.1 at four,
+ * against the L* 32.0 the target's own side reads. Ten to thirteen levels too
+ * bright, which is the first residual of U-FIORI-8 and the coordinator's own
+ * order to close.
+ *
+ * FITTED AT TWO DISTANCES, BECAUSE ONE WOULD NOT PROVE IT. The sweep was read at
+ * one metre (fifty rows of head, where a side is a band) and at four (fourteen
+ * rows, where the lantern begins to spread over it), at the same viewing angle,
+ * and it is LINEAR in the level: 0.45 of today's number gives L* 30.2 / 29.7 and
+ * 0.55 gives 33.9 / 33.2. At 0.310 the side reads L* 32.2 at one metre and 31.7
+ * at four, both inside the +/- 3 asked for.
+ *
+ * AND THE CROMA DOES NOT COME WITH IT, WHICH IS SAID HERE AND MEASURED. The
+ * target's side reads a croma of 26.9; ours reads 5.4 and it does NOT move over
+ * the whole sweep -- 5.4 at the old level, 5.3 at the new, 5.1 at 0.45. The level
+ * is not the croma's lever, and this is the measurement that overturns the note
+ * U-FIORI-8 left here ("a brighter colour is a less saturated one"): through this
+ * chain, darkening a cyan by thirteen levels moves its croma by three tenths.
+ * Where the croma goes is in the verbale, in three named places: the lantern
+ * (croma 5.4 with it, 13.3 with the halo at nought), the frame's own bloom (19.6
+ * through the chain, which has neither), and the tone curve, which caps a legal
+ * cyan at 19 to 20 at ANY level. The lever that is left is CYAN_HUE, and it is a
+ * ratified pigment: the numbers are priced in the verbale and the choice is the
+ * coordinator's.
+ */
+const CYAN_OF_PALE = 0.310;
 
 /**
  * The four pigments, built from the seat at first ask.
@@ -2248,6 +2317,11 @@ export function flowerCensus() {
     lantern: {
       dayOpen: DAY_OPEN, alpha: PETAL_ALPHA, throat: THROAT, lidRim: LID_RIM,
       glowDay: GLOW_DAY, glowNight: GLOW_NIGHT, halo: { ...HALO_DAY },
+      // AND HOW MUCH OF THAT HALO A QUAD STILL CARRIES FAR AWAY (D-F8-1 = B),
+      // published from the seat so a gate reads the LAW and never a copy of it:
+      // it is the one number of the lantern the two families do not share, and
+      // the one that could put a step back at the exchange ring.
+      haloFar: { floor: FAR_HALO_FLOOR, span: FAR_HALO_SPAN },
       bianco: {
         side: CORE_SIDE, reach: { ...CORE_REACH }, stems: 1, stem: STAMEN_STEM,
         hole: { ...HOLE_WHITE, shutHalf: holeHalf('bianco', 0), openHalf: holeHalf('bianco', 1) },
@@ -3325,6 +3399,13 @@ const FAR_VERTEX = /* glsl */`
   // WHAT THE HALO AVERAGES OVER A SHUT HEAD'S SKIN, per kind: D-F7-2 = B.
   uniform float uHaloWhite;
   uniform float uHaloCyan;
+  // AND HOW MUCH OF IT SURVIVES THE DISTANCE, which is D-F8-1 = B: the floor it
+  // falls to and how far past the ring it takes to get there.
+  uniform float uHaloFarFloor;
+  uniform float uHaloFarSpan;
+  // HOW SQUAT THE HEAD IS, off HEAD_SQUAT: the silhouette above is a box's and
+  // not a cube's since D-F8-2 = B.
+  uniform float uSquat;
   // AND WHERE ITS LAMPS STAND, per kind, in units of the head's own edge:
   // x the lamp's half-side, y how far off centre it sits.
   uniform vec3 uLampWhite;
@@ -3370,11 +3451,26 @@ const FAR_VERTEX = /* glsl */`
     // the same fact, which is that a walker at this range does not see the top
     // of a head. So both are taken from the head itself:
     //
-    //   AREA. The silhouette of a box with edge s, seen along a unit vector v,
-    //   is s * s * (|v.x| + |v.y| + |v.z|) whatever way it is turned. A quad
-    //   squared to the view plane covers its side squared, so its side is the
-    //   head's edge times the root of that sum, and the two footprints agree by
-    //   arithmetic instead of by fitting.
+    //   AREA, AND IT IS THE SILHOUETTE OF THE HEAD THIS WORLD BUILDS AND NOT OF
+    //   A CUBE (D-F8-2 = B). The silhouette of a BOX with sides a, b, c along x,
+    //   y, z, seen along a unit vector v, is a*b*|v.z| + b*c*|v.x| + a*c*|v.y|
+    //   whatever way it is turned -- each face's own area times how square on it
+    //   is. A head is a * c = s across and b = s * HEAD_SQUAT tall, so that sum
+    //   is s * s * (squat * (|v.x| + |v.z|) + |v.y|). It used to read
+    //   s * s * (|v.x| + |v.y| + |v.z|), which is the box with squat set to one,
+    //   that is a CUBE -- and the head has not been a cube since U-ERBA-1
+    //   confirmed E-ERBA-A's census (9.4 cm across, 6.8 tall). Measured at the
+    //   judging pose, that made the quad eight per cent too wide and seventeen
+    //   per cent too much area, at every range. A quad squared to the view plane
+    //   covers its side squared, so its side is the head's edge times the root of
+    //   the sum, and the two footprints agree by arithmetic instead of by
+    //   fitting.
+    //
+    //   AND THE SQUAT COMES IN AS A UNIFORM off HEAD_SQUAT rather than as a
+    //   literal, for the reason every other number this family reads does: the
+    //   solid on the near side of the ring is built to that same constant, and an
+    //   exchange whose two halves hold two copies of one number is an exchange
+    //   that opens the first time one of them is refitted.
     //
     //   COLOUR. Each of those three terms is one face of the head, and this
     //   world's faces are not interchangeable: a SIDE and the lid are lit by
@@ -3402,7 +3498,7 @@ const FAR_VERTEX = /* glsl */`
     // always the TOP face.
     vec3 toEye = normalize(cameraPosition - aFlower.xyz);
     vec3 share = abs(toEye);
-    float area = share.x + share.y + share.z;
+    float area = uSquat * (share.x + share.z) + share.y;
     vec3 alongX = vec3(toEye.x >= 0.0 ? 1.0 : -1.0, 0.0, 0.0);
     vec3 alongZ = vec3(0.0, 0.0, toEye.z >= 0.0 ? 1.0 : -1.0);
     // AND A CYAN HEAD IS THE SAME HEAD IN ANOTHER PIGMENT, which is exactly how
@@ -3440,6 +3536,13 @@ const FAR_VERTEX = /* glsl */`
     // had. Their sum can go to nought looking straight down, where the head IS
     // its lid, so the divide is floored and the branchless answer there is the
     // lid itself.
+    //
+    // THE SQUAT IS NOT IN THIS RATIO AND MUST NOT BE. Both flanks carry the same
+    // factor -- they are the two faces the head is squat ON -- so it cancels
+    // between the sum and the divide, and putting it in both would be writing it
+    // twice for no change. Where it does not cancel is vLidShare below, which is
+    // one face against all three: a squat head shows MORE lid for its height, and
+    // that is the whole of what D-F8-2 buys in colour.
     float flanks = share.x + share.z;
     vec3 head = (pale * headLight(alongX) * share.x
       + pale * headLight(alongZ) * share.z) / max(flanks, 1e-4);
@@ -3464,6 +3567,19 @@ const FAR_VERTEX = /* glsl */`
     // on exactly the object this family was ratified on. And it is per family
     // since D-F7-2 = B, on the same flag, for the same reason the share is.
     float haloMean = mix(uHaloWhite, uHaloCyan, aLook.x);
+    // AND IT THINS WITH THE DISTANCE, WHICH IS D-F8-1 = B. See the note over
+    // FAR_HALO_FLOOR: past the ring the halo is no longer read as a halo -- at
+    // thirteen metres a head is four pixels and its skirt is what a finder with a
+    // local threshold measures instead of the head -- so what survives the
+    // distance is a share of it, and the share is a smoothstep that starts AT THE
+    // RING. Starting there is what keeps the exchange shut: at reach = uRing the
+    // factor is exactly one and a head crossing inward meets a solid of the same
+    // warmth, and smoothstep leaves with zero slope, so the first metres past the
+    // ring hardly move either. And reach is the LIVE distance from the walker --
+    // uCentre is written every frame from his own position -- so nothing here
+    // waits on a lattice or steps when one is rebuilt.
+    haloMean *= mix(1.0, uHaloFarFloor,
+      smoothstep(uRing, uRing + uHaloFarSpan, reach));
 
     // AND THE LAMP IS IN THE MIDDLE OF THE HEAD, WHICH THE MEAN FORGOT.
     //
@@ -3631,6 +3747,14 @@ function createFarFlowers({ height, lightScale, pigments, ring, swapBand, hour }
       // inward meets a blue solid at the same warmth and not at the white's.
       uHaloWhite: { value: HALO_DAY.bianco },
       uHaloCyan: { value: HALO_DAY.ciano },
+      // AND HOW MUCH OF IT SURVIVES THE DISTANCE (D-F8-1 = B), which is the one
+      // number this family carries that the solids do not -- because it is a fact
+      // about a head that is four pixels wide and there are no four-pixel solids.
+      uHaloFarFloor: { value: FAR_HALO_FLOOR },
+      uHaloFarSpan: { value: FAR_HALO_SPAN },
+      // AND HOW SQUAT THE HEAD IS, off the constant the solid's own geometry is
+      // built to: one number, two families (D-F8-2 = B).
+      uSquat: { value: HEAD_SQUAT },
       // AND WHERE THAT HALO IS CENTRED, per kind, off the same seats the solid
       // hangs its lamps on: the quad carries the term's SHAPE and not only its
       // mean, so a head is bright where its lamp is instead of wearing a skirt.
