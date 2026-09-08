@@ -24,7 +24,7 @@
 //   3. NELLA RICEVUTA: quello che il banco ha letto in pagina alla posa P,
 //      scritto qui come AT_TODAY perche' un numero misurato una notte e mai
 //      piu' guardato non e' una guardia.
-import { read, reporter, selfTest } from './lib.mjs';
+import { braceBody, read, reporter, selfTest } from './lib.mjs';
 import { CAMPO, CAMPO_FAR_SHIFT } from '../../src/world/voxel/pure.js';
 import { TIERS } from '../../src/core/quality.js';
 
@@ -76,11 +76,78 @@ const injected = process.argv.includes('--self');
 const report = reporter('guard-zoom -- il fronte non insegue l\'obiettivo');
 
 // ------------------------------------------------------------ 1. IL SORGENTE
+//
+// ==========================================================================
+// E IL SORGENTE SI LEGGE PER DATAFLOW, NON A FETTE DI TESTO. QUESTO E' IL
+// DEBITO CHE U-GUARDIA-3 HA CENSITO SU QUESTO FILE.
+//
+// Cio' che stava qui tagliava il sorgente su due segnalibri di PROSA -- una
+// riga di banner con il suo numero esatto di trattini, «one shading», e due
+// nomi di variabile -- e poi cercava `uPixelScale` dentro la fetta. Tre modi di
+// rompersi, tutti e tre con una modifica CORRETTA del materiale: ribattezzare
+// il banner (e allora `indexOf` torna -1, la fetta diventa tutt'altro e il
+// verdetto e' un caso), spostare le due righe che facevano da estremi, o
+// semplicemente rientrare il blocco.
+//
+// La domanda vera non e' «in quel tratto di testo compare questo nome»: e' «la
+// SCALA della LOD e' calcolata a partire dal riquadro». Cioe' e' una domanda di
+// DATAFLOW, ed e' la stessa forma con cui U-GUARDIA-3 ha rifatto guard-zone sul
+// programma compilato: per ogni statement che SCRIVE un nome, il suo lato
+// destro nomina questo termine? Cosi' posta sopravvive a qualunque
+// riformattazione, e per giunta e' PIU' larga di prima -- prende uPixelScale
+// che entri nella scala da qualunque punto di march(), non solo fra i due
+// segnalibri.
+// ==========================================================================
 const glsl = read('src/world/voxel/campo-material.js');
-const march = glsl.slice(glsl.indexOf('Hit march('), glsl.indexOf('// ------------------------------------------------------------ one shading'));
-const ladderText = march.slice(march.indexOf('float jitter'), march.indexOf('int floorLevel'));
-report.check(!/uPixelScale/.test(ladderText),
-  'la scala della LOD non nomina uPixelScale', `${ladderText.split('\n').length} righe`);
+
+/** Il corpo di una funzione, presa per nome e chiusa dalle sue graffe. */
+function bodyOf(text, signature) {
+  const at = text.indexOf(signature);
+  if (at < 0) return null;
+  const open = text.indexOf('{', text.indexOf(')', at));
+  return open < 0 ? null : braceBody(text, open);
+}
+
+/**
+ * Ogni statement che scrive un nome, e cio' che il suo lato destro nomina.
+ *
+ * La stessa lettura che `lib/quadro.mjs` fa sul programma COMPILATO, qui sul
+ * sorgente: i commenti escono per primi, cosi' che una spiegazione non passi
+ * mai per un uso.
+ */
+export function writesIn(text) {
+  const bare = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  const out = [];
+  for (const statement of bare.split(';')) {
+    const m = /(?:^|[\s{}()])([A-Za-z_]\w*)\s*(\*=|\+=|-=|\/=|=)(?!=)([\s\S]*)$/.exec(statement);
+    if (m) out.push({ lhs: m[1], op: m[2], rhs: m[3] });
+  }
+  return out;
+}
+
+// I NOMI CHE SONO LA SCALA, che e' cio' che questo file possiede davvero. Un
+// nome e' una parola sola: ribattezzarne uno e' una riga di questa lista, dove
+// prima bastava rientrare un blocco per perdere il verdetto.
+const LADDER_TERMS = ['jitter', 'lodRung', 'lodRung2', 'step2', 'lodFloor', 'far2',
+  'floorLevel', 'level', 'lodSel', 'lodC'];
+
+/** Gli statement della scala della LOD che nominano un termine, per dataflow. */
+const ladderReading = (text, token) => writesIn(text)
+  .filter((w) => LADDER_TERMS.includes(w.lhs) && w.rhs.includes(token));
+/** E quanti statement della scala il lettore ha trovato in tutto. */
+const ladderWrites = (text) => writesIn(text).filter((w) => LADDER_TERMS.includes(w.lhs));
+
+const march = bodyOf(glsl, 'Hit march(');
+report.check(march !== null && ladderWrites(march).length >= 8,
+  'la scala della LOD si trova per i nomi che scrive, non per un segnalibro di prosa',
+  march === null ? 'march() non trovata: il lettore non ha morso niente'
+    : `${ladderWrites(march).length} statement scrivono i ${LADDER_TERMS.length} nomi della scala, `
+    + `su ${writesIn(march).length} di march()`);
+report.check(march !== null && ladderReading(march, 'uPixelScale').length === 0,
+  'e nessuno di essi nomina uPixelScale: la scala non e in pixel',
+  ladderReading(march || '', 'uPixelScale').map((w) => `${w.lhs} <- ${w.rhs.trim()}`).join(' | ')
+    || `${writesIn(march || '').filter((w) => w.rhs.includes('uPixelScale')).length} statement `
+    + 'di march() lo nominano, e nessuno e della scala');
 report.check(!/uLodGain/.test(glsl.replace(/\/\/[^\n]*/g, '')),
   'e il frammento non ha piu\' un guadagno in pixel da guardare');
 report.check(/uniform float uLodNear;/.test(glsl) && /uniform float uLodStep;/.test(glsl)
@@ -93,32 +160,91 @@ report.check(/vec2 fromWalker = p\.xz - lodC;/.test(glsl)
   + "del camminatore (U-CAMPO-2, la banda), nessuna della camera");
 // E IL RIQUADRO NON ENTRA DALLA PORTA DI SERVIZIO. uPixelScale resta -- il
 // prefiltro della lama, il giunto e lo spigolo sono in PIXEL e devono esserlo,
-// perche' quella e' la scala a cui il sotto-campionamento vive -- ma ogni sua
-// riga viva deve essere una di quelle, e il conto si fa sul codice senza i
-// commenti, cosi' che una spiegazione non passi per un uso.
-const live = glsl.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
-const sites = live.split('\n').map((l, i) => [i + 1, l.trim()])
-  .filter(([, l]) => l.includes('uPixelScale'));
-const ALLOWED = [
-  'uniform float uPixelScale;',
-  'float thin = span / max(distance(p, eye) * uPixelScale, 1e-6);',
-  'float pixel = max(travelled * uPixelScale / lean, 1e-6);',
-  'uPixelScale: { value: 0.002 },',
-  'u.uPixelScale.value = size.y > 0 ? 2 * Math.tan(fov / 2) / size.y : 0.002;',
+// perche' quella e' la scala a cui il sotto-campionamento vive -- ma ogni suo
+// uso vivo deve essere uno di quelli.
+//
+// ==========================================================================
+// E LA LISTA E' DI RUOLI, NON DI RIGHE. IL SECONDO DEBITO DI QUESTO FILE.
+//
+// Cio' che stava qui teneva CINQUE RIGHE DI SORGENTE confrontate per uguaglianza
+// esatta dopo un `trim()`. Una rientratura la passava -- il trim c'era apposta
+// -- ma tutto il resto no: spezzare una riga lunga in due, scrivere `max(1e-6,
+// x)` invece di `max(x, 1e-6)`, scrivere `0.000001` invece di `1e-6`,
+// ribattezzare `span` in `width`, aggiungere uno spazio. Cinque modi di
+// mandare in rosso una modifica corretta, e per una guardia che va in rosso a
+// vuoto c'e' un solo esito: qualcuno la spegne.
+//
+// Cio' che questo file possiede non e' il testo di cinque righe: e' che
+// uPixelScale abbia solo QUATTRO RUOLI, e ognuno dei quattro si riconosce dalla
+// forma dello statement e non dai suoi caratteri.
+//
+//   * la DICHIARAZIONE della uniform;
+//   * il suo SEGGIO nella tavola delle uniform del materiale;
+//   * la DERIVAZIONE, l'unico posto dove il valore viene calcolato, dal
+//     bersaglio legato (che e' quello che guard-campo3 tiene dall'altra parte);
+//   * una MISURA: uno statement che scrive uno dei termini in pixel dichiarati
+//     qui sotto per nome.
+//
+// Gli statement si tagliano sul punto e virgola dopo aver tolto i commenti,
+// quindi una riga spezzata in tre resta uno statement solo e una riga inserita
+// in mezzo non sposta niente. Cio' che resta appuntato sono DUE PAROLE -- i
+// nomi dei due termini in pixel -- e un nome ribattezzato e' una riga di questa
+// lista da aggiornare, con il verdetto che lo dice.
+// ==========================================================================
+
+/**
+ * I termini in PIXEL, per nome, e cos'e' ciascuno.
+ *
+ * U-CAMPO-1 §9 (RESTA): «ogni termine in pixel ... sono la scala del
+ * sotto-campionamento e devono esserlo». Sono questi due e nessun altro.
+ */
+const PIXEL_TERMS = [
+  { name: 'thin', what: 'il prefiltro della lama: quanti pixel e larga una lama' },
+  { name: 'pixel', what: 'il giunto e lo spigolo: quanti metri copre un pixel alla marcia' },
 ];
-/** Which live lines naming uPixelScale are none of the five declared uses. */
-const strayIn = (text) => text
-  .replace(/\/\/[^\n]*/g, '')
+
+/** Gli statement vivi che nominano un termine, uno per punto e virgola. */
+const statementsNaming = (text, token) => text
   .replace(/\/\*[\s\S]*?\*\//g, '')
-  .split('\n')
-  .map((l, i) => [i + 1, l.trim()])
-  .filter(([, l]) => l.includes('uPixelScale'))
-  .filter(([, l]) => !ALLOWED.includes(l));
+  .replace(/\/\/.*$/gm, '')
+  .split(';')
+  .map((s) => s.trim())
+  .filter((s) => s.includes(token));
+
+/** Il nome che uno statement scrive, se ne scrive uno. */
+const lhsOf = (statement) => {
+  const m = /(?:^|[\s{}()])([A-Za-z_]\w*)\s*(?:\*=|\+=|-=|\/=|=)(?!=)/.exec(statement);
+  return m ? m[1] : null;
+};
+
+/** I quattro ruoli, per forma. */
+const ROLES = [
+  { role: 'dichiarazione', is: (s) => /\buniform\s+\w+\s+uPixelScale\b/.test(s) },
+  { role: 'seggio', is: (s) => /\buPixelScale\s*:/.test(s) },
+  { role: 'derivazione', is: (s) => /\buPixelScale\s*\.\s*value\s*=/.test(s) },
+  { role: 'misura', is: (s) => PIXEL_TERMS.some((t) => lhsOf(s) === t.name) },
+];
+
+/** Quali usi vivi di uPixelScale non stanno in nessuno dei quattro ruoli. */
+const strayIn = (text) => statementsNaming(text, 'uPixelScale')
+  .filter((s) => !ROLES.some((r) => r.is(s)))
+  .map((s) => s.replace(/\s+/g, ' ').slice(0, 90));
+
+/** E quali ruoli il lettore ha effettivamente trovato: un ruolo vuoto e un buco. */
+const rolesIn = (text) => {
+  const statements = statementsNaming(text, 'uPixelScale');
+  return ROLES.filter((r) => statements.some((s) => r.is(s))).map((r) => r.role);
+};
+
 const stray = strayIn(glsl);
+const roles = rolesIn(glsl);
+report.check(roles.length === ROLES.length,
+  'i quattro ruoli di uPixelScale sono tutti e quattro in piedi',
+  `${roles.join(', ')} -- e i termini in pixel sono ${PIXEL_TERMS.map((t) => t.name).join(' e ')}`);
 report.check(stray.length === 0,
-  'ogni riga viva che nomina uPixelScale misura un pixel e non una distanza',
-  stray.length ? stray.map(([n, l]) => `${n}: ${l}`).join(' | ')
-    : `${sites.length} righe, tutte fra le cinque dichiarate`);
+  'e ogni altro uso vivo di uPixelScale misura un pixel e non una distanza',
+  stray.length ? stray.join(' | ')
+    : `${statementsNaming(glsl, 'uPixelScale').length} statement, tutti in uno dei quattro ruoli`);
 
 // --------------------------------------------------------- 2. L'ARITMETICA
 for (const tier of TIERS) {
@@ -171,19 +297,78 @@ const cases = [];
     caught: g.near * g.step * g.step > NEAR_WINDOW });
 }
 {
-  // (c) una scala che torna a chiamare uPixelScale, e una riga di uPixelScale
-  // che non e' nessuna delle cinque dichiarate
-  const bentText = ladderText.replace('uLodNear', 'uLodNear * uPixelScale');
+  // (c) LA SCALA CHE SI RIMETTE IL RIQUADRO DENTRO, chiesta al lettore vero.
+  //
+  // Quello che stava qui tagliava una fetta di testo, ci sostituiva un nome
+  // dentro e poi cercava `uPixelScale` nella fetta: non passava mai dal
+  // predicato del run, quindi il giorno che il lettore sbagliava il caso
+  // andava verde lo stesso. Adesso il difetto si scrive in march() e la
+  // risposta torna da `ladderReading`, che e' esattamente cio' che il run
+  // chiama.
+  const bentMarch = march.replace('float lodRung = uLodNear * jitter',
+    'float lodRung = uLodNear * jitter * uPixelScale');
   cases.push({ what: 'la scala che si rimette uPixelScale dentro',
-    caught: /uPixelScale/.test(bentText) });
-  // AND THIS ONE USED TO PROVE NOTHING: it asked whether the ALLOWED array in
-  // this same file contains a string it plainly does not, which is a constant
-  // true that never touched the source or the predicate. It now puts the line
-  // INTO the real source and asks the real predicate. (U-GUARDIA-3, E-IGIENE.)
+    caught: ladderReading(bentMarch, 'uPixelScale').length === 1
+      && ladderReading(march, 'uPixelScale').length === 0 });
+  // E LA LAMA CHE RESTA IN PIXEL NON E' UN DIFETTO, che e' l'altra meta': il
+  // lettore separa i due, e march() ne contiene uno di ciascun tipo.
+  cases.push({ what: 'ma il prefiltro della lama, che in pixel ci sta di diritto, non e scambiato per la scala',
+    caught: writesIn(march).some((w) => w.rhs.includes('uPixelScale'))
+      && ladderReading(march, 'uPixelScale').length === 0 });
+  // E UN SEGNALIBRO CHE SPARISCE NON E' UN VERDETTO. Con la fetta di testo,
+  // ribattezzare il banner faceva tornare -1 a `indexOf` e il verdetto
+  // diventava un caso; adesso una march() che non si trova e' un rosso che lo
+  // dice.
+  cases.push({ what: 'un march() che non si trova piu, che prima diventava una fetta a caso',
+    caught: bodyOf(glsl, 'Hit marciare(') === null && bodyOf(glsl, 'Hit march(') !== null });
+
+  // (d) UN USO NUOVO CHE LEGGE uPixelScale COME UNA DISTANZA.
+  //
+  // Quello che stava qui chiedeva se l'array ALLOWED di QUESTO file contenesse
+  // una stringa che non conteneva: una costante vera che non toccava ne' il
+  // sorgente ne' il predicato (U-GUARDIA-3, E-IGIENE). Adesso la riga entra nel
+  // sorgente vero e la risposta torna dal predicato vero.
   const withStray = glsl.replace('uniform float uPixelScale;',
     'uniform float uPixelScale;\n  float far = uPixelScale * 24.0;');
   cases.push({ what: 'una riga nuova che legge uPixelScale come una distanza',
     caught: strayIn(withStray).length === 1 && strayIn(glsl).length === 0 });
+  // E LA STESSA RIGA SCRITTA DENTRO UN TERMINE IN PIXEL non e' un difetto:
+  // e' esattamente cio' che i due nomi dichiarati esistono per permettere.
+  const withMeasure = glsl.replace('uniform float uPixelScale;',
+    'uniform float uPixelScale;\n  float pixel = uPixelScale * 24.0;');
+  cases.push({ what: 'mentre la stessa riga che scrive un termine in pixel passa',
+    caught: strayIn(withMeasure).length === 0 });
+
+  // (e) E QUESTA E' LA PROVA CHE LO SPILLO E' TOLTO: i quattro usi che
+  // spediscono, RIFORMATTATI nei cinque modi che la lista di righe non
+  // sopravviveva -- la riga lunga spezzata in tre, gli argomenti di `max`
+  // scambiati, `1e-6` scritto per esteso, un nome locale ribattezzato, una
+  // riga inserita in mezzo al seggio -- e nessuno dei quattro diventa un
+  // intruso.
+  const reformatted = glsl
+    .replace('float thin = span / max(distance(p, eye) * uPixelScale, 1e-6);',
+      'float thin =\n            span\n            / max(0.000001, distance(p, eye) * uPixelScale);')
+    .replace('float pixel = max(travelled * uPixelScale / lean, 1e-6);',
+      'float pixel = max(\n      0.000001,\n      travelled * uPixelScale / lean\n    );')
+    .replace('uPixelScale: { value: 0.002 },',
+      '// il seggio, con una riga di spiegazione in mezzo\n      uPixelScale: {\n        value: 0.002,\n      },')
+    .replace('u.uPixelScale.value = size.y > 0 ? 2 * Math.tan(fov / 2) / size.y : 0.002;',
+      'u.uPixelScale.value = side > 0\n      ? 2 * Math.tan(fov / 2) / side\n      : 0.002;')
+    .replace('uniform float uPixelScale;', 'uniform   float   uPixelScale;');
+  // E LA RIFORMATTAZIONE DEVE ESSERE AVVENUTA DAVVERO, altrimenti il caso e'
+  // verde per non aver fatto niente: nessuna delle cinque righe di prima
+  // sopravvive, e questa e' precisamente la lista che il predicato di prima
+  // confrontava carattere per carattere.
+  const WERE_PINNED = [
+    'uniform float uPixelScale;',
+    'float thin = span / max(distance(p, eye) * uPixelScale, 1e-6);',
+    'float pixel = max(travelled * uPixelScale / lean, 1e-6);',
+    'uPixelScale: { value: 0.002 },',
+    'u.uPixelScale.value = size.y > 0 ? 2 * Math.tan(fov / 2) / size.y : 0.002;',
+  ];
+  cases.push({ what: 'e i quattro usi che spediscono, riformattati in cinque modi, restano quattro ruoli e nessun intruso',
+    caught: WERE_PINNED.every((l) => glsl.includes(l) && !reformatted.includes(l))
+      && strayIn(reformatted).length === 0 && rolesIn(reformatted).length === 4 });
 }
 {
   // (d) una ricevuta che dice zero dove il banco ha letto l'85%
