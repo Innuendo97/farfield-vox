@@ -479,6 +479,9 @@ report.check(noGiants(source),
 // --------------------------------------------------------------------------
 const BUDGET = {
   drawsAt: 18, cardBytes: 10 * 1024 * 1024, deliveredBytes: 0, ms: 1.5, buildMs: 1500,
+  // The size of the cut, as a COUNT: see the leg below for how a millisecond
+  // became a quad and why the millisecond could not stay.
+  quads: 140000,
 };
 
 // THE DRAWS ARE THE WEDGES, AND THE WATER IS SIXTEEN OF THEM NOW AND NOT ONE.
@@ -511,20 +514,39 @@ report.check(SPEC.rings.sectors + 1 <= BUDGET.drawsAt && laysARing(source),
 // WORKER HAS. Both are asked of the cut itself rather than of a number
 // somebody wrote down: buildHills() is the same arithmetic the worker runs.
 //
-// THE CEILING ON THE CUT IS THE MANDATE'S 1.5 s AND THIS READS IT UNDER NODE,
-// with the gap between the two MEASURED on this delivery rather than assumed.
-// The worker takes 1163 ms where node's median is 1022: a gap of a hundred and
-// forty milliseconds, where U-CORNICE-1 measured a factor of two (823 ms here
-// against 1.63 s there) on a cut that had no typed-array writer under it and no
-// bound on which ridges a radius may ask about. So the ceiling held here is the
-// mandate's fifteen hundred less three hundred of margin for that gap, and the
-// browser's own reading is in the verbale beside it.
-// AND THREE TIMES, TAKING THE MIDDLE ONE. On a shared machine a single cut of
-// this reads anywhere between 0.7 and 1.5 seconds -- the first one pays for a
-// cold compiler as well -- and a gate that fired on the unlucky one would be a
-// gate nobody could keep green. Three runs and the median is the smallest
-// honest reading; the browser's own is in the verbale beside it.
-const NODE_MARGIN = 300;
+// THE SECOND HALF OF THAT SENTENCE IS A COUNT NOW AND NOT A CLOCK, WHICH IS
+// E-PERF4 APPLIED TO THIS GATE.
+//
+// What stood here read the wall clock three times, took the middle one, and
+// failed it against 1200 ms. On this delivery's own unchanged arithmetic it
+// went red in two runs out of four (E-FIORI9) and read anywhere from 1342 to
+// 2921 ms on consecutive cuts (E-LUCE8 bis) -- because eight sessions share
+// this desk, and a millisecond measured here is the LOAD on the machine and not
+// the size of the cut. A gate that fires on whoever else is compiling is a gate
+// the next unit switches off, and this campaign has already paid for one of
+// those.
+//
+// So the receipt is the WORK: how many quads the cut emits, handed back by the
+// cut itself. It is the same number on every machine and in every run --
+// measured 108986 quads and 6975104 bytes on three consecutive cuts, identical
+// to the quad and to the byte, while the three clocks beside them disagreed by
+// a hundred milliseconds. The time is still taken and still printed, as a NOTE
+// carrying all three readings and the worker's own: the mandate speaks a second
+// and a half and somebody has to be able to see it. It just does not decide the
+// colour any more.
+//
+// WHY THE QUAD IS THE COUNT, and not a number picked for being handy. The cost
+// of this cut is the lattice -- the law is asked for a height at every cell of
+// four annuli -- and the quads are what survives that walk. The two move
+// together and in the same direction: a finer cube, a wider ring or a louder
+// ridge raises the cells asked about AND the faces emitted. So a cut that grew
+// past the count the worker was timed on is a cut nobody has timed. The ceiling
+// is that measurement carried across: the worker takes 1163 ms of the mandate's
+// 1500 at 108986 quads, which leaves 29 per cent of the budget, so the count
+// may grow by 29 per cent -- 140000, rounded down to a round number.
+const AT_TODAY = { quads: 108986, bytes: 6975104, wedges: 16, workerMs: 1163 };
+/** The cut is the size the worker was measured on. */
+const cutFitsTheWorker = (stats) => stats.quads <= BUDGET.quads;
 const cuts = [];
 let cut = null;
 for (let k = 0; k < 3; k++) {
@@ -532,16 +554,22 @@ for (let k = 0; k < 3; k++) {
   cut = buildHills();
   cuts.push(Date.now() - started);
 }
-cuts.sort((a, b) => a - b);
-const cutMs = cuts[1];
 const cardBytes = cut.stats.bytes;
 report.check(cardBytes <= BUDGET.cardBytes,
   `and it weighs at most ${(BUDGET.cardBytes / 1048576).toFixed(0)} MB of card`,
   `${(cardBytes / 1048576).toFixed(2)} MB, ${cut.stats.quads} quads in `
   + `${cut.wedges.filter(Boolean).length} wedges`);
-report.check(cutMs <= BUDGET.buildMs - NODE_MARGIN,
-  `and it is cut in the time the worker has: ${BUDGET.buildMs - NODE_MARGIN} ms under node`,
-  `${cuts.join(' / ')} ms over three cuts, against a ceiling of ${BUDGET.buildMs} ms in the browser`);
+report.check(cutFitsTheWorker(cut.stats),
+  `and it cuts no more than the worker was measured on: ${BUDGET.quads} quads`,
+  `${cut.stats.quads} quads (AT_TODAY ${AT_TODAY.quads}), by ring `
+  + `${cut.stats.perRing.map((r) => r.quads).join(' / ')}`);
+report.note(`il TAGLIO in millisecondi NON e' gateato, ed e' questo: ${cuts.join(' / ')} ms `
+  + `sotto node su tre tagli di seguito, contro i ${AT_TODAY.workerMs} ms che il lavoratore `
+  + `prende nel browser e i ${BUDGET.buildMs} ms del mandato. E' una lettura della MACCHINA: `
+  + 'la stessa aritmetica ha letto 1342 e 2921 ms su corse consecutive (E-LUCE8 bis) e ha '
+  + 'mandato questa guardia in rosso 2 corse su 4 (E-FIORI9). Cio\' che la gamba qui sopra '
+  + 'gatea e\' il CONTEGGIO, che sulle stesse tre corse non si e\' mosso di un quad '
+  + '(E-PERF4: una ricevuta e\' un conteggio e non un cronometro).');
 
 // NOTHING IS DELIVERED. The whole cornice is a law and a table of numbers in
 // the source: no texture, no mesh, no asset id, nothing in public/assets.
@@ -1276,6 +1304,22 @@ if (process.argv.includes('--self')) {
     {
       what: 'and the frame that ships cuts it elsewhere',
       caught: cutsOffThread(source),
+    },
+    {
+      // The count that replaced the clock, exercised the way the clock never
+      // could be: a cut a third larger is a cut the worker was never timed on,
+      // and it is caught on every machine and at every hour of the day.
+      what: 'a cut a third bigger than the one the worker was timed on',
+      caught: !cutFitsTheWorker({ ...cut.stats, quads: Math.round(AT_TODAY.quads * 1.33) }),
+    },
+    {
+      what: 'and one just inside the margin the worker\'s own reading leaves',
+      caught: cutFitsTheWorker({ ...cut.stats, quads: Math.round(AT_TODAY.quads * 1.25) }),
+    },
+    {
+      what: 'and the cut that ships is the count AT_TODAY, to the quad, on three cuts',
+      caught: cut.stats.quads === AT_TODAY.quads && cut.stats.bytes === AT_TODAY.bytes
+        && cutFitsTheWorker(cut.stats),
     },
     {
       what: 'a second fog grown here instead of read from the seat',
