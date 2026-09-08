@@ -12,7 +12,7 @@ import {
 } from '../../assets-src/distant/fit-cornice.mjs';
 import { AIR_NEAR, HEIGHT_FOG } from '../../src/core/sky.js';
 import {
-  AIR_BETA, AIR_PALE, AIR_TURN_METRES, FOG_LOW_CAP, FOG_RADIANCE,
+  AIR_BETA, AIR_PALE, AIR_PATH_ORIGIN, FOG_LOW_CAP, FOG_RADIANCE,
 } from '../../src/world/air.js';
 import { renderChain } from '../lighting/render-chain.mjs';
 import { read, readJson, reporter, selfTest } from './lib.mjs';
@@ -817,11 +817,21 @@ report.check(PAL.length === 6
 // desk measures the delivered colour to be, and a change to the palette, to the
 // air, to the seat or to the grade that moves one of them shows up here as a
 // number instead of as a mood. The reference's own reading is printed beside it
-// and is NOT gated, because the near flank cannot be reached from here — its
-// floor with the pigment at zero already stands 45 levels of blue over the
-// reference, 18 of them the near end's, 8 the low haze ceiling's (E-LUCE2,
-// frozen) and 19 the pale end's, carried inside 227 m by the 700 m turn.
-// Gating it would be gating a plane the arithmetic refuses.
+// and is NOT gated, because the near flank cannot be reached from here — and
+// U-LUCE-8 finally has the reason, which is not the one that stood here.
+//
+// THE NEAR FLANK'S AIR IS ALREADY IN THE PALETTE. `palette()` was solved WITH
+// THE AIR SWITCHED OFF against the reference's own class mask of that plane, so
+// the rock in shadow develops to exactly 74 / 104 / 103, which is that mask's
+// reading — the reference's air of those 227 metres included. Any air this world
+// then puts in front of it is the same air counted twice. The distance term now
+// declines to do it (its path has its origin at that plane: AIR_PATH_ORIGIN),
+// and what is left over the reference is 5 / 16 / 33, ALL of it the low haze's
+// ceiling, which is E-LUCE2's and frozen. The note that stood here gave 37 of
+// the 45 levels of blue to the distance and 8 to the ceiling; it read them with
+// THE PIGMENT AT ZERO, where a ceiling that MIXES replaces nothing and looks
+// cheap. Over the rock in shadow it replaces a blue of 0.104 with a fog of
+// 0.895. The owners were right; the sizes were the wrong way round.
 //
 // THE PLANES ARE R6 §2.3's OWN WINDOWS, at the distance and height the delivered
 // cornice puts them at: the near flank at 227 m and 21 m up, which is where R6's
@@ -832,9 +842,9 @@ report.check(PAL.length === 6
 // second is the one the palette was solved against, so it is the one printed.
 // --------------------------------------------------------------------------
 const AIR_PLANES = [
-  { what: 'near flank', d: 227, h: 21, reference: [74, 104, 103], today: [82, 126, 158] },
-  { what: 'middle crest', d: 400, h: 10, reference: [83, 139, 180], today: [95, 144, 187] },
-  { what: 'pale veil', d: 1550, h: 45, reference: [149, 187, 213], today: [135, 181, 211] },
+  { what: 'near flank', d: 227, h: 21, reference: [74, 104, 103], today: [79, 120, 137] },
+  { what: 'middle crest', d: 400, h: 10, reference: [83, 139, 180], today: [88, 138, 184] },
+  { what: 'pale veil', d: 1550, h: 45, reference: [149, 187, 213], today: [134, 178, 210] },
 ];
 const AIR_DRIFT = 2;
 
@@ -843,7 +853,11 @@ const AIR_DRIFT = 2;
  *
  * Same order as FOG_GLSL and for the same reason: the distance veils the
  * surface and the low haze veils what comes out of that, because the low haze
- * is the air nearest the eye. The height integral is shared by both.
+ * is the air nearest the eye. The height integral is shared by both; the SHAPE
+ * is not, and since U-LUCE-8 it is not the same shape either — the low haze
+ * keeps E-LUCE2's gaussian and the distance is Beer-Lambert over the path
+ * beyond AIR_PATH_ORIGIN, turning towards the pale veil as the square of its
+ * own green fraction.
  */
 function veiled(radiance, distance, height) {
   const eye = POSE_VOX_DAY.position.y;
@@ -851,13 +865,14 @@ function veiled(radiance, distance, height) {
   const a = Math.exp(-Math.max(eye, 0) / HEIGHT_FOG.scaleHeight);
   const b = Math.exp(-Math.max(height, 0) / HEIGHT_FOG.scaleHeight);
   const mean = Math.abs(dy) < 0.01 ? a : ((a - b) * HEIGHT_FOG.scaleHeight) / dy;
-  const turn = 1 - Math.exp(-distance / AIR_TURN_METRES);
+  const path = Math.max(distance * mean - AIR_PATH_ORIGIN, 0);
   const g = Math.min(FOG_LOW_CAP,
     1 - Math.exp(-((distance * HEIGHT_FOG.densityAtGround * mean) ** 2)));
+  const f = AIR_BETA.map((beta) => 1 - Math.exp(-beta * path));
+  const turn = f[1] * f[1];
   return radiance.map((v, c) => {
     const tint = AIR_NEAR.getComponent(c) + (AIR_PALE[c] - AIR_NEAR.getComponent(c)) * turn;
-    const f = 1 - Math.exp(-((distance * AIR_BETA[c] * mean) ** 2));
-    return (v + (tint - v) * f) * (1 - g) + FOG_RADIANCE[c] * g;
+    return (v + (tint - v) * f[c]) * (1 - g) + FOG_RADIANCE[c] * g;
   });
 }
 
@@ -876,8 +891,14 @@ for (const plane of AIR_PLANES) {
     + `${plane.reference.join(' / ')}, so it is `
     + `${got.map((v, c) => (v > plane.reference[c] ? '+' : '') + (v - plane.reference[c])).join(' / ')}`);
 }
-report.line('  the near flank is over on all three and no palette closes it: the floor with the '
-  + 'pigment at zero is already over. Owner: the coordinator, D-L6-1');
+report.line('  the near flank is over on all three and no palette reaches it FROM HERE, because the '
+  + 'palette IS its reading: U-CORNICE-2 solved the rock');
+report.line('  in shadow with the air off against that very mask, so the pigment develops to '
+  + '74 / 104 / 103 exactly, and every metre of air this world adds');
+report.line('  is the air of the reference counted a second time. The distance term declines to add '
+  + 'it; the 5 / 16 / 33 left over is ALL the low haze');
+report.line('  ceiling, which is E-LUCE2 and frozen. Closing it means re-solving the palette WITH '
+  + 'the air in front of it. Owner: the coordinator, D-L8-1');
 
 // --------------------------------------------------------------------------
 // 7. THE CONTRACT V7 IS OWED IS ANSWERED, ON REAL TREADS.
