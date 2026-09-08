@@ -72,19 +72,54 @@ import { AIR_NEAR, HEIGHT_FOG, SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS } from '..
 // on is the one the targets are emphatic about.
 export const FOG_RADIANCE = [0.0648, 0.3903, 0.8946];
 
-// THE CEILING ON THE LOW HAZE, and it is the one number of the old air that had
-// to move.
+// THE CEILING ON THE LOW HAZE, AND IT IS THE HAZE AT ITS OWN LAST WINDOW.
 //
 // E-LUCE2 fitted the haze on four windows of the reference's meadow, the
-// furthest at sixty metres, where it comes to 0.11. Beyond that it was an
-// extrapolation and it saturated at three hundred metres: a grey term at one,
-// on everything. The reference does not do that — at four hundred metres it
-// veils red by a quarter and blue by nearly two thirds — so the grey stops, and
-// it stops at 0.13, which is what it is worth a little past the last window it
-// was measured on. Inside sixty metres nothing moves by a thousandth; past it
-// the distance is carried by the three betas below, which is where the colour
-// of it is.
-export const FOG_LOW_CAP = 0.13;
+// furthest at sixty metres. Beyond that it was an extrapolation and it
+// saturated at three hundred metres: a grey term at one, on everything. The
+// reference does not do that — at four hundred metres it veils red by a quarter
+// and blue by nearly two thirds — so the grey stops.
+//
+// WHERE IT STOPS IS NOT A CHOICE, AND IT USED TO BE ONE. It stood at 0.13,
+// described in this file as "what it is worth a little past the last window it
+// was measured on", and "a little past" is the whole of the difference between a
+// fit and a number somebody picked. It is now the haze AT that window: sixty
+// metres, on the meadow a metre up, from the walking eye — the ray that window
+// IS — through the same density and the same scale height, which comes to
+// 0.110874. So the fit is kept exactly where it was measured and stops exactly
+// where it stopped being measured, with no metres of extrapolation past it.
+// guard-aria recomputes it from the two numbers in the seat rather than
+// comparing it to a literal, so a density or a scale height that moved would
+// move the ceiling with it.
+//
+// AND THE RAY IS THE WINDOW'S OWN AND NOT A LEVEL ONE, which is a difference of
+// eighteen ten-thousandths and was measured before it was chosen. A ceiling is a
+// scalar clamp on a term that is a function of distance AND height, so "where it
+// was fitted" is a set of rays and the ceiling has to be the largest value the
+// haze took on any of them — otherwise the clamp reaches back into the fit. Read
+// along a level ray it comes to 0.109143, and that number CUTS the last window
+// by two thousandths of a fraction: 0.23 of an L* on the meadow's south flank in
+// shadow at sixty metres, which takes this file's whole change there from 0.80
+// to 1.03 and past the one L* E-LUCE2's walk is held to. What it buys is 0.13 of
+// rms on the three planes and not one level on any of them — the near flank and
+// the pale veil develop to the same three numbers either way. A tenth of a level
+// is not worth a fit, so the ceiling is the window's own ray.
+//
+// WHAT THE OLD "a little past" WAS COSTING, measured on the pigment rather than
+// on a floor. The ceiling is not additive, it is a MIX: at the near flank it
+// replaces eleven per cent of a rock in shadow — a blue of 0.104 — with the fog's
+// own 0.895, and that is the whole of what stands between that plane and its
+// reference now that the distance term declines to reach it. The near flank goes
+// 79 / 120 / 137 to 79 / 118 / 133 and the rms on the three planes 14.12 to
+// 12.79, and it costs the walk 0.03 of an L* at the last window and nothing at
+// any other, because the haze is under this value at every one of them. D-L8-1.
+//
+// AND WHAT IS STILL NOT CLOSED BY IT. At zero the near flank would land on
+// 74 / 104 / 103 exactly, which is its reference — see AIR_PATH_ORIGIN for why
+// that is a statement about the palette and not about the air. Zero is not
+// available: below this the ceiling starts cutting into the windows the haze was
+// fitted on, and E-LUCE2's walk is not this term's to spend.
+export const FOG_LOW_CAP = 0.110874;
 
 // THE DISTANCE, PER CHANNEL: Rayleigh, and now at Rayleigh's own ratio.
 //

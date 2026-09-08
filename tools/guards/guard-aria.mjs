@@ -76,9 +76,21 @@ export const FITTED = { density: 0.0059, scaleHeight: 42 };
 // the meadow, the path and the water together and SILENTLY, because haze does
 // not look like a bug.
 //
-//   * THE CEILING on the low haze, 0.13. It is what that term is worth a little
-//     past the last window it was fitted on, so E-LUCE2's fit is kept where it
-//     was measured and stops where it stopped being measured.
+//   * THE CEILING on the low haze, 0.110874, and it is DERIVED and not written
+//     down: it is the haze itself at sixty metres on the meadow a metre up, seen
+//     from the walking eye -- the furthest window E-LUCE2 fitted it on, on that
+//     window's own ray. So the fit is kept exactly where it was measured and
+//     stops exactly where it stopped being measured, with no metres of
+//     extrapolation past it. It stood at 0.13 -- "a little past the last window"
+//     -- and "a little past" is the whole of the difference between a fit and a
+//     number somebody picked. This guard RECOMPUTES it from the density and the
+//     scale height in the seat, so it is watched by injection and not by
+//     comparison: move either of those two and the ceiling has to follow, which
+//     a literal could not. And it is the window's ray and not a level one
+//     because a ceiling is a scalar clamp on a term of distance AND height, so
+//     it has to be the LARGEST value the haze took on any ray the fit covers, or
+//     the clamp reaches back into the fit: the level reading, 0.109143, cuts the
+//     last window by 0.23 of an L* and buys 0.13 of rms. D-L8-1.
 //   * THE THREE BETAS, 0.001653 / 0.003331 / 0.005559, which are R6 §2.3's own
 //     published column — 0.25 / 0.44 / 0.62 — inverted through Beer-Lambert over
 //     the path between the two planes it is measured between.
@@ -110,7 +122,7 @@ export const FITTED = { density: 0.0059, scaleHeight: 42 };
 // ARITHMETIC, and — since U-LUCE-7, below — that the near end is DERIVED from
 // whatever preset arrives and read where it was measured to be read.
 export const DISTANCE = {
-  lowCap: 0.13,
+  lowCap: 0.110874,
   beta: [0.001653, 0.003331, 0.005559],
   origin: 175,
   pale: [0.1988, 0.603064, 1.196391],
@@ -178,6 +190,26 @@ export function airAt(distance, height, eyeHeight = 1.7, law = DISTANCE,
     const f = 1 - Math.exp(-beta * path);
     return 1 - (1 - f) * (1 - g);
   });
+}
+
+// THE CEILING, RECOMPUTED FROM THE SEAT rather than compared to a literal.
+//
+// E-LUCE2's furthest window is at sixty metres on the reference's own meadow,
+// and the haze there is what the ceiling is. It is that window's OWN ray -- a
+// metre up, from the walking eye -- and not a level one, because a ceiling is a
+// scalar clamp on a term of distance and height and so has to be the largest
+// value the haze takes on any ray inside the fit. A level ray reads 0.109143 and
+// clips the last window; the difference is 0.23 of an L* on the meadow and 0.13
+// of rms on the three planes, measured before it was chosen.
+export const LAST_WINDOW = [60, 1.0];
+export const WALKING_EYE = 1.7;
+export function ceilingFrom(fitted = FITTED, window = LAST_WINDOW, eye = WALKING_EYE) {
+  const [distance, height] = window;
+  const dy = height - eye;
+  const a = Math.exp(-Math.max(eye, 0) / fitted.scaleHeight);
+  const b = Math.exp(-Math.max(height, 0) / fitted.scaleHeight);
+  const mean = Math.abs(dy) < 0.01 ? a : ((a - b) * fitted.scaleHeight) / dy;
+  return 1 - Math.exp(-((distance * fitted.density * mean) ** 2));
 }
 
 // WHERE R6'S OWN COLUMN IS READ, so that the relative fraction is asked of two
@@ -375,6 +407,36 @@ if (process.argv.includes('--self')) {
       caught: doorDistance('export const FOG_LOW_CAP = 1.0;').lowCap !== DISTANCE.lowCap,
     },
     {
+      what: 'and the ceiling put back to the 0.13 that was a little PAST the last window',
+      caught: doorDistance('export const FOG_LOW_CAP = 0.13;').lowCap !== DISTANCE.lowCap,
+    },
+    {
+      what: 'THE CEILING IS THE HAZE AT E-LUCE2 own last window, recomputed from the seat',
+      caught: Math.abs(ceilingFrom() - DISTANCE.lowCap) < 5e-4,
+    },
+    {
+      what: 'INJECTION: a denser air moves the ceiling with it, which a literal could not',
+      caught: (() => {
+        const denser = { ...FITTED, density: FITTED.density * 1.2 };
+        return Math.abs(ceilingFrom(denser) - DISTANCE.lowCap) > 0.02;
+      })(),
+    },
+    {
+      what: 'and so does a thinner column, which is the seat other half',
+      caught: (() => {
+        const thinner = { ...FITTED, scaleHeight: FITTED.scaleHeight * 0.6 };
+        return Math.abs(ceilingFrom(thinner) - DISTANCE.lowCap) > 0.005;
+      })(),
+    },
+    {
+      what: 'and the ceiling does not cut into the windows the haze was fitted on',
+      caught: [20, 35, 50, 60].every((d) => ceilingFrom(FITTED, [d, 1.0]) <= DISTANCE.lowCap),
+    },
+    {
+      what: 'and a ceiling read on a LEVEL ray, which would clip the last of them, is caught',
+      caught: Math.abs(ceilingFrom(FITTED, [60, 1.7]) - DISTANCE.lowCap) > 1e-3,
+    },
+    {
       what: 'a beta put back to the triple the old gaussian shape asked for is caught',
       caught: doorDistance('export const AIR_BETA = [0.001105, 0.001904, 0.002611];')
         .beta.some((v, c) => v !== DISTANCE.beta[c]),
@@ -520,9 +582,20 @@ report.check(fogUsesSeat(seatText),
 
 const door = doorDistance(read(DOOR));
 report.line('');
+const ceiling = ceilingFrom();
 report.check(door.lowCap === DISTANCE.lowCap,
   `${DOOR} caps the low haze at ${DISTANCE.lowCap}, where it was last measured`,
   door.lowCap === null ? 'not found' : `${door.lowCap}`);
+report.check(Math.abs(ceiling - DISTANCE.lowCap) < 5e-4,
+  `and that IS the haze at ${LAST_WINDOW[0]} m, which is the furthest window E-LUCE2 fitted it on`,
+  `recomputed from the seat's own density and scale height: ${ceiling.toFixed(6)}. `
+  + 'It stood at 0.13, which was that term a little PAST its last window; a little past is '
+  + 'where a fit stops and a choice starts. D-L8-1');
+report.check([20, 35, 50, 60].every((d) => ceilingFrom(FITTED, [d, 1.0]) <= DISTANCE.lowCap),
+  'and the ceiling reaches down to no window E-LUCE2 fitted, so the walk keeps its own fit',
+  `the haze is ${[20, 35, 50, 60].map((d) => ceilingFrom(FITTED, [d, 1.0]).toFixed(4)).join(' / ')} `
+  + 'at 20 / 35 / 50 / 60 m on the meadow, all at or under it; the furthest one is not touched '
+  + 'because it IS it');
 report.check(door.beta !== null && door.beta.every((v, c) => v === DISTANCE.beta[c]),
   `and carries the distance per channel at ${DISTANCE.beta.join(' / ')}`,
   door.beta === null ? 'not found' : door.beta.join(' / '));
