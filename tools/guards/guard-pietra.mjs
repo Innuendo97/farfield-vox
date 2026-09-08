@@ -490,12 +490,28 @@ export function oneMeshOneMaterial(text) {
   return meshes === 1 && materials === 1;
 }
 
-/** Whether the fragment's weight still names every term this file walks. */
+/**
+ * Whether the fragment's weight still names every term this file walks.
+ *
+ * ANCHORED ON TWO NAMES AND NOT ON TWO SPELLINGS. This reader used to look for
+ * the strings `'float west = '` and `'float weight = '`, trailing space and
+ * all, which made `float  west =` or `float west=` -- both of them correct
+ * GLSL, and either of them what a formatter would leave behind -- a red guard
+ * with the shader untouched. It looks for the two DECLARATIONS instead,
+ * whatever whitespace stands inside them, and reads the sentences between: what
+ * is guarded is that the weight is still built out of these ten terms, not how
+ * the two lines around them are typed.
+ */
 export function weightNamesEveryTerm(text, names) {
-  const at = text.indexOf('float west = ');
-  if (at < 0 || text.indexOf('float weight = ', at) < 0) return false;
-  const body = text.slice(at, text.indexOf(';', text.indexOf('float weight = ', at)) + 1);
-  return names.every((n) => body.includes(n));
+  const from = /\bfloat\s+west\b/.exec(text);
+  if (!from) return false;
+  const to = /\bfloat\s+weight\b/.exec(text.slice(from.index));
+  if (!to) return false;
+  const after = from.index + to.index;
+  const end = text.indexOf(';', after);
+  if (end < 0) return false;
+  const body = text.slice(from.index, end + 1);
+  return names.every((n) => new RegExp(`\\b${n}\\b`).test(body));
 }
 
 const heads = Object.fromEntries(Object.entries(spec.heads.perBlock).map(([k, v]) => [k, v.builtHead]));
@@ -646,6 +662,21 @@ if (process.argv.includes('--self')) {
     {
       what: 'a weight rewritten without one of its terms is caught',
       caught: !weightNamesEveryTerm(masonry, [...WEIGHT_UNIFORMS, 'uMossNobodyWrote']),
+    },
+    {
+      // The case that says the anchor is a NAME and not a spelling: the same
+      // two declarations typed as a formatter leaves them, and the same ten
+      // terms between them, must still pass.
+      what: 'and the same weight with the two declarations typed differently still passes',
+      caught: weightNamesEveryTerm(
+        masonry.replace(/\bfloat\s+west\s*=/, 'float  west=')
+          .replace(/\bfloat\s+weight\s*=/, 'float\n        weight ='),
+        WEIGHT_UNIFORMS),
+    },
+    {
+      what: 'and a fragment that no longer declares the flank term at all is caught',
+      caught: !weightNamesEveryTerm(masonry.replace(/\bfloat\s+west\b/, 'float ovest'),
+        WEIGHT_UNIFORMS),
     },
     {
       // ------------------------------------------------- THE LOOSE STONE
