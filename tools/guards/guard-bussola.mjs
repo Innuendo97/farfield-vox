@@ -1,5 +1,6 @@
 import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { Euler, Matrix4 } from 'three';
 
 import { POSE_VOX_DAY } from '../../src/core/poses.js';
 import {
@@ -382,19 +383,126 @@ const DEFECTS = {
     (c) => ({ ...c, bearingRadOf: (x, z) => Math.atan2(x, z) }),
 };
 
-/** Whether the engine still turns the camera the way leg 2 is bridged to. */
-function engineStillStates(text) {
-  return /Yaw 0 looks north \(-Z\)\. Forward is \(-sin, -cos\) and right is \(cos, -sin\)/.test(text)
-    && /this\.#euler\.set\(this\.#pitchF\.x, this\.#yawF\.x, 0\)/.test(text)
-    && /'YXZ'/.test(text);
+// ==========================================================================
+// THE TWO LEGS THAT USED TO GATE PROSE, AND WHAT THEY GATE NOW.
+//
+// U-GUARDIA-3's census found this file holding TWO SENTENCES OF COMMENT,
+// punctuation included, as gates: «Yaw 0 looks north (-Z). Forward is (-sin,
+// -cos) and right is (cos, -sin)» in src/core/player.js, and «A BEARING is
+// `atan2(x, -z)`» with «A CAMERA'S YAW is the engine's, `atan2(-x, -z)`» in
+// src/world/contracts.js. A sentence is not a gate. Rewording a comment for the
+// better turned this guard red; writing the sentence over an engine that had
+// stopped agreeing with it turned nothing at all -- and that second failure is
+// the one this campaign has already paid for, twice, with a ring of hills.
+//
+// WHAT THE FIRST SENTENCE ASSERTS IS ARITHMETIC, and arithmetic is asked of a
+// VALUE. `engineBasis()` above is this guard's model of the camera; the thing
+// it models is a YXZ Euler built from pitch and yaw, which is three's own
+// object and can be built here and read back. Over the same seventy-two yaws
+// and five pitches leg 2 sweeps, the two agree TO THE BIT -- worst
+// disagreement 0.000e+0, measured -- so the model is no longer bridged to a
+// sentence but to the engine's own rotation. That is strictly stronger: a
+// sentence goes on being true while the basis moves under it, and this cannot.
+//
+// WHAT REMAINS FOR THE SOURCE is the one thing three cannot answer: WHICH euler
+// player.js builds, and in WHICH ORDER it feeds pitch and yaw into it. That is
+// read structurally -- an order of 'YXZ', and a `.set(` whose three arguments
+// name pitch, then yaw, then nought -- so renaming the private field,
+// re-indenting the call or rewriting the comment above it moves nothing.
+//
+// WHAT THE SECOND PAIR OF SENTENCES ASSERTS is that a session entering by the
+// door finds the compass there. That is a list of NAMES, and it is asked as
+// one: contracts.js re-exports from './compass.js', and what it re-exports has
+// to cover every reading this guard itself asks the compass for. The prose
+// stays where it is, doing what prose does.
+// ==========================================================================
+
+/**
+ * The engine's own rotation, built by three from a YXZ euler of pitch and yaw.
+ *
+ * three writes a rotation in columns: the first is the camera's right, the
+ * second its up, and the third is BACK -- a camera looks down its own negative
+ * Z -- which is why forward is that column negated.
+ */
+function threeBasis(yawDeg, pitchDeg) {
+  const e = new Matrix4()
+    .makeRotationFromEuler(new Euler(pitchDeg * DEG, yawDeg * DEG, 0, 'YXZ')).elements;
+  return {
+    right: [e[0], e[1], e[2]],
+    up: [e[4], e[5], e[6]],
+    forward: [-e[8], -e[9], -e[10]],
+  };
 }
 
-/** Whether the door still publishes the compass with the convention on it. */
-function doorStillCarries(text) {
-  return /from '\.\/compass\.js'/.test(text)
-    && /A BEARING is `atan2\(x, -z\)`/.test(text)
-    && /A CAMERA'S YAW is the engine's, `atan2\(-x, -z\)`/.test(text);
+/** How far this guard's model of the camera stands from the engine's own. */
+function basisGap(model = engineBasis) {
+  let worst = 0;
+  for (let yaw = -175; yaw <= 180; yaw += 5) {
+    for (const pitch of [-40, -4.124, 0, 4.124, 40]) {
+      const mine = model(yaw, pitch);
+      const theirs = threeBasis(yaw, pitch);
+      for (const axis of ['right', 'up', 'forward']) {
+        for (let k = 0; k < 3; k++) {
+          worst = Math.max(worst, Math.abs(mine[axis][k] - theirs[axis][k]));
+        }
+      }
+    }
+  }
+  return worst;
 }
+
+/** The arguments of a call, split on the commas that are not inside brackets. */
+function argumentsOf(call) {
+  const out = [];
+  let depth = 0;
+  let from = 0;
+  for (let i = 0; i < call.length; i++) {
+    const c = call[i];
+    if (c === '(' || c === '[') depth++;
+    else if (c === ')' || c === ']') depth--;
+    else if (c === ',' && depth === 0) { out.push(call.slice(from, i).trim()); from = i + 1; }
+  }
+  out.push(call.slice(from).trim());
+  // A trailing comma is a style and not an argument.
+  while (out.length && out[out.length - 1] === '') out.pop();
+  return out;
+}
+
+/**
+ * Whether the engine still turns the camera the way leg 2 is bridged to.
+ *
+ * BY SHAPE AND BY NAME, never by statement: a euler whose order is YXZ, and a
+ * `set` of three arguments that are pitch, yaw and nought IN THAT ORDER. What
+ * is pinned is two words, and a rename is one word of this reader rather than a
+ * red on a correct edit.
+ */
+function engineTurnsPitchThenYaw(text) {
+  const bare = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  const yxz = /new\s+Euler\s*\([^)]*['"]YXZ['"][^)]*\)/.test(bare)
+    || /\.order\s*=\s*['"]YXZ['"]/.test(bare);
+  const ordered = [...bare.matchAll(/\.set\(([^;()]*(?:\([^()]*\)[^;()]*)*)\)\s*;/g)].some((m) => {
+    const args = argumentsOf(m[1]);
+    return args.length === 3 && /pitch/i.test(args[0]) && /yaw/i.test(args[1])
+      && Number(args[2]) === 0;
+  });
+  return yxz && ordered;
+}
+
+/** Which compass readings the door re-exports from the seat. */
+function doorPublishes(text) {
+  const bare = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  const found = new Set();
+  for (const m of bare.matchAll(/export\s*\{([^}]*)\}\s*from\s*['"]\.\/compass\.js['"]/g)) {
+    for (const name of m[1].split(',')) {
+      const bit = name.trim().split(/\s+as\s+/).pop().trim();
+      if (bit) found.add(bit);
+    }
+  }
+  return found;
+}
+
+/** Whether the door carries every reading this guard asks the compass for. */
+const doorStillCarries = (text, names) => names.every((n) => doorPublishes(text).has(n));
 
 // --------------------------------------------------------------------- run
 
@@ -412,13 +520,61 @@ if (process.argv.includes('--self')) {
     what: 'the world drifting three and a half degrees: every block moved by twice the yaw',
     caught: legs({ ...compass, bearingOf: (x, z) => bearingOf(x, z) - 2 * POSE_VOX_DAY.yaw }, sources).bad.length > 0,
   });
+  // ---- THE BRIDGE, ASKED OF THREE AND NOT OF A SENTENCE
+  //
+  // The model of the camera is bent in the two ways it can be wrong -- the yaw
+  // turned the other way, and the pitch fed after the yaw instead of before --
+  // and both come back through the same reader the run uses.
   cases.push({
-    what: 'src/core/player.js no longer stating the basis leg 2 is bridged to',
-    caught: !engineStillStates(read('src/core/player.js').replace(/Forward is \(-sin, -cos\)/, 'Forward is (sin, cos)')),
+    what: "the guard's own model of the camera turned the other way round the yaw",
+    caught: basisGap((yaw, pitch) => engineBasis(-yaw, pitch)) > 1e-9 && basisGap() === 0,
   });
   cases.push({
-    what: 'src/world/contracts.js no longer publishing the compass',
-    caught: !doorStillCarries(read('src/world/contracts.js').replace(/from '\.\/compass\.js'/, "from './nowhere.js'")),
+    what: 'and the same model with pitch and yaw swapped, which is a different euler order',
+    caught: basisGap((yaw, pitch) => engineBasis(pitch, yaw)) > 1e-9,
+  });
+  // ---- AND THE ONE THING THREE CANNOT ANSWER, READ BY SHAPE
+  const player = read('src/core/player.js');
+  cases.push({
+    what: 'the euler order dropped from YXZ, which is pitch and yaw applied the other way about',
+    caught: !engineTurnsPitchThenYaw(player.replace(/'YXZ'/g, "'XYZ'")),
+  });
+  cases.push({
+    what: 'and the two angles fed in the wrong order, which is the same defect one line down',
+    caught: !engineTurnsPitchThenYaw(
+      player.replace('this.#euler.set(this.#pitchF.x, this.#yawF.x, 0)',
+        'this.#euler.set(this.#yawF.x, this.#pitchF.x, 0)'),
+    ),
+  });
+  // AND THIS IS THE CASE THAT SAYS THE PIN IS GONE: the sentence reworded, the
+  // field renamed, the call re-indented and broken over three lines. What used
+  // to be gated here was the sentence, so every one of these turned this guard
+  // red on an edit that changed nothing about the camera.
+  cases.push({
+    what: 'while a comment reworded, the field renamed and the call broken over three lines still passes',
+    caught: engineTurnsPitchThenYaw(player
+      .replace(/Yaw 0 looks north \(-Z\)\./g, 'At yaw nought the camera faces north, which is -Z.')
+      .replace(/#euler/g, '#rotation')
+      .replace('this.#rotation.set(this.#pitchF.x, this.#yawF.x, 0)',
+        'this.#rotation.set(\n      this.#pitchF.x,\n      this.#yawF.x,\n      0,\n    )')),
+  });
+  // ---- THE DOOR, AS A LIST OF NAMES
+  const contracts = read('src/world/contracts.js');
+  const names = Object.keys(compass);
+  cases.push({
+    what: 'src/world/contracts.js no longer publishing the compass at all',
+    caught: !doorStillCarries(contracts.replace(/from '\.\/compass\.js'/, "from './nowhere.js'"), names),
+  });
+  cases.push({
+    what: 'and one reading quietly dropped from the door, which is how a session writes a fourth compass',
+    caught: !doorStillCarries(contracts.replace(/\boffAxisOf,\s*/, ''), names),
+  });
+  cases.push({
+    what: 'while the same list re-indented, re-ordered and given an alias still carries them all',
+    caught: doorStillCarries(contracts.replace(
+      /export \{\n(?:[^}]*)\n\} from '\.\/compass\.js';/,
+      `export {\n  ${[...names].reverse().join(',\n  ')},\n}\n  from "./compass.js";`,
+    ), names),
   });
   selfTest('guard-bussola', cases);
 }
@@ -434,11 +590,14 @@ r.check(!out.has('yaw'),
   "and the engine's yaw is that compass NEGATED, at every angle and not only at nought",
   out.why('yaw') || `72 yaws x 5 pitches through the YXZ basis player.js states, worst ${out.worstYaw.toExponential(2)} deg`);
 
-// AND THE ENGINE'S STATEMENT OF ITSELF, AS TEXT. The bridge above is built from
-// a sentence in another file; if that sentence goes, the bridge is a guess.
-r.check(engineStillStates(read('src/core/player.js')),
-  'and src/core/player.js still turns the camera the way that bridge assumes',
-  'a YXZ euler, pitch then yaw, and the basis stated in its own words at the walk');
+// AND THE BRIDGE ITSELF, AGAINST THE ENGINE AND NOT AGAINST A SENTENCE. The
+// model leg 2 runs on is three's own rotation or it is a guess.
+r.check(basisGap() === 0,
+  "and the basis leg 2 is bridged to IS the engine's own, to the bit",
+  `72 yaws x 5 pitches through three's YXZ euler of (pitch, yaw, 0), worst ${basisGap().toExponential(2)}`);
+r.check(engineTurnsPitchThenYaw(read('src/core/player.js')),
+  'and src/core/player.js still feeds that euler pitch, then yaw, then nought',
+  "an order of 'YXZ' and a set of three, read by shape so a rename is the only thing that moves it");
 
 r.check(!out.has('projection'),
   'the direction the law computes for a block is where the engine puts it on the frame',
@@ -459,8 +618,9 @@ r.check(!out.has('seat'),
 
 // AND THE DOOR CARRIES IT, so that a session reading the contracts finds the
 // compass there and does not write a fourth one.
-r.check(doorStillCarries(read('src/world/contracts.js')),
-  'and src/world/contracts.js publishes it with the convention written out',
-  'the door every session enters by');
+r.check(doorStillCarries(read('src/world/contracts.js'), Object.keys(compass)),
+  'and src/world/contracts.js publishes every one of those readings',
+  `the door every session enters by carries all ${Object.keys(compass).length}: `
+  + `${[...doorPublishes(read('src/world/contracts.js'))].length} re-exported from ./compass.js`);
 
 r.end(`one compass, bridged to the engine at three named places; the five blocks stand within ${out.worstPicture.toFixed(2)} of a degree of where the reference draws them, against ${(2 * POSE_VOX_DAY.yaw).toFixed(3)} if the bridge is dropped`);
