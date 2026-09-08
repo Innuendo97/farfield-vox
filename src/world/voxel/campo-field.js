@@ -5,8 +5,8 @@ import {
 import { VOXEL } from './columns.js';
 import { CENTRE, DISC_RADIUS } from './worldgen.js';
 import {
-  CAMPO, CAMPO_BEARINGS, CAMPO_BIAS, CAMPO_BLADE_CEIL, CAMPO_FAR, CAMPO_HORIZON_REACH,
-  campoCoarseSpan, campoFarOrigin, campoHorizon,
+  CAMPO, CAMPO_BEARINGS, CAMPO_BIAS, CAMPO_FAR, CAMPO_HORIZON_REACH,
+  campoCoarseSpan, campoFarOrigin, campoHorizon, campoSkyBound,
 } from './campo.js';
 import { campoBox, campoMaterial, campoResolve } from './campo-material.js';
 import { campoUniforms } from '../../core/post.js';
@@ -350,52 +350,30 @@ export function createCampo({
    * marched a cell -- and that is most of the sky, which the box of phase two
    * put back into the frame when it grew to the size of the world.
    *
-   * WHY IT IS ASKED OF SIX METRE PIECES AND NOT OF TILES. It is a MAXIMUM over
-   * the world of (how tall a thing is over the eye) / (how far away it is), and
-   * a far tile is 51.2 m across: one of them holds both the level plateau the
-   * walker stands on and the crown of the ridge, so its single maximum answers
-   * "fourteen metres, right here" and the bound comes out at sixty degrees --
-   * true, and useless. Level four of each tile's own pyramid is a cell of 6.4 m
-   * and the reduction has already taken the highest ground in each, so the
-   * crown is measured at the distance the crown actually stands at. Measured at
-   * the judging pose that is the difference between 63 degrees and 12.
+   * THE ARITHMETIC IS campoSkyBound'S, IN ./campo.js, AND IT IS THE RING'S OWN.
+   * It used to be written out here at the EXACT eye, and that is the defect
+   * U-CAMPO-4 repaired: this number is handed to campoHorizon as the CEILING it
+   * clamps to, and campoHorizon pads itself by CAMPO_HORIZON_REACH -- the eye
+   * lowered and brought nearer by 0.30 m -- for the step the walker takes
+   * before the next count. A ceiling without that padding cut it straight back
+   * off, and what was left to carry the drop was the 0.02 of margin, good for
+   * ground beyond reach/margin = 15 m and no nearer. U-GUARDIA-3 measured what
+   * that costs on ground the walker can touch: +0.0988 and +0.0841 of slope
+   * standing ABOVE the ring the fragment reads, at 11 m and 8 m out. Today's
+   * world has no ground above the eye at all -- the tallest column in the far
+   * window is 0.650 m against an eye at 1.583 -- so nothing breached and
+   * nothing in the frame moves; the day V5 puts a mound beside the walker it
+   * would have been a hole in the ground.
    *
-   * It is a BOUND and not a guess: the ground is a maximum, the mat over it is
-   * the ladder's own ceiling, and the distance is to the NEAREST corner of the
-   * cell, floored at a metre so a cell the walker is standing in cannot make it
-   * infinite. Four thousand cells, a few operations each, and only when the eye
-   * has moved a quarter of a metre.
+   * IT IS THE SAME NUMBER IN BOTH SEATS, and that is the point: the fragment
+   * takes `uSkySlope` FIRST and the ring second, so a padded ring under an
+   * unpadded cheap compare would buy nothing. One padded bound covers both.
+   *
+   * Four thousand cells, a few operations each, and only when the eye has moved
+   * a quarter of a metre -- the same walk it always was.
    */
   function skySlope(eye) {
-    let worst = -1e9;
-    for (const w of windows) {
-      const span = w.shape.span;
-      const cell = campoCoarseSpan(w.shape);
-      const n = Math.round(span / cell);
-      for (const [key, coarse] of w.coarse) {
-        const [cx, cz] = key.split(',').map(Number);
-        const x0 = cx * span;
-        const z0 = cz * span;
-        for (let j = 0; j < n; j += 1) {
-          const az = z0 + j * cell;
-          const dz = Math.max(az - eye.z, 0, eye.z - (az + cell));
-          for (let i = 0; i < n; i += 1) {
-            const top = coarse[j * n + i];
-            if (!top) continue;
-            const ax = x0 + i * cell;
-            const dx = Math.max(ax - eye.x, 0, eye.x - (ax + cell));
-            const y = (top - CAMPO_BIAS) * VOXEL + CAMPO_BLADE_CEIL;
-            if (y <= eye.y) continue;
-            const d = Math.max(1, Math.hypot(dx, dz));
-            const slope = (y - eye.y) / d;
-            if (slope > worst) worst = slope;
-          }
-        }
-      }
-    }
-    // A hand of margin, and a floor of nought: a walker who is above every
-    // scrap of ground in the world still sees the ground under their feet.
-    return Math.max(0, worst) + 0.02;
+    return campoSkyBound(coarsePatches(), eye, CAMPO_HORIZON_REACH);
   }
 
   /**

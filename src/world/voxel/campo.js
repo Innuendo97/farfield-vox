@@ -1062,6 +1062,76 @@ export const CAMPO_HORIZON_REACH = 0.30;
 export const CAMPO_HORIZON_MARGIN = 0.02;
 
 /**
+ * THE SINGLE BOUND -- THE STEEPEST ANYTHING IN THE WORLD STANDS OVER THE EYE.
+ *
+ * The maximum, over every coarse piece of the world, of the slope campoHorizon
+ * writes into that piece's own bearings. It is the ring flattened into one
+ * number: the cheap compare the fragment takes first (uSkySlope), and the
+ * CEILING campoHorizon is clamped to on its last line.
+ *
+ * IT LIVES HERE, BESIDE THE RING, BECAUSE IT IS THE RING'S OWN ARITHMETIC.
+ * U-CAMPO-4 is what moved it. It was written a second time in
+ * ./campo-field.js, at the EXACT eye, and handed to campoHorizon as a ceiling:
+ * the ring pads itself by `reach` for the step the walker takes before the next
+ * count, and the clamp then cut that padding straight back off. What was left
+ * to carry a 0.30 m drop was the 0.02 above, which covers reach/margin = 15.0 m
+ * and no nearer, so ground closer than that stood ABOVE the ring the fragment
+ * read and the ray to it was thrown away. Measured by U-GUARDIA-3 on its own
+ * banks: +0.0988 and +0.0841 of slope, on ground 11 m and 8 m out.
+ *
+ * So the two are one function and the padding is in both:
+ *
+ *   THE EYE IS THE SAME BOX. Lowered by `reach` (eyeLow), and every cell
+ *   measured from `reach` nearer than its nearest corner really is -- the same
+ *   two lines campoHorizon takes, so the bound is a maximum OF the ring's own
+ *   slopes and can never stand under one of them. The clamp is therefore an
+ *   identity today, and it is kept because it is the one place both numbers are
+ *   known and the invariant «the ring may only ever cut MORE» is worth keeping
+ *   written down.
+ *
+ *   THE FLOOR OF NOUGHT AND THE HAND OF MARGIN stay exactly as they were: a
+ *   walker above every scrap of ground in the world still sees the ground under
+ *   their feet.
+ *
+ * WHY IT IS ASKED OF SIX METRE PIECES AND NOT OF TILES: a far tile is 51.2 m
+ * across and holds both the level plateau the walker stands on and the crown of
+ * the ridge, so its single maximum answers «fourteen metres, right here» and
+ * the bound comes out at sixty degrees -- true, and useless. Level four of each
+ * tile's own pyramid is a cell of 6.4 m and the reduction has already taken the
+ * highest ground in each, so the crown is measured at the distance the crown
+ * actually stands at.
+ *
+ * @param {Iterable} patches  the same {x0, z0, cell, n, top} campoHorizon eats
+ * @param {{x,y,z}} eye       where the walker stands
+ * @param {number} reach      how far they may go before the next count
+ * @returns {number} the slope no ground in the world stands above
+ */
+export function campoSkyBound(patches, eye, reach = CAMPO_HORIZON_REACH) {
+  let worst = -1e9;
+  const eyeLow = eye.y - reach;
+  for (const patch of patches) {
+    const { x0, z0, cell, n, top } = patch;
+    for (let j = 0; j < n; j += 1) {
+      const az = z0 + j * cell;
+      const dz = Math.max(az - eye.z, 0, eye.z - (az + cell));
+      for (let i = 0; i < n; i += 1) {
+        const byte = top[j * n + i];
+        // A piece with no column in it casts nothing: campoCoarse's own nought.
+        if (!byte) continue;
+        const y = (byte - CAMPO_BIAS) * VOXEL + CAMPO_BLADE_CEIL;
+        if (y <= eyeLow) continue;
+        const ax = x0 + i * cell;
+        const dx = Math.max(ax - eye.x, 0, eye.x - (ax + cell));
+        const d = Math.max(1, Math.hypot(dx, dz) - reach);
+        const s = (y - eyeLow) / d;
+        if (s > worst) worst = s;
+      }
+    }
+  }
+  return Math.max(0, worst) + CAMPO_HORIZON_MARGIN;
+}
+
+/**
  * WHAT THE LAST RING COST, AS A COUNT.
  *
  * E-PERF4 is the reason this is here and the reason it is a COUNT. The spikes
@@ -1099,15 +1169,22 @@ export function campoHorizonCost() { return { ...HORIZON_COST }; }
  *                            campoCoarse laid (nought where no column stands)
  * @param {{x,y,z}} eye       where the walker stands
  * @param {number} reach      how far they may go before the next count
- * @param {number} ceiling    the single bound the ring may never stand above.
- *                            THE RING MAY ONLY EVER CUT MORE. Its own slopes
- *                            are taken from a padded eye -- lower by `reach`,
- *                            nearer by `reach` -- so on the bearing of the
- *                            steepest thing in the world it comes out a
- *                            hundredth or two ABOVE skySlope's exact answer,
- *                            which would be a regression wearing the clothes of
- *                            a feature. Clamped here, in the one place both
+ * @param {number} ceiling    the single bound the ring may never stand above --
+ *                            campoSkyBound, of the same patches and the same
+ *                            eye. THE RING MAY ONLY EVER CUT MORE: a bearing
+ *                            above the one bound would be a regression wearing
+ *                            the clothes of a feature, and the fragment takes
+ *                            the cheap compare first anyway, so it could never
+ *                            be reached. Clamped here, in the one place both
  *                            numbers are known, rather than at the seat.
+ *                            IT MUST CARRY THE SAME PADDING THIS RING DOES.
+ *                            U-CAMPO-4: the ceiling used to be taken at the
+ *                            EXACT eye, and this clamp then cut off the whole
+ *                            0.30 m the ring pads by for the walker's step --
+ *                            +0.0988 of slope through the ring on ground 11 m
+ *                            out. campoSkyBound is a maximum OF the slopes
+ *                            below, so the clamp is now an identity, and it
+ *                            stays because the invariant is worth writing down.
  * @returns {Float32Array} out
  */
 export function campoHorizon(out, patches, eye, reach = CAMPO_HORIZON_REACH,
@@ -1204,6 +1281,10 @@ export function campoHorizon(out, patches, eye, reach = CAMPO_HORIZON_REACH,
       }
     }
   }
+  // The ceiling. campoSkyBound takes the maximum of exactly the slope computed
+  // above, over exactly these cells, so nothing here can stand over it and this
+  // line cannot take a bearing below what its own padding asked for. That is
+  // the whole of U-CAMPO-4; the line is kept as the invariant's one seat.
   for (let b = 0; b < bins; b += 1) if (out[b] > ceiling) out[b] = ceiling;
   return out;
 }

@@ -186,6 +186,7 @@ export {
   campoMaterialCode,
   campoReduce,
   campoShape,
+  campoSkyBound,
   campoSlimCode,
   campoSlimEighths,
   campoSlot,
