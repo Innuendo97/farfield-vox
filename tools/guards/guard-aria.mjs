@@ -79,30 +79,28 @@ export const FITTED = { density: 0.0059, scaleHeight: 42 };
 //   * THE CEILING on the low haze, 0.13. It is what that term is worth a little
 //     past the last window it was fitted on, so E-LUCE2's fit is kept where it
 //     was measured and stops where it stopped being measured.
-//   * THE THREE BETAS, 0.001105 / 0.001904 / 0.002611, solved so that the two
-//     terms TOGETHER land on the fractions R6 measured at the middle crest —
-//     0.25 / 0.44 / 0.62, four hundred metres out, ten metres over the water.
-//     Red and green come out on R6's own two numbers to three digits.
-//   * THE TURN, 700 m, and the PALE END the colour turns into.
+//   * THE THREE BETAS, 0.001653 / 0.003331 / 0.005559, which are R6 §2.3's own
+//     published column — 0.25 / 0.44 / 0.62 — inverted through Beer-Lambert over
+//     the path between the two planes it is measured between.
+//   * THE ORIGIN of that path, 175 m, and the PALE END the colour turns into.
 //
-// AND THE ONE THING THE LINE ABOUT THE BETAS DOES NOT SAY, WHICH COST A UNIT ITS
-// FIT. R6 §2.3's column is a RELATIVE scale: its near flank in shadow is
-// 0 / 0 / 0 and its pale far hills are 1 / 1 / 1, so 0.25 / 0.44 / 0.62 is the
-// fraction of the way from the near flank to the pale veil and not the fraction
-// of air between the eye and the crest. This guard pins the ABSOLUTE fraction,
-// which is what the shipped triple produces; it now PRINTS the relative one
-// beside it, so that the two are never again read as the same number.
+// AND THE ONE THING THE LINE ABOUT THE BETAS USED TO GET WRONG, WHICH COST TWO
+// UNITS THEIR FIT. R6 §2.3's column is a RELATIVE scale: its near flank in
+// shadow is 0 / 0 / 0 and its pale far hills are 1 / 1 / 1, so 0.25 / 0.44 / 0.62
+// is the fraction of the way from the near flank to the pale veil and not the
+// fraction of air between the eye and the crest. This guard used to pin the
+// ABSOLUTE fraction and merely PRINT the relative one, because under the old
+// shape a triple fitted on the relative reading lost the middle crest (U-LUCE-6
+// measured it and the coordinator refused to ship it).
 //
-// AND IT PRINTS RATHER THAN GATES IT, deliberately. U-LUCE-6 refitted the triple
-// on the relative reading — 0.001776 / 0.002521 / 0.003257 — and measured what
-// it does: with the hill's pigment at zero the air alone stands OVER the
-// reference on all three channels at the middle crest, which is a plane no
-// palette can then reach, and the near flank the refit exists to clear takes
-// more air rather than less. A guard that gated the relative number would gate
-// a triple the picture rejects; a guard that hid it would let the confusion back
-// in. So the number is on the report and the choice is the coordinator's. The
-// reasoning, and what the near flank's floor is actually made of, is written
-// over AIR_BETA in the door.
+// THAT IS THE OTHER WAY ROUND NOW, AND THE REASON IS THE SHAPE. Since U-LUCE-8
+// the distance term's path has its ORIGIN at the near flank — which is where the
+// column has its zero, and where the cornice's palette was measured — so the
+// relative column and the law's own fraction are the same number and there is
+// nothing left to convert. So the RELATIVE reading is what is gated here, at
+// R6's three published figures, and the absolute one is what is printed beside
+// it. A guard that gated the absolute one now would be gating a quantity the
+// reference never published.
 //
 // AND WHAT THIS GUARD STILL DOES NOT ASSERT: the two ends as COLOURS. The near
 // end is the ramp itself, read at a declared elevation by the door in
@@ -113,8 +111,8 @@ export const FITTED = { density: 0.0059, scaleHeight: 42 };
 // whatever preset arrives and read where it was measured to be read.
 export const DISTANCE = {
   lowCap: 0.13,
-  beta: [0.001105, 0.001904, 0.002611],
-  turn: 700,
+  beta: [0.001653, 0.003331, 0.005559],
+  origin: 175,
   pale: [0.1988, 0.603064, 1.196391],
 };
 
@@ -133,18 +131,40 @@ export function doorDistance(text) {
   return {
     lowCap: DOOR_NUMBER(text, 'FOG_LOW_CAP'),
     beta: DOOR_TRIPLE(text, 'AIR_BETA'),
-    turn: DOOR_NUMBER(text, 'AIR_TURN_METRES'),
+    origin: DOOR_NUMBER(text, 'AIR_PATH_ORIGIN'),
     pale: DOOR_TRIPLE(text, 'AIR_PALE'),
   };
 }
+
+// AND THE SHAPE ITSELF, WHICH IS THE THING A TRIPLE CANNOT BE CHECKED WITHOUT.
+//
+// Two units moved numbers inside a shape that was wrong and measured that the
+// numbers could not pay for it. So the shape is now asserted where the fragment
+// states it, in the four characters that decide it: that the distance's path
+// starts at the origin and not at the eye, that what runs over it is
+// Beer-Lambert and not a square, and that the pale end is reached as the square
+// of the veil rather than over a length in metres. Read as text, because a guard
+// should not need a browser's worth of module graph to ask what a shader says.
+export const SHAPE = {
+  path: /float path = max\(distance \* airMean\(fragmentHeight\) - uAirLaw\.y, 0\.0\);/,
+  beer: /return 1\.0 - exp\(-uAirBeta \* path\);/,
+  second: /return mix\(uAirNear, uAirPale, veil\.g \* veil\.g\);/,
+  haze: /return min\(uAirLaw\.x, 1\.0 - exp\(-depth \* depth\)\);/,
+};
+
+/** Whether the door's own shader states the law this guard is fitted to. */
+export const doorShape = (text) => Object.fromEntries(
+  Object.entries(SHAPE).map(([k, re]) => [k, re.test(text)]),
+);
 
 /**
  * The two terms, walked here in the other language, so that the shape the
  * fragment computes can be asked a question about without a browser.
  *
  * Same arithmetic as FOG_GLSL: one height integral shared by both, the low haze
- * capped, the distance per channel, and the low haze applied LAST because it is
- * the air nearest the eye.
+ * capped and gaussian, the distance per channel and Beer-Lambert over the path
+ * beyond the origin, and the low haze applied LAST because it is the air
+ * nearest the eye.
  */
 export function airAt(distance, height, eyeHeight = 1.7, law = DISTANCE,
   fitted = FITTED) {
@@ -153,8 +173,9 @@ export function airAt(distance, height, eyeHeight = 1.7, law = DISTANCE,
   const b = Math.exp(-Math.max(height, 0) / fitted.scaleHeight);
   const mean = Math.abs(dy) < 0.01 ? a : ((a - b) * fitted.scaleHeight) / dy;
   const g = Math.min(law.lowCap, 1 - Math.exp(-((distance * fitted.density * mean) ** 2)));
+  const path = Math.max(distance * mean - law.origin, 0);
   return law.beta.map((beta) => {
-    const f = 1 - Math.exp(-((distance * beta * mean) ** 2));
+    const f = 1 - Math.exp(-beta * path);
     return 1 - (1 - f) * (1 - g);
   });
 }
@@ -354,27 +375,57 @@ if (process.argv.includes('--self')) {
       caught: doorDistance('export const FOG_LOW_CAP = 1.0;').lowCap !== DISTANCE.lowCap,
     },
     {
-      what: 'a beta put back to the R6 triple, fitted without the haze under it, is caught',
-      caught: doorDistance('export const AIR_BETA = [0.0011, 0.0019, 0.0023];')
+      what: 'a beta put back to the triple the old gaussian shape asked for is caught',
+      caught: doorDistance('export const AIR_BETA = [0.001105, 0.001904, 0.002611];')
         .beta.some((v, c) => v !== DISTANCE.beta[c]),
     },
     {
       what: 'the door as it stands carries the four the distance was fitted to',
       caught: (() => {
         const d = doorDistance(read(DOOR));
-        return d.lowCap === DISTANCE.lowCap && d.turn === DISTANCE.turn
+        return d.lowCap === DISTANCE.lowCap && d.origin === DISTANCE.origin
           && d.beta.every((v, c) => v === DISTANCE.beta[c])
           && d.pale.every((v, c) => v === DISTANCE.pale[c]);
       })(),
     },
     {
-      what: 'the two terms reproduce the air the reference puts on its middle crest',
-      caught: airAt(400, 10).every((v, c) => Math.abs(v - [0.25, 0.44, 0.62][c]) < 0.02),
+      what: 'an origin put back to the eye is caught',
+      caught: doorDistance('export const AIR_PATH_ORIGIN = 0;').origin !== DISTANCE.origin,
     },
     {
-      what: 'the relative reading is the RELATIVE one and not the absolute one again',
+      what: 'and one moved by a single metre',
+      caught: doorDistance('export const AIR_PATH_ORIGIN = 176;').origin !== DISTANCE.origin,
+    },
+    {
+      what: 'THE SHAPE: a path taken from the eye instead of from the origin is caught',
+      caught: !doorShape('float path = distance * airMean(fragmentHeight);').path,
+    },
+    {
+      what: 'and a square put back over the path, which is the haze fit lent to this term',
+      caught: !doorShape('return 1.0 - exp(-uAirBeta * path * path);').beer,
+    },
+    {
+      what: 'and a turn put back on a length in metres instead of on the veil',
+      caught: !doorShape('return mix(uAirNear, uAirPale, 1.0 - exp(-distance / uAirLaw.y));')
+        .second,
+    },
+    {
+      what: 'and the low haze losing the gaussian of E-LUCE2, which this unit did NOT touch',
+      caught: !doorShape('return min(uAirLaw.x, 1.0 - exp(-depth));').haze,
+    },
+    {
+      what: 'the door as it stands states all four characters of the law',
+      caught: Object.values(doorShape(read(DOOR))).every(Boolean),
+    },
+    {
+      what: 'the RELATIVE column is the one R6 published, on the scale R6 published it on',
       caught: relativeAt(R6_PLANES.near, R6_PLANES.crest)
-        .every((v, c) => v < airAt(...R6_PLANES.crest)[c] - 0.05),
+        .every((v, c) => Math.abs(v - [0.25, 0.44, 0.62][c]) < 0.01),
+    },
+    {
+      what: 'and it is the relative one and not the absolute one wearing its name',
+      caught: airAt(...R6_PLANES.crest)
+        .some((v, c) => Math.abs(v - [0.25, 0.44, 0.62][c]) > 0.05),
     },
     {
       what: 'and the low haze leaves the relative reading, as the ceiling makes it',
@@ -383,6 +434,10 @@ if (process.argv.includes('--self')) {
         return relativeAt(R6_PLANES.near, R6_PLANES.crest, 1.7, other)
           .every((v, c) => Math.abs(v - relativeAt(R6_PLANES.near, R6_PLANES.crest)[c]) < 1e-9);
       })(),
+    },
+    {
+      what: 'the near flank carries NO distance air, which is what the origin is for',
+      caught: airAt(...R6_PLANES.near).every((v) => Math.abs(v - DISTANCE.lowCap) < 1e-9),
     },
     {
       what: 'and leave the walk of E-LUCE2 where it was measured, inside sixty metres',
@@ -471,9 +526,16 @@ report.check(door.lowCap === DISTANCE.lowCap,
 report.check(door.beta !== null && door.beta.every((v, c) => v === DISTANCE.beta[c]),
   `and carries the distance per channel at ${DISTANCE.beta.join(' / ')}`,
   door.beta === null ? 'not found' : door.beta.join(' / '));
-report.check(door.turn === DISTANCE.turn,
-  `and turns from the sky's blue to the pale veil over ${DISTANCE.turn} m`,
-  door.turn === null ? 'not found' : `${door.turn}`);
+report.check(door.origin === DISTANCE.origin,
+  `and measures that path from ${DISTANCE.origin} m of it, which is where the near flank stands`,
+  door.origin === null ? 'not found' : `${door.origin}`);
+const shape = doorShape(read(DOOR));
+report.check(Object.values(shape).every(Boolean),
+  'and the fragment states the law in the four characters that decide it',
+  `path from the origin ${shape.path ? 'yes' : 'NO'}, Beer-Lambert over it `
+  + `${shape.beer ? 'yes' : 'NO'}, the pale end as the square of the veil `
+  + `${shape.second ? 'yes' : 'NO'}, the gaussian of E-LUCE2 still on the low haze `
+  + `${shape.haze ? 'yes' : 'NO'}`);
 report.check(door.pale !== null && door.pale.every((v, c) => v === DISTANCE.pale[c]),
   'and the pale end develops to the 149/187/213 the reference shows on its far hills',
   door.pale === null ? 'not found' : door.pale.join(' / '));
@@ -510,31 +572,41 @@ report.line(`  read at five degrees — which is where the near flank at 227 m a
 report.line(`  ${lower.map((v) => v.toFixed(4)).join(' / ')} against `
   + `${shipped.map((v) => v.toFixed(4)).join(' / ')}: measured through the delivered chain that `
   + `loses the middle crest (the air`);
-report.line('  alone reads 84 / 147 / 199 against the 83 / 139 / 180 of the reference) and puts the near '
-  + 'flank floor at 163 of blue against 148 today');
-report.line('  and 103 in the reference. The error is monotone in the elevation and bottoms at the '
-  + 'zenith: no elevation is named by the reference. D-L6-1');
+report.line('  alone reads 84 / 147 / 199 against the 83 / 139 / 180 of the reference) and put more '
+  + 'air on the near flank rather than less. The error is');
+report.line('  monotone in the elevation and bottoms at the zenith: no elevation is named by the '
+  + 'reference. D-L6-1. The measurement was taken under the OLD');
+report.line('  shape, whose distance term reached the near flank at all; under the origin of '
+  + 'U-LUCE-8 it does not, so the near end no longer touches that');
+report.line('  plane and the floor there is the low haze alone, 16 / 76 / 111 of blue against the '
+  + '103 the reference reads. The lever moved planes, not size');
 
 const crest = airAt(400, 10);
 const near = [35, 60].map((d) => airAt(d, 1.0)[1]);
+const relative = relativeAt(R6_PLANES.near, R6_PLANES.crest);
 report.line('');
-report.check(crest.every((v, c) => Math.abs(v - [0.25, 0.44, 0.62][c]) < 0.02),
-  'the two together put on the middle crest, FROM THE EYE, the fractions R6 tabulates',
-  `${crest.map((v) => v.toFixed(2)).join(' / ')} against 0.25 / 0.44 / 0.62 at 400 m, 10 m up`);
+report.check(relative.every((v, c) => Math.abs(v - [0.25, 0.44, 0.62][c]) < 0.02),
+  'the crest measured FROM THE NEAR FLANK carries the column R6 tabulates, on the scale it '
+  + 'tabulates it on',
+  `${relative.map((v) => v.toFixed(3)).join(' / ')} against 0.25 / 0.44 / 0.62, `
+  + `from ${R6_PLANES.near.join(' m, ')} m up to ${R6_PLANES.crest.join(' m, ')} m up`);
+report.check(airAt(...R6_PLANES.near).every((v) => Math.abs(v - DISTANCE.lowCap) < 1e-9),
+  'and the near flank itself carries no distance air at all, which is what the origin is for',
+  'the air of those 227 m is already inside the pigment U-CORNICE-2 solved against that plane');
 
 // AND THE SAME CREST MEASURED FROM THE NEAR FLANK, which is the scale R6's
 // column is actually built on. Printed and not gated: see the note over
 // DISTANCE for the measurement that says why, and AIR_BETA in the door for what
 // the near flank's floor is made of.
-const relative = relativeAt(R6_PLANES.near, R6_PLANES.crest);
-report.line(`  the same crest measured from the near flank at ${R6_PLANES.near.join(' m, ')} m up, `
-  + 'which is the scale R6 §2.3 tabulates on');
-report.line(`  reads ${relative.map((v) => v.toFixed(2)).join(' / ')} against its 0.25 / 0.44 / 0.62. `
-  + 'A triple fitted on THAT comes to 0.001776 / 0.002521 / 0.003257 and');
-report.line('  was measured and rejected: it puts the air alone over the reference on all three '
-  + 'channels at the crest, which is a plane no palette then reaches, and');
-report.line('  leaves more air on the near flank rather than less. The near flank\'s own floor is '
-  + '37 levels of blue this term\'s and 8 the ceiling\'s. Owner: the coordinator');
+report.line('  the same crest measured FROM THE EYE reads '
+  + `${crest.map((v) => v.toFixed(3)).join(' / ')}, which is a different quantity and is printed `
+  + 'rather than gated:');
+report.line('  the reference never published it. Under the old gaussian this guard gated THAT and '
+  + 'printed the relative one, and two units spent themselves');
+report.line('  refitting a triple inside a shape whose zero stood at the eye. What is left over the '
+  + 'reference at the near flank, measured on the pigment,');
+report.line('  is 5 / 16 / 33 and ALL of it the low haze ceiling: E-LUCE2, frozen. Owner of what '
+  + 'remains: the coordinator, D-L8-1');
 report.check(Math.abs(near[1] - 0.11) < 0.02 && Math.abs(near[0] - 0.04) < 0.02,
   'and leave the walk inside sixty metres where E-LUCE2 measured it',
   `${near[0].toFixed(3)} at 35 m and ${near[1].toFixed(3)} at 60 m, `
