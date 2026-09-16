@@ -8,6 +8,7 @@ import {
   bearingRadOf, directionOf, frameReadOfBearing, offAxisOf, turnOf, yawOfBearing,
 } from '../../src/world/compass.js';
 import { MONOLITHS } from '../../src/world/layout.js';
+import { projectTarget } from '../grade/lib/framing.mjs';
 import { REPO_ROOT, read, reporter, selfTest } from './lib.mjs';
 
 // GUARD-BUSSOLA -- THERE IS ONE NORTH, AND IT IS THE ONE THE PICTURE HAS.
@@ -242,6 +243,58 @@ function compassShaped(source) {
   return found;
 }
 
+/**
+ * EVERY TOOL THAT BUILDS THE REFERENCE CAMERA WITHOUT ITS YAW.
+ *
+ * WHY THIS IS A SECOND CENSUS AND NOT AN ARGUMENT TO THE FIRST. The one below
+ * walks src/ and assets-src/ looking for a second COMPASS; this one walks
+ * tools/ looking for a second CAMERA, which is a different mistake with the
+ * same cause. Until U-GRADE-1 tools/ was under neither, and that is exactly
+ * where three wrong projections of this picture lived for three sessions --
+ * `buildStoneMask` in grade/lib/target.mjs, `project` in monoliths/faces.mjs
+ * and terrain/silhouette.mjs -- each one rebuilding the lens out of POSE's
+ * pitch and field of view and quietly leaving the yaw out. One of them said so
+ * in a comment: «the camera looks north with a small upward tilt».
+ *
+ * THE SHAPE. A file that names the reference pose's own angles -- POSE.pitch or
+ * POSE.fov, the pose framing.mjs reads out of src/core/poses.js -- is building
+ * THAT camera and nothing else. Such a file must also reach the yaw: either
+ * through the seat (projectTarget, projectorFor, makePixel, makeRay) or by
+ * naming POSE.yaw or the compass bridge itself. A file that carries the pitch
+ * and not the yaw is the defect, written out.
+ *
+ * A pose of somebody's OWN -- `pose.fov` off a survey entry, a walker's camera,
+ * the recipe's -- is not this camera and is not asked about here: outline.mjs
+ * projects a camera given to it, and correctly.
+ */
+const YAWLESS = /\bPOSE\.(pitch|fov)\b/;
+const REACHES_THE_YAW = /\b(projectTarget|projectorFor|makePixel|makeRay|POSE\.yaw|offAxisOf)\b/;
+
+function toolCameras(files = null) {
+  const out = [];
+  const walk = (rel) => {
+    for (const name of readdirSync(join(REPO_ROOT, rel))) {
+      const path = `${rel}/${name}`;
+      if (statSync(join(REPO_ROOT, path)).isDirectory()) {
+        if (name !== 'node_modules' && name !== 'bin') walk(path);
+        continue;
+      }
+      if (/\.(js|mjs)$/.test(name)) out.push({ file: path, text: read(path) });
+    }
+  };
+  if (files) out.push(...files);
+  else walk('tools');
+  return out
+    .map(({ file, text }) => ({
+      file,
+      // Comments first: this guard and framing.mjs both write the defect out in
+      // prose on purpose, and prose is not a camera.
+      bare: text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1'),
+    }))
+    .filter(({ bare }) => YAWLESS.test(bare) && !REACHES_THE_YAW.test(bare))
+    .map(({ file }) => file);
+}
+
 /** Every source the world and its fits are written in. */
 function sourcesOf() {
   const out = [];
@@ -265,7 +318,7 @@ function sourcesOf() {
 // All six against ONE set of compass functions, so that the injection below can
 // hand them a bent one and read the same verdict.
 
-function legs(C, sources) {
+function legs(C, sources, projector = projectTarget, cameras = toolCameras()) {
   const bad = [];
   const no = (tag, detail) => bad.push({ tag, detail });
 
@@ -348,8 +401,30 @@ function legs(C, sources) {
   const second = sources.filter((s) => s.seats.length && !s.file.endsWith('compass.js'));
   if (second.length) no('seat', second.map((s) => `${s.file}: ${s.seats.join(', ')}`).join('; '));
 
+  // (7) AND ONE CAMERA, WHICH IS THE OTHER HALF OF THE SAME SENTENCE.
+  //
+  // The legs above prove the LAW is right. They proved it while three tools
+  // under tools/ were projecting this picture with the yaw left out, because
+  // nothing here had ever looked at tools/. So the seat the tools call --
+  // framing.mjs's projectTarget, which every offline measurement of the
+  // reference now goes through -- is asked the same question leg 4 asks the
+  // law, against the same five columns and the same tolerance; and the census
+  // says nobody has written a second one.
+  let worstSeat = 0; const seatSeen = [];
+  for (const [id, column] of REFERENCE) {
+    const m = BLOCKS.find((b) => b.id === id);
+    const cols = cornersOf(m).map((q) => projector(...q)).filter(Boolean).map((q) => q.x);
+    const mid = (Math.min(...cols) + Math.max(...cols)) / 2;
+    const off = Math.abs(Math.atan((mid - column) / FOCAL) / DEG);
+    worstSeat = Math.max(worstSeat, off);
+    seatSeen.push(`${id}  seat -> column ${mid.toFixed(1).padStart(7)}   reference ${String(column).padStart(6)}`
+      + `   ${(mid - column).toFixed(1).padStart(6)} px = ${off.toFixed(3)} deg`);
+  }
+  if (worstSeat > PICTURE_TOL) no('seat-picture', `worst ${worstSeat.toFixed(3)} deg against ${PICTURE_TOL}`);
+  if (cameras.length) no('camera', cameras.join(', '));
+
   return {
-    bad, worstYaw, worstCorner, worstPicture, corners, seen, half,
+    bad, worstYaw, worstCorner, worstPicture, corners, seen, half, worstSeat, seatSeen,
     has: (tag) => bad.some((b) => b.tag === tag),
     why: (tag) => bad.filter((b) => b.tag === tag).map((b) => b.detail)[0] ?? '',
   };
@@ -576,6 +651,45 @@ if (process.argv.includes('--self')) {
       `export {\n  ${[...names].reverse().join(',\n  ')},\n}\n  from "./compass.js";`,
     ), names),
   });
+  // ---- AND THE TWO SHAPES U-GRADE-1 FOUND IN tools/, EACH BENT BACK
+  //
+  // The first is the defect itself: the tools' seat with its yaw taken out,
+  // which is what buildStoneMask, faces.mjs and silhouette.mjs all did. The
+  // second is the HALF correction that looks right -- the yaw put back and the
+  // walker's sentinel left standing where the lens belongs -- because the two
+  // errors partly cancelled and fixing one alone reads worse on the near block
+  // than fixing neither.
+  const yawless = (wx, wy, wz) => {
+    const tanV = Math.tan(POSE_VOX_DAY.fov * DEG / 2);
+    const tanH = tanV * (FRAME_PX.w / FRAME_PX.h);
+    const cp = Math.cos(-POSE_VOX_DAY.pitch * DEG); const sp = Math.sin(-POSE_VOX_DAY.pitch * DEG);
+    const x = wx - 0; const y = wy - 1.70; const z = wz - 14;
+    const cy = y * cp - z * sp; const cz = y * sp + z * cp;
+    if (cz > -1e-6) return null;
+    return { x: (x / -cz / tanH * 0.5 + 0.5) * FRAME_PX.w, y: (0.5 - cy / -cz / tanV * 0.5) * FRAME_PX.h };
+  };
+  const halfFixed = (wx, wy, wz) => {
+    const shifted = projectTarget(wx + POSE_VOX_DAY.position.x, wy + (POSE_VOX_DAY.position.y - 1.70),
+      wz + (POSE_VOX_DAY.position.z - 14));
+    return shifted;
+  };
+  cases.push({
+    what: "the tools' camera with the yaw dropped, which is what three of them did",
+    caught: legs(compass, sources, yawless).bad.length > 0,
+  });
+  cases.push({
+    what: "and the half correction: the yaw put back with the walker's eye left under it",
+    caught: legs(compass, sources, halfFixed).bad.length > 0,
+  });
+  cases.push({
+    what: "a tool that names this pose's pitch and never reaches its yaw",
+    caught: legs(compass, sources, projectTarget,
+      toolCameras([{ file: 'tools/elsewhere.mjs', text: 'const sp = Math.sin(POSE.pitch * DEG);' }])).bad.length > 0,
+  });
+  cases.push({
+    what: 'while one that names the pitch AND goes through the seat passes',
+    caught: toolCameras([{ file: 'tools/fine.mjs', text: 'Math.tan(POSE.fov / 2); projectTarget(1, 2, 3);' }]).length === 0,
+  });
   selfTest('guard-bussola', cases);
 }
 
@@ -615,6 +729,21 @@ r.check(!out.has('read'),
 r.check(!out.has('seat'),
   'and there is ONE seat: no second atan2(x, -z) anywhere in src/ or assets-src/',
   out.why('seat') || `${sources.length} sources read; the ${sources.find((s) => s.file.endsWith('compass.js')).seats.length} readings of the compass are all in src/world/compass.js`);
+
+// AND THE TOOLS PROJECT THIS PICTURE THROUGH ONE CAMERA, WHICH IS THE OTHER
+// HALF OF THE SAME SENTENCE (U-GRADE-1). Everything above was green on the day
+// the stone mask, the face rectangles and the silhouette reader were each
+// projecting the reference with the yaw left out, because none of them is in
+// src/ and this guard had never looked anywhere else.
+r.check(!out.has('seat-picture'),
+  'and the camera the TOOLS project this picture with lands the same five blocks there',
+  out.why('seat-picture') || `grade/lib/framing.mjs projectTarget, worst ${out.worstSeat.toFixed(3)} deg against ${PICTURE_TOL}`);
+for (const line of out.seatSeen) r.line(`          ${line}`);
+
+r.check(!out.has('camera'),
+  'and no tool builds this camera again without its yaw',
+  out.why('camera') || `every file under tools/ that names POSE.pitch or POSE.fov reaches the yaw, `
+  + 'through the seat or through the compass bridge');
 
 // AND THE DOOR CARRIES IT, so that a session reading the contracts finds the
 // compass there and does not write a fourth one.
