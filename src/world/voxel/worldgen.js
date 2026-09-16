@@ -1,7 +1,7 @@
 import { AREA_CENTER, MONOLITHS, PLATFORM, STAIRS } from '../layout.js';
 import {
-  BASE_LEVEL, pathCentreSlope, pathCentreX, pathCoord, pathEdge, pathHalfWidth,
-  pathOffset, pathRun,
+  BASE_LEVEL, PATH_STONE_END_Z, pathCentreSlope, pathCentreX, pathCoord, pathEdge,
+  pathHalfWidth, pathOffset, pathRun,
 } from '../terrain-field.js';
 import {
   BLADE, BLADES_PER_VOXEL, MATERIAL, NO_COLUMN, SUB, VOXEL,
@@ -1542,6 +1542,59 @@ export function onPaving(x, z) {
 }
 
 /**
+ * THE BOX THE CORRIDOR LIVES IN, AND IT IS MEASURED AND NOT TYPED.
+ *
+ * WHAT IT IS FOR. The greedy disc CARRIES the paving -- the field marks the
+ * corridor's columns PATH so that a ray stops on the stone at the right height
+ * and stands aside for the family that draws it (E-SENT4, campoMaterialCode in
+ * ./campo.js) -- and how far the greedy is asked to cut is a tier's dial about
+ * the MEADOW. Where the two disagreed the ground had no drawer at all, and what
+ * the walker saw there was the sky: see the note over the rim test in
+ * columnSpec. So both of the disc's gates -- the chunks it asks for and the
+ * columns it lays -- have to let the corridor through whatever radius the tier
+ * asked for, and both of them need to know where the corridor is before a
+ * single column has been built.
+ *
+ * IT IS SAMPLED OFF pathRun AND pathEdge AND NOTHING ELSE, at a step of one
+ * column, so a refit of the run or of the width carries this with it and no
+ * second statement of where the stone goes can drift away from the first. The
+ * run is bounded by pathRun's own smoothsteps, which are nought outside
+ * [PATH_STONE_END_Z, 30]; the sweep starts a metre either side of that and the
+ * assertion that it found the ends is that the first and last sample are empty.
+ */
+export const CORRIDOR_BOX = (() => {
+  let x0 = Infinity;
+  let x1 = -Infinity;
+  let z0 = Infinity;
+  let z1 = -Infinity;
+  for (let iz = Math.floor((PATH_STONE_END_Z - 1) / VOXEL);
+    iz <= Math.ceil(31 / VOXEL); iz += 1) {
+    const z = (iz + 0.5) * VOXEL;
+    if (pathRun(z) <= 0) continue;
+    const slope = pathCentreSlope(z);
+    const sec = Math.sqrt(1 + slope * slope);
+    const centre = pathCentreX(z);
+    const left = centre - pathEdge(z, -1) * sec;
+    const right = centre + pathEdge(z, 1) * sec;
+    if (left < x0) x0 = left;
+    if (right > x1) x1 = right;
+    if (z < z0) z0 = z;
+    if (z > z1) z1 = z;
+  }
+  // The verge is counted in COLUMNS either side of the stone (corridorAt), so
+  // the box has to carry the widest verge the law can write before it can be
+  // used as a gate. PATH.verge.max is that number and it is read, not assumed.
+  const hem = PATH.verge.max * VOXEL;
+  return { x0: x0 - hem, x1: x1 + hem, z0: z0 - hem, z1: z1 + hem };
+})();
+
+/** Whether a chunk's own square can reach the corridor at all. */
+function meetsCorridor(x0, z0, x1, z1) {
+  return x1 >= CORRIDOR_BOX.x0 && x0 <= CORRIDOR_BOX.x1
+    && z1 >= CORRIDOR_BOX.z0 && z0 <= CORRIDOR_BOX.z1;
+}
+
+/**
  * Whether a top standing here is DRAWN by the paving, which is a wider question
  * than whether it stands on the corridor.
  *
@@ -1815,22 +1868,44 @@ export function columnSpec(ix, iz, grain = true, radius = DISC_RADIUS, beyond = 
   //    keep its rim while the field takes the world, and NOT a second law: both
   //    branches leave through the same door with the same four fields.
   if (Math.hypot(x - CENTRE.x, z - CENTRE.z) > radius) {
-    if (!beyond) return gone(MATERIAL.AIR);
-    return {
-      // The plateau's own floor, plus however many steps the boundary has
-      // fallen or climbed. The base is the SAME literal the meadow stands on,
-      // so the first terrace is one cube under the last column of the meadow
-      // and there is no seam at the rim to measure.
-      top: BASE_STEP + confineSteps(x, z, CENTRE),
-      mat: MATERIAL.GRASS,
-      // AND THE RISERS ARE EARTH, WHICH IS THE TARGET'S OWN READING OF A
-      // TERRACE: green treads on brown walls. The mesher already splits a cut
-      // wall one voxel from its top and lays that cube as meadow (E-DECISIONI8.3,
-      // «due voxel di TERRA + un voxel di PRATO»), so writing the flank as soil
-      // here is the whole of what a terraced hillside needs.
-      under: MATERIAL.EARTH,
-      depth: 1,
-    };
+    if (beyond) {
+      return {
+        // The plateau's own floor, plus however many steps the boundary has
+        // fallen or climbed. The base is the SAME literal the meadow stands on,
+        // so the first terrace is one cube under the last column of the meadow
+        // and there is no seam at the rim to measure.
+        top: BASE_STEP + confineSteps(x, z, CENTRE),
+        mat: MATERIAL.GRASS,
+        // AND THE RISERS ARE EARTH, WHICH IS THE TARGET'S OWN READING OF A
+        // TERRACE: green treads on brown walls. The mesher already splits a cut
+        // wall one voxel from its top and lays that cube as meadow
+        // (E-DECISIONI8.3, «due voxel di TERRA + un voxel di PRATO»), so writing
+        // the flank as soil here is the whole of what a terraced hillside needs.
+        under: MATERIAL.EARTH,
+        depth: 1,
+      };
+    }
+    // AND THE CORRIDOR CROSSES THE RIM, BECAUSE THE CORRIDOR IS NOT THE MEADOW.
+    //
+    // THIS IS U-SUOLO-2'S DEFECT, IN ONE TEST. `radius` is a tier's dial about
+    // how far the ten centimetre ground is cut (voxelDiscRadius, 14 m on every
+    // tier but the lowest) and the greedy it gates is the one thing that DRAWS
+    // the corridor's stone: the field marks those columns PATH and stands aside
+    // for it (campoMaterialCode and `family == 2` in ./campo-material.js). The
+    // run of the corridor is a property of the WORLD -- pathRun carries it from
+    // the bottom riser to z = 30 -- and fourteen metres from the middle of the
+    // hub is z = 15.5. Between the two there were 1765 columns, 1.2 m wide and
+    // 14.5 m long, that the field would not draw and the greedy was never asked
+    // for: the walker standing beside the CONTATTI block had the SKY under his
+    // feet, in a rectangle with a right angle in it where the far end of the
+    // run met the last chunk the disc had cut.
+    //
+    // So the rim lets the corridor through. It costs what the corridor costs --
+    // 17.7 m^2 of paving, and the disc goes from 26 chunks to 30 at the radius
+    // three tiers of four ask for -- and not one column of meadow: everything
+    // off the corridor out here is still air, so no cube of this disc is laid
+    // where the field already draws the ground.
+    if (corridorAt(x, z) < 0) return gone(MATERIAL.AIR);
   }
   if (insideBlock(x, z)) return gone(MATERIAL.STONE);
 
@@ -2279,9 +2354,21 @@ export function chunkList(n, radius = DISC_RADIUS) {
   const half = Math.ceil(radius / VOXEL / n) + 1;
   const cx0 = Math.floor(CENTRE.x / VOXEL / n);
   const cz0 = Math.floor(CENTRE.z / VOXEL / n);
+  // THE SWEEP HAS TO REACH THE CORRIDOR AS WELL AS THE DISC, and that is a
+  // SECOND thing from the test inside it. `half` is the disc's own reach in
+  // chunks; the corridor runs to z = 30 and at the lowest tier's twelve metre
+  // disc that is two chunk rows past the last one this loop would visit, so a
+  // test that is never reached is a test that is never true. Measured with the
+  // bounds left alone: 531 columns of corridor still had no drawer at radius
+  // twelve, from z = 25.65 to the end of the run.
+  const span = (m) => Math.floor(m / VOXEL / n);
+  const fromX = Math.min(cx0 - half, span(CORRIDOR_BOX.x0));
+  const fromZ = Math.min(cz0 - half, span(CORRIDOR_BOX.z0));
+  const toX = Math.max(cx0 + half, span(CORRIDOR_BOX.x1));
+  const toZ = Math.max(cz0 + half, span(CORRIDOR_BOX.z1));
   const list = [];
-  for (let cz = cz0 - half; cz <= cz0 + half; cz++) {
-    for (let cx = cx0 - half; cx <= cx0 + half; cx++) {
+  for (let cz = fromZ; cz <= toZ; cz++) {
+    for (let cx = fromX; cx <= toX; cx++) {
       // The chunk's own square against the disc, before a single column is
       // built: the corners of the box nearest the centre decide it, and a chunk
       // that cannot reach the disc costs no work at all.
@@ -2291,7 +2378,12 @@ export function chunkList(n, radius = DISC_RADIUS) {
       const z1 = z0 + n * VOXEL;
       const nx = Math.max(x0, Math.min(CENTRE.x, x1));
       const nz = Math.max(z0, Math.min(CENTRE.z, z1));
-      if (Math.hypot(nx - CENTRE.x, nz - CENTRE.z) <= radius) list.push({ cx, cz });
+      // AND THE CORRIDOR IS ASKED FOR WHATEVER THE RADIUS IS. The second half
+      // of U-SUOLO-2's repair, and it has to be here as well as in columnSpec
+      // because this gate runs FIRST: a chunk the disc never asks for cannot
+      // lay a column however the law answers. See CORRIDOR_BOX above.
+      if (Math.hypot(nx - CENTRE.x, nz - CENTRE.z) <= radius
+        || meetsCorridor(x0, z0, x1, z1)) list.push({ cx, cz });
     }
   }
   return list;
