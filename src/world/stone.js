@@ -2,7 +2,7 @@ import { MONOLITHS, PLATFORM, STAIRS } from './layout.js';
 // The PURE half of the engine's door and not the page's: this file has to
 // answer under plain node for the two measuring tools, and the page's door
 // reaches three.js.
-import { CHAMFER, masonryDecks } from './voxel/pure.js';
+import { CHAMFER, STAND, masonryDecks } from './voxel/pure.js';
 
 // WHAT THE STONE OF THIS WORLD IS MADE OF — V2's seat, and the only one.
 //
@@ -213,7 +213,18 @@ export function stoneSpecs(spec, plan = MONOLITHS) {
         at: 0,
       }]
       : [];
-    return { ...block, masonry: { ...law, courses, head: runs, recesses } };
+    // AND THE SIX ARE THE ONLY WALLS THAT GET VOLUME. `stand` is what turns a
+    // course from one rectangle into a row of slabs with their own tops,
+    // soffits, reveals and sockets (src/world/voxel/courses.js). It is asked
+    // for HERE, on the six, and NOT on the stair or the platform below: those
+    // two are WALKED ON, and src/world/contracts.js answers a foot's height off
+    // a deck that a block standing 4.5 cm proud of its riser would make a lie.
+    return {
+      ...block,
+      masonry: {
+        ...law, courses, head: runs, recesses, stand: STAND,
+      },
+    };
   });
 }
 

@@ -157,13 +157,33 @@ const layer = {
 
   /** What the built stone is costing, for the development panel and the gate. */
   get stoneTriangles() {
-    let quads = 0;
-    for (const [, piece] of layer.built) quads += piece.quads;
-    return quads * 2;
+    let triangles = 0;
+    for (const [, piece] of layer.built) {
+      // READ OFF THE BUFFER THAT IS ACTUALLY BOUND and not off the cut this
+      // piece was born with: since the wall has two of them, `piece.quads` is
+      // the near one's count and would report the whole hub's stone at its
+      // worst from anywhere in the world.
+      const index = piece.mesh.geometry.getIndex();
+      triangles += index ? index.count / 3 : piece.quads * 2;
+    }
+    return triangles;
   },
 
-  update({ elapsed }) {
+  /** How many of the six are laid as volumes right now, for the panel. */
+  get nearBlocks() {
+    let near = 0;
+    for (const [, piece] of layer.built) if (piece.lod && piece.lod() === 'near') near += 1;
+    return near;
+  },
+
+  update({ elapsed, eye }) {
     if (layer.monoliths) layer.monoliths.update(elapsed);
+    // WHICH OF THE SIX ARE WORTH THEIR VOLUMES. Asked every frame and answered
+    // by a distance, because it costs two subtractions a block and the swap
+    // itself only happens when the answer changes. See createMasonry's atRange:
+    // the near wall is sixteen times the triangles of the far one, and past
+    // NEAR_METRES it buys a fifth of a pixel of relief.
+    if (eye) for (const [, piece] of layer.built) if (piece.atRange) piece.atRange(eye);
   },
 };
 
