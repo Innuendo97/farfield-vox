@@ -226,7 +226,15 @@ export const LID_BELOW = 3.5;
 // because 06 stands behind the camera; walk round until all six are in frame
 // and the same wall submits 62,046. A budget that depends on where a walker is
 // looking is not a budget.
-export const NEAR_METRES = 22;
+//
+// FORTY-SIX, RATIFIED (E-PIETRA3). The budget the campaign holds the stone to
+// is milliseconds and not triangles (E-PERF6 retired the triangle ceilings):
+// at 46 m every block in the frame at the fitted pose -- 02 and 03 included --
+// stands as volumes, for 88,410 triangles and about half a millisecond on the
+// high tier, which is inside the 1.5 the stone is allowed. The 22 above stays
+// as the reading it was: the tightest metre at which the old triangle ceiling
+// held with nothing culled.
+export const NEAR_METRES = 46;
 
 export function hash(x, y, seed) {
   let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(seed, 1442695041)) >>> 0;
