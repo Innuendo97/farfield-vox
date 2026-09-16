@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { FRAME, POSE, REPO_ROOT } from './lib/framing.mjs';
+import { FRAME, POSE, REPO_ROOT, makePixel } from './lib/framing.mjs';
 import { encodeCleanPng } from './lib/png.mjs';
 import { agx } from './lib/agx.mjs';
 import { agxInverse } from './lib/agx-inverse.mjs';
@@ -343,28 +343,16 @@ function readRadialLeftover(bins, params, sun, project) {
   };
 }
 
-/** World direction to a pixel of the reference framing; null when behind it. */
-function makeProjector() {
-  const aspect = FRAME.width / FRAME.height;
-  const tanV = Math.tan(POSE.fov * DEG / 2);
-  const tanH = tanV * aspect;
-  const cp = Math.cos(POSE.pitch * DEG);
-  const sp = Math.sin(POSE.pitch * DEG);
-  const cy = Math.cos(POSE.yaw * DEG);
-  const sy = Math.sin(POSE.yaw * DEG);
-  return function project(d) {
-    const x = d[0] * cy - d[2] * sy;
-    const z1 = d[0] * sy + d[2] * cy;
-    const y = d[1] * cp + z1 * sp;
-    const z = -d[1] * sp + z1 * cp;
-    if (z >= -1e-6) return null;
-    const t = -1 / z;
-    return [
-      ((x * t) / tanH + 1) * 0.5 * FRAME.width - 0.5,
-      (1 - (y * t) / tanV) * 0.5 * FRAME.height - 0.5,
-    ];
-  };
-}
+/**
+ * World direction to a pixel of the reference framing; null when behind it.
+ *
+ * This one was already RIGHT -- it carried the yaw, and it agrees with
+ * framing.mjs's makePixel to the last bits -- and it is asked for by name
+ * anyway (U-GRADE-1). A correct copy is still a copy, and the whole lesson of
+ * this pass is that the three wrong ones were indistinguishable from this one
+ * by reading: they all looked like a projection somebody had thought about.
+ */
+const makeProjector = () => makePixel();
 
 /** A mask grown by a few pixels, chebyshev, in place of nothing subtler. */
 function dilate(mask, width, height, radius) {

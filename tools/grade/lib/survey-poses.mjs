@@ -37,7 +37,25 @@ import { POSE } from './framing.mjs';
 // player's, so a pose here is a place a walker can stand rather than a camera
 // hung in the air.
 export const SURVEY_POSES = {
-  'posa-P': { x: 0, z: 14, yaw: 0, pitch: 4.5, fov: 45 },
+  // THE REFERENCE FRAMING IS NOT WRITTEN DOWN HERE, IT IS ASKED FOR
+  // (U-GRADE-1). What stood on this line was `{ x: 0, z: 14, yaw: 0, pitch:
+  // 4.5, fov: 45 }` -- the five round numbers U-SENT-6 proved were never the
+  // camera the picture was fitted at -- and the check at the foot of this file
+  // caught it and THREW, which is what it was written to do. Nobody heard it:
+  // this module is not in the guard suite, so from the day the fit landed
+  // (E-SENT6) until U-GRADE-1 `check-sky-zones.mjs` and `measure-purity.mjs`
+  // did not load at all. A copy that can go stale is a copy that will, so the
+  // entry is now built from the fit and there is nothing left here to go stale.
+  // Its `y` is written too, and is an ALTITUDE: the poses below stand a walker
+  // and let the page put his eye where his feet are, this one is a lens.
+  'posa-P': {
+    x: POSE.position.x,
+    y: POSE.position.y,
+    z: POSE.position.z,
+    yaw: POSE.yaw,
+    pitch: POSE.pitch,
+    fov: POSE.fov,
+  },
   largo: { x: 0, z: 14, yaw: 0, pitch: 10, fov: 72 },
 
   'b-000': { x: 0, z: 14, yaw: 0, pitch: 8, fov: 72 },
@@ -92,6 +110,14 @@ export const REFERENCE_POSE = 'posa-P';
   for (const key of ['yaw', 'pitch', 'fov']) {
     if (reference[key] !== POSE[key]) {
       throw new Error(`${REFERENCE_POSE} has ${key} ${reference[key]} against ${POSE[key]} in src/core/poses.js`);
+    }
+  }
+  // And the EYE, which this check did not look at while the entry carried no
+  // eye at all: a pose with the fit's three angles and the spawn's two
+  // coordinates is still two cameras, and 0.599 m of it is sideways.
+  for (const key of ['x', 'y', 'z']) {
+    if (reference[key] !== POSE.position[key]) {
+      throw new Error(`${REFERENCE_POSE} has ${key} ${reference[key]} against ${POSE.position[key]} in src/core/poses.js`);
     }
   }
 }

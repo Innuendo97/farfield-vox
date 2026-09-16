@@ -1,6 +1,5 @@
-import { EYE_HEIGHT, MONOLITHS, SPAWN } from '../../src/world/layout.js';
-import { FRAME, POSE } from '../grade/lib/framing.mjs';
-import { floorAt } from './lib/pose.mjs';
+import { MONOLITHS } from '../../src/world/layout.js';
+import { POSE, projectTarget } from '../grade/lib/framing.mjs';
 
 // Where each face of each block lands in the reference framing.
 //
@@ -12,41 +11,35 @@ import { floorAt } from './lib/pose.mjs';
 
 const DEG = Math.PI / 180;
 
-// THE EYE, AT THE HEIGHT THE PAGE PUTS IT (E-V8i).
+// THE CAMERA, AND IT IS THE FITTED ONE, WHOLE (U-GRADE-1).
 //
-// This said `y: EYE_HEIGHT` and meant 1.70. EYE_HEIGHT is not an altitude: it
-// is how far a walker's eye sits above his own FEET, and the pose these
-// rectangles are drawn for -- POSE_TARGET, whose yaw, pitch and fov arrive
-// through framing.mjs -- stands a walker at (0, SPAWN.z), where the floor is
-// -0.1842. So the page's eye is at 1.5158 and this file's was 184 mm above it,
-// which is 6.5 to 12 px of vertical mis-registration over the five blocks in
-// frame. Every rectangle this file hands out is a window a colour is measured
-// in, and on the flanks of 02 and 03 -- nine and ten pixels wide -- a slip that
-// size is wider than the strip itself.
+// THE HEADER ABOVE THIS USED TO SAY the yaw arrived "through framing.mjs". It
+// did not: this file built its own projection out of POSE's pitch and fov and
+// dropped the yaw on the floor, which is the same statement as "the camera
+// looks north" and is false by 1.818 degrees -- 36.8 px of frame at this
+// focal. It also stood the eye at the WALKER's sentinel, (0, floor + 1.70,
+// SPAWN.z), where the fit stands the lens at (0.599, 1.583, 14.215): 0.599 m
+// west, 0.117 m up and 0.215 m short. The two errors ran in opposite
+// directions and PARTLY cancelled -- the silhouette centres of the five blocks
+// came out 23.3, 15.0, 15.3, 0.5 and 1.8 px from the reference's own, where the
+// missing yaw alone would have been 36.8 -- which is why this survived three
+// sessions of people looking straight at it.
 //
-// The rule has one implementation and it is ./lib/pose.mjs, so this file and
-// outline.mjs cannot drift into agreeing with each other while disagreeing with
-// the frame.
-const EYE = { x: 0, y: floorAt(0, SPAWN.z) + EYE_HEIGHT, z: SPAWN.z };
+// Both are gone in one statement, because half of this correction is worse
+// than none: with the yaw put back and the walker's eye left in place the near
+// block moves the wrong way. The projection is now framing.mjs's
+// projectTarget, which is the ONLY one in the campaign's tools, and this file
+// has no arithmetic of its own to disagree with it.
+//
+// WHAT WENT WITH IT. ./lib/pose.mjs and its floorAt are no longer imported
+// here: the sentinel rule is about standing a WALKER somewhere, and this file
+// no longer stands one -- it uses the lens the picture was fitted with, whose
+// y is an altitude and not a body. outline.mjs still owns that rule and still
+// needs it, for the poses that really are walkers.
+const EYE = POSE.position;
 
 /** Reference camera projection: world metres to pixels of the framing. */
-export function project(wx, wy, wz) {
-  const aspect = FRAME.width / FRAME.height;
-  const tanV = Math.tan(POSE.fov * DEG / 2);
-  const tanH = tanV * aspect;
-  const cp = Math.cos(-POSE.pitch * DEG);
-  const sp = Math.sin(-POSE.pitch * DEG);
-  const x = wx - EYE.x;
-  const y = wy - EYE.y;
-  const z = wz - EYE.z;
-  const cy = y * cp - z * sp;
-  const cz = y * sp + z * cp;
-  return {
-    x: (x / -cz / tanH * 0.5 + 0.5) * FRAME.width,
-    y: (0.5 - cy / -cz / tanV * 0.5) * FRAME.height,
-    depth: -cz,
-  };
-}
+export const project = projectTarget;
 
 /**
  * The two faces of a block that the reference pose can see.

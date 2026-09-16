@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import {
-  FRAME, POSE, REPO_ROOT, makeRay,
+  FRAME, POSE, REPO_ROOT, makePixel, makeRay,
 } from '../grade/lib/framing.mjs';
 import { writeCleanPng } from '../grade/lib/png.mjs';
 import { agx } from '../grade/lib/agx.mjs';
@@ -467,22 +467,19 @@ function directionOf(azimuthDeg, elevationDeg) {
   return [Math.cos(e) * Math.sin(a), Math.sin(e), -Math.cos(e) * Math.cos(a)];
 }
 
-/** The reference camera, as a projection of a direction back onto the frame. */
-function makeProjector() {
-  const tanV = Math.tan(POSE.fov * DEG / 2);
-  const tanH = tanV * (W / H);
-  const cp = Math.cos(POSE.pitch * DEG);
-  const sp = Math.sin(POSE.pitch * DEG);
-  return function project(d) {
-    const y = d[1] * cp + d[2] * sp;
-    const z = -d[1] * sp + d[2] * cp;
-    if (z >= -1e-6) return null;
-    return [
-      ((d[0] / -z) / tanH * 0.5 + 0.5) * W - 0.5,
-      (0.5 - (y / -z) / tanV * 0.5) * H - 0.5,
-    ];
-  };
-}
+/**
+ * The reference camera, as a projection of a direction back onto the frame.
+ *
+ * AND IT IS makeRay's OWN INVERSE NOW, WHICH IT WAS NOT (U-GRADE-1). What
+ * stood here rebuilt the arithmetic out of POSE's pitch and fov and left the
+ * YAW out, while `ray` eleven lines above -- framing.mjs's makeRay, on the same
+ * page, for the same camera -- carried it. So a direction did not come back to
+ * the pixel it was read from: 36.8 px out at the middle of the frame and 58.8
+ * at the corner, measured over the whole frame on a grid. Every tile this file
+ * cuts out of the photograph is chosen by `ray` and written back by this, so
+ * that gap was the atlas's own registration against the picture it is cut from.
+ */
+const makeProjector = () => makePixel();
 
 /**
  * The most pixels of the reference frame that one degree of sky ever occupies.
@@ -4637,14 +4634,20 @@ function readBlocks() {
   const platform = /export const PLATFORM = \{([\s\S]*?)\};/.exec(source);
   if (!platform) throw new Error('PLATFORM not found in src/world/layout.js');
   const platformHeight = Number(/height:\s*([0-9.]+)/.exec(platform[1])[1]);
-  const eyeHeight = Number(/export const EYE_HEIGHT = ([0-9.]+)/.exec(source)[1]);
-  const spawnZ = Number(/export const SPAWN = \{[^}]*z:\s*(-?[0-9.]+)/.exec(source)[1]);
   const found = [...source.matchAll(/id: '(\d\d)',[\s\S]*?position: \{ x: (-?[0-9.]+), z: (-?[0-9.]+) \},[\s\S]*?rotationY: (-?[0-9.]+),[\s\S]*?size: \[([^\]]+)\],\s*\n\s*baseY: ([^,]+),/g)];
   if (found.length < 5) {
     throw new Error(`only ${found.length} monolith(s) parsed out of src/world/layout.js`);
   }
   return {
-    eye: [0, eyeHeight, spawnZ],
+    // THE REFERENCE EYE IS THE LENS THE PICTURE WAS FITTED WITH (U-GRADE-1).
+    // This read EYE_HEIGHT and SPAWN out of layout.js and stood at
+    // (0, 1.70, 14) -- not even the walker's resolved sentinel, but the bare
+    // constant as an altitude, which is the defect monoliths/lib/pose.mjs was
+    // written to abolish. The sky this file takes away from the walk is the sky
+    // the BLOCKS take away, and which sky that is depends on where the lens is:
+    // 0.599 m west and 0.215 m short is tenths of a degree on a block nine
+    // degrees wide, and 0.117 m of height is more than that on their tops.
+    eye: [POSE.position.x, POSE.position.y, POSE.position.z],
     blocks: found.map((m) => ({
       id: m[1],
       x: Number(m[2]),

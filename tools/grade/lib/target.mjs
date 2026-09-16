@@ -1,7 +1,6 @@
 import { join } from 'node:path';
 import sharp from 'sharp';
-import { FRAME, POSE, REPO_ROOT } from './framing.mjs';
-import { groundHeightAt } from '../../../src/world/contracts.js';
+import { FRAME, REPO_ROOT, projectorFor } from './framing.mjs';
 
 // The reference image, and the parts of it that may be compared against a
 // render. Two things must never end up in a comparison: the interface, which is
@@ -83,21 +82,28 @@ export async function readTarget() {
  * rebuilt all the way down to the foot of the stone. The sky line below is
  * where the reference stops being unambiguously sky, which is a different
  * question and a higher line.
+ *
+ * AND IT IS DRAWN THROUGH THE FITTED CAMERA NOW, WHOLE (U-GRADE-1). What stood
+ * here built its own projection, and the comment three lines into the loop said
+ * out loud what was wrong with it: «the camera looks north». The camera does
+ * not look north. It looks 1.818 degrees east of it, which on this focal is
+ * 36.8 px -- nearly four times the ten pixels of margin this mask's whole
+ * safety rests on. The eye was wrong the other way, standing the WALKER's
+ * sentinel at (0, floor + 1.70, SPAWN.z) where the fit stands the LENS at
+ * (0.599, 1.583, 14.215), and the two errors partly cancelled: the five
+ * silhouette centres came out 23.3, 15.0, 15.3, 0.5 and 1.8 px west of the
+ * reference's own instead of the 36.8 the yaw alone would have cost.
+ *
+ * THAT CANCELLATION IS WHY IT COULD NOT BE HALF CORRECTED. Putting the yaw
+ * back without the eye moves the near blocks further from the picture than
+ * they were; both go, in one statement, through framing.mjs's projectTarget,
+ * which is now the campaign's only projection of this camera.
  */
 export async function buildStoneMask(width = FRAME.width, height = FRAME.height) {
   const layout = await import(new URL('../../../src/world/layout.js', import.meta.url).href);
-  const { MONOLITHS, PLATFORM, EYE_HEIGHT, SPAWN } = layout;
+  const { MONOLITHS, PLATFORM } = layout;
 
-  const aspect = width / height;
-  const tanV = Math.tan(POSE.fov * DEG / 2);
-  const tanH = tanV * aspect;
-  // EYE_HEIGHT is the walker's sentinel, not an altitude: the page resolves
-  // it as ground plus eye, and this mask must stand where the page stands --
-  // its ten pixels of margin are thinner than the twelve the bare constant
-  // mis-registers by.
-  const eye = { x: 0, y: groundHeightAt(0, SPAWN.z) + EYE_HEIGHT, z: SPAWN.z };
-  const cp = Math.cos(-POSE.pitch * DEG);
-  const sp = Math.sin(-POSE.pitch * DEG);
+  const project = projectorFor({ width, height });
 
   const mask = new Uint8Array(width * height);
 
@@ -118,17 +124,13 @@ export async function buildStoneMask(width = FRAME.width, height = FRAME.height)
     for (const sx of [-1, 1]) for (const sy of [0, 1]) for (const sz of [-1, 1]) {
       const lx = sx * b.w / 2;
       const lz = sz * b.d / 2;
-      const wx = b.x + lx * c + lz * s - eye.x;
-      const wy = b.y0 + sy * b.h - eye.y;
-      const wz = b.z - lx * s + lz * c - eye.z;
-      // Into camera space: the camera looks north with a small upward tilt.
-      const cy = wy * cp - wz * sp;
-      const cz = wy * sp + wz * cp;
-      if (cz > -0.01) { behind = true; break; }
-      pts.push([
-        (wx / (-cz) / tanH * 0.5 + 0.5) * width,
-        (0.5 - cy / (-cz) / tanV * 0.5) * height,
-      ]);
+      const at = project(
+        b.x + lx * c + lz * s,
+        b.y0 + sy * b.h,
+        b.z - lx * s + lz * c,
+      );
+      if (!at) { behind = true; break; }
+      pts.push([at.x, at.y]);
     }
     if (behind || pts.length === 0) continue;
 

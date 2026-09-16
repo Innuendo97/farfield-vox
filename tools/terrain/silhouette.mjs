@@ -1,8 +1,7 @@
 import { join } from 'node:path';
 import sharp from 'sharp';
-import { EYE_HEIGHT, MONOLITHS, PLATFORM, SPAWN } from '../../src/world/layout.js';
-import { FRAME, POSE, REPO_ROOT } from '../grade/lib/framing.mjs';
-import { groundHeightAt } from '../../src/world/contracts.js';
+import { MONOLITHS, PLATFORM } from '../../src/world/layout.js';
+import { FRAME, REPO_ROOT, projectTarget } from '../grade/lib/framing.mjs';
 
 // Where the blocks stand in the frame, to the pixel.
 //
@@ -23,15 +22,16 @@ const DEG = Math.PI / 180;
 // onto the next block along.
 const SEARCH = 14;
 
+// THE ONE PROJECTION, AND NOT A FOURTH COPY OF IT (U-GRADE-1).
+//
+// What stood here rebuilt the camera out of POSE's pitch and fov, dropped the
+// yaw -- which is the sentence «the camera looks north», false by 1.818 degrees
+// and 36.8 px on this focal -- and stood the eye on the WALKER's sentinel
+// rather than on the lens the silhouettes were fitted with. This file exists to
+// say whether a block has moved in the frame BY PIXELS, so a projection of its
+// own that disagrees with the fit by fifteen is not a detail: it was the
+// instrument's own error being handed to the ground as the ground's.
 function project() {
-  const aspect = FRAME.width / FRAME.height;
-  const tanV = Math.tan(POSE.fov * DEG / 2);
-  const tanH = tanV * aspect;
-  // The sentinel resolves as the page resolves it: ground plus eye.
-  const eye = { x: 0, y: groundHeightAt(0, SPAWN.z) + EYE_HEIGHT, z: SPAWN.z };
-  const cp = Math.cos(-POSE.pitch * DEG);
-  const sp = Math.sin(-POSE.pitch * DEG);
-
   const boxes = MONOLITHS.map((m) => ({
     id: m.id,
     x: m.position.x,
@@ -62,16 +62,13 @@ function project() {
         for (const sz of [-1, 1]) {
           const lx = sx * b.w / 2;
           const lz = sz * b.d / 2;
-          const wx = b.x + lx * c + lz * s - eye.x;
-          const wy = b.y0 + sy * b.h - eye.y;
-          const wz = b.z - lx * s + lz * c - eye.z;
-          const cy = wy * cp - wz * sp;
-          const cz = wy * sp + wz * cp;
-          if (cz > -0.01) continue;
-          points.push([
-            (wx / -cz / tanH * 0.5 + 0.5) * FRAME.width,
-            (0.5 - cy / -cz / tanV * 0.5) * FRAME.height,
-          ]);
+          const at = projectTarget(
+            b.x + lx * c + lz * s,
+            b.y0 + sy * b.h,
+            b.z - lx * s + lz * c,
+          );
+          if (!at) continue;
+          points.push([at.x, at.y]);
         }
       }
     }
