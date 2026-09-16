@@ -19,7 +19,6 @@
     "line, which of these the frozen engine door can express and which it cannot;",
     "the ones it cannot are an escalation and not a silence."
   ],
-
   "measuredBy": {
     "session": "V2-AN",
     "date": "2026-08-29",
@@ -38,7 +37,6 @@
     ],
     "residual": "2.4 px rms, 0.5 px median, over 96 silhouette points on the five blocks"
   },
-
   "course": {
     "why": [
       "A course is 0.215 m and the honest bar is the window spread, 0.203 to",
@@ -49,18 +47,24 @@
       "straight. A ruled grid is what these targets are not."
     ],
     "rise": 0.215,
-    "band": [0.203, 0.227],
+    "band": [
+      0.203,
+      0.227
+    ],
     "scatterSd": 0.044,
     "scatterFraction": 0.21,
     "runsFrom": 0.16,
     "runsTo": 0.26,
-    "wanderMedian": 0.030,
+    "wanderMedian": 0.03,
     "wanderP90": 0.035,
-    "nightIndependent": [0.1960, 0.2061, 0.1988],
+    "nightIndependent": [
+      0.196,
+      0.2061,
+      0.1988
+    ],
     "n": 1546,
     "source": "v2-pietra/an/out/corso.txt"
   },
-
   "block": {
     "why": [
       "THE BLOCK OF THIS WALL IS ABOUT SQUARE, and that is the single largest",
@@ -77,24 +81,60 @@
       "two differ by a fifth and a count is linear in it."
     ],
     "aspectToCourse": 0.92,
-    "meanWidth": { "inWindow": 0.1888, "window": [0.13, 0.31], "n": 484 },
-    "perFaceMedian": { "01-front": 0.1787, "04-front": 0.1724, "05-front": 0.1690 },
-    "spreadOverMedian": [0.60, 0.67],
-    "doubles": { "over": 0.30, "fraction": 0.17 },
-    "triples": { "over": 0.55, "fraction": 0.04 },
+    "meanWidth": {
+      "inWindow": 0.1888,
+      "window": [
+        0.13,
+        0.31
+      ],
+      "n": 484
+    },
+    "perFaceMedian": {
+      "01-front": 0.1787,
+      "04-front": 0.1724,
+      "05-front": 0.169
+    },
+    "spreadOverMedian": [
+      0.6,
+      0.67
+    ],
+    "doubles": {
+      "over": 0.3,
+      "fraction": 0.17
+    },
+    "triples": {
+      "over": 0.55,
+      "fraction": 0.04
+    },
     "histogram": {
       "binWidth": 0.03,
       "why": "counts by lower edge, pooled over 01-front, 04-front and 05-front",
       "counts": {
-        "0.09": 26, "0.12": 192, "0.15": 132, "0.18": 127, "0.21": 85,
-        "0.24": 59, "0.27": 32, "0.30": 20, "0.33": 26, "0.36": 14,
-        "0.39": 14, "0.42": 14, "0.45": 8, "0.48": 6, "0.51": 5,
-        "0.57": 6, "0.60": 3, "0.63": 4, "0.66": 5, "0.69": 3, "0.72": 3
+        "0.09": 26,
+        "0.12": 192,
+        "0.15": 132,
+        "0.18": 127,
+        "0.21": 85,
+        "0.24": 59,
+        "0.27": 32,
+        "0.30": 20,
+        "0.33": 26,
+        "0.36": 14,
+        "0.39": 14,
+        "0.42": 14,
+        "0.45": 8,
+        "0.48": 6,
+        "0.51": 5,
+        "0.57": 6,
+        "0.60": 3,
+        "0.63": 4,
+        "0.66": 5,
+        "0.69": 3,
+        "0.72": 3
       }
     },
     "source": "v2-pietra/an/out/blocchi.txt"
   },
-
   "joint": {
     "why": [
       "The joint of the recipe holds on stone without a change. It was fitted on",
@@ -102,12 +142,23 @@
       "measured on five windows of stone with the campaign's own estimator",
       "imported unchanged, it does not."
     ],
-    "darken": [0.949, 0.959],
-    "widthPx": [2, 3],
-    "recipeOnGrass": { "darken": [0.948, 0.958], "widthPx": 2 },
+    "darken": [
+      0.949,
+      0.959
+    ],
+    "widthPx": [
+      2,
+      3
+    ],
+    "recipeOnGrass": {
+      "darken": [
+        0.948,
+        0.958
+      ],
+      "widthPx": 2
+    },
     "source": "v2-pietra/an/out/blocchi.txt"
   },
-
   "chamfer": {
     "why": [
       "The arris is the same BRIGHTNESS as the recipe's and a different COLOUR.",
@@ -117,12 +168,24 @@
       "material's number, so it belongs to whoever fits the stone and not to",
       "whoever cuts it."
     ],
-    "lighten": [1.072, 1.091],
-    "recipeOnGrass": [1.07, 1.09],
-    "blueOverRed": { "range": [0.379, 1.604], "median": 0.84, "recipeOnGrass": 0.43 },
+    "lighten": [
+      1.072,
+      1.091
+    ],
+    "recipeOnGrass": [
+      1.07,
+      1.09
+    ],
+    "blueOverRed": {
+      "range": [
+        0.379,
+        1.604
+      ],
+      "median": 0.84,
+      "recipeOnGrass": 0.43
+    },
     "source": "v2-pietra/an/out/blocchi.txt"
   },
-
   "head": {
     "why": [
       "THE HEADS ARE STEPPED, NOT CRENELLATED. FASE 0 read them as a top course",
@@ -155,16 +218,244 @@
       "platform it stands on and not off the meadow."
     ],
     "mergeWithin": 0.105,
-    "keepWiderThan": 0.10,
-    "levelsPerHead": [1, 4],
-    "stepDepthCourses": [0.9, 6.5],
+    "keepWiderThan": 0.1,
+    "levelsPerHead": [
+      1,
+      4
+    ],
+    "stepDepthCourses": [
+      0.9,
+      6.5
+    ],
     "levels": {
-      "01-front": { "columns": 111, "peak": 5.60, "metresUp": [[5.60, 23], [4.46, 3], [4.15, 4], [4.25, 4], [4.61, 3], [5.59, 5], [5.41, 49], [5.23, 7]] },
-      "01-left":  { "columns": 42,  "peak": 6.12, "metresUp": [[6.07, 15], [6.08, 6], [6.03, 7], [5.16, 3]] },
-      "02-front": { "columns": 112, "peak": 7.14, "metresUp": [[7.14, 20], [5.80, 3], [5.92, 6], [5.91, 11], [7.10, 16], [6.90, 27], [6.71, 21]] },
-      "03-front": { "columns": 183, "peak": 11.99, "metresUp": [[11.89, 33], [10.15, 4], [10.29, 4], [10.41, 3], [10.52, 4], [11.92, 11], [10.45, 3], [10.56, 3], [10.45, 4], [10.15, 7], [11.98, 48], [11.70, 42], [11.32, 3]] },
-      "04-front": { "columns": 96,  "peak": 5.91, "metresUp": [[5.73, 6], [5.91, 17], [4.49, 6], [4.80, 3], [4.50, 9], [5.88, 42]] },
-      "05-front": { "columns": 93,  "peak": 4.86, "metresUp": [[3.34, 6], [4.68, 6], [4.84, 13], [3.10, 3], [3.70, 3], [4.07, 3], [4.86, 5], [4.86, 8], [4.86, 6], [4.85, 17]] }
+      "01-front": {
+        "columns": 111,
+        "peak": 5.6,
+        "metresUp": [
+          [
+            5.6,
+            23
+          ],
+          [
+            4.46,
+            3
+          ],
+          [
+            4.15,
+            4
+          ],
+          [
+            4.25,
+            4
+          ],
+          [
+            4.61,
+            3
+          ],
+          [
+            5.59,
+            5
+          ],
+          [
+            5.41,
+            49
+          ],
+          [
+            5.23,
+            7
+          ]
+        ]
+      },
+      "01-left": {
+        "columns": 42,
+        "peak": 6.12,
+        "metresUp": [
+          [
+            6.07,
+            15
+          ],
+          [
+            6.08,
+            6
+          ],
+          [
+            6.03,
+            7
+          ],
+          [
+            5.16,
+            3
+          ]
+        ]
+      },
+      "02-front": {
+        "columns": 112,
+        "peak": 7.14,
+        "metresUp": [
+          [
+            7.14,
+            20
+          ],
+          [
+            5.8,
+            3
+          ],
+          [
+            5.92,
+            6
+          ],
+          [
+            5.91,
+            11
+          ],
+          [
+            7.1,
+            16
+          ],
+          [
+            6.9,
+            27
+          ],
+          [
+            6.71,
+            21
+          ]
+        ]
+      },
+      "03-front": {
+        "columns": 183,
+        "peak": 11.99,
+        "metresUp": [
+          [
+            11.89,
+            33
+          ],
+          [
+            10.15,
+            4
+          ],
+          [
+            10.29,
+            4
+          ],
+          [
+            10.41,
+            3
+          ],
+          [
+            10.52,
+            4
+          ],
+          [
+            11.92,
+            11
+          ],
+          [
+            10.45,
+            3
+          ],
+          [
+            10.56,
+            3
+          ],
+          [
+            10.45,
+            4
+          ],
+          [
+            10.15,
+            7
+          ],
+          [
+            11.98,
+            48
+          ],
+          [
+            11.7,
+            42
+          ],
+          [
+            11.32,
+            3
+          ]
+        ]
+      },
+      "04-front": {
+        "columns": 96,
+        "peak": 5.91,
+        "metresUp": [
+          [
+            5.73,
+            6
+          ],
+          [
+            5.91,
+            17
+          ],
+          [
+            4.49,
+            6
+          ],
+          [
+            4.8,
+            3
+          ],
+          [
+            4.5,
+            9
+          ],
+          [
+            5.88,
+            42
+          ]
+        ]
+      },
+      "05-front": {
+        "columns": 93,
+        "peak": 4.86,
+        "metresUp": [
+          [
+            3.34,
+            6
+          ],
+          [
+            4.68,
+            6
+          ],
+          [
+            4.84,
+            13
+          ],
+          [
+            3.1,
+            3
+          ],
+          [
+            3.7,
+            3
+          ],
+          [
+            4.07,
+            3
+          ],
+          [
+            4.86,
+            5
+          ],
+          [
+            4.86,
+            8
+          ],
+          [
+            4.86,
+            6
+          ],
+          [
+            4.85,
+            17
+          ]
+        ]
+      }
     },
     "paleTopCourse": {
       "why": [
@@ -194,13 +485,33 @@
         "wall cannot be both."
       ],
       "takenUnder": "targetHead, the drawn stone, per heads.perBlock",
-      "ratio": { "01-front": 1.051, "01-left": 1.161, "02-front": 1.119, "03-front": 1.103, "04-front": 1.096, "05-front": 1.008 },
+      "ratio": {
+        "01-front": 1.051,
+        "01-left": 1.161,
+        "02-front": 1.119,
+        "03-front": 1.103,
+        "04-front": 1.096,
+        "05-front": 1.008
+      },
       "median": 1.103,
-      "band": [1.008, 1.161],
+      "band": [
+        1.008,
+        1.161
+      ],
       "wasTakenUnderTheBox": {
         "why": "kept, because a correction that erases what it corrected cannot be checked",
-        "ratio": { "01-front": 1.072, "01-left": 1.157, "02-front": 1.303, "03-front": 1.192, "04-front": 2.370, "05-front": 1.002 },
-        "band": [1.00, 2.37]
+        "ratio": {
+          "01-front": 1.072,
+          "01-left": 1.157,
+          "02-front": 1.303,
+          "03-front": 1.192,
+          "04-front": 2.37,
+          "05-front": 1.002
+        },
+        "band": [
+          1,
+          2.37
+        ]
       },
       "source": "v2-pietra/dev2t/pallido.mjs on the day target, v2-pietra/dev3/out/pallido-bersaglio.txt"
     },
@@ -211,7 +522,6 @@
     },
     "source": "v2-pietra/an/out/muschio.txt"
   },
-
   "quoins": {
     "why": [
       "DECLARED BY FASE 0 AND NOT MEASURED, and it is written down rather than",
@@ -223,7 +533,6 @@
     "measured": false,
     "source": "FASE 0, v2-pietra/VERBALE.md"
   },
-
   "heads": {
     "why": [
       "WHERE THE STONE ACTUALLY STOPS, PER BLOCK, AGAINST THE BOX layout.js",
@@ -240,17 +549,48 @@
     ],
     "rise": 0.215,
     "perBlock": {
-      "01": { "boxHeight": 5.44, "targetHead": 5.41, "courses": 25, "builtHead": 5.375 },
-      "02": { "boxHeight": 7.03, "targetHead": 6.90, "courses": 32, "builtHead": 6.880 },
-      "03": { "boxHeight": 11.84, "targetHead": 11.71, "courses": 54, "builtHead": 11.610 },
-      "04": { "boxHeight": 6.24, "targetHead": 5.89, "courses": 27, "builtHead": 5.805 },
-      "05": { "boxHeight": 4.84, "targetHead": 4.85, "courses": 23, "builtHead": 4.945 },
-      "06": { "boxHeight": 5.20, "targetHead": null, "courses": 24, "builtHead": 5.160 }
+      "01": {
+        "boxHeight": 5.44,
+        "targetHead": 5.41,
+        "courses": 25,
+        "builtHead": 5.375
+      },
+      "02": {
+        "boxHeight": 7.03,
+        "targetHead": 6.9,
+        "courses": 32,
+        "builtHead": 6.88
+      },
+      "03": {
+        "boxHeight": 11.84,
+        "targetHead": 11.71,
+        "courses": 54,
+        "builtHead": 11.61
+      },
+      "04": {
+        "boxHeight": 6.24,
+        "targetHead": 5.89,
+        "courses": 27,
+        "builtHead": 5.805
+      },
+      "05": {
+        "boxHeight": 4.84,
+        "targetHead": 4.85,
+        "courses": 23,
+        "builtHead": 4.945
+      },
+      "06": {
+        "boxHeight": 5.2,
+        "targetHead": null,
+        "courses": 24,
+        "builtHead": 5.16
+      }
     },
-    "notInFrame": ["06"],
+    "notInFrame": [
+      "06"
+    ],
     "source": "v2-pietra/an/out/scalinata.txt"
   },
-
   "stairs": {
     "why": [
       "The run layout.js declares is the run the target draws, and this is the one",
@@ -270,11 +610,20 @@
     "nosingsFound": 5,
     "nosingsPerModelledStep": 0.96,
     "cyanStrip": false,
-    "treadsDay": { "r": 41.5, "g": 53.8, "b": 54.8, "blueOverGreen": 1.018 },
-    "treadsNight": { "r": 11.4, "g": 24.9, "b": 36.8, "blueOverGreen": 1.479 },
+    "treadsDay": {
+      "r": 41.5,
+      "g": 53.8,
+      "b": 54.8,
+      "blueOverGreen": 1.018
+    },
+    "treadsNight": {
+      "r": 11.4,
+      "g": 24.9,
+      "b": 36.8,
+      "blueOverGreen": 1.479
+    },
     "source": "v2-pietra/an/out/scalinata.txt"
   },
-
   "referenceCounts": {
     "why": [
       "The band the chapter declares, from the agreement of two independent",
@@ -283,8 +632,14 @@
       "against it rather than beside it: tools/monoliths/spec.mjs does that",
       "arithmetic and it does not come out inside the band."
     ],
-    "blockOn05": [506, 512],
-    "allSix": [4801, 5002],
+    "blockOn05": [
+      506,
+      512
+    ],
+    "allSix": [
+      4801,
+      5002
+    ],
     "source": "SESSIONI-VOX.md, chapter V2, residue 2"
   },
   "palette": {
@@ -329,28 +684,212 @@
       "they do, and the miss is the reference's rather than theirs."
     ],
     "measuredBy": {
-      "session": "R5", "date": "2026-09-07", "camera": "POSE_VOX_DAY",
+      "session": "R5",
+      "date": "2026-09-07",
+      "camera": "POSE_VOX_DAY",
       "space": "CIELAB D65, medians over the projected face",
       "source": "per-il-committente/ricerca/2026-09-07-R5-pietra.md, sections 1.3 to 1.5"
     },
-    "perFace": {      "01-front": { "sunTerm": -0.659, "L": 13.0, "C": 9.8, "h": 231, "L_p10": 10.0, "L_p90": 17.1, "moss%": 1.4,
-        "mossTenths": [0.5, 0.2, 1.1, 0.0, 0.0, 0.0, 0.0, 0.0, 3.1, 9.1], "pxPerMetre": 53.5 },
-      "01-left": { "sunTerm": 0.177, "L": 31.4, "C": 5.6, "h": 142, "L_p10": 16.3, "L_p90": 42.6, "moss%": 17.9,
-        "mossTenths": [0.1, 2.9, 5.5, 2.4, 6.7, 14.1, 21.2, 16.2, 31.4, 70.6], "pxPerMetre": 41.8 },
-      "02-front": { "sunTerm": -0.433, "L": 15.3, "C": 11.1, "h": 227, "L_p10": 12.6, "L_p90": 19.2, "moss%": 3.0,
-        "mossTenths": [3.8, 5.2, 0.9, 0.2, 0.0, 0.3, 0.7, 0.0, 0.2, 16.1], "pxPerMetre": 46.3 },
-      "02-left": { "sunTerm": 0.528, "L": 41.0, "C": 5.8, "h": 134, "L_p10": 31.3, "L_p90": 57.0, "moss%": 21.9,
-        "mossTenths": [0.0, 0.0, 0.0, 2.7, 4.5, 10.5, 36.7, 16.0, 27.1, 88.3], "pxPerMetre": 10.9 },
-      "03-front": { "sunTerm": -0.32, "L": 15.4, "C": 10.6, "h": 233, "L_p10": 12.9, "L_p90": 19.6, "moss%": 1.1,
-        "mossTenths": [1.2, 1.9, 0.7, 0.0, 0.0, 0.1, 0.0, 0.2, 0.5, 4.7], "pxPerMetre": 36.6 },
-      "04-front": { "sunTerm": 0.315, "L": 19.1, "C": 9.6, "h": 220, "L_p10": 14.4, "L_p90": 29.7, "moss%": 9.5,
-        "mossTenths": [1.7, 0.5, 0.5, 0.0, 1.6, 0.0, 0.0, 0.0, 7.1, 69.2], "pxPerMetre": 51.3 },
-      "04-right": { "sunTerm": -0.605, "L": 20.2, "C": 14.2, "h": 240, "L_p10": 14.5, "L_p90": 76.5, "moss%": 17.0,
-        "mossTenths": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.2, 3.9, 28.0, 88.2], "pxPerMetre": 22.8 },
-      "05-front": { "sunTerm": 0.425, "L": 26.3, "C": 5.2, "h": 190, "L_p10": 21.7, "L_p90": 34.9, "moss%": 3.7,
-        "mossTenths": [1.0, 4.7, 1.4, 6.4, 4.9, 0.5, 3.8, 1.0, 2.3, 10.1], "pxPerMetre": 67.3 },
-      "05-right": { "sunTerm": -0.534, "L": 11.5, "C": 9.7, "h": 232, "L_p10": 7.8, "L_p90": 15.9, "moss%": 0.6,
-        "mossTenths": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 5.9], "pxPerMetre": 29.8 }    },
+    "perFace": {
+      "01-front": {
+        "sunTerm": -0.659,
+        "L": 13,
+        "C": 9.8,
+        "h": 231,
+        "L_p10": 10,
+        "L_p90": 17.1,
+        "moss%": 1.4,
+        "mossTenths": [
+          0.5,
+          0.2,
+          1.1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          3.1,
+          9.1
+        ],
+        "pxPerMetre": 53.5
+      },
+      "01-left": {
+        "sunTerm": 0.177,
+        "L": 31.4,
+        "C": 5.6,
+        "h": 142,
+        "L_p10": 16.3,
+        "L_p90": 42.6,
+        "moss%": 17.9,
+        "mossTenths": [
+          0.1,
+          2.9,
+          5.5,
+          2.4,
+          6.7,
+          14.1,
+          21.2,
+          16.2,
+          31.4,
+          70.6
+        ],
+        "pxPerMetre": 41.8
+      },
+      "02-front": {
+        "sunTerm": -0.433,
+        "L": 15.3,
+        "C": 11.1,
+        "h": 227,
+        "L_p10": 12.6,
+        "L_p90": 19.2,
+        "moss%": 3,
+        "mossTenths": [
+          3.8,
+          5.2,
+          0.9,
+          0.2,
+          0,
+          0.3,
+          0.7,
+          0,
+          0.2,
+          16.1
+        ],
+        "pxPerMetre": 46.3
+      },
+      "02-left": {
+        "sunTerm": 0.528,
+        "L": 41,
+        "C": 5.8,
+        "h": 134,
+        "L_p10": 31.3,
+        "L_p90": 57,
+        "moss%": 21.9,
+        "mossTenths": [
+          0,
+          0,
+          0,
+          2.7,
+          4.5,
+          10.5,
+          36.7,
+          16,
+          27.1,
+          88.3
+        ],
+        "pxPerMetre": 10.9
+      },
+      "03-front": {
+        "sunTerm": -0.32,
+        "L": 15.4,
+        "C": 10.6,
+        "h": 233,
+        "L_p10": 12.9,
+        "L_p90": 19.6,
+        "moss%": 1.1,
+        "mossTenths": [
+          1.2,
+          1.9,
+          0.7,
+          0,
+          0,
+          0.1,
+          0,
+          0.2,
+          0.5,
+          4.7
+        ],
+        "pxPerMetre": 36.6
+      },
+      "04-front": {
+        "sunTerm": 0.315,
+        "L": 19.1,
+        "C": 9.6,
+        "h": 220,
+        "L_p10": 14.4,
+        "L_p90": 29.7,
+        "moss%": 9.5,
+        "mossTenths": [
+          1.7,
+          0.5,
+          0.5,
+          0,
+          1.6,
+          0,
+          0,
+          0,
+          7.1,
+          69.2
+        ],
+        "pxPerMetre": 51.3
+      },
+      "04-right": {
+        "sunTerm": -0.605,
+        "L": 20.2,
+        "C": 14.2,
+        "h": 240,
+        "L_p10": 14.5,
+        "L_p90": 76.5,
+        "moss%": 17,
+        "mossTenths": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.2,
+          3.9,
+          28,
+          88.2
+        ],
+        "pxPerMetre": 22.8
+      },
+      "05-front": {
+        "sunTerm": 0.425,
+        "L": 26.3,
+        "C": 5.2,
+        "h": 190,
+        "L_p10": 21.7,
+        "L_p90": 34.9,
+        "moss%": 3.7,
+        "mossTenths": [
+          1,
+          4.7,
+          1.4,
+          6.4,
+          4.9,
+          0.5,
+          3.8,
+          1,
+          2.3,
+          10.1
+        ],
+        "pxPerMetre": 67.3
+      },
+      "05-right": {
+        "sunTerm": -0.534,
+        "L": 11.5,
+        "C": 9.7,
+        "h": 232,
+        "L_p10": 7.8,
+        "L_p90": 15.9,
+        "moss%": 0.6,
+        "mossTenths": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          5.9
+        ],
+        "pxPerMetre": 29.8
+      }
+    },
     "sunOverShadow": {
       "on": "01, its west flank over its front, as the ratio of LINEAR luminances behind the two CIELAB medians (31.4 over 13.0 = 4.367); in encoded luminance the same two faces read 2.25, which is not this number",
       "target": 4.4,
@@ -364,7 +903,11 @@
       "why": "the reference resolves its block AND its course; a render whose tile carries a feature larger than a block resolves neither, which is what 'camouflage' means as a measurement"
     },
     "moss": {
-      "tintOverStoneBeside": [0.84, 0.93, 0.83],
+      "tintOverStoneBeside": [
+        0.84,
+        0.93,
+        0.83
+      ],
       "why": "the moss of the reference is DARKER than the stone it grows on, on all three channels: 59/70/58 against 70/76/69 on the west flank of 01",
       "byClass": {
         "shadedFronts": "1.1 to 3.7 per cent",
@@ -374,10 +917,385 @@
       }
     },
     "rocks": {
-      "litFaces": { "L": 50.5, "C": 13.4, "h": 95, "rgb": [130, 124, 104] },
-      "darkFaces": { "L": 12.8, "C": 4.0, "h": 158 },
-      "ruins": { "litL": 53, "h": 89, "blockMetres": [0.3, 0.4], "courses": [1, 2] },
+      "litFaces": {
+        "L": 50.5,
+        "C": 13.4,
+        "h": 95,
+        "rgb": [
+          130,
+          124,
+          104
+        ]
+      },
+      "darkFaces": {
+        "L": 12.8,
+        "C": 4,
+        "h": 158
+      },
+      "ruins": {
+        "litL": 53,
+        "h": 89,
+        "blockMetres": [
+          0.3,
+          0.4
+        ],
+        "courses": [
+          1,
+          2
+        ]
+      },
       "why": "the reference has TWO stones: the wall at L* 31 in the sun, and the rock at L* 50, warm. The low ruins past 05 are the rock and not the wall."
+    }
+  },
+  "relief": {
+    "why": [
+      "WHETHER THE BLOCKS OF THESE WALLS ARE VOLUMES, as the day target draws",
+      "them. Written by tools/monoliths/relief.mjs --measure; the target is the",
+      "committente's own material and is never carried here, so what is kept is",
+      "the reading.",
+      "",
+      "proud/flush/back/gone are per cent of the blocks a face gives a census on.",
+      "lidMedian is how far a block's own top face stands above its front face,",
+      "in L*: it is the reading that tells a volume from a painted grid, and a",
+      "wall of flat rectangles reads nought."
+    ],
+    "measuredFrom": "farfield-day-voxel-target.png",
+    "camera": "tools/monoliths/faces.mjs, the reference framing",
+    "lattice": {
+      "rise": 0.215,
+      "cell": 0.19
+    },
+    "cuts": {
+      "lidProud": 6,
+      "bodyGone": -9,
+      "bodyBack": -3
+    },
+    "perFace": {
+      "01-front": {
+        "census": false,
+        "courses": 25,
+        "columns": 18,
+        "crestStepped": 0,
+        "crestDeepest": 0,
+        "crestDrops": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "01-west": {
+        "census": true,
+        "courses": 25,
+        "columns": 8,
+        "crestStepped": 50,
+        "crestDeepest": 15,
+        "crestDrops": [
+          15,
+          15,
+          15,
+          1,
+          0,
+          0,
+          0,
+          0
+        ],
+        "read": 66,
+        "proud": 1.5,
+        "flush": 86.4,
+        "back": 10.6,
+        "gone": 1.5,
+        "lidMedian": 0.7,
+        "holeTenths": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          8.3,
+          0,
+          0,
+          0
+        ],
+        "holeFromEdge": [
+          4.5,
+          0,
+          0,
+          0
+        ]
+      },
+      "02-front": {
+        "census": false,
+        "courses": 33,
+        "columns": 18,
+        "crestStepped": 11.1,
+        "crestDeepest": 1,
+        "crestDrops": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1
+        ]
+      },
+      "03-front": {
+        "census": false,
+        "courses": 55,
+        "columns": 29,
+        "crestStepped": 10.3,
+        "crestDeepest": 19,
+        "crestDrops": [
+          19,
+          1,
+          2,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "04-front": {
+        "census": true,
+        "courses": 29,
+        "columns": 16,
+        "crestStepped": 0,
+        "crestDeepest": 0,
+        "crestDrops": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "read": 180,
+        "proud": 1.1,
+        "flush": 92.8,
+        "back": 6.1,
+        "gone": 0,
+        "lidMedian": 0.5,
+        "holeTenths": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "holeFromEdge": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "05-front": {
+        "census": true,
+        "courses": 23,
+        "columns": 15,
+        "crestStepped": 13.3,
+        "crestDeepest": 1,
+        "crestDrops": [
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "read": 123,
+        "proud": 3.3,
+        "flush": 90.2,
+        "back": 5.7,
+        "gone": 0.8,
+        "lidMedian": 0.4,
+        "holeTenths": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          6.3,
+          0
+        ],
+        "holeFromEdge": [
+          0,
+          0,
+          6.3,
+          0
+        ]
+      },
+      "05-east": {
+        "census": true,
+        "courses": 23,
+        "columns": 9,
+        "crestStepped": 11.1,
+        "crestDeepest": 1,
+        "crestDrops": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1
+        ],
+        "read": 129,
+        "proud": 0,
+        "flush": 97.7,
+        "back": 2.3,
+        "gone": 0,
+        "lidMedian": -0.1,
+        "holeTenths": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "holeFromEdge": [
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    "pooled": {
+      "faces": [
+        "01-west",
+        "04-front",
+        "05-front",
+        "05-east"
+      ],
+      "read": 498,
+      "proud": 1.4,
+      "flush": 92.6,
+      "back": 5.6,
+      "gone": 0.4,
+      "lidMedian": 0.3
+    },
+    "flatWall": {
+      "why": [
+        "WHAT THE SAME ESTIMATOR READ ON THE WALL THIS CHAPTER REPLACED: one",
+        "rectangle a course, with the block drawn into it by the fragment as a",
+        "darker line. It is here so that a miss this render INHERITS can be told",
+        "from one it CAUSED. The reading that separates the two walls is",
+        "lidMedian, which is negative on every face of this one and positive on",
+        "every face of the target: a painted joint puts a DARKER line exactly",
+        "where a block's own top edge puts a brighter one.",
+        "",
+        "Taken at the reference framing off the tip this branch was cut from."
+      ],
+      "perFace": {
+        "01-west": {
+          "proud": 12.5,
+          "back": 8.3,
+          "gone": 0,
+          "lidMedian": -0.26
+        },
+        "04-front": {
+          "proud": 3,
+          "back": 10.3,
+          "gone": 1.8,
+          "lidMedian": -0.73
+        },
+        "05-front": {
+          "proud": 0,
+          "back": 12.1,
+          "gone": 0,
+          "lidMedian": -0.78
+        },
+        "05-east": {
+          "proud": 1.5,
+          "back": 2.3,
+          "gone": 0,
+          "lidMedian": -0.71
+        }
+      }
     }
   }
 }
