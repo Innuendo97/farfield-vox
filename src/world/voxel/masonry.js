@@ -9,7 +9,7 @@ import {
 import { FOG_GLSL, LOW_SKY, fogUniforms } from '../air.js';
 import { faceLightGlsl, faceLightUniforms } from '../face-light.js';
 import { MONOLITHS } from '../layout.js';
-import { buildMasonry, masonryLaw } from './courses.js';
+import { NEAR_METRES, buildMasonry, masonryLaw } from './courses.js';
 
 // The block, built as masonry instead of delivered as a mesh.
 //
@@ -566,6 +566,45 @@ export const STONE_LIGHT_SCALE = 1.5;
 // the shortcut this campaign spent a session removing from the light.
 export const STONE_SKY_SHARE = 0.35;
 
+// AND HOW MUCH OF THAT SHARE A FACE SUNK INTO ITS OWN WALL GIVES BACK.
+//
+// A block's front face stands at its wall's plane or proud of it and keeps all
+// of it. The floor of a joint, the soffit of a block and the far wall of a
+// socket stand up to one shell BEHIND that plane, at the bottom of a slot two
+// centimetres wide, and the strip of sky they can see from there is a fraction
+// of a hemisphere. faceTerms knows none of that: it hands every upward normal
+// the whole of it, which is the truth for the cap of a monolith and a lie for
+// the 4 cm ledge on top of a block. Left unsaid, the estimator read fifteen per
+// cent of the blocks of 05's east flank standing proud where the target reads
+// NONE, because every lid on the six was as bright as a head.
+//
+// IT IS NOT AN AMBIENT OCCLUSION TERM, and the difference is not a quibble:
+// E-RICERCA-B measured that these targets carry no AO and E-FOND-PIANO4 struck
+// it out of the mesher. This is a distance the GENERATOR CUT, read back off the
+// fragment's own position, and it touches the SKY term alone -- the sun is a
+// direction, and whether a direction reaches a face is the seal's answer and
+// not this one's.
+export const STONE_NICHE = 0.6;
+
+// And what is left of the SUN on a block's own top ledge, which is the same
+// geometry answered for the other term. A ledge 36 mm deep under a wall, with
+// this world's sun at 47 degrees of elevation, stands in that wall's shadow for
+// the whole of its depth -- the shadow reaches 0.19 m out. It is not nought only
+// because the ledge of a block standing two steps proud of its neighbour can
+// catch a sliver, and because a term driven to nought is a term nobody can put
+// back.
+//
+// AND IT IS EVERY WALL OF THE JOINT AND NOT ONLY THE LEDGE, which is where this
+// was first written too narrowly and what that cost. A REVEAL is vertical, so a
+// reveal on a flank turned away from the sun can still face along the wall and
+// straight into it: on 05's east flank the face reads nothing of this sun and
+// the reveals beside it read the whole beam. The estimator does not know a
+// reveal from a lid -- it reads the top of a cell -- and it called those blocks
+// proud. Seven per cent of that flank, against none on the target, and shading
+// the ledges alone moved it by NOTHING, which is how the reveals were found.
+export const STONE_LEDGE_SUN = 0.25;
+
+
 /**
  * The stone tile as a texture, from bytes the worker has already generated.
  *
@@ -686,6 +725,18 @@ const FRAGMENT = /* glsl */`
 
   uniform sampler2D tStone;
   uniform sampler2D tInk;
+  // How far out of a wall's own plane anything that belongs to that wall can
+  // stand, in metres: the deepest box plus the proudest block. Nought on a wall
+  // with no relief, which is what puts this fragment back on the normal alone.
+  uniform float uShell;
+  // How much of its sky a face standing a whole shell behind its wall's plane
+  // gives up: see STONE_NICHE.
+  uniform float uNiche;
+  // What is left of the sun on a block's own top ledge: see STONE_LEDGE_SUN.
+  uniform float uLedgeSun;
+  // One step of a block's stand-out, in metres: how far out of its wall's plane
+  // a face can be and still be the block's own front rather than a joint's.
+  uniform float uStand;
   uniform vec3 uAlbedo;
   uniform float uGain;
   uniform float uTile;
@@ -765,6 +816,23 @@ const FRAGMENT = /* glsl */`
     float sx = abs(f.x);
     float sz = abs(f.z);
     bool lid = abs(f.y) > 0.9;
+    // AND THE NORMAL IS NOT ENOUGH ANY MORE, which is what a wall of volumes
+    // costs this fragment. A block that stands proud of its wall shows two
+    // REVEALS, and a reveal of the FRONT wall has a normal pointing along x --
+    // the same normal a face of the WEST wall has. Read off the normal alone
+    // it took the west wall's lattice, so the stone in a 4 cm strip beside every
+    // block on the front was drawn from a different block's tint and a
+    // different course's phase, in a stripe a walker reads at five pixels.
+    //
+    // So the wall is settled by WHERE THE FRAGMENT STANDS and the normal only
+    // breaks the tie. Everything a wall owns -- its faces, its reveals, its
+    // soffits, the floors of its sockets -- lies inside uShell of that wall's
+    // own plane, and nothing else in the block does. The two disagree only
+    // within a shell of a corner, and there the SIDE wall wins, which is the
+    // face a quoin turns to the eye anyway.
+    bool nearFB = uShell > 0.0 && abs(vLocal.z) > uHalf.z - uShell;
+    bool nearLR = uShell > 0.0 && abs(vLocal.x) > uHalf.x - uShell;
+    bool onFront = uShell <= 0.0 ? sz >= sx : (sz > 0.5 ? nearFB : (nearFB && !nearLR));
     // AND THE DRESSED FACET IS NAMED HERE, off the same normal, because it is
     // the only thing on a block that leans: a wall stands at nought, a lid and
     // the floor of a socket at one, and the chamfer over a course at 0.7071
@@ -779,11 +847,16 @@ const FRAGMENT = /* glsl */`
     if (lid) {
       u = vLocal.x + uHalf.x;
       span = 2.0 * uHalf.x;
-    } else if (sx > sz) {
-      u = f.x > 0.0 ? uHalf.z - vLocal.z : vLocal.z + uHalf.z;
+    } else if (!onFront) {
+      // A face of a side wall, or a reveal that belongs to one. Which of the
+      // two sides is settled by the fragment's own x when the normal cannot say
+      // -- a reveal's normal runs along the wall, not out of it.
+      float side = sx > 0.5 ? f.x : sign(vLocal.x);
+      u = side > 0.0 ? uHalf.z - vLocal.z : vLocal.z + uHalf.z;
       span = 2.0 * uHalf.z;
     } else {
-      u = f.z > 0.0 ? vLocal.x + uHalf.x : uHalf.x - vLocal.x;
+      float side = sz > 0.5 ? f.z : sign(vLocal.z);
+      u = side > 0.0 ? vLocal.x + uHalf.x : uHalf.x - vLocal.x;
       span = 2.0 * uHalf.x;
     }
     float up = lid ? vLocal.z + uHalf.z : vLocal.y;
@@ -910,6 +983,47 @@ const FRAGMENT = /* glsl */`
     // and 05 read 1.083 and 1.173 against 1.244 and 1.163). A knob that ships
     // at the value the measurement asks for is not a knob, and the 1.71x stays
     // parked at D5 with its number rather than being quietly spent here.
+    //
+    // A JOINT, ON THE OTHER HAND, IS A NICHE, and that one is not a knob: see
+    // STONE_NICHE. How far behind its own wall's plane this fragment stands,
+    // over the deepest anything on this wall can stand, is how much of its sky
+    // it gives up. Nought on a wall with no volumes, so the far block and the
+    // stair are exactly where they were.
+    // AND A BLOCK'S OWN TOP LEDGE STANDS IN THE SHADOW OF THE BLOCK ABOVE IT,
+    // which is the sun's half of the same fact and the larger half of it.
+    //
+    // faceTerms hands any upward normal the full sun term, and at an elevation
+    // of 47 degrees the wall standing over a 36 mm ledge throws its shadow
+    // 0.19 m out -- five times the ledge. So that ledge NEVER sees this sun,
+    // and on a flank turned away from it the arithmetic was handing a lid the
+    // whole beam while the face under it got none: a jump of four and a half
+    // times, on the one face of the six that is 5 px wide. The estimator read
+    // it as seven per cent of 05's east flank standing proud where the target
+    // reads NONE, and it was the last leg of guard-rilievo to come good.
+    //
+    // It is the LEDGES only, and the head of a block is not one: uHead's own
+    // cap stands clear inside the plan, where nothing is over it, and it is
+    // told apart here the same way a reveal is -- by whether it lies inside a
+    // wall's shell.
+    if (uShell > 0.0) {
+      float sunk = onFront ? uHalf.z - abs(vLocal.z) : uHalf.x - abs(vLocal.x);
+      if (lid) sunk = min(uHalf.x - abs(vLocal.x), uHalf.z - abs(vLocal.z));
+      // A face of a block that is not the block's OWN FRONT is a wall of the
+      // joint: a ledge, a soffit, a reveal or the floor of a socket. Every one
+      // of them stands in a slot 2.2 cm wide, and at this sun's elevation the
+      // block beside it or over it shadows the whole of it.
+      bool ownFace = onFront ? sz > 0.5 : sx > 0.5;
+      if (!ownFace || sunk > 2.0 * uStand) terms.x *= uLedgeSun;
+      // SQUARED, and that shape is a correction rather than a flourish. Linear,
+      // the term reached a RECESSED BLOCK'S OWN FRONT FACE -- 3.8 cm behind the
+      // plane, a quarter of a shell, with the whole sky still over it -- and
+      // took six per cent of its sky, which the estimator read as another
+      // fourteen per cent of 05's front standing set back. A face a quarter of a
+      // shell in is not in a slot; the floor of a joint, two thirds of one in,
+      // is. Squared keeps the first at 97% and puts the second at 75%.
+      float sunkFrac = clamp(sunk / uShell, 0.0, 1.0);
+      terms.y *= 1.0 - uNiche * sunkFrac * sunkFrac;
+    }
     vec3 light = faceLightOf(terms);
 
     // ------------------------------------------------------------- the moss
@@ -1118,11 +1232,16 @@ export function createMasonry(entry, tile, ready = null, engraved = true) {
     head.push(new Vector2(run.x1, run.courses));
   }
 
-  const geometry = new BufferGeometry();
-  geometry.setAttribute('position', new BufferAttribute(built.positions, 3));
-  geometry.setAttribute('normal', new BufferAttribute(built.normals, 3));
-  geometry.setIndex(new BufferAttribute(built.indices, 1));
-  geometry.computeBoundingSphere();
+  const solid = built.lod === 'near';
+  const geometryOf = (cut) => {
+    const g = new BufferGeometry();
+    g.setAttribute('position', new BufferAttribute(cut.positions, 3));
+    g.setAttribute('normal', new BufferAttribute(cut.normals, 3));
+    g.setIndex(new BufferAttribute(cut.indices, 1));
+    g.computeBoundingSphere();
+    return g;
+  };
+  const geometry = geometryOf(built);
 
   const material = new ShaderMaterial({
     uniforms: {
@@ -1132,10 +1251,28 @@ export function createMasonry(entry, tile, ready = null, engraved = true) {
       uGain: { value: STONE_GAIN },
       uTile: { value: 1 / law.tile },
       ...faceLightUniforms(STONE_LIGHT_SCALE * STONE_EXPOSURE),
-      uJoint: { value: STONE_JOINT },
+      // AND THE JOINT IS NOUGHT ON A WALL THAT HAS ONE.
+      //
+      // STONE_JOINT is a PAINTED joint: six per cent off the pigment over two
+      // pixels wherever a fragment stands near the edge of its own block. It
+      // was the right answer while a course was one rectangle, and it is the
+      // exact thing the committente read back as "linee orizzontali e verticali
+      // ordinate che formano cubi per intersezione" -- because that is what it
+      // is, a line drawn where two cells meet. On a wall laid as volumes the
+      // joint is a VOID with two reveals and a shadow of its own, and a painted
+      // line on top of it would be a second joint beside the real one.
+      //
+      // The far wall keeps it, and that is the whole of the LOD: past
+      // NEAR_METRES the blocks collapse back into the rectangle this file has
+      // always merged, and the rectangle needs its line back.
+      uJoint: { value: solid ? 0 : STONE_JOINT },
       uJointPixels: { value: STONE_JOINT_PIXELS },
       uTint: { value: STONE_TINT },
-      uArris: { value: STONE_ARRIS },
+      // The arris goes with it, for the same reason and with the same switch: it
+      // LEANS THE NORMAL near the end of a block to stand in for a dressed edge
+      // that was not built. It is built now -- it is the reveal beside it -- and
+      // the two together dress one edge twice.
+      uArris: { value: solid ? 0 : STONE_ARRIS },
       uArrisPixels: { value: STONE_ARRIS_PIXELS },
       uArrisPigment: { value: STONE_ARRIS_PIGMENT },
       // The head as the fragment has to walk it, from the runs the GENERATOR
@@ -1171,6 +1308,10 @@ export function createMasonry(entry, tile, ready = null, engraved = true) {
       // is a number the spec carried in as data, so nothing here is a second
       // opinion about the wall — it is the same opinion, on the other side of
       // the merge.
+      uShell: { value: solid ? 3 * law.stand + law.gap + law.sink : 0 },
+      uNiche: { value: STONE_NICHE },
+      uLedgeSun: { value: STONE_LEDGE_SUN },
+      uStand: { value: law.stand },
       uHalf: { value: new Vector3(spec.size[0] / 2, height / 2, spec.size[2] / 2) },
       uRise: { value: law.rise },
       uCell: { value: law.cell },
@@ -1208,6 +1349,33 @@ export function createMasonry(entry, tile, ready = null, engraved = true) {
   mesh.position.set(spec.position.x, spec.baseY, spec.position.z);
   mesh.rotation.y = angle;
 
+  // THE TWO WALLS, AND THE SWAP BETWEEN THEM.
+  //
+  // A block laid as volumes is sixteen times the triangles of the same block
+  // merged into one rectangle a course, and past about NEAR_METRES a step of
+  // 4.5 cm is a fifth of a pixel: what the near wall buys there is nothing and
+  // what it costs is every triangle of it. So the far wall is cut ONCE, the
+  // first time a block is far enough to need it, and the two are swapped on the
+  // MESH -- one geometry in, one out.
+  //
+  // THE DRAW COUNT DOES NOT MOVE, which is the constraint this had to be built
+  // under: E-V2i counted the draws of this family at nine and named the tenth a
+  // provisional debt, and a LOD that drew a near mesh AND a far mesh would have
+  // spent an eleventh on a block that is one block. One mesh a block, as it was;
+  // what changes is which buffer it points at.
+  let far = null;
+  let lod = built.lod;
+  const swap = (want) => {
+    if (want === lod) return false;
+    if (want === 'far' && !far) far = geometryOf(buildMasonry(spec, { lod: 'far' }));
+    mesh.geometry = want === 'far' ? far : geometry;
+    material.uniforms.uJoint.value = want === 'far' ? STONE_JOINT : 0;
+    material.uniforms.uArris.value = want === 'far' ? STONE_ARRIS : 0;
+    material.uniforms.uShell.value = want === 'far' ? 0 : 3 * law.stand + law.gap + law.sink;
+    lod = want;
+    return true;
+  };
+
   return {
     mesh,
     spec,
@@ -1218,7 +1386,25 @@ export function createMasonry(entry, tile, ready = null, engraved = true) {
     height,
     quads: built.quads,
     fused: built.fused,
+    laid: built.laid,
+    opened: built.opened,
     vertices: built.vertices,
+    lod: () => lod,
+    /**
+     * Puts this block on the wall its distance has earned.
+     *
+     * Measured to the block's own footprint and not to its centre, so a tall
+     * one does not go coarse while the eye stands at its foot. Returns whether
+     * anything actually changed, so a caller can count the swaps.
+     */
+    atRange(eye) {
+      if (!solid) return false;
+      const dx = eye.x - spec.position.x;
+      const dz = eye.z - spec.position.z;
+      const reach = Math.max(spec.size[0], spec.size[2]) / 2;
+      const away = Math.max(0, Math.hypot(dx, dz) - reach);
+      return swap(away > NEAR_METRES ? 'far' : 'near');
+    },
     setEngraving(texture) { material.uniforms.tInk.value = texture; },
   };
 }
