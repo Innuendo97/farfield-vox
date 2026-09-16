@@ -17,7 +17,7 @@ import {
 // e' il disco su un altopiano» -- and no longer of a tier, so the floor reads
 // it from the seat that states it instead of being told a radius by a layer.
 import { PLATEAU } from './voxel/confine.js';
-import { CHAMFER } from './voxel/pure.js';
+import { CHAMFER, STAND } from './voxel/pure.js';
 import MASONRY from '../../assets-src/monoliths/masonry-spec.json' with { type: 'json' };
 import { builtStoneAt, stoneSpecs } from './stone.js';
 
@@ -762,20 +762,40 @@ let flowers = null;
  * THE BLOCKS ARE THE ONLY THING ASSEMBLED HERE, because a monolith is a box in
  * the plan and there is nothing to measure: the plan IS the mesh. Everything
  * else is asked of the file that cuts it.
+ *
+ * AND THE PLAN IS NO LONGER THE MESH, WHICH IS WHY THE BOX GREW.
+ *
+ * The sentence above was true while a course of a monolith was one rectangle
+ * standing exactly on the plan's own face. Since the six are laid as VOLUMES
+ * (src/world/voxel/courses.js) the proudest block on a wall stands two steps
+ * out of that face -- 2 x STAND -- and a camera walked up to the plan's box
+ * would have put its near plane INSIDE the stone the frame draws, which is the
+ * one thing this file says outright it may never do: nothing in it may quietly
+ * become a different answer from the one the frame draws.
+ *
+ * It is grown by the PROUDEST a block can stand and not by the shell, because
+ * the rest of the shell runs INWARD -- a box is a box, and the reveals, the
+ * soffits and the floors of the sockets are all behind this face. The stair and
+ * the platform are not grown: they are not laid as volumes, and
+ * src/world/stone.js says why.
  */
 export function cameraSolids() {
   const out = [];
+  const proud = 2 * STAND;
+  const crest = STAND > 0 ? MASONRY.course.rise : 0;
   for (const m of MONOLITHS) {
     const [w, h, d] = m.size;
     out.push({
       name: `monolite ${m.id}`,
       x: m.position.x,
       z: m.position.z,
-      halfWidth: w / 2,
-      halfDepth: d / 2,
+      halfWidth: w / 2 + proud,
+      halfDepth: d / 2 + proud,
       rotationY: (m.rotationY * Math.PI) / 180,
       y0: m.baseY,
-      y1: m.baseY + h,
+      // And a crest block stands a whole course over its own head, which is the
+      // one place on these six where the stone is taller than the plan.
+      y1: m.baseY + h + crest,
     });
   }
   out.push(...pileSolids());
