@@ -171,7 +171,32 @@ const ALLOCATION_RADIUS = 35;
 // row has just stopped holding for it. The ritual is the one used here: measure,
 // write the number with its reason, and let the coordinator ratify. Writing the
 // row where the world actually stands is what makes that conversation possible.
-const ALLOCATION = 185200;
+//
+// AND A FIFTH TIME, FOR A PIECE OF GROUND THAT WAS NOT BEING DRAWN AT ALL.
+// U-SUOLO-2 (E-DECISIONI22): the corridor's run reaches z = 30 and this disc was
+// gated at the tier's `voxelDiscRadius`, which at 14 m from the middle of the
+// hub is z = 15.5. The 1 765 columns between the two -- 1.2 m wide, 14.5 m long,
+// 17.7 m^2, with the CONTATTI block sitting in the middle of them -- were drawn
+// by NOBODY: the field stands aside on PATH for a paving that was never asked
+// for, and the walker saw the sky in the grass. The rim of columnSpec and the
+// sweep of chunkList now let the corridor through whatever the radius, so the
+// disc goes from 26 chunks to 30 at r = 14 m and from 184 296 to 185 210
+// triangles: +914, which is +457 quads. Twenty three of them are the paving's
+// own rim walls (320 to 343) and the rest is the ribbon's surface. The SOIL
+// family does not move at all, 1 257 quads either way, and that is the reading
+// that says the ribbon is drawn the way the rest of the corridor is: the band
+// beside the stone belongs to the paving since U-SENT-7 (`pavedTop`), so it
+// arrives in the paving's family out here exactly as it does inside the disc,
+// and there is no seam of family at z = 15.5 to find.
+//
+// Ten triangles over the row. That is the smallest overshoot this file has ever
+// had to answer and the answer is the same one: the row goes to the measured
+// number with a third of a per cent of headroom, 185 820, by the rule the three
+// amendments above it used, in the direction the measurement went. What is being
+// bought is not detail -- it is seventeen square metres of ground that the
+// picture was missing -- and the gate that decided it is guard-cuciture, which
+// asserts that no pixel under the walker's own horizon is left undrawn.
+const ALLOCATION = 185820;
 
 /** What §2.9 allocated before D-E2 amended it, kept so the move stays readable. */
 const ALLOCATION_BEFORE = 60000;
