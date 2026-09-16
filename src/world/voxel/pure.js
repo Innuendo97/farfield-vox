@@ -129,6 +129,7 @@ export {
   WANDER,
   WANDER_SPAN,
   STAND,
+  DRESS,
   GAP,
   GAP_UP,
   SINK,

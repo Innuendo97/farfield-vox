@@ -578,6 +578,18 @@ export const STONE_SKY_SHARE = 0.35;
 // cent of the blocks of 05's east flank standing proud where the target reads
 // NONE, because every lid on the six was as bright as a head.
 //
+// AND WHAT U-PIETRA-4 FOUND WHEN IT ASKED THIS TERM THE SAME QUESTION: with the
+// course joint refitted from 12 mm to 5 and the camera corrected, driving this
+// to NOUGHT moves the whole census by six tenths of a point on one class and
+// the pooled lid by nothing at all. The 0.6 is therefore NOT supported by the
+// judged framing any more -- at 20 to 31 m the floor of a 5 mm joint is a
+// quarter of a pixel. It stays because the argument under it is about metres of
+// stone and not about that framing: at the five metres the committente judged
+// the 06 from the same joint is two pixels, and a floor two thirds of a shell
+// behind the plane with the whole sky over it is a lie there too. Declared, so
+// that the next reader knows this number is held by its reasoning and not by a
+// reading.
+//
 // IT IS NOT AN AMBIENT OCCLUSION TERM, and the difference is not a quibble:
 // E-RICERCA-B measured that these targets carry no AO and E-FOND-PIANO4 struck
 // it out of the mesher. This is a distance the GENERATOR CUT, read back off the
@@ -602,7 +614,64 @@ export const STONE_NICHE = 0.6;
 // reveal from a lid -- it reads the top of a cell -- and it called those blocks
 // proud. Seven per cent of that flank, against none on the target, and shading
 // the ledges alone moved it by NOTHING, which is how the reveals were found.
+//
+// RE-MEASURED BY U-PIETRA-4 THROUGH THE CORRECTED CAMERA, and it holds: driven
+// to 1.0 on the wall as it now stands, 05's east flank goes from 0.0 to 7.9 per
+// cent of its blocks reading proud against a target of NONE, and 04's front
+// goes over the band on the blocks it reads set back. The number U-PIETRA-3
+// fitted survives its own camera being wrong, which is worth saying because the
+// lid beside it did not.
 export const STONE_LEDGE_SUN = 0.25;
+
+// AND HOW MUCH OF ITS OWN SKY A DRESSED EDGE CUT INTO A WALL ACTUALLY SEES.
+//
+// THIS IS D5, TAKEN OFF ITS PEG AND SPENT, WITH THE READING THAT SPENDS IT.
+// faceTerms hands a facet leaning up and out at 45 degrees a sky term of 0.854
+// against the wall's 0.500 -- 1.71x, of sky alone -- and the note beside this
+// file's arris used to say that occluding it "was tried and MEASURED" and moved
+// the reading by little, so the knob stayed parked with its number. That
+// measurement was taken on a wall carrying ONE facet a course, through a camera
+// since found to project the target two to eighteen pixels off the face it was
+// measuring (U-GRADE-1).
+//
+// RE-TAKEN, on the wall this chapter draws -- a dressed edge on EVERY block --
+// and through the corrected camera, it is neither small nor a taste. And the
+// target states the size of its own dressed edge and has since U-PIETRA-1:
+// masonry-spec.json `chamfer.lighten` is 1.072 to 1.091, seven to nine per cent
+// brighter than the flat it was cut from, which is under two L*. A facet lit as
+// a FREE facet develops to several times that, and the estimator read it as
+// blocks standing proud where the target has none.
+//
+// WHAT IT IS, PHYSICALLY. The edge is cut INTO a wall: the stone of the block
+// above stands in the same plane over it and its own block under it, so the
+// half dome a free facet is handed is not what it can see from in there. This
+// takes the EXCESS back toward the wall's own share -- a wall's sky term is
+// 0.5 + 0.5 * n.y with n.y nought, which is 0.500 exactly, so the wall's side
+// of the mix is a constant and not a second opinion.
+//
+// AND THE SUN IS A SECOND KNOB BECAUSE IT IS A SECOND OCCLUSION, and the
+// arithmetic says which way. A 45 degree bevel one DRESS deep leaves the stone
+// of the block above standing one DRESS proud of the bevel's own inner edge,
+// and this world's sun at 47 degrees of elevation throws that overhang's shadow
+// 1.07 of a DRESS down it -- past the foot of the bevel, every hour this world
+// has. So a dressed edge never sees MORE sun than the wall it is cut into, and
+// STONE_DRESS_SUN ships at nought. It is a mix toward the wall's own beam and
+// not a multiplier on the bevel's: driven instead through STONE_LEDGE_SUN's
+// 0.25, which is what a ledge lying BEHIND the plane is worth, the edge came
+// out DARKER than the stone beside it and drew a black line along every course
+// -- the pooled lid went to -0.64 L*, which is the defect this whole chapter
+// exists to remove. Measured, and in the verbale of U-PIETRA-4 with the rest of
+// the sweep.
+export const STONE_DRESS_SUN = 0.18;
+//
+// AND IT IS NOT AN OCCLUSION TERM, for the reason STONE_NICHE is not one:
+// E-RICERCA-B measured no AO in these targets. It is a statement about which
+// NORMAL a strip of dressed stone is honestly lit by, applied where the
+// geometry says the strip is cut into a wall.
+//
+// INSIDE THE NEAR WALL'S OWN BLOCK, so the far wall -- one facet a course, the
+// wall this chapter replaced, seen past 46 m -- is exactly where it was.
+export const STONE_DRESS_SKY = 0.25;
 
 
 /**
@@ -729,6 +798,8 @@ const FRAGMENT = /* glsl */`
   // stand, in metres: the deepest box plus the proudest block. Nought on a wall
   // with no relief, which is what puts this fragment back on the normal alone.
   uniform float uShell;
+  uniform float uDressSun;
+  uniform float uDressSky;
   // How much of its sky a face standing a whole shell behind its wall's plane
   // gives up: see STONE_NICHE.
   uniform float uNiche;
@@ -737,6 +808,8 @@ const FRAGMENT = /* glsl */`
   // One step of a block's stand-out, in metres: how far out of its wall's plane
   // a face can be and still be the block's own front rather than a joint's.
   uniform float uStand;
+  uniform float uGapUp;
+  uniform float uDress;
   uniform vec3 uAlbedo;
   uniform float uGain;
   uniform float uTile;
@@ -953,6 +1026,51 @@ const FRAGMENT = /* glsl */`
     float below = lid ? 0.0 : top - 1.0 - course;
     albedo *= 1.0 + (uPaleTop - 1.0) * clamp(1.0 - below / uPaleCourses, 0.0, 1.0);
 
+    // ------------------------------------------- the block's own dressed edge
+    //
+    // WHERE THE TOP OF A BLOCK STOPS BEING A WALL. The far wall cuts a real
+    // facet over every course -- one quad a COURSE, which is cheap -- and the
+    // wall of boxes replaced that rectangle with a row of slabs and cut none on
+    // any of them: a block's top edge became a right angle with the joint's own
+    // shadow over it, a DARKER line exactly where the reference draws a
+    // brighter one. Through one estimator at the reference framing the far wall
+    // reads its lid 1.04 L* over the face under it, the target 0.42, and the
+    // wall of boxes without this −0.45. The sign is the whole of what the
+    // committente could not find on the six.
+    //
+    // AND IT IS DRAWN HERE AND NOT CUT, which is a measurement and not a
+    // saving of convenience. A dressed edge on every block is one quad a BLOCK
+    // -- 9,349 of them, 19,228 triangles, a fifth of the whole wall -- and what
+    // that quad buys is a strip of the block's own front plane carrying the
+    // normal of the facet that stands for it. It is COPLANAR: it adds no
+    // silhouette, closes nothing, and under an analytic light a face's shading
+    // is its normal and nothing else. So the quad and this are the same picture
+    // and one of them costs 19,228 triangles. BOTH WERE CUT AND BOTH WERE
+    // PHOTOGRAPHED at the judged pose before this line was written: the census
+    // and the lid agree to within the estimator's own quantum, and the triangle
+    // that carried it is not spent. It is the device this file already uses for
+    // the arris at a block's END, for the same reason and with the same words.
+    //
+    // HELD IN METRES OF STONE and not in pixels, unlike that one, because this
+    // edge has a SIZE the reference states -- DRESS in courses.js -- where the
+    // vertical arris is a line at every distance. So it foreshortens, and a
+    // block seen from below shows less of its own top edge, which is true.
+    //
+    // NOT ON A LID, NOT ON A SOFFIT, NOT ON A REVEAL AND NOT DOWN A SOCKET: a
+    // dressed edge belongs to the block's OWN FRONT, and the three others are
+    // walls of the joint. The socket's floor is told apart the way STONE_NICHE
+    // tells it apart, by how far behind its own wall's plane it stands.
+    float sunkAt = onFront ? uHalf.z - abs(vLocal.z) : uHalf.x - abs(vLocal.x);
+    float blockTop = min(courseY(course + 1.0, vLocal.x, vLocal.z),
+                         courseY(top, vLocal.x, vLocal.z)) - uGapUp * 0.5;
+    if (uDress > 0.0 && !lid && (onFront ? sz > 0.5 : sx > 0.5)
+        && sunkAt < 1.5 * uStand && up > blockTop - uDress) {
+      // Up and OUT of its own wall at 45 degrees, which is the one angle every
+      // dressed edge in this world is cut at.
+      n = normalize(n + vec3(0.0, 1.0, 0.0));
+      facet = 1.0;
+    }
+
     // The same two analytic terms as the meadow, because they come from the
     // same place: src/world/face-light.js is the one producer of the pair, and
     // this file used to write out a second copy of it. A block and the grass at
@@ -964,6 +1082,19 @@ const FRAGMENT = /* glsl */`
     // out of the beam, and bending a pair you were given is a material's
     // business. Producing one is not.
     vec2 terms = faceTerms(n);
+    // AND A DRESSED EDGE CUT INTO A WALL IS NOT A FREE FACET: see
+    // STONE_DRESS_SUN and STONE_DRESS_SKY. Both take the edge back toward the
+    // light of its OWN WALL -- the same normal with the lean taken out -- and
+    // they are two knobs and not one because the sun and the sky are occluded
+    // by different amounts by the same stone. Asked of the PAIR and not of the
+    // light, so everything under this -- the relief's bend, the sky share, the
+    // niche, the ledge -- reaches a dressed edge exactly as it reaches the
+    // stone beside it.
+    if (uShell > 0.0 && facet > 0.5) {
+      vec2 wall = faceTerms(normalize(vec3(n.x, 0.0, n.z)));
+      terms.x = mix(wall.x, terms.x, uDressSun);
+      terms.y = mix(wall.y, terms.y, uDressSky);
+    }
     terms.x *= clamp(1.0 - uRelief * (above - pair.g), 0.45, 1.9);
     // AND THE SKY TERM IS BENT TOO, WHICH IS NEW AND IS THE OTHER HALF OF THE
     // SAME PERMISSION. The line above takes sun off a face that leans out of the
@@ -973,16 +1104,13 @@ const FRAGMENT = /* glsl */`
     // the seat is still one, and the ratio between a lit face and a shaded one
     // is the number this moves. See STONE_SKY_SHARE.
     terms.y *= uSkyShare;
-    // AND THE SKY TERM IS LEFT ALONE ON THE DRESSED EDGE, which is a decision
-    // and not an omission. A facet leaning at the sky is handed 0.854 by
-    // faceTerms against the wall's 0.5 — 1.71x, of sky alone — and this file
-    // escalated that against the targets' 1.072 to 1.091. Occluding it here was
-    // tried and MEASURED: with the skin closed, driving the facet's share of
-    // the sky from 1.00 to 0.20 moves the arris the estimator reads from 1.150
-    // to 1.117 pooled, and the render is already AT the target without it (04
-    // and 05 read 1.083 and 1.173 against 1.244 and 1.163). A knob that ships
-    // at the value the measurement asks for is not a knob, and the 1.71x stays
-    // parked at D5 with its number rather than being quietly spent here.
+    // AND THE DRESSED EDGE IS NO LONGER LEFT ALONE, which is D5 spent and not a
+    // knob quietly turned: see STONE_DRESS_SUN and STONE_DRESS_SKY above, and
+    // the measurement that spends it. The note that used to stand here said the
+    // 1.71x of sky a leaning facet is handed "moves the reading by little"; it
+    // was taken on a wall carrying ONE facet a course and through a camera
+    // U-GRADE-1 has since corrected. On a wall carrying one on every block it
+    // is worth a fifth of 01's west flank reading as blocks standing proud.
     //
     // A JOINT, ON THE OTHER HAND, IS A NICHE, and that one is not a knob: see
     // STONE_NICHE. How far behind its own wall's plane this fragment stands,
@@ -1310,8 +1438,12 @@ export function createMasonry(entry, tile, ready = null, engraved = true) {
       // the merge.
       uShell: { value: solid ? 3 * law.stand + law.gap + law.sink : 0 },
       uNiche: { value: STONE_NICHE },
+      uDressSun: { value: STONE_DRESS_SUN },
+      uDressSky: { value: STONE_DRESS_SKY },
       uLedgeSun: { value: STONE_LEDGE_SUN },
       uStand: { value: law.stand },
+      uGapUp: { value: law.gapUp },
+      uDress: { value: solid ? law.dress : 0 },
       uHalf: { value: new Vector3(spec.size[0] / 2, height / 2, spec.size[2] / 2) },
       uRise: { value: law.rise },
       uCell: { value: law.cell },
@@ -1372,6 +1504,7 @@ export function createMasonry(entry, tile, ready = null, engraved = true) {
     material.uniforms.uJoint.value = want === 'far' ? STONE_JOINT : 0;
     material.uniforms.uArris.value = want === 'far' ? STONE_ARRIS : 0;
     material.uniforms.uShell.value = want === 'far' ? 0 : 3 * law.stand + law.gap + law.sink;
+    material.uniforms.uDress.value = want === 'far' ? 0 : law.dress;
     lod = want;
     return true;
   };

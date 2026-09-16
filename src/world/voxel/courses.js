@@ -112,12 +112,12 @@ export const WANDER_SPAN = 1.2;
 // at, 0.19 m of block is seven to thirteen pixels, so relief a walker reads as
 // unmistakable volume is ONE OR TWO PIXELS there. Measured through
 // tools/monoliths/relief.mjs the day target reads its blocks' own top faces a
-// median 0.3 to 0.7 L* ABOVE the faces under them -- the sign is the whole
+// median 0.3 to 0.5 L* ABOVE the faces under them -- the sign is the whole
 // finding, and the magnitude is a pixel and a half of lid. A wall built to make
 // that reading large would be a wall of steps a metre deep seen from the hub.
 //
-// STAND     0.045: one step of a block's stand-out, which at the pose the six
-//           are judged from is 2.4 px on 01 and at a walker's distance from the
+// STAND     0.036: one step of a block's stand-out, which at the pose the six
+//           are judged from is 1.9 px on 01 and at a walker's distance from the
 //           06 is eight. Two steps is as far as any block goes.
 // GAP       0.022: the void ACROSS, between two blocks. The spec reads the
 //           joint at 2 to 3 px on faces running 42 to 67 px per metre, which is
@@ -130,35 +130,89 @@ export const WANDER_SPAN = 1.2;
 export const STAND = 0.036;
 export const GAP = 0.022;
 
-// AND THE COURSE JOINT IS HALF THE WIDTH OF THE UPRIGHT ONE, which is a
-// measurement and not a taste: the targets' strongest lattice signal is the
-// COURSE (autocorrelation 0.48 at 12 px on 05-right, against no peak at all on
-// the render before the tile came down), and what carries it is a tight dark
-// line and not a slot. It is also what lets a block's own top edge be seen: the
+// AND THE COURSE JOINT IS A QUARTER OF THE UPRIGHT ONE, which is a measurement
+// and not a taste: the targets' strongest lattice signal is the COURSE
+// (autocorrelation 0.48 at 12 px on 05-right, against no peak at all on the
+// render before the tile came down), and what carries it is a tight dark line
+// and not a slot. It is also what lets a block's own top edge be seen: the
 // wider the gap over a block, the more of the wall behind it stands in the band
 // the eye reads its lid in, and the wall behind is the darkest thing on the
-// face. At 0.022 the lid of a shadowed front read 0.0 L* over its own face
-// where the target reads 0.5.
-export const GAP_UP = 0.012;
+// face.
+//
+// 0.022 -> 0.012 -> 0.005, AND THE LAST STEP IS THE ONE THAT WAS MEASURED
+// RIGHT. The first two were taken through the camera U-GRADE-1 has since
+// corrected. Re-measured: a course of these walls does not stand where the
+// estimator's nominal lattice puts it -- it strays with a standard deviation of
+// 30 mm and the gap between two of them by 42, which is the target's own
+// scatter and is meant -- so the 12 mm void does not read as a 12 mm line. It
+// is SMEARED across a fifth of a course, and what the estimator sees at the top
+// of a cell is that smear. Profiled on 05's front, the render carried 2.6 times
+// the integrated darkness the target carries there; at 0.005 it carries the
+// target's. Held still at every other constant, that step alone moved the
+// pooled lid from +0.02 to +0.23 L*, which is the largest single move in this
+// chapter after the dressed edge itself.
+//
+// AND IT IS STILL A VOID AND NOT A LINE: 5 mm is 2 px at the range the
+// committente judged the 06 from, against 9 for the upright joint beside it.
+export const GAP_UP = 0.005;
 export const SINK = 0.030;
 export const HOLE = 0.19;
+
+// HOW MUCH OF A BLOCK'S OWN TOP IS DRESSED STONE.
+//
+// The one reading that separates a wall of volumes from a drawing of one is
+// whether a block's top edge stands BRIGHTER than the face under it, and the
+// only thing on this stone that can be brighter than a wall is a surface that
+// leans at the sky. The far wall has carried one over every course since the
+// chapter before this: CHAMFER, 0.028 m at 45 degrees. The near wall had none,
+// because the row of boxes that replaced the rectangle was cut with square
+// tops — and it read −0.45 L* where the target reads +0.42 and the far wall
+// +1.04. The sign was the whole of the committente's complaint and this is the
+// half of the cure that the boxes themselves did not carry.
+//
+// FITTED, AND THE FIT IS A DEPTH AND NOT AN ANGLE. The angle is 45 degrees
+// because that is the angle every dressed edge in this world is cut at -- the
+// chamfer over a course, the arris at a block's end. What is left to fit is HOW
+// FAR DOWN the edge is dressed, and it lands where the estimator reads the
+// render's lid at the target's own figure: 0.028 gives a pooled lid of 0.27 L*,
+// 0.036 gives 0.39 against the target's 0.42, and 0.040 overshoots to 0.66 and
+// takes 01's west flank past the census with it. The sweep is in the verbale of
+// U-PIETRA-4.
+//
+// AND IT IS NOT CUT: it is drawn, in the fragment, for nought triangles. The
+// reason is measured rather than argued and it is written where it happens, in
+// src/world/voxel/masonry.js.
+export const DRESS = 0.036;
 
 // HOW MANY BLOCKS DO WHAT, as shares of the blocks of one wall.
 //
 // These are the UNDERLYING shares and not what a picture of the six reads back:
-// at twenty to thirty metres a 4.5 cm step is under half the width of the joint
-// beside it, so the estimator that judges a render recovers a fraction of them.
-// The two are kept apart on purpose. What is fitted here is the wall a walker
-// stands in front of; what is GATED, in tools/guards/guard-pietra.mjs, is what
-// the estimator reads at the pose the target was drawn at, against what the
-// same estimator reads on the target.
+// at twenty to thirty metres a 3.6 cm step is under twice the width of the
+// joint beside it, so the estimator that judges a render recovers a fraction of
+// them and reads other things as them. The two are kept apart on purpose. What
+// is fitted here is the wall a walker stands in front of; what is GATED, in
+// tools/guards/guard-rilievo.mjs, is what the estimator reads at the pose the
+// target was drawn at, against what the same estimator reads on the target.
 //
 // PROUD_DEEP is two steps out, PROUD one, BACK one in. Nothing sinks two: a
 // block set back further than the joint is deep stops reading as a block set
 // back and starts reading as a hole that is not one.
+//
+// BACK 0.075 -> 0.040 (U-PIETRA-4). The target re-read through the corrected
+// camera puts 5.3 per cent of its blocks back where it used to read 5.6, which
+// is not the reason: the reason is that the render reads MORE back than it lays
+// and always did. A block set back loses a corner of its sky, and so does a
+// block under a proud one, and so does a cell the engraving's glow has stepped
+// on -- the estimator cannot tell the three apart, and the flat wall this
+// chapter replaced reads 7.8 per cent back on 04's front with not one recessed
+// block in it. So the share that lands the RENDER on the target is lower than
+// the target's own, and the difference is the estimator's floor and is
+// declared rather than fitted away. Sensitivity, measured: 0.075 -> 0.050 moves
+// 04-front's reading by 0.7 points, which is what a fifth of the class being
+// real looks like.
 export const PROUD_DEEP = 0.01;
 export const PROUD = 0.032;
-export const BACK = 0.075;
+export const BACK = 0.040;
 
 // HOW OFTEN A BLOCK IS GONE, and where the gone ones stand.
 //
@@ -584,6 +638,7 @@ export function masonryLaw(spec) {
     // deliberately do not, because their courses are treads a foot lands on and
     // src/world/contracts.js answers for them off a deck this must not move.
     stand: m.stand ?? 0,
+    dress: m.dress ?? DRESS,
     gap: m.gap ?? GAP,
     gapUp: m.gapUp ?? GAP_UP,
     sink: m.sink ?? SINK,
@@ -1039,6 +1094,11 @@ export function buildMasonry(spec, { lod = 'near' } = {}) {
         open[3] = Math.max(open[3], top);
         const front = r.out * law.stand;
         const back = floor;
+        // THE BLOCK'S OWN TOP EDGE IS DRESSED, and it is dressed in the
+        // FRAGMENT: see DRESS, and src/world/voxel/masonry.js. Not one triangle
+        // is spent here on it, which is measured and not assumed -- the two
+        // ways of drawing the same coplanar strip were both cut and both
+        // photographed, and they are the same picture for 19,228 triangles.
         face(front, u0, u1, yA0, yB0, yA1, yB1);
         // THE SOFFIT ALWAYS AND THE LID ALMOST NEVER, which is the one place
         // this generator spends a triangle on where the eye is rather than on
