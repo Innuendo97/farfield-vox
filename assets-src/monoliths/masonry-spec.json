@@ -957,10 +957,20 @@
       "proud/flush/back/gone are per cent of the blocks a face gives a census on.",
       "lidMedian is how far a block's own top face stands above its front face,",
       "in L*: it is the reading that tells a volume from a painted grid, and a",
-      "wall of flat rectangles reads nought."
+      "wall of flat rectangles reads nought.",
+      "",
+      "RE-READ BY U-GRADE-1 (2026-09-16) THROUGH A CAMERA THAT WAS WRONG WHEN",
+      "these numbers were first taken. faces.mjs projected without the fitted",
+      "yaw and from the walker's eye instead of the lens, so every window below",
+      "stood two to eighteen pixels west of the face it was measuring. What",
+      "moved: the pooled census 498 -> 530 blocks, proud 1.4 -> 2.5 per cent,",
+      "lidMedian 0.30 -> 0.40 L*, and on 05-east the lid changed SIGN, -0.1 to",
+      "+0.4 -- that face was reading as a painted grid because the window was",
+      "off it. 01-west's crest read three deep drops where there is one. The",
+      "estimator, the cuts and the lattice are untouched: only the camera moved."
     ],
-    "measuredFrom": "farfield-day-voxel-target.png",
-    "camera": "tools/monoliths/faces.mjs, the reference framing",
+    "measuredFrom": "target.png",
+    "camera": "tools/monoliths/faces.mjs, which is grade/lib/framing.mjs projectTarget: the fitted camera, whole",
     "lattice": {
       "rise": 0.215,
       "cell": 0.19
@@ -973,75 +983,8 @@
     "perFace": {
       "01-front": {
         "census": false,
+        "cellPx": 9.8,
         "courses": 25,
-        "columns": 18,
-        "crestStepped": 0,
-        "crestDeepest": 0,
-        "crestDrops": [
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0
-        ]
-      },
-      "01-west": {
-        "census": true,
-        "courses": 25,
-        "columns": 8,
-        "crestStepped": 50,
-        "crestDeepest": 15,
-        "crestDrops": [
-          15,
-          15,
-          15,
-          1,
-          0,
-          0,
-          0,
-          0
-        ],
-        "read": 66,
-        "proud": 1.5,
-        "flush": 86.4,
-        "back": 10.6,
-        "gone": 1.5,
-        "lidMedian": 0.7,
-        "holeTenths": [
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          8.3,
-          0,
-          0,
-          0
-        ],
-        "holeFromEdge": [
-          4.5,
-          0,
-          0,
-          0
-        ]
-      },
-      "02-front": {
-        "census": false,
-        "courses": 33,
         "columns": 18,
         "crestStepped": 11.1,
         "crestDeepest": 1,
@@ -1066,15 +1009,84 @@
           1
         ]
       },
+      "01-west": {
+        "census": true,
+        "cellPx": 7.9,
+        "courses": 25,
+        "columns": 8,
+        "crestStepped": 25,
+        "crestDeepest": 14,
+        "crestDrops": [
+          14,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "read": 104,
+        "proud": 3.8,
+        "flush": 85.6,
+        "back": 7.7,
+        "gone": 2.9,
+        "lidMedian": 0.5,
+        "holeTenths": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          11.8,
+          10,
+          0,
+          0
+        ],
+        "holeFromEdge": [
+          0,
+          2.6,
+          4.9,
+          0
+        ]
+      },
+      "02-front": {
+        "census": false,
+        "cellPx": 8.7,
+        "courses": 33,
+        "columns": 18,
+        "crestStepped": 22.2,
+        "crestDeepest": 28,
+        "crestDrops": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          1,
+          28
+        ]
+      },
       "03-front": {
         "census": false,
+        "cellPx": 6.8,
         "courses": 55,
         "columns": 29,
         "crestStepped": 10.3,
-        "crestDeepest": 19,
+        "crestDeepest": 17,
         "crestDrops": [
-          19,
-          1,
           2,
           0,
           0,
@@ -1101,15 +1113,18 @@
           0,
           0,
           0,
-          0
+          0,
+          2,
+          17
         ]
       },
       "04-front": {
         "census": true,
+        "cellPx": 9.7,
         "courses": 29,
         "columns": 16,
-        "crestStepped": 0,
-        "crestDeepest": 0,
+        "crestStepped": 25,
+        "crestDeepest": 1,
         "crestDrops": [
           0,
           0,
@@ -1123,17 +1138,17 @@
           0,
           0,
           0,
-          0,
-          0,
-          0,
-          0
+          1,
+          1,
+          1,
+          1
         ],
-        "read": 180,
-        "proud": 1.1,
-        "flush": 92.8,
-        "back": 6.1,
+        "read": 185,
+        "proud": 4.3,
+        "flush": 88.6,
+        "back": 7,
         "gone": 0,
-        "lidMedian": 0.5,
+        "lidMedian": 0.4,
         "holeTenths": [
           0,
           0,
@@ -1155,6 +1170,7 @@
       },
       "05-front": {
         "census": true,
+        "cellPx": 12.6,
         "courses": 23,
         "columns": 15,
         "crestStepped": 13.3,
@@ -1176,12 +1192,12 @@
           0,
           0
         ],
-        "read": 123,
-        "proud": 3.3,
-        "flush": 90.2,
-        "back": 5.7,
-        "gone": 0.8,
-        "lidMedian": 0.4,
+        "read": 113,
+        "proud": 0.9,
+        "flush": 93.8,
+        "back": 5.3,
+        "gone": 0,
+        "lidMedian": 0.3,
         "holeTenths": [
           0,
           0,
@@ -1191,18 +1207,19 @@
           0,
           0,
           0,
-          6.3,
+          0,
           0
         ],
         "holeFromEdge": [
           0,
           0,
-          6.3,
+          0,
           0
         ]
       },
       "05-east": {
         "census": true,
+        "cellPx": 5.6,
         "courses": 23,
         "columns": 9,
         "crestStepped": 11.1,
@@ -1218,12 +1235,12 @@
           0,
           1
         ],
-        "read": 129,
+        "read": 128,
         "proud": 0,
-        "flush": 97.7,
-        "back": 2.3,
+        "flush": 99.2,
+        "back": 0.8,
         "gone": 0,
-        "lidMedian": -0.1,
+        "lidMedian": 0.4,
         "holeTenths": [
           0,
           0,
@@ -1251,12 +1268,12 @@
         "05-front",
         "05-east"
       ],
-      "read": 498,
-      "proud": 1.4,
-      "flush": 92.6,
-      "back": 5.6,
-      "gone": 0.4,
-      "lidMedian": 0.3
+      "read": 530,
+      "proud": 2.5,
+      "flush": 91.7,
+      "back": 5.3,
+      "gone": 0.6,
+      "lidMedian": 0.4
     },
     "flatWall": {
       "why": [

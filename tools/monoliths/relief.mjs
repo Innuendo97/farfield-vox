@@ -367,6 +367,17 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   console.log(`relief, on ${path}   course ${RISE} m   block ${CELL} m\n`);
   for (const [name, r] of Object.entries(read)) print(name, r);
   if (write) {
+    // WHAT A RE-MEASURE MAY NOT THROW AWAY (U-GRADE-1).
+    //
+    // `relief.flatWall` is the SAME estimator's reading of the wall this
+    // chapter replaced, kept so that a miss this render INHERITS can be told
+    // from one it caused. It is not produced here -- it was taken once, off the
+    // tip this branch was cut from -- and this writer built a whole new
+    // `spec.relief` object, so every run of --measure silently deleted it.
+    // Found the first time anybody re-measured: guard-rilievo's own self test
+    // reads it and threw on an undefined. A tool that destroys a sibling
+    // reading it cannot regenerate is a tool nobody can afford to run.
+    const kept = spec.relief && spec.relief.flatWall ? { flatWall: spec.relief.flatWall } : {};
     const pooled = Object.entries(read).filter(([, r]) => r.census);
     const weight = pooled.reduce((s, [, r]) => s + r.read, 0);
     const mean = (pick) => pooled.reduce((s, [, r]) => s + pick(r) * r.read, 0) / weight;
@@ -381,9 +392,19 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         'lidMedian is how far a block\'s own top face stands above its front face,',
         'in L*: it is the reading that tells a volume from a painted grid, and a',
         'wall of flat rectangles reads nought.',
+        '',
+        'RE-READ BY U-GRADE-1 (2026-09-16) THROUGH A CAMERA THAT WAS WRONG WHEN',
+        'these numbers were first taken. faces.mjs projected without the fitted',
+        "yaw and from the walker's eye instead of the lens, so every window below",
+        'stood two to eighteen pixels west of the face it was measuring. What',
+        'moved: the pooled census 498 -> 530 blocks, proud 1.4 -> 2.5 per cent,',
+        'lidMedian 0.30 -> 0.40 L*, and on 05-east the lid changed SIGN, -0.1 to',
+        '+0.4 -- that face was reading as a painted grid because the window was',
+        "off it. 01-west's crest read three deep drops where there is one. The",
+        'estimator, the cuts and the lattice are untouched: only the camera moved.',
       ],
       measuredFrom: path.split(/[\\/]/).pop(),
-      camera: 'tools/monoliths/faces.mjs, the reference framing',
+      camera: 'tools/monoliths/faces.mjs, which is grade/lib/framing.mjs projectTarget: the fitted camera, whole',
       lattice: { rise: RISE, cell: CELL },
       cuts: { lidProud: LID_PROUD, bodyGone: BODY_GONE, bodyBack: BODY_BACK },
       perFace: Object.fromEntries(Object.entries(read).map(([k, r]) => [k, {
@@ -414,6 +435,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         gone: round(mean((r) => r.gone)),
         lidMedian: round(mean((r) => r.lidMedian)),
       },
+      ...kept,
     };
     writeFileSync(SPEC, `${JSON.stringify(spec, null, 2)}\n`);
     console.log(`\nwritten to assets-src/monoliths/masonry-spec.json under "relief"`);
