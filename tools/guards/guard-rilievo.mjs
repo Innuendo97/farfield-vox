@@ -58,8 +58,12 @@ const BAND = {
   // the triangle ceilings out in favour of the millisecond, and the millisecond
   // is measured at the gate; this stays because it is the quantity the LOD
   // distance is actually set by, and a change to NEAR_METRES that blew it would
-  // otherwise only show up on somebody's frame rate.
-  trianglesAtPose: 60000,
+  // otherwise only show up on somebody's frame rate. NINETY THOUSAND, ratified
+  // with NEAR_METRES 46 (E-PIETRA3): all six blocks as volumes at the judged
+  // pose submit 88,410, for about half a millisecond on the high tier, which
+  // the stone's millisecond budget (E-PERF6) allows; the ceiling sits a
+  // per-cent above that reading so a NEAR_METRES nobody ratified still trips it.
+  trianglesAtPose: 90000,
   // A wall with no socket in it has no holes, whatever its shares say.
   socketsPerBlock: [0.01, 0.06],
   // And the crest has to be a skyline rather than a line.
