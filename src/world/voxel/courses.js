@@ -90,6 +90,144 @@ export const WANDER = 0;
 /** How far along a wall the wander is resampled, in metres. */
 export const WANDER_SPAN = 1.2;
 
+// THE BLOCK AS A VOLUME, AND WHY EVERY NUMBER BELOW IS SMALL.
+//
+// The committente's reading of the six was that they "sono composti da linee
+// orizzontali e verticali ordinate che formano cubi per intersezione, e cio'
+// non sembra che siano cubi reali". That is an exact description of what this
+// file used to cut: one rectangle a course, with the block drawn into it by the
+// fragment as a darker line where two cells meet. It satisfies every
+// measurement spec.mjs takes -- the course is right, the block is right, the
+// joint is the right six per cent over the right two pixels -- and it is still
+// a picture of masonry rather than masonry, because the thing that makes a wall
+// read as laid is not where the lines fall. It is that a block STANDS OUT of
+// the wall or sinks into it, that the gap between two of them is a VOID with
+// its own shadow, and that some of them are simply GONE.
+//
+// So a block is a SLAB now: five faces standing off the joint's own floor, with
+// its own top, its own soffit and its own two reveals. Nothing is painted.
+//
+// AND THE NUMBERS ARE SMALL BECAUSE THE TARGET'S ARE. This is the trap a first
+// reading of the complaint walks into: at the framing the targets were drawn
+// at, 0.19 m of block is seven to thirteen pixels, so relief a walker reads as
+// unmistakable volume is ONE OR TWO PIXELS there. Measured through
+// tools/monoliths/relief.mjs the day target reads its blocks' own top faces a
+// median 0.3 to 0.7 L* ABOVE the faces under them -- the sign is the whole
+// finding, and the magnitude is a pixel and a half of lid. A wall built to make
+// that reading large would be a wall of steps a metre deep seen from the hub.
+//
+// STAND     0.045: one step of a block's stand-out, which at the pose the six
+//           are judged from is 2.4 px on 01 and at a walker's distance from the
+//           06 is eight. Two steps is as far as any block goes.
+// GAP       0.022: the void ACROSS, between two blocks. The spec reads the
+//           joint at 2 to 3 px on faces running 42 to 67 px per metre, which is
+//           3 to 5 cm of joint INCLUDING the shadow it throws; the void itself
+//           is the smaller half of that.
+// SINK      0.030: how deep the void goes before it reaches the wall behind.
+//           Deeper than this and a joint seen at a graze becomes a slot.
+// HOLE      0.19: one block. A gone block has to show the COURSE BEHIND IT and
+//           not a dent, which is what "veri e propri buchi" means.
+export const STAND = 0.036;
+export const GAP = 0.022;
+
+// AND THE COURSE JOINT IS HALF THE WIDTH OF THE UPRIGHT ONE, which is a
+// measurement and not a taste: the targets' strongest lattice signal is the
+// COURSE (autocorrelation 0.48 at 12 px on 05-right, against no peak at all on
+// the render before the tile came down), and what carries it is a tight dark
+// line and not a slot. It is also what lets a block's own top edge be seen: the
+// wider the gap over a block, the more of the wall behind it stands in the band
+// the eye reads its lid in, and the wall behind is the darkest thing on the
+// face. At 0.022 the lid of a shadowed front read 0.0 L* over its own face
+// where the target reads 0.5.
+export const GAP_UP = 0.012;
+export const SINK = 0.030;
+export const HOLE = 0.19;
+
+// HOW MANY BLOCKS DO WHAT, as shares of the blocks of one wall.
+//
+// These are the UNDERLYING shares and not what a picture of the six reads back:
+// at twenty to thirty metres a 4.5 cm step is under half the width of the joint
+// beside it, so the estimator that judges a render recovers a fraction of them.
+// The two are kept apart on purpose. What is fitted here is the wall a walker
+// stands in front of; what is GATED, in tools/guards/guard-pietra.mjs, is what
+// the estimator reads at the pose the target was drawn at, against what the
+// same estimator reads on the target.
+//
+// PROUD_DEEP is two steps out, PROUD one, BACK one in. Nothing sinks two: a
+// block set back further than the joint is deep stops reading as a block set
+// back and starts reading as a hole that is not one.
+export const PROUD_DEEP = 0.01;
+export const PROUD = 0.032;
+export const BACK = 0.075;
+
+// HOW OFTEN A BLOCK IS GONE, and where the gone ones stand.
+//
+// The target has few and they are not scattered: spec.missingBlock found one by
+// its own detector, on the WEST FLANK of 01, and the census in `relief` finds
+// the rest of them on the flanks and within a course or two of a vertical edge.
+// The committente said the same thing in words -- "lungo i fianchi e gli
+// spigoli ci sono BUCHI". So the rate is small and it is WEIGHTED: twice as
+// likely within a course of an upright edge, and again toward the crest, where
+// a wall weathers from the top down.
+//
+// AND NEVER UNDER THE WRITING. The engraved panel is the one place on these six
+// where a hole would not read as age: it would read as a missing letter. Holes
+// are refused on the engraved face except in its outer two cells.
+export const GONE = 0.020;
+export const GONE_EDGE = 2.0;
+export const GONE_CREST = 1.8;
+
+// THE CREST, WHICH IS THE ONLY PLACE A BLOCK MAY STAND A WHOLE COURSE PROUD.
+//
+// Every head in this world already steps: spec.head cuts it into runs that drop
+// by up to six courses, and that is measured. What it does NOT do is crenellate
+// -- the top course of a run is a straight line of blocks, and the target's is
+// not. On the west flank of 01 three columns of eight stand fifteen courses
+// below the highest, and the skyline between them is block by block.
+//
+// A raised block stands one course ABOVE the head and reads as a merlon
+// against the sky; a dropped one stands one course below it and reads as the
+// gap between two. A crest block is never GONE, and that is a decision and not
+// an oversight: the head's own cap is a rectangle over the whole run, so a hole
+// in the top course would show the cap two centimetres behind it rather than
+// the notch it is meant to be. From a walker's eye, five to twelve metres under
+// that cap, a dropped block and a missing one draw the same silhouette anyway.
+//
+// These two only ever touch the TOP COURSE of a run, so nothing a foot can
+// stand on moves: src/world/stone.js reads the decks, and a deck is the run's
+// own head, which is where it was.
+export const CREST_DROP = 0.28;
+export const CREST_RAISE = 0.16;
+
+// How high a block's top may stand and still be given a top face, in metres
+// above the meadow. Nothing in this world flies: a walker's eye is 1.58 m on
+// the ground and 3.0 m on the platform, so no lid above this line is ever seen
+// by anybody and cutting one is a triangle spent on nothing.
+export const LID_BELOW = 3.5;
+
+// How far a block may be from the camera before its five faces are given up for
+// the one rectangle a course this file used to cut.
+//
+// The near wall is seven times the triangles of the far one, and the swap is
+// per BLOCK and not per face, so the draw count does not move -- one mesh a
+// block, as it was.
+//
+// AND 22 IS A BUDGET AND NOT A THRESHOLD OF VISION, which is worth saying
+// plainly because the number would be larger if it were only about seeing. At
+// the pose the six are judged from they stand, footprint taken off, at 3.3 (06),
+// 18.0 (05), 19.3 (01), 20.6 (04), 23.6 (02) and 27.9 m (03). Laid as volumes
+// all six submit 88,410 triangles against the 60,000 this chapter is allowed;
+// with 02 and 03 collapsed they submit 50,186. Those two are the FURTHEST and
+// the narrowest in that frame -- 03's cell reads 6.9 px there and 02's 8.8 --
+// and four steps toward either brings it back.
+//
+// THE CEILING IS MEASURED WITH NOTHING CULLED, which is why it is 22 and not
+// 26. At 26 the renderer reports 54,726 at that pose and passes, but only
+// because 06 stands behind the camera; walk round until all six are in frame
+// and the same wall submits 62,046. A budget that depends on where a walker is
+// looking is not a budget.
+export const NEAR_METRES = 22;
+
 export function hash(x, y, seed) {
   let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(seed, 1442695041)) >>> 0;
   h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
@@ -326,6 +464,89 @@ export function isCut(course, i, law) {
 }
 
 /**
+ * The blocks of one course of one wall, as the fragment finds them.
+ *
+ * IT IS THE FRAGMENT'S OWN WALK, WRITTEN FORWARDS. src/world/voxel/masonry.js
+ * takes a point, rounds it to a cell, and then walks OUT to the nearest cut on
+ * either side to find which block it is standing on. This walks the same cuts
+ * from one end of the wall to the other and hands back every block once, with
+ * the lattice index the fragment would have recovered for it. The two have to
+ * agree or a block would be cut as a volume at one place and tinted as a block
+ * at another.
+ *
+ * @returns {{u0: number, u1: number, first: number, cells: number}[]} in metres
+ *          along the wall, with the index the block's own hash is drawn at
+ */
+export function blocksOf(course, span, law) {
+  const phase = cellPhase(course, law);
+  const from = Math.floor(-phase / law.cell) - 1;
+  const to = Math.ceil((span - phase) / law.cell) + 1;
+  const inside = [];
+  for (let i = from; i <= to; i++) {
+    const u = cellEdge(course, i, law);
+    if (u > 1e-6 && u < span - 1e-6) inside.push({ u, i });
+  }
+  const out = [];
+  let u0 = 0;
+  let first = inside.length ? inside[0].i - 1 : from;
+  let cells = 1;
+  for (const node of inside) {
+    if (isCut(course, node.i, law)) {
+      out.push({ u0, u1: node.u, first, cells });
+      u0 = node.u;
+      first = node.i;
+      cells = 1;
+    } else cells += 1;
+  }
+  out.push({ u0, u1: span, first, cells });
+  return out.filter((b) => b.u1 - b.u0 > 1e-6);
+}
+
+/**
+ * What one block does: how far it stands out of its wall, and whether it is there.
+ *
+ * DETERMINISTIC AND PURE, off the same hash everything else on this stone is
+ * drawn from, so the generator, the guard and anything that has to ask about a
+ * block later all get the one answer. `wall` is a small integer per face, so
+ * the west flank of a block and its front do not lay the same wall twice.
+ *
+ * @param {number} wall   which of the four faces, 0..3
+ * @param {number} course the course, off the ground
+ * @param {number} first  the lattice index the block begins at
+ * @param {object} law    the wall's law, with the relief shares on it
+ * @param {object} where  how near this block stands to an upright edge and to
+ *                        the crest, and whether its face carries the writing
+ * @returns {{out: number, gone: boolean, raise: number}} out in STEPS, not metres
+ */
+export function blockRelief(wall, course, first, law, where = {}) {
+  if (!law.stand) return { out: 0, gone: false, raise: 0 };
+  const draw = stoneHash(course * 4 + wall, first, 71);
+  let out = 0;
+  if (draw[0] < law.proudDeep) out = 2;
+  else if (draw[0] < law.proudDeep + law.proud) out = 1;
+  else if (draw[0] > 1 - law.back) out = -1;
+
+  // The crest is its own law: on the top course of a run a block stands a whole
+  // course above its neighbours or a whole course below them, which is what
+  // makes a skyline out of a straight line.
+  if (where.crest) {
+    const crestDraw = stoneHash(course * 4 + wall, first, 83);
+    if (crestDraw[0] < law.crestDrop) return { out, gone: false, raise: -1 };
+    if (crestDraw[1] < law.crestRaise) return { out, gone: false, raise: 1 };
+    return { out, gone: false, raise: 0 };
+  }
+
+  // Everywhere else a hole is rare, and likelier at an edge and near the top.
+  // The engraved panel keeps its letters: only its outer two cells may open.
+  const edge = Math.max(0, where.fromEdge ?? 9);
+  const high = Math.min(1, Math.max(0, where.upFrac ?? 0));
+  const weight = (1 + (law.goneEdge - 1) * Math.exp(-edge))
+    * (1 + (law.goneCrest - 1) * high * high);
+  const allowed = !where.engraved || edge < 2;
+  return { out, gone: allowed && draw[1] < law.gone * weight, raise: 0 };
+}
+
+/**
  * The law of a wall, with every default in one place.
  *
  * @param {object} spec an entry of src/world/layout.js, optionally with a
@@ -347,6 +568,27 @@ export function masonryLaw(spec) {
     tile: m.tile ?? STONE_METRES,
     head: m.head ?? null,
     recesses: m.recesses ?? [],
+
+    // THE RELIEF IS OPT-IN AND THE DEFAULT IS NOUGHT, which is the same rule
+    // the wander and the jitter above are written under: a wall nobody has
+    // asked for volume on is the flat one this file has always cut. The six
+    // blocks ask for it through src/world/stone.js; the STAIR and the PLATFORM
+    // deliberately do not, because their courses are treads a foot lands on and
+    // src/world/contracts.js answers for them off a deck this must not move.
+    stand: m.stand ?? 0,
+    gap: m.gap ?? GAP,
+    gapUp: m.gapUp ?? GAP_UP,
+    sink: m.sink ?? SINK,
+    hole: m.hole ?? HOLE,
+    proud: m.proud ?? PROUD,
+    proudDeep: m.proudDeep ?? PROUD_DEEP,
+    back: m.back ?? BACK,
+    gone: m.gone ?? GONE,
+    goneEdge: m.goneEdge ?? GONE_EDGE,
+    goneCrest: m.goneCrest ?? GONE_CREST,
+    crestDrop: m.crestDrop ?? CREST_DROP,
+    crestRaise: m.crestRaise ?? CREST_RAISE,
+    lidBelow: m.lidBelow ?? LID_BELOW,
   };
 }
 
@@ -399,9 +641,13 @@ function headRuns(law, width) {
  * @param {object} spec an entry of src/world/layout.js, with an optional
  *                      `masonry` block of measured numbers on it
  */
-export function buildMasonry(spec) {
+export function buildMasonry(spec, { lod = 'near' } = {}) {
   const [width, , depth] = spec.size;
   const law = masonryLaw(spec);
+  // WHICH OF THE TWO WALLS THIS IS. A wall with no relief declared has only
+  // ever had one, and asking for 'far' on a wall that stands close by is how
+  // the LOD is served without a second generator.
+  const solid = lod !== 'far' && law.stand > 0;
   const { rise, chamfer } = law;
   const runs = headRuns(law, width);
   const courses = Math.max(...runs.map((r) => r.courses));
@@ -412,6 +658,8 @@ export function buildMasonry(spec) {
   const indices = [];
   let quads = 0;
   let fused = 0;   // how many cell faces the merged rectangles stood for
+  let laid = 0;    // how many blocks were cut as volumes of their own
+  let opened = 0;  // and how many of those are sockets rather than stone
 
   const quad = (n, corners) => {
     const base = positions.length / 3;
@@ -589,6 +837,233 @@ export function buildMasonry(spec) {
     }
   };
 
+  /**
+   * One wall, block by block, as SLABS instead of a rectangle.
+   *
+   * WHAT A BLOCK IS HERE. A box, standing out of its wall by its own law: a
+   * front face, its own top, its own soffit and its own two reveals, with the
+   * void of the joint cut out of all four sides. Nothing on it is painted --
+   * there is no joint uniform reaching this geometry -- so the line between two
+   * blocks is the shadow one of them throws on the other, which is what the
+   * committente could not find on the six.
+   *
+   * WHY THE BOX IS DEEP AND ITS DEPTH IS NEVER SEEN. Each box runs back DEEP
+   * metres from its own front, which is more than any two neighbours can differ
+   * by. So a block's top is only VISIBLE as far as the step to the block above
+   * it -- the rest of it is inside that block -- and the depth of a joint is
+   * never a number anyone has to fit: it comes out of the two blocks beside it.
+   * The alternative, a floor at a fixed depth behind every block, makes every
+   * flush block sit on a shelf of that depth, which is a raked joint and not a
+   * laid wall.
+   *
+   * @param {object}   wall   one of the four of the skin
+   * @param {number}   index  which of the four, so two faces do not lay alike
+   * @param {Function} topFor the head run standing at a distance u along it
+   * @param {number}   from   the lowest course this wall carries
+   * @param {object[]} holes  the stretches {course, u0, u1} it does not carry
+   */
+  const buildBlockWall = (wall, index, topFor, from = 0, holes = []) => {
+    const { gap } = law;
+    const baseY = spec.baseY || 0;
+    // WHERE EVERY BOX ENDS, and why they all end in the same place.
+    //
+    // Behind the proudest block by two steps and the sink, so the deepest block
+    // still has stone behind it and the shallowest joint is still a joint. It
+    // is COMMON to every box on the wall on purpose: with one plane behind them
+    // all, the strip of wall between two blocks can be closed by ONE rectangle
+    // a course instead of a rectangle a block.
+    //
+    // AND WITHOUT THAT RECTANGLE THE WALL LEAKS SKY, which is not a theory --
+    // it is what the first cut of this did. A skin is all there is; the inside
+    // of a block is never built. Two boxes 2.2 cm apart with nothing behind
+    // them are a 2.2 cm window through the monolith, and a line of sight that
+    // enters one goes out the far wall, which is back-facing and culled, and
+    // draws the SKY. Every course of every face came back with a bright line on
+    // it. It is the same defect the chamfer had, found the same way.
+    const floor = -(2 * law.stand + law.sink);
+
+    // A point of this wall in the block's own frame: `u` along it, `off` metres
+    // out of its plane, `y` up.
+    const at = (u, off, y) => [
+      wall.x0 + wall.dx * u + wall.n[0] * off,
+      y,
+      wall.z0 + wall.dz * u + wall.n[2] * off,
+    ];
+
+    // THE THREE FACES OF A BOX THAT ARE NOT ITS FRONT, wound off the wall's own
+    // basis. The wall is walked along (dx, dz) and that step crossed with up is
+    // the outward normal, so (along, up, out) is right handed and every winding
+    // below falls out of it instead of being guessed and fixed up.
+    //
+    // upright: one of the two reveals, at a fixed u, standing between two
+    //          depths. `side` is +1 for the reveal facing along the wall.
+    const upright = (u, off0, off1, y0, y1, side) => {
+      const n = [wall.dx * side, 0, wall.dz * side];
+      const corners = side > 0
+        ? [at(u, off0, y0), at(u, off0, y1), at(u, off1, y1), at(u, off1, y0)]
+        : [at(u, off0, y0), at(u, off1, y0), at(u, off1, y1), at(u, off0, y1)];
+      quad(n, corners);
+    };
+    // flat: the top of a box or its soffit, between two depths. `up` is +1 for
+    //       a face looking at the sky.
+    const flat = (u0, u1, yA, yB, off0, off1, up) => {
+      const n = [0, up, 0];
+      const corners = up > 0
+        ? [at(u0, off0, yA), at(u0, off1, yA), at(u1, off1, yB), at(u1, off0, yB)]
+        : [at(u0, off0, yA), at(u1, off0, yB), at(u1, off1, yB), at(u0, off1, yA)];
+      quad(n, corners);
+    };
+    // face: the block's own front, or the floor of the socket a gone one leaves.
+    const face = (off, u0, u1, yA0, yB0, yA1, yB1) => {
+      quad(wall.n, [at(u0, off, yA0), at(u1, off, yB0), at(u1, off, yB1), at(u0, off, yA1)]);
+    };
+
+    const engraved = wall.key === 'front';
+    let top = 0;
+    for (let u = 0; u <= wall.span + 1e-9; u += Math.min(law.cell, wall.span) / 2) {
+      top = Math.max(top, topFor(u).courses);
+    }
+
+    for (let c = from; c < top; c++) {
+      // The stretches of this course that carry stone, merged as they are laid,
+      // so the wall behind the blocks is one rectangle a run and not one a
+      // block. A socket breaks a run, because what is behind a socket is a
+      // block further back and not this wall.
+      const behind = [];
+      let open = null;
+      const close = () => { if (open) behind.push(open); open = null; };
+      for (const b of blocksOf(c, wall.span, law)) {
+        const mid = (b.u0 + b.u1) / 2;
+        const cap = topFor(mid);
+        if (c >= cap.courses) { close(); continue; }
+        if (holes.some((h) => h.course === c && mid > h.u0 && mid < h.u1)) { close(); continue; }
+
+        const r = blockRelief(index, c, b.first, law, {
+          crest: c === cap.courses - 1,
+          fromEdge: Math.min(b.u0, wall.span - b.u1) / law.cell,
+          upFrac: c / Math.max(1, cap.courses),
+          engraved,
+        });
+
+        // The block's own four bounds, with half a joint taken off each side.
+        // That half is the whole of the void: two neighbours give a joint of
+        // one `gap`, and the outermost block of a wall gives up half of one to
+        // the corner, which is where a quoin's own shadow comes from.
+        const u0 = b.u0 + gap / 2;
+        const u1 = b.u1 - gap / 2;
+        if (u1 - u0 < 1e-4) { close(); continue; }
+        // THE COURSE LINE IS ASKED ONCE, AT THE MIDDLE OF THE BLOCK, and that is
+        // what makes a block a BOX. Asked at both ends it answers two different
+        // heights -- the course strays by up to 84 mm across this wall -- and a
+        // rectangle whose two ends sit at different heights is not planar. Cut
+        // as two triangles under ONE normal it draws a crease down its own
+        // diagonal, and every face of every block on the six had one.
+        //
+        // What it costs is that a course line is now a staircase of blocks
+        // rather than a polyline, which is what a course of laid stone is: the
+        // wander survives BETWEEN blocks, where the eye reads it, and stops
+        // inside one, where it was only ever a defect.
+        const [mx, , mz] = at((u0 + u1) / 2, 0, 0);
+        const up = law.gapUp;
+        const raise = r.raise * rise;
+        const base = courseY(c, mx, mz, law);
+        const top = Math.min(courseY(c + 1, mx, mz, law), headY(cap, mx, mz)) + raise;
+        const yA0 = base + up / 2;
+        const yB0 = yA0;
+        const yA1 = top - up / 2;
+        const yB1 = yA1;
+        if (yA1 - yA0 < 1e-4) { close(); continue; }
+
+        laid += 1;
+        if (r.gone) {
+          opened += 1;
+          close();
+          // The socket a gone block leaves: a floor ONE BLOCK back, so what
+          // shows through it is the course behind this one rather than a dent
+          // in it, and four walls carrying on from where the neighbours'
+          // reveals stop. Their normals point INTO the socket, because that is
+          // the side of them anybody is ever going to see.
+          // AT THE FULL CELL AND NOT AT THE BLOCK'S OWN BOUNDS, which is the
+          // difference between a socket and a window. The wall behind stops at
+          // the cell edge on either side of a gone block, so a socket cut half
+          // a joint inside that leaves an 11 mm slit at each corner with
+          // nothing behind it -- and a slit with nothing behind it draws the
+          // SKY, because the far wall of a block is back-facing and culled.
+          // Four of the holes on 04 came back with daylight in them.
+          // Grown 2 mm all round, so that the socket's own walls end INSIDE the
+          // blocks beside it rather than exactly on the seam with them. A seam
+          // between two surfaces that meet exactly is a line of depth-buffer
+          // argument, and on a socket the losing side of that argument is a
+          // pixel of sky.
+          const w0 = b.u0 - 0.002;
+          const w1 = b.u1 + 0.002;
+          const s0 = base - 0.002;
+          const s1 = Math.min(courseY(c + 1, mx, mz, law), headY(cap, mx, mz)) + 0.002;
+          // THE FOUR WALLS RUN FROM THE FLOOR OUTWARD and not from the wall in,
+          // which is not a matter of taste: every winding in this generator is
+          // taken off (along, up, out) with out POSITIVE, so a face handed its
+          // two depths the other way round comes out back-facing, and a
+          // back-facing face inside a skin is a hole with the SKY in it. That is
+          // exactly what the first cut of the sockets drew -- daylight in every
+          // one of them, on a block 2 m thick.
+          face(-law.hole, w0, w1, s0, s0, s1, s1);
+          // And they run PAST the wall's plane, not up to it. Ending them at the
+          // floor of the joint leaves the socket closed only as far as that
+          // floor, and a line of sight steep enough to pass over the top of it
+          // goes on into the inside of the block and leaves through the far
+          // wall, which is culled: a pixel of sky along the lintel of every
+          // socket. Run out to the proudest a block can stand they end INSIDE
+          // the blocks around them, where nothing can see them.
+          const lip = 2 * law.stand;
+          upright(w0, -law.hole, lip, s0, s1, 1);
+          upright(w1, -law.hole, lip, s0, s1, -1);
+          flat(w0, w1, s1, s1, -law.hole, lip, -1);
+          flat(w0, w1, s0, s0, -law.hole, lip, 1);
+          continue;
+        }
+
+        // THE WALL BEHIND REACHES THE FULL COURSE and not just the tops of the
+        // blocks on it. A block's own top stops half a course joint short of
+        // the course line; if the wall behind stopped there too, the 6 mm
+        // between them would be open to the inside of the block, and anybody
+        // looking into the socket next door saw daylight through that band.
+        if (open) open[1] = b.u1; else open = [b.u0, b.u1, base, top];
+        open[3] = Math.max(open[3], top);
+        const front = r.out * law.stand;
+        const back = floor;
+        face(front, u0, u1, yA0, yB0, yA1, yB1);
+        // THE SOFFIT ALWAYS AND THE LID ALMOST NEVER, which is the one place
+        // this generator spends a triangle on where the eye is rather than on
+        // what the stone is, and it is worth saying why it is allowed to.
+        // Nothing in this world flies: an eye stands at 1.58 m on the meadow
+        // and at 3.0 m on the platform, and these six run from 4.8 m to 13.1 m.
+        // Every block above that line shows a walker its SOFFIT for as long as
+        // the world exists and can never show a lid to anybody. The rule is a
+        // height and not a guess -- `lidBelow`, carried on the law -- and it
+        // comes off the 96,546 triangles the six cost with lids everywhere.
+        // The crest keeps its lid: a merlon seen against the sky is the one
+        // block whose top edge is a silhouette rather than a surface.
+        if (r.raise > 0 || yA1 + baseY < law.lidBelow) flat(u0, u1, yA1, yB1, back, front, 1);
+        flat(u0, u1, yA0, yB0, back, front, -1);
+        upright(u0, back, front, yA0, yA1, -1);
+        upright(u1, back, front, yB0, yB1, 1);
+      }
+      close();
+      // And the wall behind them, one rectangle a run. It reaches from the
+      // bottom of the course to the top of the tallest block on the run, so a
+      // raised crest block never opens a window over its neighbours' heads.
+      for (const run of behind) {
+        const [rx0] = at(run[0], floor, 0);
+        const [, , rz0] = at(run[0], floor, 0);
+        const [rx1, , rz1] = at(run[1], floor, 0);
+        const y0 = courseY(c, rx0, rz0, law);
+        const y1 = run[3];
+        if (y1 - y0 < 1e-4) continue;
+        quad(wall.n, [[rx0, y0, rz0], [rx1, y0, rz1], [rx1, y1, rz1], [rx0, y1, rz0]]);
+      }
+    }
+  };
+
   // Where a block is left out of a course: the targets show one, a dark socket
   // on the west flank of 01. Turned into an interval of its own wall ONCE, so
   // the run that is broken and the socket that is cut are the same stretch of
@@ -605,14 +1080,13 @@ export function buildMasonry(spec) {
     sockets.push({ wall, course: r.course, u0, u1, depth: r.depth ?? law.cell * 0.35 });
   }
 
-  for (const wall of skin) {
+  for (let w = 0; w < skin.length; w++) {
+    const wall = skin[w];
     const along = wall.dx !== 0;
-    buildWall(
-      wall,
-      (u) => runAt(along ? wall.x0 + wall.dx * u : wall.x0),
-      0,
-      sockets.filter((s) => s.wall === wall),
-    );
+    const topFor = (u) => runAt(along ? wall.x0 + wall.dx * u : wall.x0);
+    const holes = sockets.filter((s) => s.wall === wall);
+    if (solid) buildBlockWall(wall, w, topFor, 0, holes);
+    else buildWall(wall, topFor, 0, holes);
   }
 
   // The steps of the head, as walls of their own. A head that drops six courses
@@ -626,13 +1100,13 @@ export function buildMasonry(spec) {
     const high = a.courses > b.courses ? a : b;
     const low = a.courses > b.courses ? b : a;
     const east = a.courses > b.courses;
-    buildWall(
-      east
-        ? { key: 'step', n: [1, 0, 0], x0: a.x1, z0: depth / 2, dx: 0, dz: -1, span: depth }
-        : { key: 'step', n: [-1, 0, 0], x0: a.x1, z0: -depth / 2, dx: 0, dz: 1, span: depth },
-      () => high,
-      low.courses,
-    );
+    const riser = east
+      ? { key: 'step', n: [1, 0, 0], x0: a.x1, z0: depth / 2, dx: 0, dz: -1, span: depth }
+      : { key: 'step', n: [-1, 0, 0], x0: a.x1, z0: -depth / 2, dx: 0, dz: 1, span: depth };
+    // The riser is laid like everything else, with a seat of its own (4 + i) so
+    // that a step of the head does not repeat the flank it stands beside.
+    if (solid) buildBlockWall(riser, 4 + i, () => high, low.courses);
+    else buildWall(riser, () => high, low.courses);
   }
 
   // The cap of each head run, inset all round by the same dressed edge the
@@ -707,6 +1181,9 @@ export function buildMasonry(spec) {
     runs,
     quads,
     fused,
+    lod: solid ? 'near' : 'far',
+    laid,
+    opened,
     vertices: positions.length / 3,
     angle: spec.rotationY * DEG,
   };
