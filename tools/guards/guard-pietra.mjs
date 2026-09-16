@@ -447,6 +447,8 @@ const material = {
   rim: literal(masonry, 'STONE_RIM'),
   f0: literal(masonry, 'STONE_F0'),
   arris: literal(masonry, 'STONE_ARRIS_PIGMENT'),
+  dressSun: literal(masonry, 'STONE_DRESS_SUN'),
+  dressSky: literal(masonry, 'STONE_DRESS_SKY'),
   scale: literal(masonry, 'STONE_LIGHT_SCALE') * literal(masonry, 'STONE_EXPOSURE'),
   mossTint: triple(masonry, 'MOSS_TINT'),
 };
@@ -576,6 +578,26 @@ export function turfPerHead(specs2, built) {
 const mossDarkerThanStone = (tint) => tint.every((v) => v < 1);
 /** The stone is opaque: no sky is reflected off a still frame. */
 const opaqueStone = (m) => m.rim === 0 && m.f0 === 0;
+/**
+ * How much of a FREE facet's own excess a dressed edge keeps, on one face.
+ *
+ * The pair is BENT, so the sum is written out here rather than asked of
+ * bareFace, which produces a pair and cannot be handed one. See the leg.
+ */
+export function dressKept(f, m, light, composite, sun) {
+  const nDS = (n) => n[0] * sun[0] + n[1] * sun[1] + n[2] * sun[2];
+  const edge = [f.normal[0] * Math.SQRT1_2, Math.SQRT1_2, f.normal[2] * Math.SQRT1_2];
+  const gs = Math.max(sun[1], 0);
+  const ts = m.dressSun * Math.max(nDS(edge), 0) + (1 - m.dressSun) * Math.max(nDS(f.normal), 0);
+  const tk = (0.5 + m.dressSky * 0.5 * edge[1]) * m.skyShare;
+  const bent = [0, 1, 2].map((c) => m.albedo[c] * m.arris * m.scale
+    * (ts * light.sunBeam[c] * light.sunStrength + tk * light.skyBalance[c] * light.skyStrength
+      + GROUND_BOUNCE[c] * (1 - tk) * (gs * light.sunBeam[c] * light.sunStrength
+        + light.skyBalance[c] * light.skyStrength)));
+  const flat = luminance(composite(bareFace(f.normal, light, m.albedo, m.scale, m.skyShare)));
+  const free = luminance(composite(bareFace(edge, light, m.albedo, m.scale, m.skyShare))) / flat;
+  return { is: luminance(composite(bent)) / flat, free, kept: (luminance(composite(bent)) / flat - 1) / Math.max(1e-6, free - 1) };
+}
 /** No ruin stands taller than the metre the reading allows one. */
 const ruinsUnderTheCap = (ruins) => Math.max(...ruins.map((r) => r.height)) <= BAND.ruinHeight;
 /** A basin of the size the target draws, and wider than the water it holds. */
@@ -593,7 +615,22 @@ if (process.argv.includes('--self')) {
   // one coverage, one lit ratio, a corner and a belly, and no foot at all.
   const painted = { ...law, cover: 0.33, shade: 1 / 5.5, foot: 0, head: 0, west: 0, edgeGain: 0.033, reach: 0.5 };
   const green = { ...material, albedo: [0.276, 0.321, 0.230], skyShare: 1 };
+  const sunSelf = sunVector(light.elevation, light.azimuth);
+  const freeDress = { ...material, dressSun: 1, dressSky: 1 };
+  const deadDress = { ...material, dressSun: 0, dressSky: 0, arris: 0.9 };
   selfTest('guard-pietra', [
+    {
+      // THE DEFECT ITSELF AND NOT A MODEL OF IT: the shares as they stood
+      // before U-PIETRA-4, which is a dressed edge lit as though nothing stood
+      // over it. It is what guard-rilievo read as a third of 01's west flank
+      // standing proud against the target's 3.8 per cent.
+      what: 'a dressed edge lit as a facet under an open dome is caught',
+      caught: dressKept(flank, freeDress, light, composite, sunSelf).kept > 0.35,
+    },
+    {
+      what: 'and a dressed edge DARKER than the flat it was cut from is caught too',
+      caught: !(dressKept(flank, deadDress, light, composite, sunSelf).is > 1),
+    },
     {
       what: 'the green pigment the six were drawn with is caught as a pigment',
       caught: greyness(green.albedo) > BAND.pigmentGrey,
@@ -894,6 +931,51 @@ report.check(opaqueStone(material),
 report.check(material.arris > 1,
   'the dressed edge is lighter than the flat it was cut from, as the spec reads it',
   `${material.arris} against the spec's ${spec.chamfer.lighten.join(' to ')}`);
+
+// HOW MUCH LIGHTER, AND THAT HALF WAS NEVER ASKED (U-PIETRA-4).
+//
+// The line above asks whether the PIGMENT on dressed stone is greater than one.
+// The spec states a quantity and not a sign -- `chamfer.lighten`, 1.072 to
+// 1.091, measured on the target's own arrises -- and nothing in this campaign
+// held the render to it. It went unnoticed while the dressed edge was one facet
+// a COURSE; on the wall of volumes it is one on every BLOCK, and a facet lit as
+// a FREE facet develops to 1.6 times its wall and was read by guard-rilievo as
+// a third of 01's west flank standing proud against the target's 3.8 per cent.
+//
+// THE PAIR IS BENT AND SO THE SUM IS RESTATED, which is the one place this
+// guard writes light of its own and it is written for the reason
+// src/world/face-light.js gives for faceLightOf existing at all: bareFace
+// PRODUCES a pair from a normal, and a material that bends a pair it was given
+// cannot be asked through a door that only produces one. The two shares are
+// read out of the material rather than copied, the sun and sky beams come from
+// the same readLight() as everything else here, and the ground's return is the
+// same GROUND_BOUNCE off the same bent sky term -- so the only thing restated
+// is the plus sign.
+const dressed = faces.map((f) => ({ id: `${f.id}-${f.name}`, ...dressKept(f, material, light, composite, sun) }));
+// What is gated is the SHARE of the excess and not the ratio itself, because
+// the excess is what the two terms are about and because the ratio is not the
+// quantity the spec states -- see the note under this leg.
+const kept = dressed.map((d) => d.kept);
+report.line('');
+report.line(`  the dressed edge develops to ${dressed.map((d) => d.is.toFixed(2)).join(', ')} of the `
+  + `flat beside it, where a FREE facet reads ${dressed.map((d) => d.free.toFixed(2)).join(', ')}`);
+report.line(`  on ${dressed.map((d) => d.id).join(', ')}`);
+report.check(Math.max(...kept) <= 0.35 && Math.min(...dressed.map((d) => d.is)) > 1,
+  'and a dressed edge is lit as stone cut INTO a wall, not as a facet under an open dome',
+  `it keeps ${(100 * Math.min(...kept)).toFixed(0)} to ${(100 * Math.max(...kept)).toFixed(0)}% of `
+  + `a free facet's excess, band 0 to 35 -- sun ${material.dressSun}, sky ${material.dressSky}`);
+
+report.note('and what this leg does NOT gate is the spec’s own '
+  + `${spec.chamfer.lighten.join(' to ')}: the dressed edge above develops to `
+  + `${Math.min(...dressed.map((d) => d.is)).toFixed(2)} to `
+  + `${Math.max(...dressed.map((d) => d.is)).toFixed(2)} of its flat, which is over it, and the two `
+  + 'are NOT the same measurement. chamfer.lighten was read off the target at 20 to 31 m, where a '
+  + '36 mm arris is under one pixel and what the window reads is the arris AVERAGED WITH THE STONE '
+  + 'BESIDE IT; this is the facet’s own contrast, unsmeared. Driving this down to 1.09 means '
+  + 'sun and sky shares of nought, and measured on the picture at the judged pose that takes the '
+  + 'pooled lid from +0.39 to -0.31 L* against the target’s +0.42 -- the estimator and this chain '
+  + 'disagree, and the one the committente looks at is the picture. Declared and not fitted away. '
+  + 'Owner: D5, with both numbers now on it.');
 
 const cap = lch(composite(bareFace([0, 1, 0], light, rock.albedo, material.scale, rock.skyShare)));
 report.check(rock.albedo[0] > rock.albedo[1] && rock.albedo[1] > rock.albedo[2],
