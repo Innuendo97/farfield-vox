@@ -1,6 +1,6 @@
 import {
-  BACK, CREST_DROP, CREST_RAISE, GAP, GONE, HOLE, NEAR_METRES, PROUD, PROUD_DEEP, SINK, STAND,
-  blockRelief, blocksOf, buildMasonry, masonryLaw,
+  BACK, CREST_DROP, CREST_RAISE, DRESS, GAP, GAP_UP, GONE, HOLE, NEAR_METRES, PROUD, PROUD_DEEP,
+  SINK, STAND, blockRelief, blocksOf, buildMasonry, masonryLaw,
 } from '../../src/world/voxel/pure.js';
 import { cameraSolids } from '../../src/world/contracts.js';
 import { stairSpecs, stoneSpecs } from '../../src/world/stone.js';
@@ -47,13 +47,21 @@ const BAND = {
   // points of percentage, class by class. It is the mandate's own tolerance.
   census: 5,
   // The reading that separates a volume from a drawing of one: how far a
-  // block's own top edge stands ABOVE the face under it, in L*. The target
-  // reads 0.4 to 0.7 on the three faces that can carry the census and -0.1 on
-  // the fourth; a wall with a painted joint reads -0.3 to -0.8, because a
-  // painted joint puts a DARKER line exactly where a lid puts a brighter one.
-  // So what is gated is the SIGN, pooled, and the ceiling stops a wall of
-  // ledges from passing as a wall of blocks.
-  lidPooled: [0.0, 1.2],
+  // block's own top edge stands ABOVE the face under it, in L*. Through the
+  // camera U-GRADE-1 corrected, the target reads 0.3 to 0.5 on the four faces
+  // that carry a census and 0.42 pooled.
+  //
+  // AND THE BAND IS NARROWER THAN THE SIGN NOW, which is the point of it. What
+  // this used to gate was that the number was POSITIVE, because the wall this
+  // chapter replaced read -0.63 pooled and any lid at all was the finding.
+  // Re-measured, that is no longer where the failures are: the same estimator
+  // reads the FLAT wall at +1.04 -- its facet is one a course, unoccluded and
+  // painted on top, and it overshoots the target by two and a half times -- and
+  // the wall of boxes with no dressed edge at all at -0.45. A band of 0 to 1.2
+  // passes the first of those. This one does not: 0.10 to 0.80 admits the
+  // render at 0.39 and the target at 0.42 and refuses both walls this chapter
+  // is not.
+  lidPooled: [0.10, 0.80],
   // What the six may submit at the pose they are judged from. E-PERF6 struck
   // the triangle ceilings out in favour of the millisecond, and the millisecond
   // is measured at the gate; this stays because it is the quantity the LOD
@@ -137,6 +145,33 @@ export function laysVolumes(source) {
     && /flat\(u0, u1, yA0, yB0, back, front, -1\)/.test(source);
 }
 
+/**
+ * Whether the near wall dresses the top edge of every one of its blocks.
+ *
+ * WHY THIS IS A LEG AND NOT A DETAIL. The wall of boxes E-PIETRA3 delivered was
+ * cut with SQUARE tops, and through the camera U-GRADE-1 corrected it read its
+ * blocks' top edges 0.45 L* DARKER than the faces under them where the target
+ * reads 0.42 brighter -- a wall of real volumes drawing the one line a painted
+ * joint draws, which is the committente's complaint arriving by the other road.
+ * Nothing in the census caught it: every share was inside the band.
+ *
+ * AND IT IS DRAWN AND NOT CUT, so the source is where it has to be asked. One
+ * quad a block is 19,228 triangles, a fifth of this wall, and what it buys is a
+ * strip of the block's own front plane carrying the normal of the facet that
+ * stands for it -- coplanar, adding no silhouette and closing nothing. Both
+ * were cut and both were photographed at the judged pose; the census and the
+ * lid agree, and the triangles are not spent. What this checks is that the
+ * fragment still LEANS that strip and that the near wall is still handed a
+ * depth to lean it over, because either of those quietly going to nought puts
+ * the wall back where E-PIETRA3 left it with every other reading still green.
+ */
+export function dressesEveryBlock(masonry, dress, gapUp, cell) {
+  return /uDress:\s*\{\s*value:\s*solid\s*\?\s*law\.dress\s*:\s*0\s*\}/.test(masonry)
+    && /uDress\.value\s*=\s*want === 'far' \? 0 : law\.dress/.test(masonry)
+    && /n = normalize\(n \+ vec3\(0\.0, 1\.0, 0\.0\)\);/.test(masonry)
+    && dress > gapUp && dress < cell / 2;
+}
+
 /** Whether the socket a gone block leaves reaches a whole block behind the wall. */
 export function socketsReachBehind(law) {
   return law.hole >= law.cell * 0.8 && law.hole > 2 * law.stand + law.sink;
@@ -175,17 +210,36 @@ if (args.includes('--self')) {
       caught: Math.abs(20.0 - SPEC.relief.perFace['01-west'].back) > BAND.census,
     },
     {
-      // AND THE ALLOWANCE DOES NOT BECOME A HOLE. It is granted per face and
-      // per class, only where the FLAT wall already missed by more than the
-      // band, and only up to the miss it already had. A class the flat wall got
-      // right gets the plain five points and nothing more.
-      what: 'the allowance for an inherited miss does not cover a class the flat wall got right',
-      caught: Math.abs(SPEC.relief.flatWall.perFace['05-east'].back
-        - SPEC.relief.perFace['05-east'].back) <= BAND.census,
+      what: 'a lid that reads DARKER than the face under it is caught',
+      caught: !(-0.45 >= BAND.lidPooled[0]),
     },
     {
-      what: 'a lid that reads DARKER than the face under it is caught',
-      caught: !(-0.6 >= BAND.lidPooled[0]),
+      // AND THE FLAT WALL DOES NOT PASS THIS GATE EITHER, which the band that
+      // stood here before could not say: the wall this chapter replaced reads
+      // +1.04 pooled through the corrected camera -- a facet a course, painted
+      // on top of the lean, overshooting the target by two and a half times.
+      what: "the flat wall's own over-bright arris is caught by the ceiling",
+      caught: !(1.04 <= BAND.lidPooled[1]),
+    },
+    {
+      what: 'a near wall left with no depth of dressed edge is caught',
+      caught: !dressesEveryBlock(MASONRY_SOURCE, 0, GAP_UP, masonryLaw(spec0).cell),
+    },
+    {
+      what: 'a dressed edge too shallow to reach past the course joint is caught',
+      caught: !dressesEveryBlock(MASONRY_SOURCE, GAP_UP, GAP_UP, masonryLaw(spec0).cell),
+    },
+    {
+      what: 'a fragment that stopped leaning the dressed edge is caught',
+      caught: !dressesEveryBlock(
+        MASONRY_SOURCE.replace('n = normalize(n + vec3(0.0, 1.0, 0.0));', 'n = normalize(n);'),
+        DRESS, GAP_UP, masonryLaw(spec0).cell),
+    },
+    {
+      what: 'a near wall handed the far wall’s dressed edge of nought is caught',
+      caught: !dressesEveryBlock(
+        MASONRY_SOURCE.replace(/uDress: \{ value: solid \? law\.dress : 0 \}/, 'uDress: { value: 0 }'),
+        DRESS, GAP_UP, masonryLaw(spec0).cell),
     },
     {
       what: 'the stair keeps its flat courses, which a foot stands on',
@@ -230,8 +284,13 @@ report.check(laysVolumes(COURSES_SOURCE),
   'src/world/voxel/courses.js, buildBlockWall');
 
 report.check(noPaintedJoint(MASONRY_SOURCE),
-  'and NOTHING on it is painted: no joint uniform and no arris reach the near wall',
+  'and no joint PIGMENT and no leaned arris reach the near wall',
   'the line between two blocks is the shadow one throws on the other');
+
+report.check(dressesEveryBlock(MASONRY_SOURCE, DRESS, GAP_UP, masonryLaw(specs[0]).cell),
+  'and the top edge of every block is DRESSED, which is what a lid brighter than its face is',
+  `${(1000 * DRESS).toFixed(0)} mm at 45 degrees, leaned in the fragment for nought triangles, `
+  + `over a course joint of ${(1000 * GAP_UP).toFixed(0)} mm`);
 
 report.check(specs.every((s) => masonryLaw(s).stand > 0),
   'all six blocks are laid as volumes',
@@ -314,30 +373,35 @@ if (!plate) {
   const got = await measure(plate);
   const want = SPEC.relief.perFace;
   report.line(`  the census on ${plate}`);
-  report.line('  face        class     target   render    miss   allow');
-  // THE ALLOWANCE, AND WHY THERE IS ONE.
+  report.line('  face        class     target   render    miss');
+  // WHAT USED TO STAND HERE WAS AN ALLOWANCE, AND IT IS GONE (U-PIETRA-4).
   //
-  // Five points from the target, EXCEPT where the wall this chapter replaced
-  // already stood further off than that -- and then the allowance is the miss
-  // it already had, plus a point. That is not a band widened to let something
-  // through: it is the difference between a defect this chapter CAUSED and one
-  // it INHERITED, and the inherited one is measured rather than asserted. The
-  // flat wall's own reading is in `relief.flatWall` of the spec, taken at this
-  // framing off the tip this branch was cut from.
+  // E-PIETRA3 granted, per face and per class, whatever miss the FLAT wall this
+  // chapter replaced already had, plus a point -- so that a defect this render
+  // INHERITED could be told from one it caused. It bit on exactly one number
+  // and it rested on `relief.flatWall` of the spec.
   //
-  // It bites on exactly one number. 05's front reads 12.2 per cent of blocks
-  // set back against the target's 5.7; the FLAT wall read 12.1 on the same face
-  // through the same estimator, with not one block set back anywhere in it. The
-  // spread that puts those cells under the cut is the per-block tint, which is
-  // STONE_TINT -- fitted by E-PIETRA1, gated by guard-pietra, and untouched
-  // here. No share of recessed blocks can cure it and none caused it.
-  const flat = SPEC.relief.flatWall ? SPEC.relief.flatWall.perFace : {};
-  const allowance = (name, kind) => {
-    const had = flat[name] ? Math.abs(flat[name][kind] - want[name][kind]) : 0;
-    return Math.max(BAND.census, had > BAND.census ? had + 1 : 0);
-  };
+  // TWO THINGS KILLED IT, AND BOTH ARE MEASUREMENTS.
+  //
+  // First, NOTHING NEEDS IT ANY MORE. Every class on every face now reads
+  // within the plain five points, worst 4.3, with the refitted quotas and the
+  // dressed edge. An allowance nothing uses is a door left open.
+  //
+  // Second, AND THIS IS THE REASON IT COULD NOT SIMPLY BE LEFT: the reading it
+  // rested on is STALE. `relief.flatWall` was taken through the camera
+  // U-GRADE-1 has since corrected, and the same flat wall re-photographed
+  // through the right one is a different wall -- 01-west reads 32.8 per cent of
+  // its blocks proud where the committed field says 12.5, and its lid +2.60
+  // where the field says -0.26. Fed those honest numbers, this allowance would
+  // have granted 01-west proud THIRTY points against a target of 3.8, which is
+  // not an allowance, it is the gate removed. A mechanism that gets more
+  // permissive the more accurately it is measured is the wrong mechanism.
+  //
+  // The re-measured flat wall is in the verbale of U-PIETRA-4. `relief.flatWall`
+  // in assets-src/monoliths/masonry-spec.json is left exactly as it is and is
+  // declared stale: it is under `relief`, which is not this unit's to write.
+  // Owner: whoever owns the spec's `relief`.
   let worst = 0;
-  let inherited = 0;
   let lidWeight = 0;
   let lidSum = 0;
   for (const [name, r] of Object.entries(got)) {
@@ -346,21 +410,17 @@ if (!plate) {
     lidWeight += r.read;
     for (const kind of ['proud', 'back', 'gone']) {
       const miss = Math.abs(r[kind] - want[name][kind]);
-      const allow = allowance(name, kind);
-      if (allow > BAND.census) inherited += 1;
-      worst = Math.max(worst, miss - allow);
+      worst = Math.max(worst, miss);
       report.line(`  ${name.padEnd(11)} ${kind.padEnd(8)}`
         + `${want[name][kind].toFixed(1).padStart(7)}${r[kind].toFixed(1).padStart(9)}`
-        + `${miss.toFixed(1).padStart(8)}${allow.toFixed(1).padStart(8)}`
-        + `${miss > allow ? '   <-- over' : ''}`);
+        + `${miss.toFixed(1).padStart(8)}`
+        + `${miss > BAND.census ? '   <-- over' : ''}`);
     }
   }
-  const lid = lidWeight ? lidSum / lidWeight : 0;
-  report.check(worst <= 0,
+  report.check(worst <= BAND.census,
     'every class on every face reads within five points of the target',
-    `worst ${(worst + BAND.census).toFixed(1)} points against its own allowance, `
-    + `band ${BAND.census}, ${inherited} class${inherited === 1 ? '' : 'es'} carrying `
-    + 'an allowance for a miss the flat wall already had');
+    `worst ${worst.toFixed(1)} points, band ${BAND.census}, and no class carries an allowance`);
+  const lid = lidWeight ? lidSum / lidWeight : 0;
   report.check(lid >= BAND.lidPooled[0] && lid <= BAND.lidPooled[1],
     'and a block\'s own top edge reads BRIGHTER than the face under it, as the target\'s does',
     `${lid.toFixed(2)} L* pooled against the target's ${SPEC.relief.pooled.lidMedian}, `
@@ -372,11 +432,12 @@ report.note('the target\'s own relief is measured at 20 to 31 m, where 0.19 m of
   + 'px and a step of 36 mm is ONE AND A HALF. So the shares above are not what a picture of the '
   + 'six reads back and were never fitted to be: what is fitted is the wall a walker stands in '
   + 'front of, and what is gated is what the one estimator reads on both images at the one pose.');
-report.note('02 and 03 are laid FLAT at the judged pose and only there: at 23.6 and 27.9 m from '
-  + 'the eye they are the two of the six past NEAR_METRES, and they are the two whose cells read '
-  + 'narrowest in that frame, 8.8 px and 6.9. Four steps toward either and it is volumes like the '
-  + `rest. What decides it is a BUDGET -- all six near submit ${nearTris} triangles against a `
-  + `ceiling of ${BAND.trianglesAtPose}, and neither of those two carries a census.`);
+report.note(`all six are laid as VOLUMES at the judged pose and NEAR_METRES is ${NEAR_METRES} m: `
+  + `the furthest of them, 03, stands at 27.9 m. The ${atPose} triangles that costs are the whole `
+  + `of what the six submit, against a ceiling of ${BAND.trianglesAtPose}. The note that stood here `
+  + 'said 02 and 03 were laid flat at this pose, which was true at the 22 m of the reading before '
+  + 'E-PIETRA3 ratified 46 and has been false since; it is written down because a stale note in a '
+  + 'green report is how a reader learns to stop reading them.');
 report.note('the fronts of 01, 02 and 03 carry no census at all: the engraving\'s glow lifts whole '
   + 'blocks on them by twenty to thirty L*, which is ten times the relief signal, and no mask that '
   + 'leaves the stone behind reaches it. Their CREST is measured and gated; their faces are not. '
