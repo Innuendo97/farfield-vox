@@ -6,9 +6,12 @@ import {
 } from '../../src/core/avatar.js';
 import { POSES, POSE_TARGET, POSE_TARGET_TERZA, POSE_VOX_DAY } from '../../src/core/poses.js';
 import {
-  AREA_CENTER, AREA_HARD_RADIUS, AREA_SOFT_RADIUS, EYE_HEIGHT,
+  AREA_CENTER, AREA_HARD_RADIUS, AREA_SOFT_RADIUS, EYE_HEIGHT, SPAWN,
 } from '../../src/world/layout.js';
-import { cameraSolids, groundHeightAt } from '../../src/world/contracts.js';
+import {
+  VISITOR, openVisitor, serveRepo, toolsPresent, visitorPlate,
+} from './lib/quadro.mjs';
+import { builtHeightAt, cameraSolids, groundHeightAt } from '../../src/world/contracts.js';
 import {
   ROCK_PILES, RUINS, footOf, looseStoneSolids, pileField, pileSolids,
 } from '../../src/world/rock-piles.js';
@@ -140,8 +143,10 @@ function makeProject(pose, frame = FRAME) {
  * marked -- which over-states a single cell by under a pixel and can never
  * under-state it, so an outline read this way is never narrower than the body is.
  */
-function silhouette(body, { pose = POSE_VOX_DAY, feet = FEET, cell = VOXEL / SUBDIVISION } = {}) {
-  const project = makeProject(pose);
+function silhouette(body, {
+  pose = POSE_VOX_DAY, feet = FEET, cell = VOXEL / SUBDIVISION, frame = FRAME,
+} = {}) {
+  const project = makeProject(pose, frame);
   const s = Math.sin(pose.yaw * DEG);
   const c = Math.cos(pose.yaw * DEG);
   const bb = bounds(body);
@@ -196,10 +201,16 @@ function silhouette(body, { pose = POSE_VOX_DAY, feet = FEET, cell = VOXEL / SUB
     sole,
     outlineBottom: list[list.length - 1].y,
     heightPx: H,
-    fraction: H / FRAME.height,
-    uFeet: (foot.reduce((a, r) => a + (r.lo + r.hi) / 2, 0) / foot.length + 0.5) / FRAME.width,
+    fraction: H / frame.height,
+    uFeet: (foot.reduce((a, r) => a + (r.lo + r.hi) / 2, 0) / foot.length + 0.5) / frame.width,
     widest: Math.max(...list.map((r) => r.w)),
     wideAt35: at(0.35).w,
+    // THE HEAD'S OWN SPAN, a tenth of a height below the crown. It is here
+    // because it is the one part of him a PLATE can be compared on without a
+    // handle: the crown row says where he begins and this says where he is,
+    // across the frame, on rows that are all hair and jacket and nothing else.
+    wideAt10: at(0.10).w,
+    centreAt10: (at(0.10).lo + at(0.10).hi) / 2,
     cols: [Math.min(...list.map((r) => r.lo)), Math.max(...list.map((r) => r.hi))],
   };
 }
@@ -612,6 +623,204 @@ export function oneDoor(testo, seggio = /\bdevPose\s*\.\s*place\s*\(/) {
   return !/\bplayer\s*\.\s*setPose\s*\(/.test(testo);
 }
 
+// ==================================================== THE ARRIVAL, AND THE BODY IN IT
+//
+// EVERYTHING ABOVE PROJECTS THE FIGURE AND NOTHING ABOVE LOOKS AT HIM. That was
+// the whole of E-AVATAR3: for nine days this guard was green, thirteen legs of
+// it, while the page every visitor is handed drew no walker at all. A projection
+// asks "where would he be"; it cannot ask "is he there", and the one pose that
+// matters most -- the one the world is DELIVERED on -- was asked of neither.
+//
+// WHAT WENT WRONG, BECAUSE THE SHAPE OF IT IS THE SHAPE OF THIS SECTION. The
+// boom read the floor at the point the RULE asks for, before anything had said
+// whether the camera ever gets there. The floor a walker is handed is
+// `max(meadow, built stone)` -- he climbs the stair and stands on the platform --
+// and 4.74 m astern of the spawn that point is inside the plan of block 06, the
+// one stood behind the walker on purpose so that it stays out of the reference
+// framing. The floor answered 5.16 m, the lens was lifted to the ROOF OF A BLOCK
+// IT NEVER STANDS ON, and the stone then slid it back down an arm that now
+// pointed up at 38 degrees: it came to rest at 4.698 m instead of 1.888. The aim
+// stayed the walker's own, so the figure -- drawn, whole, `fade` 1, `visible`
+// true -- sat 39.6 degrees below the axis of a frame 22.1 degrees deep.
+//
+// SO THERE ARE TWO LEGS HERE AND THEY SHARE ONLY THEIR NUMBERS. The first is
+// arithmetic and costs nothing: the arrival camera, built from the walker's own
+// seats, and the figure projected into the visitor's window. The second opens
+// the page a visitor is DELIVERED, takes one plate, and COUNTS HIS PIXELS. The
+// first would have caught this defect the day it was written; the second is what
+// says that the first is still describing the picture.
+
+/** The window the visitor's page is measured in -- the committente's own. */
+const ARRIVO_FRAME = { width: VISITOR.width, height: VISITOR.height };
+
+/**
+ * Where the figure stands in that window when the page is walked into.
+ *
+ * READ OFF TWO PLATES THAT SHARE NO CODE, NO TIP AND NO MACHINE, and that is why
+ * they are written down rather than derived. The first is the committente's own
+ * screenshot of 2026-09-08 09:36:28 at 1893x845, where the head runs columns
+ * 770..822 from row 525 down; the second is this desk's own plate of the cured
+ * page at 1892x845, where it runs 767..829 from row 525. Row to the pixel,
+ * centre to two pixels, off two machines and eight days apart.
+ *
+ * `box` is HIS OWN COLUMNS from the crown to the bottom edge of the frame -- his
+ * feet are below it, which is what a 3.87 m arm does and what both plates show.
+ * `fill` is what that box reads with him in it, and `control` the worst of four
+ * boxes of the same size at the same rows out in the meadow either side.
+ */
+const ARRIVO = {
+  crown: 525,
+  centre: 797,
+  box: { x0: 745, x1: 855, y0: 525, y1: 845 },
+  fill: 0.709,
+  control: 0.089,
+};
+
+// AND THE TOLERANCES, WHICH ARE NOT TIGHT AND SHOULD NOT BE. This leg is not
+// fitting a framing -- the legs above do that, at the pose the campaign is
+// judged on, to six pixels. It is asking whether the walker is in the picture at
+// all, and the readings it has to keep apart are 0.709 and 0.023. A tolerance
+// tight enough to argue about the grade would only ever go red for the wrong
+// reason.
+const ARRIVO_TOLL = { crown: 14, centre: 18, fill: 0.40, ratio: 4, visible: 0.35 };
+
+/** The floor the WALKER is handed, which is the one the boom was reading. */
+const walkerFloor = (x, z) => Math.max(groundHeightAt(x, z), builtHeightAt(x, z));
+
+/**
+ * The camera the world is delivered on: the spawn, third person, the level aim a
+ * walker arrives with, the hub's own floor and the lens's own list of stone.
+ */
+function arrivalEye() {
+  const stance = walkerFloor(SPAWN.x, SPAWN.z);
+  const out = { x: 0, y: 0, z: 0, arm: 0 };
+  thirdPersonEye(
+    out, { x: SPAWN.x, z: SPAWN.z, stance, yaw: SPAWN.yaw * DEG }, 0, PITCH_LIMIT,
+    walkerFloor, AVATAR.height,
+    { reach: 1, solids: cameraSolids(), eyeHeight: EYE_HEIGHT },
+  );
+  return { ...out, stance, pivotY: stance + EYE_HEIGHT };
+}
+
+/** And the figure, projected into the visitor's window from that camera. */
+function arrivalFigure(eye, kind = 'm') {
+  const pose = {
+    position: { x: eye.x, y: eye.y, z: eye.z },
+    yaw: SPAWN.yaw,
+    pitch: 0,
+    fov: RIG.fov,
+  };
+  return silhouette(WALKS[kind][1], {
+    pose,
+    feet: { x: SPAWN.x, z: SPAWN.z, ground: eye.stance },
+    frame: ARRIVO_FRAME,
+  });
+}
+
+// ------------------------------------------------------- his pixels, on a plate
+//
+// WHAT COUNTS AS THE FIGURE, AND WHY IT IS NOT "DARK". The meadow at the arrival
+// runs from luma 12 in the shade between two cubes of grass to 146 on a lit face,
+// and the figure runs 7 to 93: darkness alone separates nothing. What does
+// separate them is that the meadow is GREEN and the path is SAND and he is
+// neither -- his jacket, his jeans, his hair and his pack are all within a few
+// levels of grey of one another. So a pixel is his if it is dark AND its green is
+// not ahead of its red AND its red is not far ahead of its blue. Measured, that
+// reads 0.709 of his own box with him in it and 0.023 without: a ratio of thirty,
+// which is what a leg needs to be about the body and not about the hour of day.
+function isFigure(data, channels, width, x, y) {
+  const i = (y * width + x) * channels;
+  const r = data[i];
+  const g = data[i + 1];
+  const b = data[i + 2];
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b < 110 && g - r < 10 && r - b < 45;
+}
+
+/**
+ * The figure, counted in the plate the visitor's page gives up.
+ *
+ * NO HANDLE IS TOUCHED AND NONE EXISTS TO TOUCH: this is the page without `?dev`,
+ * so there is no `window.farfield` to ask where the body went. The frame is all
+ * there is, which is also all the committente has.
+ *
+ * @returns {{fill:number, control:number, crown:number|null, centre:number|null}}
+ */
+export function figuraLetta(plate, want = ARRIVO) {
+  const { data, channels, width, height } = plate;
+  const { box } = want;
+  const fillOf = (dx) => {
+    const x0 = Math.max(0, box.x0 + dx);
+    const x1 = Math.min(width, box.x1 + dx);
+    const y1 = Math.min(height, box.y1);
+    let n = 0;
+    for (let y = box.y0; y < y1; y++) {
+      for (let x = x0; x < x1; x++) if (isFigure(data, channels, width, x, y)) n += 1;
+    }
+    return n / Math.max(1, (x1 - x0) * (y1 - box.y0));
+  };
+  // THE CONTROLS ARE THE SAME BOX MOVED SIDEWAYS, which is what makes the reading
+  // self-calibrating: a grade that darkened the whole world would lift the
+  // meadow's boxes with his, and the ratio between them would not move.
+  const control = Math.max(...[-450, -250, 250, 450].map(fillOf));
+
+  // His crown, and the middle of his head under it. The search starts well above
+  // the row he is expected on, so a body that has drifted UP the frame is read
+  // rather than missed.
+  let crown = null;
+  let centre = null;
+  for (let y = Math.max(0, box.y0 - 60); y < Math.min(height, box.y1); y += 1) {
+    let n = 0;
+    for (let x = box.x0; x < box.x1; x += 1) if (isFigure(data, channels, width, x, y)) n += 1;
+    if (n >= 20) { crown = y; break; }
+  }
+  if (crown !== null) {
+    let sum = 0;
+    let n = 0;
+    for (let y = crown; y < Math.min(height, crown + 60); y += 1) {
+      for (let x = Math.max(0, box.x0 - 40); x < Math.min(width, box.x1 + 40); x += 1) {
+        if (isFigure(data, channels, width, x, y)) { sum += x; n += 1; }
+      }
+    }
+    centre = n ? sum / n : null;
+  }
+  return { fill: fillOf(0), control, crown, centre };
+}
+
+/**
+ * The verdict of the arrival leg, over the one reading the visitor's page gives.
+ *
+ * A PURE FUNCTION WITH THE BROWSER OUTSIDE IT, so that the injections below can
+ * feed it the two readings that were actually taken -- before the cure and after
+ * -- instead of an imitation of them.
+ */
+export function arrivoVerdict(reading, want = ARRIVO, toll = ARRIVO_TOLL) {
+  const fails = [];
+  const pc = (v) => `${(v * 100).toFixed(1)}%`;
+  if (reading.persona !== 'terza') {
+    fails.push(`the visitor's page arrived in ${reading.persona} person:`
+      + ' this world arrives in third, and there is no body to count in first');
+  }
+  if (!(reading.fill >= toll.fill)) {
+    fails.push(`the figure's own place in the frame is ${pc(reading.fill)} figure,`
+      + ` floor ${pc(toll.fill)} -- the walker is not in the picture the visitor is handed`);
+  } else if (!(reading.fill >= toll.ratio * reading.control)) {
+    fails.push(`his box reads ${pc(reading.fill)} against ${pc(reading.control)} out in the`
+      + ` meadow, under the ${toll.ratio}x this leg stands on: what is dark there is the`
+      + ' whole frame and not a body');
+  }
+  if (reading.crown === null) {
+    fails.push('no row anywhere near his own carries the figure at all');
+  } else if (Math.abs(reading.crown - want.crown) > toll.crown) {
+    fails.push(`his crown reads row ${reading.crown} where two plates put it at ${want.crown}`
+      + ` +-${toll.crown}: the body is in the frame and not where the rule puts it`);
+  } else if (reading.centre === null || Math.abs(reading.centre - want.centre) > toll.centre) {
+    const said = reading.centre === null ? '(none)' : reading.centre.toFixed(0);
+    fails.push(`his head is centred on column ${said} where two plates put it at`
+      + ` ${want.centre} +-${toll.centre}`);
+  }
+  return fails;
+}
+
 if (process.argv.includes('--self')) {
   const solids = cameraSolids();
   const eye = {};
@@ -859,6 +1068,54 @@ if (process.argv.includes('--self')) {
     {
       what: 'and a page with no key at all is caught, which is the door quietly walled up',
       caught: !oneDoor('window.setDevPose = (asked) => devPose.place(asked);'),
+    },
+    // ---- THE ARRIVAL, AND THE TWO READINGS THAT WERE ACTUALLY TAKEN.
+    //
+    // The pair below is not fabricated: they are this desk's own plates of the
+    // visitor's page at 1892x845, before the cure and after it, at the same tip
+    // and in the same hour. A verdict that cannot tell those two apart is a
+    // verdict that would have let E-AVATAR3 through, which is what it did.
+    {
+      what: 'the visitor\'s page as measured AFTER the cure passes the arrival leg',
+      caught: arrivoVerdict({
+        persona: 'terza', fill: 0.709, control: 0.089, crown: 525, centre: 798,
+      }).length === 0,
+    },
+    {
+      what: 'and the same page BEFORE it -- the body five metres up, out of frame -- is caught',
+      caught: arrivoVerdict({
+        persona: 'terza', fill: 0.023, control: 0.070, crown: null, centre: null,
+      }).length > 0,
+    },
+    {
+      what: 'a body simply not drawn -- the fade at nought -- reads the meadow and is caught',
+      caught: arrivoVerdict({
+        persona: 'terza', fill: 0.089, control: 0.089, crown: null, centre: null,
+      }).length > 0,
+    },
+    {
+      what: 'a body in the frame but a metre up the boom is caught by its crown row',
+      caught: arrivoVerdict({
+        persona: 'terza', fill: 0.62, control: 0.05, crown: 448, centre: 798,
+      }).length > 0,
+    },
+    {
+      what: 'and one that slid across the frame is caught by the column his head is on',
+      caught: arrivoVerdict({
+        persona: 'terza', fill: 0.62, control: 0.05, crown: 525, centre: 905,
+      }).length > 0,
+    },
+    {
+      what: 'a lens inside the stone fills the box and every control with it: caught',
+      caught: arrivoVerdict({
+        persona: 'terza', fill: 0.99, control: 0.97, crown: 525, centre: 798,
+      }).length > 0,
+    },
+    {
+      what: 'and a visitor\'s page that quietly arrived in first person is caught too',
+      caught: arrivoVerdict({
+        persona: 'prima', fill: 0.709, control: 0.089, crown: 525, centre: 798,
+      }).length > 0,
     },
   ]);
 }
@@ -1194,6 +1451,41 @@ for (const kind of Object.keys(WALKS)) {
       + `${paletteAt(bad.i, bad.j, bad.k, PAINTS[kind], bad.n)} in the stamped list` : '');
 }
 
+// ------------------------------------------------- the arrival, before any browser
+//
+// THE ONE POSE EVERY VISITOR GETS, AND IT HAD NEVER BEEN ASKED FOR. The legs
+// above are all at the framing the campaign is judged on, which is a pose a
+// walker reaches by pressing a key. This is the pose he is GIVEN.
+const arrivo = arrivalEye();
+const figura = arrivalFigure(arrivo);
+const visibleOfHim = figura === null
+  ? 0 : (ARRIVO_FRAME.height - figura.crown) / figura.heightPx;
+report.line(`  arrivo ${ARRIVO_FRAME.width}x${ARRIVO_FRAME.height}: lens `
+  + `(${arrivo.x.toFixed(3)}, ${arrivo.y.toFixed(3)}, ${arrivo.z.toFixed(3)}), arm `
+  + `${arrivo.arm.toFixed(3)} m over a pivot at ${arrivo.pivotY.toFixed(3)}; crown row `
+  + `${figura === null ? '(behind the lens)' : figura.crown}, head `
+  + `${figura === null ? '-' : figura.wideAt10.toFixed(0)} px on column `
+  + `${figura === null ? '-' : figura.centreAt10.toFixed(0)}, `
+  + `${(visibleOfHim * 100).toFixed(0)}% of him inside the frame`);
+
+// THE LENS MAY NOT CLIMB ABOVE THE PIVOT IT SWINGS FROM. At the aim a walker
+// arrives with, the rule takes the boom from the eye at 1.70 to 1.583 over the
+// feet -- DOWNWARDS -- and the swing adds 0.23 m of lift, so the lens stands
+// under its own pivot plus a clearance. It stood 3.0 m over it, on a roof.
+report.check(arrivo.y <= arrivo.pivotY + GROUND_CLEARANCE,
+  'the arrival lens stands on its own arm and not on a roof',
+  `${arrivo.y.toFixed(3)} m against a pivot at ${arrivo.pivotY.toFixed(3)}`);
+report.check(figura !== null && Math.abs(figura.crown - ARRIVO.crown) <= ARRIVO_TOLL.crown,
+  `his crown lands on row ${ARRIVO.crown} +-${ARRIVO_TOLL.crown} of the visitor's frame`,
+  figura === null ? 'the figure is behind the lens' : `${figura.crown}`);
+report.check(figura !== null
+  && Math.abs(figura.centreAt10 - ARRIVO.centre) <= ARRIVO_TOLL.centre,
+  `and his head on column ${ARRIVO.centre} +-${ARRIVO_TOLL.centre}, left of the middle`,
+  figura === null ? '-' : `${figura.centreAt10.toFixed(1)}`);
+report.check(visibleOfHim >= ARRIVO_TOLL.visible,
+  `at least ${(ARRIVO_TOLL.visible * 100).toFixed(0)}% of him is inside that frame`,
+  `${(visibleOfHim * 100).toFixed(1)}%`);
+
 // ---------------------------------------------------------------------- notes
 //
 // THE GROUND UNDER HIS FEET, PRINTED WHATEVER IT SAYS. It used to be printed
@@ -1212,6 +1504,68 @@ report.note(`the ground at the feet the picture draws (${FEET.x}, ${FEET.z}) sta
     : ''));
 report.note(`the rule is anchored at the day fit's own aim (${RIG.pitch} deg); the night fit `
   + `sits 0.42 deg away, which is ${(rig.planar * 0.42 * DEG * 1000).toFixed(0)} mm on the arm`);
+
+// -------------------------------------- and the page a visitor is handed, in pixels
+//
+// THE LAST LEG IS THE ONLY ONE THAT LOOKS. Everything above this line is a
+// projection, and a projection is a statement about the rule: it says where the
+// figure WOULD be drawn by a camera built out of the same seats. It cannot say
+// that anything was drawn. E-AVATAR3 is the whole argument for the difference --
+// thirteen green legs over a page with no walker in it.
+//
+// IT OPENS THE VISITOR'S PAGE AND NOT THIS CAMPAIGN'S. No `?dev`, no tier asked
+// for by hand, no pose imposed, no person placed: the arrival is the thing under
+// test, and E-SUOLO1 is the standing lesson that a guard which fixes the state
+// for its own convenience photographs a world its own tool has healed. One
+// plate, ~40 s, and `--fast` is there for the runs that cannot spend it.
+const FAST = process.argv.includes('--fast');
+const PORT_FLAG = process.argv.find((a) => a.startsWith('--port='));
+const { chromium, sharp, missing } = toolsPresent();
+let arrivoServer = null;
+let arrivoVisitor = null;
+
+if (FAST) {
+  report.note('--fast: the visitor\'s page was not opened, so the arrival stands on arithmetic alone');
+} else if (missing.length) {
+  report.note(`no ${missing.join(' and ')} on this machine: the arrival was asked of the`
+    + ' projection above and not of a plate');
+} else {
+  try {
+    arrivoServer = await serveRepo(PORT_FLAG ? Number(PORT_FLAG.slice(7)) : null);
+    arrivoVisitor = await openVisitor({
+      chromium,
+      port: arrivoServer.port,
+      width: ARRIVO_FRAME.width,
+      height: ARRIVO_FRAME.height,
+    });
+    const seen = await visitorPlate(arrivoVisitor, sharp);
+    const letto = { ...figuraLetta(seen), persona: await arrivoVisitor.person() };
+    report.line(`  visitatore ${ARRIVO_FRAME.width}x${ARRIVO_FRAME.height}, ${letto.persona}`
+      + ` persona: his own box reads ${(letto.fill * 100).toFixed(1)}% figure against`
+      + ` ${(letto.control * 100).toFixed(1)}% out in the meadow; crown row`
+      + ` ${letto.crown === null ? '(none)' : letto.crown}, head centred on column`
+      + ` ${letto.centre === null ? '-' : letto.centre.toFixed(0)}`);
+    const fails = arrivoVerdict(letto);
+    report.check(fails.length === 0,
+      'the page a visitor is delivered has the WALKER in it, with no handle touched',
+      fails.join(' | '));
+    if (arrivoVisitor.noise.length) {
+      report.note(`the visitor's page logged ${arrivoVisitor.noise.length} error(s): `
+        + arrivoVisitor.noise.slice(0, 2).join(' | '));
+    }
+    if (!/D3D11|Metal|OpenGL/i.test(arrivoVisitor.driver)
+      || /SwiftShader/i.test(arrivoVisitor.driver)) {
+      report.note(`the arrival was drawn by ${arrivoVisitor.driver}: the readings above`
+        + ' were taken on a real driver');
+    }
+  } catch (error) {
+    report.check(false, 'the visitor\'s page loads and its arrival can be read', error.message);
+  } finally {
+    if (arrivoVisitor) await arrivoVisitor.close().catch(() => {});
+    // E-OPS5: serveRepo's own stop kills by the exact pid and its tree.
+    if (arrivoServer) await arrivoServer.stop().catch(() => {});
+  }
+}
 
 report.end(`H ${AVATAR.height} m in third and ${EYE_HEIGHT} at the eye in first; arm `
   + `${rig.planar.toFixed(3)} m planar, ${rig.lateral.toFixed(3)} abeam, `
