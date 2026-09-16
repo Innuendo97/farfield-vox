@@ -346,8 +346,10 @@ export function armClear(from, to, solids, pad = 0) {
  * The arm swings with pitch, as a boom does: look down and the camera rises
  * behind the shoulder, look up and it drops. Three things govern its length --
  * the retraction above, the switch's own run, and the stone -- and then the
- * ground has the last word on its height, because a camera that has gone under
- * the world shows the inside of it.
+ * ground under WHERE IT ARRIVED has a word on its height, because a camera that
+ * has gone under the world shows the inside of it. The order of those last two
+ * is not a detail and is argued at the foot of this function: a floor read
+ * where the arm was merely heading is a roof the camera never stands on.
  *
  * @param {object} out       written into; no allocation a frame
  * @param {object} body      { x, z, stance, yaw } of the walker
@@ -398,27 +400,49 @@ export function thirdPersonEye(
   let z = body.z - outBehind * -cos + outLateral * -sin;
   let y = pivotY + lift;
 
-  // AND THE GROUND HAS ITS WORD FIRST. Read where the camera actually is rather
-  // than where the walker is: five metres astern the world has moved on. The
-  // clearance is a head's worth, so the near plane never bites into the turf.
-  // It runs BEFORE the stone and not after: lifting a camera out of the ground
-  // can carry it into a wall, and the wall is the one that must have the last
-  // word.
+  // THE STONE FIRST, AND THE FLOOR WHERE THE ARM ACTUALLY ARRIVES.
+  //
+  // THIS ORDER IS THE WHOLE OF E-AVATAR3 AND IT COST THE ARRIVAL ITS WALKER.
+  // The floor used to be read at the point the rule ASKS FOR, before anything
+  // had been allowed to say the camera never gets there -- and the floor a
+  // walker is handed is `max(meadow, built stone)`, because a walker climbs the
+  // stair and stands on the platform. Five metres astern of the spawn that
+  // point is inside the plan of block 06, the one deliberately stood behind the
+  // walker so that it stays out of the reference framing: the floor answered
+  // 5.16 m, the boom was lifted to the ROOF OF A BLOCK IT NEVER STANDS ON, and
+  // the stone then slid it back down an arm that now pointed up at 38 degrees.
+  // The camera came to rest 4.70 m in the air instead of 1.89, the aim stayed
+  // the walker's own, and the figure -- drawn, whole, fade 1 -- sat 39.6
+  // degrees below the axis of a frame 22.1 degrees deep. The body was in the
+  // world and out of the picture, at the one pose every visitor arrives on.
+  //
+  // So the stone speaks first, and the floor is read WHERE THE CAMERA IS, not
+  // where it was heading. A roof the arm stops short of is not a floor; it is a
+  // wall, and it has already had its say. Nothing else moves: the aim, the
+  // offsets and the retraction are untouched, and where the boom was clear of
+  // everything the answer is the same to the bit.
+  const pivot = { x: body.x, y: pivotY, z: body.z };
+  const shorten = (f) => {
+    if (!(f < 1)) return;
+    x = pivot.x + (x - pivot.x) * f;
+    y = pivot.y + (y - pivot.y) * f;
+    z = pivot.z + (z - pivot.z) * f;
+  };
+  shorten(armClear(pivot, { x, y, z }, opts.solids, GROUND_CLEARANCE));
+
+  // NOW THE TURF, at the place the arm reached. The clearance is a head's
+  // worth, so the near plane never bites into it.
   if (ground) {
     const floor = ground(x, z) + GROUND_CLEARANCE;
     if (y < floor) y = floor;
   }
 
-  // THEN THE STONE. The camera comes back along its own arm to the first thing
-  // it meets, which keeps the aim and the framing and only shortens the boom.
-  const pivot = { x: body.x, y: pivotY, z: body.z };
-  const wanted = { x, y, z };
-  const f = armClear(pivot, wanted, opts.solids, GROUND_CLEARANCE);
-  if (f < 1) {
-    x = pivot.x + (x - pivot.x) * f;
-    y = pivot.y + (y - pivot.y) * f;
-    z = pivot.z + (z - pivot.z) * f;
-  }
+  // AND THE STONE AGAIN, BECAUSE A LIFT CAN CARRY A CAMERA INTO A WALL, and the
+  // wall is still the one that must have the last word. It is a second pass
+  // over the same list rather than a loop: the lift is vertical and the boxes
+  // are convex, so one correction closes it, and a guard walks every bearing
+  // round every block to say that it does.
+  shorten(armClear(pivot, { x, y, z }, opts.solids, GROUND_CLEARANCE));
 
   out.x = x;
   out.y = y;
