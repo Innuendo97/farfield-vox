@@ -2,9 +2,14 @@ import {
   AdditiveBlending, Box3, BufferAttribute, BufferGeometry, DoubleSide,
   DynamicDrawUsage, Mesh, ShaderMaterial, Sphere, Vector3,
 } from 'three';
+import { SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS } from '../core/sky.js';
+import { FOG_GLSL, fogUniforms } from './air.js';
+import { faceLightGlsl, faceLightUniforms } from './face-light.js';
 import { MONOLITHS } from './layout.js';
 import { groundHeightAt } from './contracts.js';
-import { INK_CORE, INK_GAIN, INK_HALO } from './voxel/masonry.js';
+import {
+  INK_CORE, INK_GAIN, INK_HALO, STONE_ALBEDO, STONE_EXPOSURE, STONE_LIGHT_SCALE,
+} from './voxel/masonry.js';
 
 // The six blocks: what hangs AROUND them.
 //
@@ -322,6 +327,109 @@ const FOCUS_SIZE = 0.12;
 // burning at twice its resting light behind a panel is read through the panel.
 const FOCUS_OPEN_DIM = 0.85;
 
+// ------------------------------------------------- THE WRITING, AS BODIES
+//
+// The letters of the six blocks are STONE STANDING OFF THE STONE, and this is
+// where they are hung.
+//
+// WHY THEY ARE NOT PAINTED ANY MORE. The committente's reading of the delivered
+// hub was that «il testo e i simboli dei monoliti soffrono le linee scure dove
+// i cubi si separano, e questo rende complicata la lettura», and it was an
+// exact description of a projection: the engraving was laid on the wall in
+// metres of stone, and the day the wall became BOXES that projection started
+// landing on the reveals and the soffits of every block as readily as on their
+// fronts. Every course line and every upright joint went through a glyph, and a
+// glyph in two halves with a black bar between them is a glyph somebody has to
+// work to read. Neither of the first two answers survived the committente
+// (E-DECISIONI24: «no [...] rendili STACCATI dai monoliti, come se fossero
+// SOLIDI, e non proiettati sulla pietra»), and the third one is this.
+//
+// AND IT IS ONE MESH AND ONE DRAW FOR ALL SIX. src/world/engraving.js hands
+// every face back in WORLD METRES for exactly this reason: six bodies in six
+// block frames would be six matrices and six calls, and the whole of what this
+// file has learned about the rhombi and the globe is that a handful of quads
+// scattered over six materials is the most expensive cheap thing in a scene.
+// Concatenated, the writing of the whole hub is ONE geometry, ONE material and
+// ONE call — and the draw count of the world moves by exactly that one.
+//
+// WHAT IS PER BLOCK IS TWO NUMBERS AND NEITHER IS A UNIFORM BLOCK. The FOCUS —
+// how lit a block is as the walker comes up to it — is the only thing about a
+// letter that changes at run time, and it is carried as a small array of gains
+// indexed IN THE VERTEX SHADER off a per-vertex block number. A varying costs
+// one interpolator; a material per block would cost five more draws.
+
+// How much brighter the writing burns when a walker comes up to its block, and
+// how far it steps back once the face has opened. Carried here rather than
+// beside FOCUS_INK because they are one pair of numbers with one reader, and
+// the two above are the seat the ink used to be handed to the wall through.
+const WRITING_VERTEX = /* glsl */`
+  attribute float aTone;
+  attribute float aBlock;
+
+  uniform float uGain[${MONOLITHS.length}];
+
+  varying vec3 vNormal;
+  varying vec3 vWorld;
+  varying float vDistance;
+  varying float vTone;
+  varying float vGain;
+
+  void main() {
+    // THE POSITIONS ARE ALREADY THE WORLD'S. This mesh stands at the origin
+    // with no turn of its own -- six blocks at six bearings cannot share one --
+    // so the vertex is the world point and the normal is the world normal, and
+    // there is no normalMatrix in this program to disagree with either.
+    vNormal = normal;
+    vWorld = position;
+    vTone = aTone;
+    // Dynamic indexing of a uniform array is allowed in the VERTEX stage of
+    // GLSL ES 1.00 and not reliably in the fragment one, which is the whole
+    // reason the focus is resolved here and carried across as a varying.
+    vGain = uGain[int(aBlock)];
+    vDistance = length(cameraPosition - position);
+    gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const WRITING_FRAGMENT = /* glsl */`
+  precision highp float;
+
+  uniform vec3 uAlbedo;
+  uniform vec3 uCore;
+
+  varying vec3 vNormal;
+  varying vec3 vWorld;
+  varying float vDistance;
+  varying float vTone;
+  varying float vGain;
+
+  ${SCENE_LIGHT_GLSL}
+  ${faceLightGlsl()}
+  ${FOG_GLSL}
+
+  void main() {
+    vec3 n = normalize(vNormal);
+
+    // A LETTER IS CUT FROM THE SAME STONE THE WALL IS, and that is what gives
+    // it its own shadow without a shadow map. Its front looks where the wall
+    // looks and takes the wall's light; its flanks look along the wall, so the
+    // one the sun rakes is pale and the one turned from it is dark, by the same
+    // two terms every other face in this world is lit by. Nothing here is a
+    // bevel painted on a card.
+    vec3 colour = uAlbedo * faceLightOf(faceTerms(n));
+
+    // And what it gives off. The core of E-PIETRA2, at the gain it was
+    // delivered at, on the FRONT; a third of it on the flanks and almost none
+    // on the back. The reader is looking at the front, and a flank that burned
+    // as brightly would read as a second letter beside the first rather than as
+    // the thickness of the first.
+    colour += uCore * vTone * vGain;
+
+    colour = throughAir(colour, vDistance, vWorld.y);
+    gl_FragColor = vec4(colour, 1.0);
+  }
+`;
+
 // Where the globe stands on the meadow in front of the fifth block. Far enough
 // out that the pool clears the stone -- the water is 1.22 m across, so its edge
 // would touch the face at anything under 0.61 -- and set sideways so that the
@@ -476,8 +584,100 @@ export function createMonoliths() {
   markers.name = 'markers';
   meshes.push(markers);
 
+  // ---------------------------------------------------- and the writing on them
+  //
+  // ONE MESH FOR THE SIX, held empty until the first face is cut. The faces
+  // arrive one per frame from engraveAll() and in order of distance from the
+  // reference pose, so this is rebuilt six times over the first second or so of
+  // the world and never again — against a draw call a block, for ever.
+  const written = new Map();
+  const slotOf = new Map(MONOLITHS.map((block, i) => [block.id, i]));
+  const gains = MONOLITHS.map(() => INK_GAIN);
+
+  const writing = new Mesh(new BufferGeometry(), new ShaderMaterial({
+    uniforms: {
+      // The letters are cut from the stone of the wall they stand on, so they
+      // take its pigment by reference to the seat that states it rather than
+      // carrying a grey of their own. There is no tile on them: the mottling of
+      // this stone opens at a tenth of a metre and a stem is a fiftieth, so a
+      // tile here would be one shade over a whole letter.
+      uAlbedo: { value: new Vector3(...STONE_ALBEDO) },
+      uCore: { value: new Vector3(...INK_CORE) },
+      uGain: { value: gains },
+      ...faceLightUniforms(STONE_LIGHT_SCALE * STONE_EXPOSURE),
+      ...SCENE_LIGHT_UNIFORMS,
+      ...fogUniforms(),
+    },
+    vertexShader: WRITING_VERTEX,
+    fragmentShader: WRITING_FRAGMENT,
+    fog: false,
+  }));
+  writing.name = 'writing';
+  meshes.push(writing);
+
+  /**
+   * The bodies of every face that has been cut, as one geometry.
+   *
+   * Concatenated and not merged: src/world/engraving.js already handed each
+   * face back in WORLD metres and already greedy-meshed it, so there is nothing
+   * left to fuse between two blocks eight metres apart. What this adds is the
+   * one thing a shared mesh needs and a lone one does not — WHICH BLOCK each
+   * vertex belongs to, so the focus can still reach a single face.
+   */
+  function layWriting() {
+    let quads = 0;
+    for (const [, cut] of written) quads += cut.quads;
+    const position = new Float32Array(quads * 12);
+    const normal = new Float32Array(quads * 12);
+    const tone = new Float32Array(quads * 4);
+    const block = new Float32Array(quads * 4);
+    const index = new Uint32Array(quads * 6);
+    let v = 0;
+    let t = 0;
+    let i = 0;
+    for (const [id, cut] of written) {
+      position.set(cut.positions, v);
+      normal.set(cut.normals, v);
+      tone.set(cut.tones, t);
+      block.fill(slotOf.get(id) || 0, t, t + cut.quads * 4);
+      for (let k = 0; k < cut.indices.length; k++) index[i + k] = cut.indices[k] + t;
+      v += cut.quads * 12;
+      t += cut.quads * 4;
+      i += cut.quads * 6;
+    }
+    const laid = new BufferGeometry();
+    laid.setAttribute('position', new BufferAttribute(position, 3));
+    laid.setAttribute('normal', new BufferAttribute(normal, 3));
+    laid.setAttribute('aTone', new BufferAttribute(tone, 1));
+    laid.setAttribute('aBlock', new BufferAttribute(block, 1));
+    laid.setIndex(new BufferAttribute(index, 1));
+    laid.computeBoundingSphere();
+    writing.geometry.dispose();
+    writing.geometry = laid;
+  }
+
+  // AND IT IS LAID EMPTY BEFORE THE FIRST FRAME, WHICH IS NOT A FORMALITY.
+  // three.js keys a program on what the OBJECT needs as well as on the shader,
+  // and an empty BufferGeometry needs nothing: the first frame compiled this
+  // material once for a mesh with no `normal` attribute and again, minutes
+  // later, for the same mesh once a face had landed and given it one. Two live
+  // programs for one material, which guard-programmi counted and reported. So
+  // the attribute SHAPE is fixed here, at zero length, and never changes again.
+  layWriting();
+
   return {
     meshes,
+
+    /** What the writing of the hub is made of, for the panel and the guard. */
+    get writingCensus() {
+      const per = [];
+      let triangles = 0;
+      for (const [, cut] of written) {
+        per.push(cut.census);
+        triangles += cut.census.triangles;
+      }
+      return { faces: per.length, triangles, per };
+    },
 
     /**
      * A block's stone, as soon as the worker has cut it.
@@ -520,10 +720,18 @@ export function createMonoliths() {
      * landed yet is the ordinary case and not the exception — see attach() —
      * so the texture is remembered first and applied second.
      */
-    setEngraving(id, texture) {
-      engravings.set(id, texture);
+    setEngraving(id, delivery) {
+      engravings.set(id, delivery);
+      // THE BODIES DO NOT WAIT FOR THE STONE and never could: they are hung on
+      // the WORLD, off the plan, and the plan is known before anything has been
+      // cut. Only the halo has to wait for a wall to land on, which is what the
+      // seat above exists for.
+      if (delivery && delivery.solids) {
+        written.set(id, delivery.solids);
+        layWriting();
+      }
       const block = blocks.get(id);
-      if (block) block.setEngraving(texture);
+      if (block) block.setEngraving(delivery);
     },
 
     /** Distance from the reference camera, which is what sizes the engraving. */
@@ -544,11 +752,16 @@ export function createMonoliths() {
       const held = focus.get(id);
       if (held && held.value === value && held.out === out) return;
       focus.set(id, { value, out });
+      // ONE ARITHMETIC AND TWO READERS, which is what the writing coming off
+      // the wall costs this seat. The halo on the stone and the body standing
+      // off it are one light: they brighten together, they step back together
+      // when the face opens, and the gain is worked out ONCE here rather than
+      // twice by two files that would drift.
+      const gain = INK_GAIN * (1 + FOCUS_INK * value * (1 - FOCUS_OPEN_DIM * out));
+      const slot = slotOf.get(id);
+      if (slot !== undefined) gains[slot] = gain;
       const block = blocks.get(id);
-      if (block) {
-        block.material.uniforms.uInk.value = INK_GAIN
-          * (1 + FOCUS_INK * value * (1 - FOCUS_OPEN_DIM * out));
-      }
+      if (block) block.material.uniforms.uInk.value = gain;
     },
 
     /**

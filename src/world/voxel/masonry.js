@@ -9,7 +9,9 @@ import {
 import { FOG_GLSL, LOW_SKY, fogUniforms } from '../air.js';
 import { faceLightGlsl, faceLightUniforms } from '../face-light.js';
 import { MONOLITHS } from '../layout.js';
-import { NEAR_METRES, buildMasonry, masonryLaw } from './courses.js';
+import {
+  INK_STANDOFF, INK_THICKNESS, NEAR_METRES, buildMasonry, masonryLaw,
+} from './courses.js';
 
 // The block, built as masonry instead of delivered as a mesh.
 //
@@ -491,6 +493,18 @@ export const INK_CORE = [0.07, 1.60, 2.00];
 export const INK_HALO = [0.05, 0.96, 1.44];
 export const INK_GAIN = 0.78;
 
+// How much of the sun a letter takes from the stone it stands over.
+//
+// NOT ONE, AND THE REASON IS NOT TIMIDITY. This world has no shadow map on the
+// six and does not need one for this: the only thing between the wall and the
+// sun is the letter, and where a letter is the sun is gone, so the honest value
+// is the whole of the sun term. It is held a tenth under that for the one thing
+// the arithmetic cannot see -- a letter is a body of LIGHT as well as a body of
+// stone, and the face of it that looks at the wall is the face that is glowing
+// at it. Ninety per cent is the sun stopped with that tenth left in.
+export const STONE_INK_SHADE = 0.90;
+
+
 export const STONE_EXPOSURE = 1.25;
 
 // How much light the stone is given before its own exposure, and it is the LAST
@@ -861,7 +875,16 @@ const FRAGMENT = /* glsl */`
   uniform vec2 uFace;
   uniform float uInk;
   uniform float uInkOn;
-  uniform vec3 uInkCore;
+  // Where the letters stand, measured out of this wall's own plane to the
+  // MIDDLE of their thickness, and how much of the sun one of them takes from
+  // the stone it shades. The depth is asked of the file that states it
+  // (src/world/voxel/courses.js) and never summed a second time here.
+  uniform float uInkDepth;
+  uniform float uInkShade;
+  // AND NOT uInkCore, WHICH THIS WALL HAS NO READER FOR ANY MORE. The core of
+  // the stroke is the body that stands off the wall; what reaches the wall is
+  // the halo alone. A uniform nothing samples is a colour somebody will
+  // eventually reach for.
   uniform vec3 uInkHalo;
 
   ${SCENE_LIGHT_GLSL}
@@ -1152,6 +1175,57 @@ const FRAGMENT = /* glsl */`
       float sunkFrac = clamp(sunk / uShell, 0.0, 1.0);
       terms.y *= 1.0 - uNiche * sunkFrac * sunkFrac;
     }
+    // ------------------------------- what the writing standing off it throws
+    //
+    // THE WRITING IS NOT ON THIS WALL ANY MORE, and the reason is the reason
+    // this block is in the demo at all. The type used to be PROJECTED onto the
+    // stone off the block's own centre and its own two axes, in metres, which
+    // is an arithmetic that cannot tell a block's front from its reveals: the
+    // day the wall stopped being one rectangle a course and became boxes, every
+    // upright joint and every course line started running straight through a
+    // glyph -- and that is exactly what the committente read back. The letters
+    // are BODIES now, standing clear of this wall (src/world/engraving.js,
+    // src/world/monoliths.js). Two things of theirs still land here, and both
+    // are things a body standing off a wall really does to it.
+    //
+    // ONE: THE SHADOW. It is what makes a letter read as standing OFF a wall
+    // rather than lying on it, and it is not a drop shadow painted at an angle
+    // somebody liked: the ray from this fragment towards the sun is followed to
+    // the plane the letters stand in, and what is asked is whether a letter is
+    // there. So it moves with the sun through the whole day cycle, it lengthens
+    // exactly as the sun drops, and it lands CORRECTLY on a block that stands
+    // proud or sits back -- the lift is measured from this fragment's own depth
+    // and not from the wall's plane. It takes the SUN term and not the colour,
+    // because a shadow is the sun being blocked and not a wash of grey: a face
+    // in shadow keeps every bit of its sky.
+    vec3 offset = vWorld - uCentre;
+    vec2 ink = vec2(
+      dot(offset, uRight) / uFace.x + 0.5,
+      0.5 - offset.y / uFace.y);
+    float facing = smoothstep(0.55, 0.90, dot(n, uFront)) * uInkOn;
+    float inside = step(0.0, ink.x) * step(ink.x, 1.0) * step(0.0, ink.y) * step(ink.y, 1.0);
+    float toSun = dot(uFront, uSunDir);
+    if (facing * inside > 0.0 && toSun > 0.12) {
+      float lift = uInkDepth - (dot(offset, uFront) - uHalf.z);
+      vec3 slide = uSunDir * (lift / toSun);
+      vec2 along = ink + vec2(dot(slide, uRight) / uFace.x, -slide.y / uFace.y);
+      float onFace = step(0.0, along.x) * step(along.x, 1.0)
+        * step(0.0, along.y) * step(along.y, 1.0);
+      terms.x *= 1.0 - uInkShade * texture2D(tInk, along).g * onFace * facing;
+    }
+
+    // AND THE SKY A LETTER TAKES AWAY IS NOT HERE, WHICH IS A MEASUREMENT AND
+    // NOT AN OVERSIGHT. A body standing eight centimetres off a wall does block
+    // the wall's view of the sky, and a term for it was written, shipped into
+    // the frame and read back: at 1.2 times the halo's own field it moved the
+    // Michelson contrast at the edge of a stroke by 0.000, 0.001, 0.001, 0.000
+    // and 0.000 on the five fronts. It cannot do better than that by
+    // construction rather than by bad luck -- the field it is shaped from is
+    // the halo's, so wherever it is strong the glow it is competing with is
+    // strong too, and the glow is ten times the stone under it. A knob that
+    // cannot move the picture is a knob somebody has to keep switching off, so
+    // it went out rather than shipping at a value that does nothing.
+
     vec3 light = faceLightOf(terms);
 
     // ------------------------------------------------------------- the moss
@@ -1288,25 +1362,7 @@ const FRAGMENT = /* glsl */`
     float dressed = max(facet, leaned);
     albedo *= mix(1.0, uArrisPigment, dressed);
 
-    // ------------------------------------------------------------ engraving
-    //
-    // NOT ONE LINE OF src/world/engraving.js CHANGED, and this is the whole
-    // reason the block is in the demo. The writing is projected off the block's
-    // own centre and its own two axes, in METRES OF STONE — the same arithmetic
-    // the delivered material uses — so what is under it can be a baked mesh or
-    // a wall of generated courses and the type lands on the same stone.
-    vec3 offset = vWorld - uCentre;
-    vec2 ink = vec2(
-      dot(offset, uRight) / uFace.x + 0.5,
-      0.5 - offset.y / uFace.y);
-    float facing = smoothstep(0.55, 0.90, dot(n, uFront)) * uInkOn;
-    float inside = step(0.0, ink.x) * step(ink.x, 1.0) * step(0.0, ink.y) * step(ink.y, 1.0);
-    vec2 cut = texture2D(tInk, ink).rg * (facing * inside);
-    // Nothing is cut where nothing is drawn, so the groove term falls back to
-    // one rather than to the half grey the map stores.
-    float groove = mix(1.0, 0.42 + 1.16 * cut.g, facing * inside);
-
-    vec3 colour = albedo * light * groove;
+    vec3 colour = albedo * light;
 
     // --------------------------------------------------------- the sky in it
     vec3 view = normalize(vWorld - cameraPosition);
@@ -1316,7 +1372,17 @@ const FRAGMENT = /* glsl */`
     float fresnel = uF0 + uRim * pow(1.0 - clamp(dot(-view, n), 0.0, 1.0), uRimPower);
     colour += sky * fresnel;
 
-    colour += mix(uInkHalo, uInkCore, cut.r) * cut.r * uInk;
+    // TWO: THE GLOW. A body of cyan standing eight centimetres off a wall lights
+    // the wall, and the reference draws that halo plainly -- far bluer than the
+    // stroke it surrounds, blue over red 64 at one or two pixels out and still
+    // 35 at eight to fourteen (E-PIETRA2). It is the HALO's colour and not a
+    // ramp from a core out to it: the ramp was there because a painted stroke
+    // ran from its own middle out through its halo in one map, and what falls
+    // on this wall now is only ever the halo. The GROOVE that the second
+    // channel of that map used to shade is gone with the groove it described,
+    // because nothing is cut into this stone; what the second channel carries
+    // now is the letters' own silhouette, which is what the shadow above reads.
+    colour += uInkHalo * texture2D(tInk, ink).r * (facing * inside) * uInk;
 
     colour = throughAir(colour, vDistance, vWorld.y);
     gl_FragColor = vec4(colour, 1.0);
@@ -1461,7 +1527,8 @@ export function createMasonry(entry, tile, ready = null, engraved = true) {
       // sampled an unbound map would read it as a groove over its whole front.
       uInkOn: { value: engraved ? 1 : 0 },
       uInk: { value: INK_GAIN },
-      uInkCore: { value: new Vector3(...INK_CORE) },
+      uInkDepth: { value: INK_STANDOFF + INK_THICKNESS / 2 },
+      uInkShade: { value: STONE_INK_SHADE },
       uInkHalo: { value: new Vector3(...INK_HALO) },
       // All four shared by reference and not copied: one sun, one weather in
       // what reflects it, one pair of light colours, one body of air. A copy
@@ -1538,6 +1605,12 @@ export function createMasonry(entry, tile, ready = null, engraved = true) {
       const away = Math.max(0, Math.hypot(dx, dz) - reach);
       return swap(away > NEAR_METRES ? 'far' : 'near');
     },
-    setEngraving(texture) { material.uniforms.tInk.value = texture; },
+    // The halo of the writing, out of what engrave() cut. It is handed the
+    // WHOLE delivery and takes the half of it that is its own: the bodies are
+    // hung by src/world/monoliths.js, which is the one file that knows where
+    // the six of them stand in the world.
+    setEngraving(written) {
+      material.uniforms.tInk.value = written ? (written.texture || null) : null;
+    },
   };
 }
