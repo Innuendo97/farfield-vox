@@ -200,6 +200,14 @@ export function createCampo({
   // Asking for the seat is what tells the post chain there is a field to draw
   // apart, so it is asked for once, here, at the moment the field is built.
   const resolve = campoResolve(campoUniforms());
+  // AND ONE DIAL FOR BOTH SIDES OF THE SEAM. `campodebug` is written on the
+  // FIELD's uniforms by src/world/layers/v1-suolo.js, and the recomposition
+  // carried a uDebug of its own that nothing ever wrote: every mode it
+  // documents was unreachable from the address bar, and a mode of the field's
+  // (7, the closed traversals of U-SUOLO-3) arrived here as a colour to be
+  // blended rather than as a picture to be passed through. One object behind
+  // both copies, so a number typed once reaches the whole of the ground.
+  resolve.material.uniforms.uDebug = material.uniforms.uDebug;
   resolve.visible = false;
   group.add(resolve);
   let fieldScale = 1;

@@ -94,7 +94,16 @@ import { SPAWN } from '../layout.js';
  *                  is the null arm this term is priced against: one fetch and
  *                  one multiply, in the field and in the three programs of the
  *                  vegetation, with everything else in the frame identical
- *   campodebug=2   magenta where a ray ran out without finding anything
+ *   campodebug=2   magenta where a ray found nothing at all -- which after
+ *                  U-SUOLO-3 is the corridor and the columns nobody laid, and
+ *                  no longer a traversal that ran out of its steps
+ *   campodebug=7   verde dove la traversata e' stata CHIUSA invece che trovata:
+ *                  il raggio ha finito i passi restando dentro al mondo e la
+ *                  terra su cui stava e' la risposta. E' la ricevuta di
+ *                  U-SUOLO-3, e si conta sulla stessa lastra su cui si legge la
+ *                  legge. I modi 3-6 sono quelli della RICOMPOSIZIONE e ora
+ *                  l'indirizzo li raggiunge: vedi campo-field.js, un solo
+ *                  uDebug per le due sponde della cucitura
  */
 /**
  * The ring as an address asks for it: `R`, `R,s` or `R,s,h`, in metres.

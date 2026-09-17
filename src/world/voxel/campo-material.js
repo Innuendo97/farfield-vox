@@ -14,8 +14,8 @@ import { SHEET_GLSL, sheetArray, sheetUniforms } from './sheet.js';
 import { bladeSettings, earthSettings, voxelSettings } from './material.js';
 import {
   CAMPO, CAMPO_BEARINGS, CAMPO_BIAS, CAMPO_BLADE_CEIL, CAMPO_CUT_GLSL, CAMPO_FAR,
-  CAMPO_FAR_SHIFT, CAMPO_LOOK_MAX, CAMPO_LOOK_SHIFT, CAMPO_RUNG, campoCutUniform,
-  zoneFrame,
+  CAMPO_FAR_SHIFT, CAMPO_LOOK_MAX, CAMPO_LOOK_SHIFT, CAMPO_MATERIAL, CAMPO_RUNG,
+  campoCutUniform, zoneFrame,
 } from './campo.js';
 
 /**
@@ -468,6 +468,11 @@ const FRAGMENT = /* glsl */`
     bool found;
     bool blade;
     bool near;
+    // WHETHER THIS GROUND WAS FOUND OR CLOSED. A ray that runs out of steps is
+    // answered with the ground it was standing over rather than with the sky:
+    // see THE TRAVERSAL THAT RAN OUT at the foot of march(). This is the
+    // receipt that says which of the two happened, and uDebug 7 paints it.
+    bool closed;
     int level;
     float t;
     vec3 p;
@@ -485,6 +490,7 @@ const FRAGMENT = /* glsl */`
     hit.found = false;
     hit.blade = false;
     hit.near = true;
+    hit.closed = false;
     hit.level = 0;
     hit.t = tLeave;
     hit.p = eye;
@@ -583,6 +589,15 @@ const FRAGMENT = /* glsl */`
     // The ray's own parameter, kept because tEnter and tLeave are measured in
     // it and the crossings are added to it.
     float tRay = tEnter + 1e-4;
+    // WHETHER THE RAY LEFT THE WORLD OR SIMPLY STOPPED IN IT. The loop below
+    // ends three ways and they are not the same answer: a ray that walked out
+    // of the far window, or past the end of its own interval, has looked at
+    // every cell there was and found nothing -- that is SKY, and it is the
+    // right answer. A ray that hit the ceiling on its steps has not looked at
+    // anything of the sort: it is still inside the world, still under the
+    // canopy it was crossing, and the ground it was over is still there. See
+    // THE TRAVERSAL THAT RAN OUT, under the loop.
+    bool escaped = false;
 
     // ---------------------------------------------- WHICH CENTRE THIS PIXEL HAS
     //
@@ -753,10 +768,10 @@ const FRAGMENT = /* glsl */`
       // parameter along the ray and not against the length of the interval:
       // tLeave is measured from the EYE, so a window entered fourteen metres
       // out would otherwise be abandoned after the six metres it is deep.
-      if (tRay > tLeave) break;
+      if (tRay > tLeave) { escaped = true; break; }
       if (p.x < uFarBounds.x || p.z < uFarBounds.y
         || p.x > uFarBounds.z || p.z > uFarBounds.w
-        || p.y < uHeight.x || p.y > uHeight.y) break;
+        || p.y < uHeight.x || p.y > uHeight.y) { escaped = true; break; }
       // AND IT CLIMBS ONLY WHEN IT HAS LEFT THE PARENT CELL AS WELL.
       //
       // THIS IS THE ONE LINE THE WHOLE COST OF THE FRAME WAS IN, and it is the
@@ -775,6 +790,146 @@ const FRAGMENT = /* glsl */`
       // floor, and no cell is ever tested twice.
       ivec2 parentAfter = ivec2(floor(p.xz / (span * 2.0)));
       if (parentAfter != parentBefore) level = min(level + 1, min(uTopLevel, FAR_TOP));
+    }
+
+    // ======================================================================
+    // THE TRAVERSAL THAT RAN OUT, AND WHY IT MAY NOT ANSWER "SKY".
+    //
+    // THE DEFECT THIS IS THE ANSWER TO (E-DECISIONI23, U-SUOLO-3). «Linee di
+    // cuciture azzurre ancora visibili quando cammino.» Measured on this tip,
+    // on the page as delivered, with only the two engines that draw ground in
+    // the frame: at pitch -26 in open meadow the top rows of the picture carry
+    // runs of SKY -- up to 966 pixels in one plate -- lying on ground between
+    // 23 and 30 m out that the aerial says is solid. They are the GRAZING rays,
+    // the flattest in the frame, and they stand in thin lines because a line of
+    // the picture is a line of bearings and the cost of a march is a property
+    // of the bearing.
+    //
+    // WHAT THEY WERE, PROVED ONE SOURCE AT A TIME AND NOT REASONED:
+    //
+    //   the horizon did NOT throw them away. uDebug 2 paints the fragments that
+    //   MARCHED and found nothing; the two discards over main() leave the pixel
+    //   alone. Over a hundred and twenty walking frames: 650 magenta, ZERO
+    //   black. Nothing was refused before it was marched.
+    //
+    //   the recomposition did not lose them. At campores=1, the frame drawn
+    //   whole with no reduced buffer at all, the same four poses read 4924
+    //   pixels against 2712 -- MORE, because the resolve's own neighbourhood
+    //   fills a single lost texel and the native frame has nothing to fill it
+    //   with. It is not the gate; it is covering for this.
+    //
+    //   nor the second ray, nor the band, nor the ring. camporaggi=1 reads
+    //   2686 against 2712; the band taken off (mode snap, lag nought) reads 655
+    //   magenta against 650; walking backwards reads 806. None of them moves.
+    //
+    //   IT IS THE CEILING ON THE STEPS, and it is monotone in it. The same four
+    //   poses, the same plates, uSteps alone moved: 96 -> 2712 px, 128 -> 202,
+    //   192 -> 0, 400 -> 0. On a walk: 48 -> 163 549 px, 96 -> 9 535, 400 ->
+    //   2 069. A grazing ray crosses the meadow a cell at a time for twenty
+    //   five metres and there are not always ninety six cells' worth of ceiling
+    //   under it.
+    //
+    // AND A CEILING IS NOT A THING A PICTURE MAY BE MADE OF. Raising it buys a
+    // smaller chance and never zero: the number of cells a grazing ray crosses
+    // has no bound that a uniform can be set to, so any uSteps at all leaves a
+    // pose that shows the sky through the grass. What has a bound is the
+    // ANSWER. A ray that stopped because it ran out of steps is still inside
+    // the world -- it did not leave through uFarBounds and it did not pass
+    // tLeave, or escaped would say so -- and the cell it is standing over has
+    // ground in it. That ground is the honest answer to the pixel: not the sky,
+    // which is a statement about a place the ray never reached.
+    //
+    // WHAT IT COSTS, AND IT IS NOTHING IN THE FRAME. Every ray that finds its
+    // ground returns from inside the loop and never arrives here; every ray
+    // that leaves the world sets escaped and takes the branch out. What is
+    // left is the handful of fragments that ran out, which is where the defect
+    // was. Measured with the field's own clock, arms swapped in one opening of
+    // the page on a uniform: see the verbale.
+    //
+    // WHERE IT PUTS THE SURFACE. Straight down, on the top of the cell the ray
+    // stands in, and not along the ray: the extrapolation of a nearly flat ray
+    // onto a plane below it is tens of metres long and would paint a smear, and
+    // a ray this shallow has its ground under its own foot to within the cell
+    // it is already in. Under the blade where one stands, on the soil where
+    // none does -- topYOf is the one and groundYOf the other, exactly as the
+    // finest level of the loop reads them.
+    //
+    // WHICH PICTURE IT ASKS, AND IT IS THE FINEST THAT ANSWERS AT ALL.
+    //
+    // Not the level the ray stopped at, and that is the whole of the second
+    // attempt at this cure. The first closed on the ray's OWN cell and left four
+    // pixels standing out of a hundred and four plates, always in the corner of
+    // the frame -- which is where the recomposition's four taps collapse onto
+    // one and a lost texel has no neighbour to be filled from, so one ray
+    // becomes one hole. A coarse cell carries ONE CHILD'S byte (campoReduce
+    // writes data[o + 2] = data[bo + 2], the child with the highest ground),
+    // family and all: a cell of 3.2 m or of 25.6 m that straddles the CORRIDOR
+    // reduces to family PATH.
+    //
+    // AND A FAMILY THIS FIELD STANDS ASIDE ON IS NOT AN ANSWER TO A RAY THAT
+    // WAS STILL FLYING. That is the third attempt and the one that holds. The
+    // four survivors were rays travelling the length of the corridor half a
+    // metre over it -- measured against the law: from the failing station the
+    // ray is at (1.17; 27.9) at twenty metres, over PATH, 0.56 m up, and its
+    // true ground is the meadow at 37.7 m, eight metres further on. shade()
+    // returns nought alpha on PATH by the law it has kept since E-SENT4 --
+    // rightly, because the greedy disc draws that stone -- but the greedy's
+    // stone is not on this ray: the ray never came down to it. Closing there
+    // paints the very sky the closure was called to close.
+    //
+    // So where the finest texel says NOTHING the closure climbs -- one level at
+    // a time, out of the near pyramid into the far one, up to the top, 25.6 m of
+    // ground a side, which says something about everywhere the box contains.
+    //
+    // AND WHERE IT SAYS «CORRIDOR» IT IS READ AS MEADOW, WHICH LOOKS LIKE A LIE
+    // AND IS NOT. Climbing does not escape it: campoReduce ranks its children on
+    // the GROUND byte, the paving's ground is the meadow's own soil, and the
+    // blade that makes the meadow taller is in another byte -- so a tie is
+    // broken by whichever child came first, and over a corridor forty metres
+    // long every rung can come back PATH. What settles it is the DEPTH TEST,
+    // which has already run: this field draws at renderOrder 10, after the
+    // greedy, into a buffer that already holds the corridor's stone at the
+    // corridor's own depth. Where the paving is really in front of this pixel
+    // the closed fragment is killed by that test and the stone stays; where it
+    // is not -- which is every one of these rays, because they were still flying
+    // half a metre over the paving on their way to the meadow beyond it -- there
+    // is nothing in the buffer at all, and a meadow is the honest answer where
+    // the sky is a statement about a place the ray never reached.
+    if (!escaped && !hit.found) {
+      bool nr = insideNear(p.xz);
+      int lv = nr ? 0 : FAR_SHIFT;
+      float span = uCell * exp2(float(lv));
+      ivec2 cell = ivec2(floor(p.xz / span));
+      vec4 t = cellAt(cell, lv, nr);
+      for (int k = 0; k < ${CAMPO.levels + CAMPO_FAR.levels}; k++) {
+        if (t.b > 0.0 || lv >= FAR_TOP) break;
+        lv = lv + 1;
+        nr = insideNear(p.xz) && lv <= NEAR_TOP;
+        if (!nr && lv < FAR_SHIFT) lv = FAR_SHIFT;
+        span = uCell * exp2(float(lv));
+        cell = ivec2(floor(p.xz / span));
+        t = cellAt(cell, lv, nr);
+      }
+      // The family read as the meadow's, on the byte and nowhere else, so that
+      // every other reader of this texel is untouched.
+      int closedPacked = int(t.b * 255.0 + 0.5);
+      if ((closedPacked & 3) == ${CAMPO_MATERIAL.PATH}) {
+        t.b = float(closedPacked - ${CAMPO_MATERIAL.PATH} + ${CAMPO_MATERIAL.GRASS}) / 255.0;
+      }
+      if (!campoYields(p.xz) && t.b > 0.0) {
+        float groundY = groundYOf(t);
+        float topY = topYOf(t);
+        hit.found = true;
+        hit.blade = topY > groundY;
+        hit.near = nr;
+        hit.closed = true;
+        hit.level = lv;
+        hit.p = vec3(p.x, min(p.y, topY), p.z);
+        hit.n = vec3(0.0, 1.0, 0.0);
+        hit.cell = cell;
+        hit.tex = t;
+        hit.t = distance(hit.p, eye);
+      }
     }
     return hit;
   }
@@ -1116,6 +1271,9 @@ const FRAGMENT = /* glsl */`
     vec4 sum = vec4(0.0);
     float nearest = 1e9;
     int used = 0;
+    // Whether any ray of this pixel was CLOSED rather than found: the receipt
+    // uDebug 7 paints. See THE TRAVERSAL THAT RAN OUT in march().
+    bool closed = false;
     // HOW MANY RAYS THIS PIXEL GETS, AND IT IS NOT THE SAME EVERYWHERE.
     //
     // A second ray is worth having exactly where the ray finds detail smaller
@@ -1170,6 +1328,7 @@ const FRAGMENT = /* glsl */`
       Hit hit = march(eye, dir, inv, tEnter, tLeave, dither);
       vec4 c = shade(dir, hit);
       sum += c;
+      if (hit.closed && c.a > 0.0) closed = true;
       if (c.a > 0.0 && hit.t < nearest) nearest = hit.t;
       // AND THE FIRST RAY DECIDES WHETHER THERE ARE ANY MORE.
       if (k == 0 && (!hit.found || hit.t > uRayNear)) rays = 1;
@@ -1183,6 +1342,14 @@ const FRAGMENT = /* glsl */`
       if (uDebug > 1.5) { fragColour = vec4(1.0, 0.0, 1.0, 1.0); return; }
       discard;
     }
+    // uDebug 7 -- WHERE THE TRAVERSAL WAS CLOSED RATHER THAN FOUND. Green, on a
+    // frame that is otherwise the frame, so the receipt can be counted with the
+    // same plate the law is read off: the assertion of guard-cuciture is that
+    // there is no sky, and this is how a guard also asks how much of the meadow
+    // is standing on a march that ran out. Magenta above still marks the rays
+    // that found nothing at all, which after this cure is the corridor and the
+    // columns nobody laid, and nothing else.
+    if (uDebug > 6.5 && closed) { fragColour = vec4(0.0, 1.0, 0.0, 1.0); return; }
     // THE COLOUR IS THE MEAN OF THE RAYS THAT FOUND GROUND AND THE ALPHA IS THE
     // SHARE OF THEM THAT DID, which is the whole of what more than one ray
     // buys: a pixel on the silhouette of the ridge carries the fraction of
@@ -1577,15 +1744,23 @@ const RESOLVE_FRAGMENT = /* glsl */`
     // I MODI DI DIAGNOSI, prima di ogni cancello: quello che il quadro LEGGE,
     // separato da quello che ne fa. 3 il colore del texel, 4 la sua copertura,
     // 5 la sua profondita', 6 il quadro intero in magenta.
+    //
+    // E SOPRA IL 6 IL TEXEL PASSA COM'E'. I modi del CAMPO stanno sull'altra
+    // sponda della stessa cucitura -- uDebug e' un solo seggio, condiviso per
+    // riferimento (campoResolve(seat)) -- e il 7 di U-SUOLO-3 dipinge di verde
+    // le traversate CHIUSE. Una ricomposizione che ci mettesse sopra il proprio
+    // magenta cancellerebbe la ricevuta prima che qualcuno la conti; e la
+    // profondita' resta quella vera, perche' il selciato del corridoio va
+    // ancora composto con la terra e non davanti a essa.
     if (uDebug > 2.5) {
       int r0 = (f.x >= 0.5 ? 1 : 0) + (f.y >= 0.5 ? 2 : 0);
       vec3 show = uDebug < 3.5 ? c[r0].rgb
         : uDebug < 4.5 ? vec3(c[r0].a)
         : uDebug < 5.5 ? vec3(pow(d[r0], 64.0))
         : uDebug < 6.5 ? (c[r0].a > 0.0 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 1.0))
-        : vec3(1.0, 0.0, 1.0);
+        : c[r0].rgb;
       fragColour = vec4(show, 1.0);
-      gl_FragDepth = uDebug > 5.5 ? 0.0 : d[r0];
+      gl_FragDepth = (uDebug > 5.5 && uDebug < 6.5) ? 0.0 : d[r0];
       return;
     }
 
