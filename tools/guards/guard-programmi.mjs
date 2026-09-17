@@ -151,6 +151,7 @@ const FAMILIES = [
   { id: 'cubi', what: 'the greedy cubes (today: the trees)', has: ['uShadeMap'], owed: 1 },
   { id: 'monoliti', what: 'the masonry of the five blocks', has: ['tInk'], owed: 1 },
   { id: 'monoliti-segno', what: 'the marker at the foot of each block', has: ['uCore', 'uHalo'], lacks: ['uFogColour'], owed: 1 },
+  { id: 'monoliti-scritta', what: 'the writing, as bodies standing off the six', has: ['uCore', 'uAlbedo'], owed: 1 },
   { id: 'rocce', what: 'the rocks and the slabs', has: ['uSlabFalloff'], owed: 1 },
   { id: 'pietre-sciolte', what: 'the loose stones', has: ['uArrisPigment'], lacks: ['uJoint'], owed: 1 },
   { id: 'colline', what: 'the hills of the cornice', has: ['uPalette', 'uAirPale'], owed: 1 },
