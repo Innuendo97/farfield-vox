@@ -3,18 +3,12 @@
   "chiave": "progetti",
   "titolo": "Progetti",
   "icona": "cubo",
-  "copertura": 0.85,
-  "nota": "i periodi delle voci sono quelli dell'incarico presso cui il lavoro è stato svolto: nessuna delle due fonti data i singoli filoni di lavoro",
-  "riservatezza": {
-    "stato": "in_attesa_committente",
-    "nota": "i nomi dei clienti finali e dei progetti sono riportati come nel CV; va confermato che possano comparire su un sito pubblico, altrimenti le voci vanno rese anonime"
-  },
+  "copertura": 1,
+  "nota": "i periodi delle voci sono quelli dell'incarico presso cui il lavoro è stato svolto: il curriculum non data i singoli filoni di lavoro. I nomi dei clienti finali e dei progetti sono riportati come nel curriculum.",
   "incisione": {
     "titolo": "PROGETTI",
     "parolechiave": ["Idee", "Pianificazione", "Sviluppo", "Soluzioni", "Impatto"],
-    "fonte": "inquadratura di riferimento",
-    "stato": "in_attesa_committente",
-    "nota": "parole provvisorie dall'inquadratura di riferimento; il CV non propone un'incisione alternativa"
+    "fonte": "E-DECISIONI25, parole confermate dal coordinatore: il curriculum non propone un'incisione alternativa"
   },
   "timeline": [
     {
@@ -23,10 +17,11 @@
       "periodo": "2023 — oggi",
       "sottotitolo": "Portale retail, gestione dinamica dei contenuti promozionali",
       "riassunto": "Nuova sezione del portale retail per la gestione dinamica di contenuti promozionali su CMS.",
-      "dettaglio": "Progettata e sviluppata da zero: controller Groovy, template JSP e contenuti applicativi JavaScript su **Oracle WebCenter Sites**.",
+      "dettaglio": "Progettata e sviluppata da zero: controller **Groovy**, template **JSP** e contenuti applicativi **JavaScript** su **Oracle WebCenter Sites**.",
       "tecnologie": ["Groovy", "JSP", "JavaScript", "Oracle WebCenter Sites"],
       "cliente": "Poste Italiane",
-      "datore": "Capgemini S.p.A."
+      "datore": "Capgemini S.p.A.",
+      "fonte": "Curriculum Vitae.tex, sezione Esperienza Professionale, Capgemini S.p.A."
     },
     {
       "id": "fatture-e-pagamenti",
@@ -34,10 +29,11 @@
       "periodo": "2023 — oggi",
       "sottotitolo": "Portale self-care per la clientela business",
       "riassunto": "Archivio fatture e note di credito con ricerca e filtri avanzati, pagamenti via Request To Pay, notifiche multicanale e ticketing.",
-      "dettaglio": "Frontend **Angular** e backend **Java Spring Boot**, in esercizio su **OpenShift/Kubernetes** con pipeline CI/CD Jenkins. Il flusso di pagamento usa lo standard **Request To Pay (RTP)**.",
+      "dettaglio": "Frontend **Angular** e backend **Java Spring Boot**, in esercizio su **OpenShift/Kubernetes** con pipeline CI/CD **Jenkins**. Il flusso di pagamento usa lo standard **Request To Pay (RTP)**.",
       "tecnologie": ["Angular", "Java", "Spring Boot", "OpenShift/Kubernetes", "Jenkins"],
       "cliente": "Poste Italiane",
-      "datore": "Capgemini S.p.A."
+      "datore": "Capgemini S.p.A.",
+      "fonte": "Curriculum Vitae.tex, sezione Esperienza Professionale, Capgemini S.p.A."
     },
     {
       "id": "migrazione-gen3",
@@ -48,7 +44,8 @@
       "dettaglio": "Oltre al passaggio di runtime sono stati introdotti telemetria (**OpenTelemetry**) e **Redis**.",
       "tecnologie": ["Java 21", "Spring Boot 3.4", "OpenTelemetry", "Redis"],
       "cliente": "Poste Italiane",
-      "datore": "Capgemini S.p.A."
+      "datore": "Capgemini S.p.A.",
+      "fonte": "Curriculum Vitae.tex, sezione Esperienza Professionale, Capgemini S.p.A."
     },
     {
       "id": "myposte-business",
@@ -59,7 +56,8 @@
       "dettaglio": "Frontend **AngularJS** su Oracle WCS e Backend-for-Frontend in **Spring**.",
       "tecnologie": ["AngularJS", "Spring", "Oracle WebCenter Sites"],
       "cliente": "Poste Italiane",
-      "datore": "Capgemini S.p.A."
+      "datore": "Capgemini S.p.A.",
+      "fonte": "Curriculum Vitae.tex, sezione Esperienza Professionale, Capgemini S.p.A."
     },
     {
       "id": "reskin-prelogin",
@@ -70,7 +68,8 @@
       "dettaglio": "Intervento trasversale su applicativi **Angular** e **AngularJS**, con la continuità funzionale garantita su tutti.",
       "tecnologie": ["Angular", "AngularJS", "CSS"],
       "cliente": "Poste Italiane",
-      "datore": "Capgemini S.p.A."
+      "datore": "Capgemini S.p.A.",
+      "fonte": "Curriculum Vitae.tex, sezione Esperienza Professionale, Capgemini S.p.A."
     },
     {
       "id": "prenota-da-lis",
@@ -81,7 +80,8 @@
       "dettaglio": "Oltre allo sviluppo: risoluzione di issue, rientri in sicurezza/CIS e adeguamento delle certificazioni CA.",
       "tecnologie": ["AngularJS", "Webview", "Sicurezza applicativa"],
       "cliente": "Poste Italiane",
-      "datore": "Capgemini S.p.A."
+      "datore": "Capgemini S.p.A.",
+      "fonte": "Curriculum Vitae.tex, sezione Esperienza Professionale, Capgemini S.p.A."
     },
     {
       "id": "successioni",
@@ -89,12 +89,11 @@
       "periodo": "2022 — 2023",
       "sottotitolo": "Gestione successioni bancarie su Italia, Germania e Austria",
       "riassunto": "Gestione del RUN e sviluppo evolutivo dell'applicativo su tre ambienti nazionali.",
-      "dettaglio": "Backend **Java/Spring**, frontend **JSP/JSF**; troubleshooting con ServiceNow e Splunk.",
+      "dettaglio": "Backend **Java/Spring**, frontend **JSP/JSF**; troubleshooting con **ServiceNow** e **Splunk**. Partner di progetto: **Engineering Ingegneria Informatica**.",
       "tecnologie": ["Java", "Spring", "JSP", "JSF", "ServiceNow", "Splunk"],
       "cliente": "Unicredit",
       "datore": "Itconsulting S.r.l.",
-      "stato": "in_attesa_committente",
-      "nota": "il CV indica come partner Engineering Ingegneria Informatica, il profilo LinkedIn indica IBM: serve la conferma di quale sia corretto"
+      "fonte": "Curriculum Vitae.tex, sezione Esperienza Professionale, Itconsulting S.r.l. (il profilo LinkedIn indica IBM come partner: prevale la fonte primaria)"
     },
     {
       "id": "monnalisa",
@@ -102,41 +101,29 @@
       "periodo": "2022 — 2023",
       "sottotitolo": "Applicativo proprietario di gestione magazzini",
       "riassunto": "Sviluppo e testing dell'applicativo di gestione magazzini per la divisione francese del cliente.",
-      "dettaglio": "**Java/Spring** e **SQL**, test con **JUnit**, metodologia Agile. Partner di progetto: E.M.M. Informatica.",
+      "dettaglio": "**Java/Spring** e **SQL**, test con **JUnit**, metodologia Agile. Partner di progetto: **E.M.M. Informatica**.",
       "tecnologie": ["Java", "Spring", "SQL", "JUnit"],
       "cliente": "AmerisourceBergen",
-      "datore": "Itconsulting S.r.l."
+      "datore": "Itconsulting S.r.l.",
+      "fonte": "Curriculum Vitae.tex, sezione Esperienza Professionale, Itconsulting S.r.l."
     },
     {
       "id": "hydra",
       "titolo": "HYDRA",
       "periodo": "2022 — 2023",
       "sottotitolo": "Sistema automatizzato per l'erogazione di acqua",
-      "riassunto": "Progetto formativo interno: sistema automatizzato per l'erogazione di acqua.",
+      "riassunto": "Progetto formativo: sistema automatizzato per l'erogazione di acqua.",
       "dettaglio": "Backend **Python** (Django/Flask), frontend **Angular/TypeScript**.",
       "tecnologie": ["Python", "Django", "Flask", "Angular", "TypeScript"],
       "cliente": null,
-      "datore": "Itconsulting S.r.l."
-    },
-    {
-      "id": "tesi-cybersicurezza",
-      "titolo": "L'era dell'IA nella battaglia per la cybersicurezza",
-      "periodo": "2024",
-      "sottotitolo": "Tesi di laurea triennale",
-      "riassunto": "Tesi di laurea in Ingegneria Informatica sull'impatto dell'intelligenza artificiale nella cybersicurezza.",
-      "dettaglio": null,
-      "tecnologie": [],
-      "cliente": null,
-      "datore": "Universitas Mercatorum",
-      "stato": "in_attesa_committente",
-      "nota": "del lavoro di tesi è noto il solo titolo: servono abstract e risultati se la voce deve comparire fra i progetti"
+      "datore": "Itconsulting S.r.l.",
+      "fonte": "Curriculum Vitae.tex, sezione Esperienza Professionale, Itconsulting S.r.l."
     }
   ],
   "stanza": {
     "chiave": "progetti",
     "ancoraMonolite": "02",
     "presentazione": "griglia-schede",
-    "elementi": [],
-    "stato": "da_progettare"
+    "elementi": []
   }
 }

@@ -3,24 +3,52 @@
   "chiave": "obiettivi",
   "titolo": "Obiettivi",
   "icona": "bersaglio",
-  "copertura": 0.25,
+  "copertura": 1,
   "incisione": {
     "titolo": "OBIETTIVI",
-    "parolechiave": ["Crescita", "Libertà", "Progetti significativi", "Un futuro migliore"],
-    "fonte": "inquadratura di riferimento",
-    "stato": "in_attesa_committente",
-    "nota": "quattro voci provvisorie dall'inquadratura di riferimento: nessuna delle due fonti contiene obiettivi personali dichiarati"
+    "parolechiave": ["Crescita", "Autonomia tecnica", "AI engineering", "Progetti significativi"],
+    "fonte": "E-DECISIONI25, quattro voci derivate dalla chiusura del profilo LinkedIn - Profilo Ottimizzato.md"
   },
   "timeline": [
     {
-      "id": "ruolo-target",
-      "titolo": "Ruolo che sto cercando",
+      "id": "crescita",
+      "titolo": "Crescita",
       "periodo": "oggi",
       "sottotitolo": "Software / Full Stack Engineer, stack Java/Spring e Angular",
       "riassunto": "Aperto a nuove opportunità come Software/Full Stack Engineer su stack Java/Spring e Angular, in contesti cloud-native.",
-      "dettaglio": "Interesse particolare per i ruoli che integrano strumenti di AI engineering nello sviluppo quotidiano.",
-      "tecnologie": ["Java", "Spring Boot", "Angular", "Kubernetes"],
-      "fonte": "LinkedIn - Profilo Ottimizzato.md, chiusura della sezione About"
+      "dettaglio": "Il posizionamento è quello su cui è costruito il profilo: **Full Stack Engineer enterprise** (Java, Spring Boot, Angular, cloud-native) come nucleo, con l'**AI-augmented engineering** come elemento distintivo.",
+      "tecnologie": ["Java", "Spring Boot", "Angular", "OpenShift/Kubernetes"],
+      "fonte": "LinkedIn - Profilo Ottimizzato.md, chiusura della sezione Informazioni/About e riga di posizionamento"
+    },
+    {
+      "id": "autonomia-tecnica",
+      "titolo": "Autonomia tecnica",
+      "periodo": "oggi",
+      "sottotitolo": "Più margine di decisione su backend e frontend",
+      "riassunto": "Maggiore autonomia tecnica sugli sviluppi backend e frontend, dentro il progetto e sulle scelte di architettura.",
+      "dettaglio": "È la direzione che il profilo dichiara per il percorso in corso, dopo gli anni sul progetto Poste Italiane.",
+      "tecnologie": [],
+      "fonte": "LinkedIn - Profilo Ottimizzato.md, sezione Esperienze, ruolo in Capgemini S.p.A."
+    },
+    {
+      "id": "ai-engineering",
+      "titolo": "AI engineering",
+      "periodo": "oggi",
+      "sottotitolo": "Strumenti di AI integrati nello sviluppo, non accanto",
+      "riassunto": "Interesse particolare per i ruoli che integrano l'uso di strumenti AI nello sviluppo quotidiano.",
+      "dettaglio": "Le competenze raccolte — 11 certificazioni **Anthropic Academy** su **Claude Code**, orchestrazione multi-agente, **MCP** e prompt/context engineering — sono già applicate per velocizzare sviluppo, code review e documentazione nei progetti enterprise.",
+      "tecnologie": ["Claude Code", "MCP", "Prompt & context engineering"],
+      "fonte": "LinkedIn - Profilo Ottimizzato.md, sezione Informazioni/About e sua chiusura"
+    },
+    {
+      "id": "progetti-significativi",
+      "titolo": "Progetti significativi",
+      "periodo": "oggi",
+      "sottotitolo": "Applicazioni enterprise con utenti veri",
+      "riassunto": "Continuare a lavorare su applicazioni enterprise con un bacino d'utenza reale, come quelle dei quattro anni passati.",
+      "dettaglio": "Il percorso finora è tutto su quel terreno: **Poste Italiane**, **Unicredit**, **AmerisourceBergen**.",
+      "tecnologie": [],
+      "fonte": "Curriculum Vitae.tex, profilo; LinkedIn - Profilo Ottimizzato.md, sezione Informazioni/About"
     },
     {
       "id": "modalita-lavoro",
@@ -30,25 +58,13 @@
       "riassunto": "Preferenza dichiarata per modalità ibrida e da remoto, con base a Napoli.",
       "dettaglio": null,
       "tecnologie": [],
-      "fonte": "LinkedIn - Profilo Ottimizzato.md, preferenze Open To Work"
-    },
-    {
-      "id": "obiettivi-questionario",
-      "titolo": "Obiettivi personali",
-      "periodo": null,
-      "sottotitolo": null,
-      "riassunto": null,
-      "dettaglio": null,
-      "tecnologie": [],
-      "stato": "in_attesa_committente",
-      "nota": "il monolite espone quattro obiettivi con il relativo racconto: le fonti coprono solo la ricerca di ruolo, il resto va raccolto dal committente"
+      "fonte": "LinkedIn - Profilo Ottimizzato.md, preferenze Open To Work e riga di posizionamento (mercato target)"
     }
   ],
   "stanza": {
     "chiave": "obiettivi",
     "ancoraMonolite": "05",
     "presentazione": "anello-luminoso",
-    "elementi": [],
-    "stato": "da_progettare"
+    "elementi": []
   }
 }

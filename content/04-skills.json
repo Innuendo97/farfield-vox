@@ -3,13 +3,11 @@
   "chiave": "skills",
   "titolo": "Skills",
   "icona": "valigetta",
-  "copertura": 0.95,
+  "copertura": 1,
   "incisione": {
     "titolo": "SKILLS",
-    "parolechiave": ["Code", "Design", "Problem Solving", "Teamwork", "Continuous Learning"],
-    "fonte": "inquadratura di riferimento",
-    "stato": "in_attesa_committente",
-    "nota": "l'incisione mostra cinque voci, il CV ne elenca otto categorie: serve la scelta delle cinque da incidere, oppure la conferma delle parole di riferimento"
+    "parolechiave": ["Java & Spring", "Angular", "Cloud & DevOps", "Database", "AI & Tooling"],
+    "fonte": "E-DECISIONI25, cinque categorie scelte fra le righe delle Competenze Tecniche del Curriculum Vitae.tex"
   },
   "timeline": [
     {
@@ -19,7 +17,8 @@
       "sottotitolo": null,
       "riassunto": "Java (8/21), Groovy, JavaScript/TypeScript, Python, SQL",
       "dettaglio": null,
-      "tecnologie": ["Java 8", "Java 21", "Groovy", "JavaScript", "TypeScript", "Python", "SQL"]
+      "tecnologie": ["Java 8", "Java 21", "Groovy", "JavaScript", "TypeScript", "Python", "SQL"],
+      "fonte": "Curriculum Vitae.tex, Competenze Tecniche, riga «Linguaggi»"
     },
     {
       "id": "backend",
@@ -28,7 +27,8 @@
       "sottotitolo": null,
       "riassunto": "Spring, Spring Boot, JSP/JSF, Django, Flask, REST API",
       "dettaglio": null,
-      "tecnologie": ["Spring", "Spring Boot", "JSP", "JSF", "Django", "Flask", "REST API"]
+      "tecnologie": ["Spring", "Spring Boot", "JSP", "JSF", "Django", "Flask", "REST API"],
+      "fonte": "Curriculum Vitae.tex, Competenze Tecniche, riga «Backend»"
     },
     {
       "id": "frontend",
@@ -37,7 +37,8 @@
       "sottotitolo": null,
       "riassunto": "Angular, AngularJS, HTML5, CSS, Bootstrap",
       "dettaglio": null,
-      "tecnologie": ["Angular", "AngularJS", "HTML5", "CSS", "Bootstrap"]
+      "tecnologie": ["Angular", "AngularJS", "HTML5", "CSS", "Bootstrap"],
+      "fonte": "Curriculum Vitae.tex, Competenze Tecniche, riga «Frontend»"
     },
     {
       "id": "cms",
@@ -46,7 +47,8 @@
       "sottotitolo": null,
       "riassunto": "Oracle WebCenter Sites (WCS)",
       "dettaglio": null,
-      "tecnologie": ["Oracle WebCenter Sites"]
+      "tecnologie": ["Oracle WebCenter Sites"],
+      "fonte": "Curriculum Vitae.tex, Competenze Tecniche, riga «CMS»"
     },
     {
       "id": "cloud-devops",
@@ -55,7 +57,8 @@
       "sottotitolo": null,
       "riassunto": "RedHat OpenShift / Kubernetes, Jenkins (CI/CD), Azure, Maven, Git, SVN",
       "dettaglio": null,
-      "tecnologie": ["RedHat OpenShift", "Kubernetes", "Jenkins", "Azure", "Maven", "Git", "SVN"]
+      "tecnologie": ["RedHat OpenShift", "Kubernetes", "Jenkins", "Azure", "Maven", "Git", "SVN"],
+      "fonte": "Curriculum Vitae.tex, Competenze Tecniche, riga «Cloud & DevOps»"
     },
     {
       "id": "database",
@@ -64,7 +67,8 @@
       "sottotitolo": null,
       "riassunto": "Oracle, MongoDB",
       "dettaglio": null,
-      "tecnologie": ["Oracle", "MongoDB"]
+      "tecnologie": ["Oracle", "MongoDB"],
+      "fonte": "Curriculum Vitae.tex, Competenze Tecniche, riga «Database»"
     },
     {
       "id": "ai-tooling",
@@ -73,9 +77,8 @@
       "sottotitolo": null,
       "riassunto": "Claude Code avanzato (skill/plugin, MCP server, multi-agent orchestration, memory, Artifacts) — 11 cert. Anthropic Academy; prompt & context engineering; OpenAI Codex; Google Gemini; modelli open-source (Kimi, Qwen, DeepSeek); Figma",
       "dettaglio": null,
-      "tecnologie": [],
-      "fonte": "Curriculum Vitae.tex, riga «AI & Tooling» delle Competenze Tecniche",
-      "nota": "riga riportata fedele al CV su indicazione del committente"
+      "tecnologie": ["Claude Code", "MCP", "Prompt & context engineering", "OpenAI Codex", "Google Gemini", "Kimi", "Qwen", "DeepSeek", "Figma"],
+      "fonte": "Curriculum Vitae.tex, Competenze Tecniche, riga «AI & Tooling» (riportata alla lettera)"
     },
     {
       "id": "metodologie",
@@ -84,7 +87,8 @@
       "sottotitolo": null,
       "riassunto": "Agile/Scrum, Waterfall, Jira, Confluence",
       "dettaglio": null,
-      "tecnologie": ["Agile", "Scrum", "Waterfall", "Jira", "Confluence"]
+      "tecnologie": ["Agile", "Scrum", "Waterfall", "Jira", "Confluence"],
+      "fonte": "Curriculum Vitae.tex, Competenze Tecniche, riga «Metodologie»"
     },
     {
       "id": "lingue",
@@ -93,56 +97,64 @@
       "sottotitolo": null,
       "riassunto": "Italiano (madrelingua) · Inglese (B1/B2)",
       "dettaglio": null,
-      "tecnologie": []
+      "tecnologie": [],
+      "fonte": "Curriculum Vitae.tex, Competenze Tecniche, riga «Lingue»"
+    },
+    {
+      "id": "cert-anthropic",
+      "titolo": "Certificazioni Anthropic",
+      "periodo": null,
+      "sottotitolo": "11 certificati — Anthropic Academy",
+      "riassunto": "Undici certificati su assistenti di sviluppo, API, MCP, skill e orchestrazione multi-agente.",
+      "dettaglio": "- Claude 101\n- AI Fluency: Framework & Foundations\n- AI Capabilities & Limitations\n- Building with the Claude API\n- Intro to MCP\n- MCP: Advanced Topics\n- Agent Skills\n- Claude Code 101\n- Claude Code in Action\n- Intro to Claude Cowork\n- Intro to Subagents",
+      "tecnologie": [],
+      "fonte": "Curriculum Vitae.tex, sezione Certificazioni, riga «Anthropic»"
+    },
+    {
+      "id": "cert-udemy",
+      "titolo": "Certificazioni Udemy",
+      "periodo": null,
+      "sottotitolo": "10 certificati — Udemy",
+      "riassunto": "Dieci corsi fra machine learning, sviluppo web, cloud Azure, containerizzazione e Go.",
+      "dettaglio": "- Machine Learning: il corso completo\n- Mastering ML within AI\n- Impara a utilizzare l'IA\n- Claude – Master Claude Cowork\n- Claude Code: Skills & Plugins\n- Django, Python e Bootstrap\n- Go (Golang) da Zero\n- AZ-900: Azure Fundamentals\n- AZ-204: Developing Solutions for Azure\n- Docker Per Comuni Mortali",
+      "tecnologie": [],
+      "fonte": "Curriculum Vitae.tex, sezione Certificazioni, riga «Udemy»"
+    },
+    {
+      "id": "cert-mongodb",
+      "titolo": "Certificazioni MongoDB",
+      "periodo": null,
+      "sottotitolo": "1 certificato — MongoDB Inc.",
+      "riassunto": "Certificazione da architetto sul motore documentale.",
+      "dettaglio": "- SI Architect Certification",
+      "tecnologie": [],
+      "fonte": "Curriculum Vitae.tex, sezione Certificazioni, riga «MongoDB Inc.»"
+    },
+    {
+      "id": "cert-cisco",
+      "titolo": "Certificazioni Cisco",
+      "periodo": null,
+      "sottotitolo": "2 certificati — Cisco Systems",
+      "riassunto": "Networking e fondamenti dei sistemi.",
+      "dettaglio": "- CCNA Routing and Switching\n- IT Essentials",
+      "tecnologie": [],
+      "fonte": "Curriculum Vitae.tex, sezione Certificazioni, riga «Cisco Systems»"
     }
   ],
   "certificazioni": {
     "totale": 24,
-    "stato": "in_attesa_committente",
-    "nota": "il conteggio complessivo va confermato: sommando le righe del CV si arriva a 24 certificati, mentre altrove ne sono stati indicati 27",
+    "fonte": "Curriculum Vitae.tex, sezione Certificazioni: i nomi per esteso stanno nelle quattro voci della timeline, uno per ente, e non sono ripetuti qui",
     "gruppi": [
-      {
-        "id": "udemy",
-        "ente": "Udemy",
-        "voci": [
-          "Machine Learning: il corso completo",
-          "Mastering ML within AI",
-          "Impara a utilizzare l'IA",
-          "Django, Python e Bootstrap",
-          "Go (Golang) da Zero",
-          "AZ-900: Azure Fundamentals",
-          "AZ-204: Developing Solutions for Azure",
-          "Docker Per Comuni Mortali"
-        ],
-        "vociOmesse": 2,
-        "stato": "in_attesa_committente",
-        "nota": "due corsi riguardano gli strumenti citati nella riga skills «AI & Tooling»: il titolo esteso è riportato solo lì, in attesa di conferma su come pubblicarli"
-      },
-      {
-        "id": "academy-ai",
-        "ente": null,
-        "voci": [],
-        "conteggio": 11,
-        "stato": "in_attesa_committente",
-        "nota": "undici certificati dell'academy citata nella riga skills «AI & Tooling»; l'elenco per titolo resta in quella riga, in attesa di conferma su come pubblicarlo"
-      },
-      {
-        "id": "mongodb",
-        "ente": "MongoDB Inc.",
-        "voci": ["SI Architect Certification"]
-      },
-      {
-        "id": "cisco",
-        "ente": "Cisco Systems",
-        "voci": ["CCNA Routing and Switching", "IT Essentials"]
-      }
+      { "id": "anthropic", "ente": "Anthropic", "conteggio": 11, "voce": "cert-anthropic" },
+      { "id": "udemy", "ente": "Udemy", "conteggio": 10, "voce": "cert-udemy" },
+      { "id": "mongodb", "ente": "MongoDB Inc.", "conteggio": 1, "voce": "cert-mongodb" },
+      { "id": "cisco", "ente": "Cisco Systems", "conteggio": 2, "voce": "cert-cisco" }
     ]
   },
   "stanza": {
     "chiave": "skills",
     "ancoraMonolite": "04",
     "presentazione": "griglia-categorie",
-    "elementi": [],
-    "stato": "da_progettare"
+    "elementi": []
   }
 }

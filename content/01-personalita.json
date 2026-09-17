@@ -3,55 +3,73 @@
   "chiave": "personalita",
   "titolo": "Personalità",
   "icona": "lampadina",
-  "copertura": 0.15,
+  "copertura": 1,
   "incisione": {
     "titolo": "PERSONALITÀ",
-    "parolechiave": ["Curioso", "Resiliente", "Creativo", "Empatico", "Determinato"],
-    "fonte": "inquadratura di riferimento",
-    "stato": "in_attesa_committente",
-    "nota": "cinque parole provvisorie riprese dall'inquadratura di riferimento: il CV non contiene tratti personali, servono le parole scelte dal committente"
+    "parolechiave": ["Curioso", "Resiliente", "Disciplinato", "Determinato", "Lucido sotto pressione"],
+    "fonte": "E-DECISIONI25, cinque tratti derivati dal Curriculum Vitae.tex (Esperienza Militare, Formazione, Certificazioni, riga «AI & Tooling»)"
   },
   "timeline": [
     {
-      "id": "pressione",
+      "id": "curioso",
       "tipo": "tratto",
-      "titolo": "Lucidità sotto pressione",
-      "periodo": "2021 — 2022",
-      "sottotitolo": "Sala operativa, emergenze marittime",
-      "riassunto": "Un anno di comunicazioni operative in contesti time-critical e ad alto stress.",
-      "dettaglio": "Operatore in sala operativa per il coordinamento di emergenze marittime via radio e linea 1530. È l'esperienza che ha rafforzato disciplina, resilienza e capacità decisionale sotto pressione.",
+      "titolo": "Curioso",
+      "periodo": null,
+      "sottotitolo": "Ventiquattro certificati, su quattro terreni diversi",
+      "riassunto": "Machine learning, sviluppo su cloud, containerizzazione, networking, database e strumenti di AI engineering: i titoli raccolti non stanno tutti sullo stesso mestiere.",
+      "dettaglio": "L'elenco per intero sta in **Skills**. La riga *AI & Tooling* del curriculum è la più recente di questo percorso: **Claude Code** avanzato (skill e plugin, server MCP, orchestrazione multi-agente, memory, Artifacts), prompt e context engineering, **OpenAI Codex**, **Google Gemini**, modelli open-source (**Kimi**, **Qwen**, **DeepSeek**) e **Figma**.",
       "tecnologie": [],
+      "fonte": "Curriculum Vitae.tex, sezioni Certificazioni e Competenze Tecniche (riga «AI & Tooling»)"
+    },
+    {
+      "id": "resiliente",
+      "tipo": "tratto",
+      "titolo": "Resiliente",
+      "periodo": "2021 — 2024",
+      "sottotitolo": "La laurea presa mentre il resto correva",
+      "riassunto": "Gli anni della Laurea Triennale in Ingegneria Informatica, 2021 — 2024, si sovrappongono per intero al servizio in Marina Militare e ai due impieghi da sviluppatore.",
+      "dettaglio": "Nessuna pausa fra le tre cose: il servizio a Imperia fino a febbraio 2022, l'ingresso in Itconsulting lo stesso mese, il passaggio in Capgemini a maggio 2023, la discussione della tesi nel 2024.",
+      "tecnologie": [],
+      "fonte": "Curriculum Vitae.tex, sezioni Formazione, Esperienza Professionale ed Esperienza Militare"
+    },
+    {
+      "id": "disciplinato",
+      "tipo": "tratto",
+      "titolo": "Disciplinato",
+      "periodo": "2021 — 2022",
+      "sottotitolo": "Scuola Sottufficiali di La Maddalena",
+      "riassunto": "La formazione militare prima del servizio, e poi il lavoro su procedure e sistemi che non ammettono improvvisazione.",
+      "dettaglio": "Formato presso la **Scuola Sottufficiali di La Maddalena**; in servizio, uso quotidiano dei sistemi informativi governativi **Pelagus**, **PMIS**, **SSN**, **Giano** e **Folium**, e coordinamento interfunzionale con Capitanerie di Porto e unità navali.\n\nÈ l'esperienza che, nelle parole del profilo, ha rafforzato disciplina, resilienza e capacità decisionale sotto pressione — qualità portate quotidianamente nello sviluppo software.",
+      "tecnologie": ["Pelagus", "PMIS", "SSN", "Giano", "Folium"],
       "fonte": "Curriculum Vitae.tex, sezione Esperienza Militare; LinkedIn - Profilo Ottimizzato.md, esperienza Marina Militare"
     },
     {
-      "id": "apprendimento",
+      "id": "determinato",
       "tipo": "tratto",
-      "titolo": "Apprendimento continuo",
+      "titolo": "Determinato",
       "periodo": null,
-      "sottotitolo": "Certificazioni e laurea",
-      "riassunto": "Ventiquattro certificati fra piattaforme di formazione e vendor tecnologici, accanto alla laurea triennale in Ingegneria Informatica.",
-      "dettaglio": "I titoli coprono machine learning, sviluppo su cloud, containerizzazione, networking e database. Gli anni della laurea, 2021 — 2024, si sovrappongono per intero al servizio in Marina Militare e ai due impieghi da sviluppatore.",
+      "sottotitolo": "Dal diploma al software enterprise",
+      "riassunto": "Diploma di perito informatico, il servizio in Guardia Costiera, poi lo sviluppo: Itconsulting, e da maggio 2023 Capgemini sul progetto Poste Italiane.",
+      "dettaglio": "Oltre quattro anni di sviluppo e manutenzione di applicativi enterprise per grandi clienti — **Poste Italiane**, **Unicredit**, **AmerisourceBergen** — e sei filoni di lavoro paralleli sul solo incarico in corso, dal CMS al backend cloud-native.",
       "tecnologie": [],
-      "fonte": "Curriculum Vitae.tex, sezioni Certificazioni e Formazione"
+      "fonte": "Curriculum Vitae.tex, profilo e sezioni Esperienza Professionale, Esperienza Militare e Formazione"
     },
     {
-      "id": "tratti-questionario",
+      "id": "lucido-sotto-pressione",
       "tipo": "tratto",
-      "titolo": "In aggiornamento",
-      "periodo": null,
-      "sottotitolo": null,
-      "riassunto": null,
-      "dettaglio": null,
+      "titolo": "Lucido sotto pressione",
+      "periodo": "2021 — 2022",
+      "sottotitolo": "Sala operativa, emergenze marittime",
+      "riassunto": "Operatore in sala operativa per il coordinamento di emergenze marittime via radio e linea 1530.",
+      "dettaglio": "Gestione di comunicazioni operative in contesti **time-critical** e ad alto stress, con il coordinamento interfunzionale che ne segue: Capitanerie di Porto e unità navali.",
       "tecnologie": [],
-      "stato": "in_attesa_committente",
-      "nota": "il monolite espone cinque tratti con relativo racconto: nessuna delle due fonti li contiene, vanno raccolti dal committente"
+      "fonte": "Curriculum Vitae.tex, sezione Esperienza Militare"
     }
   ],
   "stanza": {
     "chiave": "personalita",
     "ancoraMonolite": "01",
     "presentazione": "timeline-verticale",
-    "elementi": [],
-    "stato": "da_progettare"
+    "elementi": []
   }
 }

@@ -3,12 +3,11 @@
   "chiave": "contatti",
   "titolo": "Contatti",
   "icona": "busta",
-  "copertura": 0.9,
+  "copertura": 1,
   "incisione": {
     "titolo": "CONTATTI",
     "parolechiave": ["Email", "LinkedIn", "GitHub"],
-    "fonte": "Curriculum Vitae.tex, intestazione, per email e LinkedIn",
-    "nota": "il monolite sta alle spalle dello spawn, fuori dall'inquadratura di riferimento: l'incisione non ha un modello da replicare. La terza voce dipende dalla conferma dell'indirizzo GitHub"
+    "fonte": "Curriculum Vitae.tex, intestazione, per email e LinkedIn; E-DECISIONI25 per GitHub"
   },
   "timeline": [
     {
@@ -42,21 +41,19 @@
       "dettaglio": null,
       "tecnologie": [],
       "url": "https://github.com/Innuendo97",
-      "stato": "in_attesa_committente",
-      "nota": "l'indirizzo non compare in nessuna delle due fonti: va confermato prima della pubblicazione"
+      "fonte": "E-DECISIONI25, identità git del committente: l'indirizzo non compare nel curriculum"
     }
   ],
   "privacy": {
     "telefono": "escluso",
-    "nota": "il numero di telefono presente nel CV non compare in nessun file di contenuto né sul sito, per scelta esplicita del committente",
+    "nota": "il numero di telefono presente nel curriculum non compare in nessun file di contenuto né sul sito, per scelta esplicita del committente",
     "gdpr": "Autorizzo il trattamento dei miei dati personali ai sensi del Reg. UE 2016/679 (GDPR) e del D.Lgs. 196/2003.",
-    "fonte": "Curriculum Vitae.tex, chiusura del documento"
+    "fonte": "Curriculum Vitae.tex, chiusura del documento; E-DECISIONI25 per l'esclusione del telefono"
   },
   "stanza": {
     "chiave": "contatti",
     "ancoraMonolite": "06",
     "presentazione": "elenco-canali",
-    "elementi": [],
-    "stato": "da_progettare"
+    "elementi": []
   }
 }
