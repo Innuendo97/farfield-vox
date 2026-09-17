@@ -2,6 +2,14 @@ import {
   GAP, INK_CLEAR, INK_REACH, INK_STANDOFF, INK_THICKNESS, STAND,
 } from '../../src/world/voxel/pure.js';
 import { cameraSolids } from '../../src/world/contracts.js';
+// THE THREE SHARES ARE IMPORTED AND NOT READ OUT OF THE SOURCE WITH A REGULAR
+// EXPRESSION, which is E-GUARDIA4's own rule: cure at the VALUE where a value
+// can be reached. src/world/engraving.js does import three, and three imports
+// under plain node -- tools/guards/lib/popolazioni.mjs has been loading this
+// world's meshes that way all along. What is still read as TEXT below is
+// SHAPE and not a number: whether the mesher cuts flanks in four directions at
+// all, which is not a value anybody can import.
+import { INK_FACE } from '../../src/world/engraving.js';
 import { MONOLITHS } from '../../src/world/layout.js';
 import { read, reporter, selfTest } from './lib.mjs';
 
@@ -107,12 +115,6 @@ const BAND = {
   seiBites: 0.06,
 };
 
-/** The three shares engrave() gives the faces of a body. */
-function inkFace(source) {
-  const found = source.match(/INK_FACE = \{\s*front:\s*([0-9.]+),\s*side:\s*([0-9.]+),\s*back:\s*([0-9.]+)/);
-  return found ? { front: +found[1], side: +found[2], back: +found[3] } : null;
-}
-
 // ------------------------------------------------------- the named gates
 //
 // Each of these is ONE expression with a name, and the self test below calls
@@ -131,8 +133,7 @@ export function nothingPaintedOnTheWall(source) {
 }
 
 /** A letter has a front, four flanks and a back, and the flanks are darker. */
-export function cutAsABody(source) {
-  const face = inkFace(source);
+export function cutAsABody(face, source) {
   if (!face) return false;
   if (!(face.front === 1 && face.side < face.front * 0.4 && face.back < face.side)) return false;
   return /const runs = \[0, 1, 2, 3\]\.map\(\(dir\) => edgeRuns\(/.test(source)
@@ -167,10 +168,7 @@ if (args.includes('--self')) {
   const painted = MASONRY_SOURCE
     .replace('colour += uInkHalo * texture2D(tInk, ink).r',
       'colour += mix(uInkHalo, uInkCore, q) * texture2D(tInk, ink).r');
-  const flat = ENGRAVING_SOURCE.replace(
-    /INK_FACE = \{ front: 1\.0, side: [0-9.]+, back: [0-9.]+ \}/,
-    'INK_FACE = { front: 1.0, side: 1.0, back: 1.0 }',
-  );
+  const flat = { front: 1.0, side: 1.0, back: 1.0 };
   const noFlanks = ENGRAVING_SOURCE.replace(
     'const runs = [0, 1, 2, 3].map((dir) => edgeRuns(',
     'const runs = [].map((dir) => edgeRuns(',
@@ -200,15 +198,15 @@ if (args.includes('--self')) {
     },
     {
       what: 'a body whose flanks burn at the core\'s level is caught -- it is a bolder letter, not a thicker one',
-      caught: !cutAsABody(flat),
+      caught: !cutAsABody(flat, ENGRAVING_SOURCE),
     },
     {
       what: 'a body cut with no flanks at all is caught',
-      caught: !cutAsABody(noFlanks),
+      caught: !cutAsABody(INK_FACE, noFlanks),
     },
     {
       what: 'and the delivered body has a front, flanks darker than it, and a back',
-      caught: cutAsABody(ENGRAVING_SOURCE),
+      caught: cutAsABody(INK_FACE, ENGRAVING_SOURCE),
     },
     {
       what: 'a camera box that did not grow by the letters\' own reach is caught',
@@ -270,13 +268,10 @@ report.check(/INK_STANDOFF = 2 \* STAND \+ INK_CLEAR/.test(COURSES_SOURCE),
 
 // --------------------------------------------------------------- the bodies
 report.line('');
-report.check(cutAsABody(ENGRAVING_SOURCE),
+report.check(cutAsABody(INK_FACE, ENGRAVING_SOURCE),
   'every glyph, icon, rule and bar is cut as a SOLID: a front, four flanks and a back',
-  (() => {
-    const face = inkFace(ENGRAVING_SOURCE);
-    return `front at the core's own level, flanks at ${face.side}, back at ${face.back} -- `
-      + 'the flanks are the «ombra propria» and are lit as the stone they are cut from';
-  })());
+  `front at the core's own level, flanks at ${INK_FACE.side}, back at ${INK_FACE.back} -- `
+  + 'the flanks are the «ombra propria» and are lit as the stone they are cut from');
 
 report.check(nothingPaintedOnTheWall(MASONRY_SOURCE),
   'and NOTHING of the writing is painted on the stone: the wall draws the halo and the shadow',
