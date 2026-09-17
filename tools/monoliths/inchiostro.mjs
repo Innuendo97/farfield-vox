@@ -12,10 +12,13 @@
 // number for each and one that crosses them.
 //
 //   CONTRASTO   Michelson at the edge of a stroke: the stroke against the stone
-//               one pixel outside it. It is the quantity legibility actually
-//               depends on and it is scale free, so the same number can be read
-//               on a face 31 m away and on one at 3.5 m without either of them
-//               being converted into the other.
+//               just outside it. It is the quantity legibility actually depends
+//               on and it is scale free, so the same number can be read on a
+//               face 31 m away and on one at 3.5 m without either of them being
+//               converted into the other. TWO of them come back, at the edge of
+//               the stroke and at its face, and the note over the loop that
+//               takes them says why quoting one alone would be a choice rather
+//               than a measurement.
 //   PEZZI       connected pieces of ink per thousand pixels of ink. A stroke a
 //               joint has cut in two is two pieces where the composition drew
 //               one, so this rises with exactly the defect and with nothing
@@ -208,6 +211,7 @@ export function readRect(plate, rect) {
   // and putting it in the denominator would be measuring the stroke against
   // itself.
   const edges = [];
+  const cores = [];
   const levels = [];
   const blueOverRed = [];
   for (let y = 2; y < h - 2; y++) {
@@ -218,9 +222,34 @@ export function readRect(plate, rect) {
       blueOverRed.push((f.rgb[i * 3 + 2] + 1) / (f.rgb[i * 3] + 1));
       for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
         if (ink[(y + dy) * w + (x + dx)]) continue;
+        // TWO READINGS AND NOT ONE, BECAUSE THEY DISAGREE AND THE DISAGREEMENT
+        // IS THE INFORMATION.
+        //
+        // The stone is taken TWO pixels out in both: the pixel immediately
+        // beside a stroke is the antialiased edge of that stroke, and putting
+        // it in the denominator is measuring the stroke against itself.
+        //
+        // What differs is the STROKE's side. `contrast` takes the boundary
+        // pixel, which is the mandate's own «Michelson sul bordo del glifo
+        // contro la parete», and `coreContrast` takes the brightest ink within
+        // two steps inward -- the stroke's own face. On the reference and on a
+        // painted stroke the two are nearly the same pixel. On a letter that is
+        // a BODY they are not: a body has a FLANK, dark by design because it is
+        // the thickness the mandate asked for, and the boundary pixel of such a
+        // letter is that flank. So the first reading charges a body for having
+        // an edge, and the second charges it for a core level it does not set
+        // -- what the brightest pixel of a stroke comes to is the 32-cube grade
+        // and not this material (E-PIETRA2, owner E-LUCE / D5). Neither is
+        // wrong; quoting one of them alone would be.
         const outer = light[(y + 2 * dy) * w + (x + 2 * dx)];
-        const inner = light[i];
-        if (inner + outer > 1) edges.push((inner - outer) / (inner + outer));
+        const edge = light[i];
+        let core = edge;
+        for (let k = 1; k <= 2; k++) {
+          const j = (y - k * dy) * w + (x - k * dx);
+          if (ink[j] && light[j] > core) core = light[j];
+        }
+        if (edge + outer > 1) edges.push((edge - outer) / (edge + outer));
+        if (core + outer > 1) cores.push((core - outer) / (core + outer));
         break;
       }
     }
@@ -271,6 +300,7 @@ export function readRect(plate, rect) {
   return {
     ink: area,
     contrast: median(edges),
+    coreContrast: median(cores),
     edges: edges.length,
     halo: rings.map((ring) => (ring.length && strokeLevel
       ? median(ring) / strokeLevel : null)),
@@ -327,6 +357,7 @@ async function main() {
     if (r.contrast === null) { process.stdout.write(`${name}  (no ink)\n`); continue; }
     process.stdout.write(
       `${name}  ink ${String(r.ink).padStart(6)}  contrasto ${r.contrast.toFixed(3)}`
+      + `/${r.coreContrast.toFixed(3)}`
       + `  pezzi/1000 ${r.piecesPerThousand.toFixed(2)}  morsi ${(r.bites * 100).toFixed(1)}%`
       + `  luma ${r.luma.toFixed(0)}  B/R ${r.blueOverRed.toFixed(2)}\n`
       + `             alone ${r.halo.map((v) => (v === null ? '  -  ' : v.toFixed(3))).join(' ')}`

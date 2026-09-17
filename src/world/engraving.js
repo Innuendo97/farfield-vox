@@ -608,12 +608,21 @@ export const INK_FACE = { front: 1.0, side: 0.14, back: 0.05 };
  * frame would need a transform each, which is six matrices, six draw calls and
  * six of everything else. Handed back in the world they concatenate.
  *
+ * EXPORTED, AND THE REASON IS A GUARD. Everything above the threshold in this
+ * file needs a canvas and therefore a browser; from the coverage down it is
+ * arithmetic, and the census of windings, holes and sides
+ * (tools/guards/guard-avvolgimento.mjs) has to be able to cut a body under
+ * plain node and walk rays at it. A flank wound the wrong way is a hole with
+ * the wall showing through it, which is the defect the sockets of
+ * src/world/voxel/courses.js were cut for twice, and it is not a defect a
+ * screenshot finds.
+ *
  * @param {object} monolith the entry from src/world/layout.js
  * @param {Uint8Array} cover the coverage inkCoverage() painted
  * @param {object} metrics  the metrics that coverage was painted at
  * @returns {object} positions, normals, a tone per vertex, indices and a census
  */
-function cutSolids(monolith, cover, metrics) {
+export function cutSolids(monolith, cover, metrics) {
   const { width, height } = metrics;
   const cells = inkCells(cover);
 
@@ -686,6 +695,18 @@ function cutSolids(monolith, cover, metrics) {
 
   // The four flanks. Each run is a wall one cell thick standing between the two
   // depths, wound so its lit side is the side anybody can see.
+  //
+  // AND THE TWO HORIZONTAL ONES WERE WOUND INSIDE OUT, which is written here
+  // because the winding of a face taken off a basis by eye is exactly what
+  // nobody checks twice. (across, up, out) is right handed -- right x up is
+  // front -- so the cross product of a quad's first two edges has to come back
+  // along the normal it was handed, and on the top and the bottom flank it came
+  // back along the other one. 204 faces of 644 were back facing on the census
+  // bench, which means the lid and the soffit of every stroke were being culled
+  // and a letter was showing its own thickness on two sides out of four.
+  // Found by tools/guards/guard-avvolgimento.mjs, not by a screenshot: a
+  // culled face is invisible, and a face that is invisible where you were not
+  // looking is a face nobody reports.
   for (const [x, y, run] of runs[0]) {
     const a = acrossAt(x);
     const u1 = upAt(y);
@@ -702,13 +723,13 @@ function cutSolids(monolith, cover, metrics) {
     const u = upAt(y);
     const a0 = acrossAt(x);
     const a1 = acrossAt(x + run);
-    quad(up, [[a0, u, near], [a1, u, near], [a1, u, far], [a0, u, far]], INK_FACE.side);
+    quad(up, [[a0, u, far], [a1, u, far], [a1, u, near], [a0, u, near]], INK_FACE.side);
   }
   for (const [x, y, run] of runs[3]) {
     const u = upAt(y + 1);
     const a0 = acrossAt(x);
     const a1 = acrossAt(x + run);
-    quad(down, [[a0, u, far], [a1, u, far], [a1, u, near], [a0, u, near]], INK_FACE.side);
+    quad(down, [[a0, u, near], [a1, u, near], [a1, u, far], [a0, u, far]], INK_FACE.side);
   }
 
   let lit = 0;

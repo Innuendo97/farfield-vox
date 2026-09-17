@@ -139,10 +139,54 @@ export function populations(root) {
       async build() {
         const mon = await load('src/world/monoliths.js');
         const built = mon.createMonoliths();
-        return built.meshes.map((mesh, i) => ({
-          suffix: String(i), mesh: fromMesh(mesh),
-          material: mesh.material, side: sideOf(mesh.material), billboard: true,
-        }));
+        // THE WRITING IS NOT THIS POPULATION and has its own entry below. It
+        // shares this file's seat because it hangs on the same six blocks, and
+        // it arrives EMPTY: the bodies are cut from a canvas the moment a face
+        // is engraved, and there is no canvas under node. A mesh with no
+        // triangles is not a population with a defect, it is a population that
+        // has not been built yet, and censusing it is how this guard died.
+        return built.meshes
+          .filter((mesh) => mesh.geometry.index && mesh.geometry.index.count > 0)
+          .map((mesh, i) => ({
+            suffix: String(i), mesh: fromMesh(mesh),
+            material: mesh.material, side: sideOf(mesh.material), billboard: true,
+          }));
+      },
+    },
+    {
+      // THE WRITING OF THE SIX, CUT UNDER PLAIN NODE FROM A BITMAP THIS FILE
+      // DRAWS, which is the only way to census it at all: everything above the
+      // threshold in src/world/engraving.js needs a canvas, and from the
+      // coverage down it is arithmetic. What the bitmap says does not matter to
+      // the census and matters a great deal to what it EXERCISES, so it is not
+      // a rectangle: a bar, a ring with a hole in it and a diagonal, which
+      // between them give the mesher a straight flank, an inside flank and a
+      // staircase of them. A flank wound the wrong way is a letter with the
+      // wall showing through it.
+      name: 'scritta dei monoliti', owner: 'V2', closed: true, grid: 56,
+      where: 'engraving.js cutSolids / i corpi che stanno davanti alla parete',
+      async build() {
+        const { cutSolids } = await load('src/world/engraving.js');
+        const { MONOLITHS } = await load('src/world/layout.js');
+        const width = 96;
+        const height = 96;
+        const cover = new Uint8Array(width * height);
+        const at = (x, y) => { cover[y * width + x] = 255; };
+        for (let y = 8; y < 20; y++) for (let x = 8; x < 70; x++) at(x, y);
+        for (let y = 30; y < 62; y++) {
+          for (let x = 30; x < 62; x++) {
+            const dx = x - 46;
+            const dy = y - 46;
+            const r = Math.hypot(dx, dy);
+            if (r < 15 && r > 7) at(x, y);
+          }
+        }
+        for (let k = 0; k < 40; k++) for (let w = 0; w < 4; w++) at(10 + k + w, 72 + k);
+        const cut = cutSolids(MONOLITHS[0], cover, { width, height });
+        return [{
+          mesh: { positions: cut.positions, normals: cut.normals, indices: cut.indices },
+          side: 'FrontSide',
+        }];
       },
     },
     {

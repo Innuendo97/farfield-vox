@@ -60,16 +60,23 @@ const sei = args.includes('--sei') ? args[args.indexOf('--sei') + 1] : null;
 // adding a key to it would be a merge conflict over a measurement neither of
 // them disputes. Residue, with its owner: whoever integrates the two.
 const TARGET = {
-  '01-front': { contrast: 0.475, halo1: 0.307, bites: 0.278, piecesPerThousand: 16.26 },
-  '02-front': { contrast: 0.426, halo1: 0.326, bites: 0.249, piecesPerThousand: 15.13 },
-  '03-front': { contrast: 0.431, halo1: 0.345, bites: 0.286, piecesPerThousand: 13.81 },
-  '04-front': { contrast: 0.347, halo1: 0.352, bites: 0.194, piecesPerThousand: 9.68 },
-  '05-front': { contrast: 0.254, halo1: 0.482, bites: 0.202, piecesPerThousand: 6.63 },
+  '01-front': { contrast: 0.475, core: 0.603, halo1: 0.307, bites: 0.278 },
+  '02-front': { contrast: 0.426, core: 0.578, halo1: 0.326, bites: 0.249 },
+  '03-front': { contrast: 0.431, core: 0.584, halo1: 0.345, bites: 0.286 },
+  '04-front': { contrast: 0.347, core: 0.486, halo1: 0.352, bites: 0.194 },
+  '05-front': { contrast: 0.254, core: 0.428, halo1: 0.482, bites: 0.202 },
 };
 
 const BAND = {
   // How far under the target's own edge contrast a face may read. The
-  // mandate's number.
+  // mandate's number, on the mandate's own reading -- «il contrasto locale dei
+  // glifi (Michelson sul bordo del glifo contro la parete)», which is the
+  // stroke's EDGE against the stone. The estimator also hands back the same
+  // Michelson taken at the stroke's FACE, and that one is reported and not
+  // gated: what the brightest pixel of a stroke comes to is set by the 32-cube
+  // grade downstream of everything this unit owns, and E-PIETRA2 escalated it
+  // with its numbers. Gating a unit on a number whose owner is another unit is
+  // how a chapter stalls.
   contrastShare: 0.90,
   // And how much clear of the proudest block a letter has to stand, in metres.
   // Not nought: two surfaces that meet exactly are a line of depth-buffer
@@ -87,8 +94,17 @@ const BAND = {
   // framings on purpose. So what is gated is the contrast the five fronts reach
   // at thirty metres, which the same writing at a tenth of the distance may
   // certainly not fall under.
-  seiContrast: 0.25,
-  seiBites: 0.10,
+  //
+  // AND THE ONE THAT IS ACTUALLY GATED THERE IS THE BITE AND NOT THE CONTRAST,
+  // because at three and a half metres a letter's FLANK is three pixels wide
+  // and the edge reading charges the body for having one -- the delivered,
+  // cut-about writing reads 0.171 and the cured one 0.265, which is the right
+  // direction and a third of the margin the same pair shows at thirty metres.
+  // What a joint leaves is a HOLE in a stroke, and a hole is what MORSI counts:
+  // the delivered sixth block is at 8.0 per cent and the cured one at 3.5, so
+  // six is a ceiling the defect fails and the cure clears.
+  seiContrast: 0.20,
+  seiBites: 0.06,
 };
 
 /** The three shares engrave() gives the faces of a body. */
@@ -289,22 +305,31 @@ if (!plate) {
   const { measure, readPlate, readRect } = await import('../monoliths/inchiostro.mjs');
   const got = await measure(plate);
   report.line(`  the writing on ${plate}`);
-  report.line('  face         contrasto  target   floor    alone 1px  target     morsi  target');
+  report.line('  face          bordo  target   floor  |  faccia  target  |  alone  target  |  morsi');
   let worst = 1;
+  let worstCore = 1;
   for (const [name, want] of Object.entries(TARGET)) {
     const r = got[name];
     if (!r || r.contrast === null) continue;
     const floor = want.contrast * BAND.contrastShare;
     worst = Math.min(worst, r.contrast / want.contrast);
-    report.line(`  ${name.padEnd(12)}${r.contrast.toFixed(3).padStart(8)}`
-      + `${want.contrast.toFixed(3).padStart(9)}${floor.toFixed(3).padStart(8)}`
-      + `${r.halo[0].toFixed(3).padStart(11)}${want.halo1.toFixed(3).padStart(9)}`
-      + `${`${(r.bites * 100).toFixed(1)}%`.padStart(10)}${`${(want.bites * 100).toFixed(1)}%`.padStart(8)}`
+    worstCore = Math.min(worstCore, r.coreContrast / want.core);
+    report.line(`  ${name.padEnd(12)}${r.contrast.toFixed(3).padStart(7)}`
+      + `${want.contrast.toFixed(3).padStart(8)}${floor.toFixed(3).padStart(8)}  |`
+      + `${r.coreContrast.toFixed(3).padStart(8)}${want.core.toFixed(3).padStart(8)}  |`
+      + `${r.halo[0].toFixed(3).padStart(7)}${want.halo1.toFixed(3).padStart(8)}  |`
+      + `${`${(r.bites * 100).toFixed(1)}%`.padStart(7)}`
       + `${r.contrast < floor ? '   <-- under' : ''}`);
   }
   report.check(worst >= BAND.contrastShare,
     'every face reads at least nine tenths of the contrast the target reads at its own edge',
     `worst ${(worst * 100).toFixed(1)}% of the target's, band ${BAND.contrastShare * 100}%`);
+  report.note('read at the stroke\'s FACE instead of its edge -- the second pair of columns -- '
+    + `the same five faces stand at ${(worstCore * 100).toFixed(0)} to `
+    + `${(100 * Math.max(...Object.entries(TARGET).map(([n, wnt]) => (got[n] && got[n].coreContrast ? got[n].coreContrast / wnt.core : 0)))).toFixed(0)}`
+    + ' per cent of the target, against 62 to 72 for the delivered writing. That reading is NOT '
+    + 'gated and the reason is its owner: what the brightest pixel of a stroke comes to is the '
+    + '32-cube grade, which E-PIETRA2 measured, escalated and parked. Owner: E-LUCE / D5.');
   report.note('the halo is measured as the level one pixel out from a stroke against that '
     + 'stroke\'s own level, and the far end of the same profile -- fourteen pixels out, which is '
     + 'the STONE -- agrees with the target to within a hundredth on every face. What is compared '
@@ -317,11 +342,12 @@ if (!plate) {
     const near = await readPlate(sei);
     const r = readRect(near, { x0: 420, y0: 260, x1: 1180, y1: 820 });
     report.line('');
-    report.check(r.contrast >= BAND.seiContrast && r.bites <= BAND.seiBites,
+    report.check(r.bites <= BAND.seiBites && r.contrast >= BAND.seiContrast,
       'and the sixth block, at the three and a half metres the defect was reported from',
-      `contrasto ${r.contrast.toFixed(3)} (floor ${BAND.seiContrast}), `
-      + `morsi ${(r.bites * 100).toFixed(1)}% (ceiling ${BAND.seiBites * 100}%), `
-      + `${r.pieces} pieces of ink where the composition draws about thirty-one`);
+      `morsi ${(r.bites * 100).toFixed(1)}% against a ceiling of ${BAND.seiBites * 100}% `
+      + `(the delivered writing is at 8.0), contrasto ${r.contrast.toFixed(3)}/`
+      + `${r.coreContrast.toFixed(3)} against 0.171/0.306 delivered, `
+      + `${r.pieces} pieces of ink against 53`);
   } else {
     report.note('no --sei given, so the sixth block at three and a half metres was not read. It '
       + 'is the one view the committente actually reported the defect from.');
