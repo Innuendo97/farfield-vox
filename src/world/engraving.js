@@ -118,7 +118,7 @@ const GROOVE_LIGHT = 0.5;
 //
 //   target            0.307 / 0.270 / 0.272 / 0.245 / 0.232   on 01
 //   delivered         0.482 / 0.407 / 0.338 / 0.302 / 0.245
-//   0.035 at 0.20     0.351 / 0.308 / 0.265 / 0.226 / 0.238
+//   0.035 at 0.20     0.355 / 0.311 / 0.265 / 0.225 / 0.237
 //
 // The far end of all three is the STONE and agrees; what the delivered halo was
 // doing was adding half as much again to the two pixels next to every stroke,
@@ -126,7 +126,7 @@ const GROOVE_LIGHT = 0.5;
 // own sentence about the reference is that the glow is «stretto», and
 // E-DECISIONI23 threw out a wider one on E-PIETRA2's measurement before this
 // unit was dispatched. The Michelson contrast at the edge of a stroke follows:
-// pooled over the five fronts it goes 0.249 delivered, 0.434 at 0.20, against
+// pooled over the five fronts it goes 0.249 delivered, 0.430 at 0.20, against
 // the reference's 0.387.
 const HALO = 0.035;
 const HALO_ALPHA = 0.20;
