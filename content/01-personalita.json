@@ -15,7 +15,7 @@
       "tipo": "tratto",
       "titolo": "Curioso",
       "periodo": null,
-      "sottotitolo": "Ventiquattro certificati, su quattro terreni diversi",
+      "sottotitolo": "Ventiquattro certificati, su terreni diversi",
       "riassunto": "Machine learning, sviluppo su cloud, containerizzazione, networking, database e strumenti di AI engineering: i titoli raccolti non stanno tutti sullo stesso mestiere.",
       "dettaglio": "L'elenco per intero sta in **Skills**. La riga *AI & Tooling* del curriculum è la più recente di questo percorso: **Claude Code** avanzato (skill e plugin, server MCP, orchestrazione multi-agente, memory, Artifacts), prompt e context engineering, **OpenAI Codex**, **Google Gemini**, modelli open-source (**Kimi**, **Qwen**, **DeepSeek**) e **Figma**.",
       "tecnologie": [],
@@ -50,7 +50,7 @@
       "periodo": null,
       "sottotitolo": "Dal diploma al software enterprise",
       "riassunto": "Diploma di perito informatico, il servizio in Guardia Costiera, poi lo sviluppo: Itconsulting, e da maggio 2023 Capgemini sul progetto Poste Italiane.",
-      "dettaglio": "Oltre quattro anni di sviluppo e manutenzione di applicativi enterprise per grandi clienti — **Poste Italiane**, **Unicredit**, **AmerisourceBergen** — e sei filoni di lavoro paralleli sul solo incarico in corso, dal CMS al backend cloud-native.",
+      "dettaglio": "Oltre quattro anni di sviluppo e manutenzione di applicativi enterprise per grandi clienti — **Poste Italiane**, **Unicredit**, **AmerisourceBergen** — e sei filoni di lavoro sul solo incarico in corso, dal CMS al backend cloud-native.",
       "tecnologie": [],
       "fonte": "Curriculum Vitae.tex, profilo e sezioni Esperienza Professionale, Esperienza Militare e Formazione"
     },
