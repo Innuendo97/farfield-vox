@@ -111,3 +111,10 @@ npm-debug.log*
 
 # bytecode di Python: lo scrive chi importa tools/lighting/sun.py
 __pycache__/
+
+# il materiale della lavorazione condiviso con il committente: affiancati,
+# ricerche e verbali si leggono sul posto, non si spediscono.
+/per-il-committente/
+/finestra-luce/
+/fondazione/
+/.scratch/
