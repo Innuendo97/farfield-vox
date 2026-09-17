@@ -17,7 +17,7 @@ import {
 // e' il disco su un altopiano» -- and no longer of a tier, so the floor reads
 // it from the seat that states it instead of being told a radius by a layer.
 import { PLATEAU } from './voxel/confine.js';
-import { CHAMFER, STAND } from './voxel/pure.js';
+import { CHAMFER, INK_REACH, STAND } from './voxel/pure.js';
 import MASONRY from '../../assets-src/monoliths/masonry-spec.json' with { type: 'json' };
 import { builtStoneAt, stoneSpecs } from './stone.js';
 
@@ -778,10 +778,20 @@ let flowers = null;
  * soffits and the floors of the sockets are all behind this face. The stair and
  * the platform are not grown: they are not laid as volumes, and
  * src/world/stone.js says why.
+ *
+ * AND THE WRITING STANDS FURTHER OUT THAN THE STONE DOES, which is the second
+ * time this sentence has had to be corrected and for the same reason: something
+ * the frame draws moved outside the box, and this file may not quietly become a
+ * different answer from the one the frame draws. The letters are BODIES now
+ * (src/world/voxel/courses.js, INK_REACH) standing clear of the proudest block
+ * and three centimetres thick on top of that, so the reach is the larger of the
+ * two and not the stone's alone. It is asked of the file that states it rather
+ * than added up here: a standoff and a thickness summed in two places is how a
+ * near plane ends up inside a letter.
  */
 export function cameraSolids() {
   const out = [];
-  const proud = 2 * STAND;
+  const proud = Math.max(2 * STAND, INK_REACH);
   const crest = STAND > 0 ? MASONRY.course.rise : 0;
   for (const m of MONOLITHS) {
     const [w, h, d] = m.size;
