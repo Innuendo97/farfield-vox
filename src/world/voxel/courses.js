@@ -184,6 +184,41 @@ export const HOLE = 0.19;
 // src/world/voxel/masonry.js.
 export const DRESS = 0.036;
 
+// HOW FAR OFF THE WALL THE WRITING STANDS, AND IT IS THE WALL THAT SETS IT.
+//
+// The writing is not painted on this stone any more. The committente's reading
+// of it was that «il testo e i simboli dei monoliti soffrono le linee scure
+// dove i cubi si separano», and it was exact: an engraving projected onto a
+// wall of boxes is sampled on the reveals and the soffits as well as on the
+// fronts, so every course line and every upright joint went THROUGH a glyph.
+// The answer (E-DECISIONI24) is that the letters are BODIES standing clear of
+// the stone, and the three numbers below are what «clear of» means.
+//
+// THE STANDOFF IS NOT A TASTE, IT IS THE PROUDEST BLOCK PLUS A MARGIN. A block
+// may stand two steps out of its wall — 2 x STAND — and a letter hung any
+// nearer than that would be pierced by the handful of blocks that do. So the
+// standoff is DERIVED from STAND and moves with it; nothing here has to be
+// re-measured when the wall is refitted. The margin is eight millimetres:
+// enough that the two surfaces never argue in the depth buffer at any distance
+// this world is walked at, small enough that the whole body stays inside the
+// clearance src/world/contracts.js keeps round a block for the camera.
+export const INK_CLEAR = 0.008;
+export const INK_STANDOFF = 2 * STAND + INK_CLEAR;
+// And how thick a letter is. Three centimetres is what reads as a body rather
+// than as a card, and the two readings that matter are these: at the pose the
+// six are judged from a flank comes to a third of a pixel on the third block
+// and a whole one on the first, which is enough to darken the edge of a stroke
+// and not enough to widen it; at the three and a half metres the committente
+// stands from the sixth, a glyph twenty degrees off the axis of the view shows
+// 2.8 px of flank under 7.4 px of standoff. Foreshortened, both of them: a
+// flank is only ever seen edge-on, and quoting the 8 px that 30 mm covers
+// head-on at that distance would be quoting a face nobody is looking at.
+export const INK_THICKNESS = 0.030;
+// What the pair of them reaches, which is the one number anything OUTSIDE this
+// file needs: the camera's own boxes are grown by it, and a second sum of the
+// two is how a lens ends up inside a letter.
+export const INK_REACH = INK_STANDOFF + INK_THICKNESS;
+
 // HOW MANY BLOCKS DO WHAT, as shares of the blocks of one wall.
 //
 // These are the UNDERLYING shares and not what a picture of the six reads back:
