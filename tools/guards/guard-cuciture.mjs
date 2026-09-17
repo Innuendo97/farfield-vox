@@ -6,6 +6,13 @@ import {
 } from '../../src/world/voxel/columns.js';
 import { chunkList } from '../../src/world/voxel/mesher.js';
 import { CENTRE, CORRIDOR_BOX, columnSpec } from '../../src/world/voxel/worldgen.js';
+// THE ONE PROJECTOR THIS CAMPAIGN HAS. Leg 3 has to turn a PIXEL into a place
+// on the plateau, and U-GRADE-1 made tools/grade/lib/framing.mjs the single
+// seat for exactly that arithmetic -- a guard carrying its own copy of a camera
+// is the drift that unit spent itself closing. Checked against the live camera
+// on this tip at the pose leg 3 walks: five pixels, corners and centre, 0.00000
+// degrees apart.
+import { makeRay } from '../grade/lib/framing.mjs';
 import { reporter, selfTest } from './lib.mjs';
 import {
   VISITOR, bandSky, openVisitor, openWorld, serveRepo, toolsPresent,
@@ -40,7 +47,42 @@ import {
 // them. The «right angle» is the far end of the run meeting the side of it.
 //
 // ===========================================================================
-// WHAT THIS GUARD ASKS, IN THREE LEGS, AND WHY THREE.
+// AND THE SECOND INCIDENT, WHICH THIS FILE'S OWN RESIDUE ANNOUNCED
+// (E-DECISIONI23, U-SUOLO-3).
+//
+// «Linee di cuciture azzurre ancora visibili quando cammino.» The strip was
+// gone and something else was not. Leg 2 below had said so in writing: at pitch
+// -26 the same sweep found patches of up to 43 px at eight to nine metres, in
+// meadow the aerial says is solid, and leg 2 could not see them because its
+// frame reaches seven metres. Nor could any leg here turn: the visitor cannot
+// be turned under pointer lock by a driver, and legs 1 to 3 photograph three
+// bearings between them.
+//
+// WHAT THEY WERE. The field marches a ray per pixel and the ray is given a
+// CEILING on its crossings (uSteps, ninety six). A grazing ray -- the flattest
+// in the frame, the top rows at pitch -26 -- crosses the meadow a cell at a
+// time for twenty five metres, and there are not always ninety six cells' worth
+// of ceiling under it. A ray that ran out reported NO HIT, and no hit is the
+// sky. They stand in thin lines because a line of the picture is a line of
+// bearings and what a march costs is a property of the bearing; they are seen
+// walking because they are a property of WHERE THE EYE IS, and a walker sweeps
+// every position while a pose sits on one.
+//
+// Proved one source at a time, on pinned poses, with the arms in
+// src/world/voxel/campo-material.js: not the horizon gates (650 magenta, zero
+// black), not the recomposition (the native frame reads MORE: 4924 against
+// 2712), not the second ray, not the band, not the walk's direction -- and
+// monotone in uSteps alone: 96 -> 2712 px, 128 -> 202, 192 -> 0.
+//
+// THE CURE IS NOT A BIGGER CEILING, because the number of cells a grazing ray
+// crosses has no bound a uniform can be set to and any ceiling leaves a pose
+// that shows the sky through the grass. It is that a ray which ran out inside
+// the world answers with the ground it was standing over: THE TRAVERSAL THAT
+// RAN OUT, at the foot of march(). LEG 3 is what holds it, and it holds it
+// where the committente was standing: walking, turning, at three pitches.
+//
+// ===========================================================================
+// WHAT THIS GUARD ASKS, IN FOUR LEGS, AND WHY FOUR.
 //
 //   1. THE LAW. Every column this world's FIELD stands aside on is a column the
 //      greedy is both ASKED FOR (chunkList) and LAYS (columnSpec). Offline, no
@@ -63,13 +105,28 @@ import {
 //
 //      WHAT THAT GIVES UP, AND IT IS DECLARED. Seven metres is the walker's own
 //      ground and not the meadow at the horizon, so a hole further out than that
-//      is leg 1's to catch and not this one's. There is one such residue on this
-//      tip and it is NOT a hole in the data: at pitch -26 the same sweep found
-//      patches of up to 43 px at eight to nine metres, in open meadow that the
-//      aerial says is solid -- the traversal missing at a grazing angle, which
-//      is the scintillation family (D-C3-3, U-PERF-6) and not this unit's.
+//      is leg 1's or leg 4's to catch and not this one's. The residue this leg
+//      declared on the tip before -- 43 px at eight to nine metres at pitch -26
+//      -- was real, it was the exhausted traversal above, and leg 4 is what
+//      now stands where it stood.
 //
-//   3. THE VISITOR'S PAGE. Legs 1 and 2 measure `?dev`, and E-SUOLO-VIS1 is the
+//   3. THE WALK WITH THE ROTATION (U-SUOLO-3). Thirty metres down the corridor
+//      and thirty across the meadow, stopping every 2.5 m, and at every station
+//      FOUR bearings and one of the three pitches the committente walks at --
+//      so the twelve bearings and the three pitches are all taken, several
+//      times each, over the two walks. The frame is shallow now, so sky belongs
+//      in it and a count of undrawn pixels would be a count of the sky: the
+//      question is asked of each undrawn pixel instead, through the campaign's
+//      own projector, and it is the question the unit was given. Does this
+//      pixel's ray point UNDER the horizontal, and -- marched against the LAW,
+//      the same `columnSpec` seat leg 1 reads and campoTile writes its bytes
+//      out of -- does it go under the world's own surface within sixty metres.
+//      Masonry's footprint leaves by the same door it leaves leg 1 by: a column
+//      with no top and stone under it is not the field's and owes nothing. What
+//      is left is sky under the horizon where the ground is, and the assertion
+//      is zero of it. No threshold, for the reason leg 2 gives.
+//
+//   4. THE VISITOR'S PAGE. Legs 1 to 3 measure `?dev`, and E-SUOLO-VIS1 is the
 //      standing lesson of this repository about what that is worth: the
 //      committente's own page is a different machine, in the THIRD person, with
 //      no tier asked for by hand and no pose imposed. So the last leg opens the
@@ -79,7 +136,7 @@ import {
 //      E-SUOLO-VIS1). It is the leg with a floor on it, and it is the leg that
 //      photographs the world the defect was reported from.
 //
-//   --fast  legs 2 and 3 are skipped; leg 1 always runs.
+//   --fast  legs 2, 3 and 4 are skipped; leg 1 always runs.
 //   --port=N  reuse a development server already up on N.
 
 const flags = process.argv.slice(2);
@@ -271,7 +328,329 @@ async function groundPlate(world, sharp, pose, { hide = [], settle = 900 } = {})
 }
 
 // ===========================================================================
-// LEG 3 -- THE VISITOR'S PAGE.
+// LEG 3 -- THE WALK WITH THE ROTATION (U-SUOLO-3).
+
+/** The three pitches the committente walks at. */
+const WALK_PITCHES = [-15, -26, -35];
+/** Where the eye stands while walking: the walker's own, not the pose's. */
+const WALK_EYE = 1.7;
+
+/**
+ * THE TWO WALKS, AND WHY THE STATIONS TURN.
+ *
+ * Thirty metres of corridor and thirty of open meadow, a station every 2.5 m.
+ * Twelve bearings at three pitches at every one of twenty six stations is nine
+ * hundred plates and a guard nobody runs; four bearings at one pitch is a
+ * hundred and four, and because the base bearing steps 30 degrees and the pitch
+ * steps one place at every station, ALL TWELVE bearings and all three pitches
+ * are taken, several times each and at several places, over the two walks.
+ *
+ * The defect is a coincidence of WHERE the eye is and WHICH WAY it looks -- a
+ * pose reproduces it exactly and a neighbouring pose does not -- so what a
+ * sweep needs is breadth over that product and not depth at one point of it.
+ */
+function walkStations(id, from, along) {
+  const out = [];
+  for (let k = 0; k * 2.5 <= 30; k += 1) {
+    const step = k * 2.5;
+    const x = from.x + along.x * step;
+    const z = from.z + along.z * step;
+    for (let q = 0; q < 4; q += 1) {
+      out.push({
+        id: `${id} ${step.toFixed(1)} m`,
+        x,
+        z,
+        yaw: (k * 30 + q * 90) % 360,
+        pitch: WALK_PITCHES[k % WALK_PITCHES.length],
+      });
+    }
+  }
+  return out;
+}
+
+const WALK_ROT = [
+  ...walkStations('sentiero', { x: 0.25, z: 0 }, { x: 0, z: 1 }),
+  ...walkStations('prato', { x: -15, z: 8 }, { x: 1, z: 0 }),
+];
+/** What the two walks actually cover, counted rather than claimed. */
+const WALK_COVER = {
+  yaws: new Set(WALK_ROT.map((s) => s.yaw)).size,
+  pitches: [...new Set(WALK_ROT.map((s) => s.pitch))].sort((a, b) => b - a),
+};
+
+/**
+ * HOW FAR THIS LEG WILL VOUCH FOR A PIXEL, AND WHY IT IS A MARCH AND NOT A
+ * PLANE.
+ *
+ * The first draft of this predicate met the ray with the plateau's own level
+ * and asked whether the meeting point was inside the rim. It was wrong, and
+ * wrong in the direction that hides the defect: the poses this unit pinned look
+ * OUTWARD, and the sky they carried lay at forty metres, on the first terraces
+ * past PLATEAU where y = 0 is not the ground at all and the plane's answer is a
+ * place the world is not. So the ray is marched against the LAW -- columnSpec,
+ * the same seat leg 1 reads and the same seat campoTile writes its bytes out of
+ * -- and what is asked is the honest question: walking out from the eye, does
+ * this ray go under the world's own surface before REACH_M.
+ *
+ * AND THE REACH IS TWO HUNDRED METRES, WHICH IS MEASURED AND NOT CHOSEN. The
+ * rays this unit is about are the FLATTEST in the frame, and a flat ray over
+ * ground that is itself falling away runs a long way before it meets anything:
+ * from the pinned pose A, at pitch -3.9 degrees, the law puts the meeting at
+ * 97 m -- past the rim, past the terraces, out where the basin levels. Sixty
+ * metres was tried first and answered «no ground owed» for exactly the pixels
+ * the defect is made of, which is the shape of a predicate that excuses what it
+ * is supposed to catch. Two hundred is inside the far window the field draws
+ * (409.6 m, centred on the world), so everything inside it is this engine's.
+ *
+ * THE STEP IS HALF A METRE, and what that can miss is a terrace crossed and
+ * recrossed inside one sample. A riser is one cube (0.10 m) and a ray this flat
+ * changes height by 3.5 cm over half a metre, so a crossing missed here is a
+ * FAULT NOT COUNTED and never a fault invented: the leg errs towards letting a
+ * pixel through, which is the only direction a guard may err in.
+ */
+const REACH_M = 200;
+const MARCH_M = 0.5;
+
+/** The surface the law puts at a point, in metres, or null where it puts none. */
+function lawY(gx, gz) {
+  const spec = columnSpec(Math.floor(gx / VOXEL), Math.floor(gz / VOXEL), true, PLATEAU, true);
+  if (spec.top === NO_COLUMN) {
+    // Masonry stands on this column: the ground under a block is nobody's, and
+    // the frame this leg reads has the monoliths taken out of it, so a pixel
+    // that lands here is not owed anything. It is the same door leg 1 leaves by.
+    return spec.mat === MATERIAL.STONE ? 'pietra' : null;
+  }
+  // campoGroundByte's own inverse, in metres: what the field's texel says.
+  return (spec.top + 1) * VOXEL;
+}
+
+/**
+ * THE LAW, CUT ONCE INTO A GRID, BECAUSE A MARCH PER PIXEL IS NOT AFFORDABLE.
+ *
+ * Most of what leg 3 marches is NOT a hole: at pitch -15 the band between the
+ * field's own skyline and the horizontal is sky, undrawn (the hills are out of
+ * this frame) and pointing down, so every pixel of it pays a full march to be
+ * told there is nothing owed. Asked of columnSpec that is four hundred calls a
+ * pixel and minutes a plate. Asked of a grid cut once it is four hundred array
+ * reads, and the grid is the SAME function, sampled: no second law.
+ *
+ * Half a metre a cell over the whole far window, 641 601 columns, cut on first
+ * use and kept. NaN is «no column here», and the stone flag is its own byte.
+ */
+const GRID_M = 0.5;
+const GRID_N = Math.round((REACH_M * 2) / GRID_M) + 1;
+let gridY = null;
+let gridStone = null;
+
+function cutGrid() {
+  gridY = new Float32Array(GRID_N * GRID_N);
+  gridStone = new Uint8Array(GRID_N * GRID_N);
+  for (let j = 0; j < GRID_N; j += 1) {
+    const gz = -REACH_M + j * GRID_M;
+    for (let i = 0; i < GRID_N; i += 1) {
+      const y = lawY(-REACH_M + i * GRID_M, gz);
+      if (y === 'pietra') { gridStone[j * GRID_N + i] = 1; gridY[j * GRID_N + i] = NaN; } else {
+        gridY[j * GRID_N + i] = y === null ? NaN : y;
+      }
+    }
+  }
+}
+
+/**
+ * HOW FAR UNDER THE SURFACE A RAY MUST GO BEFORE THE LAW WILL SWEAR TO IT.
+ *
+ * ONE VOXEL, and it is a tolerance in METRES OF WORLD and not a budget of
+ * PIXELS -- which is the whole difference, and the reason leg 2's «no
+ * threshold» is not contradicted here. The law answers in exact real numbers;
+ * the picture it is compared against does not. Out where these rays are, the
+ * field reads a texel forty centimetres across whose ground is a byte quantised
+ * to one cube and whose blade is a second byte over it. Where a ray passes
+ * closer to the surface than the picture's own quantum, «ground» and «air» are
+ * the same answer and the pixel is legitimately either.
+ *
+ * IT IS NOT A GUESS, it is the one case that survived this unit's cure and it
+ * was measured. From the station prato 17.5 m at bearing 210, pitch -26, the
+ * top CORNER ray meets the law's surface at 29.80 m -- and the closest it had
+ * come before that, at 29.75 m, is ONE POINT THREE MILLIMETRES above it. A leg
+ * that calls that a hole is not measuring the world: it is splitting a
+ * millimetre at thirty metres against a picture built in decimetres, and it
+ * does it intermittently, which is how it was recognised (two runs of the same
+ * tip, same station: 2 px and 0 px).
+ */
+const GRAZE_M = VOXEL;
+
+/** The march itself, against whichever reading of the law it is handed. */
+function walkRay(eye, d, height) {
+  for (let t = 0.4; t <= REACH_M; t += MARCH_M) {
+    const gx = eye.x + d[0] * t;
+    const gz = eye.z + d[2] * t;
+    // Past the far window the ground is the skyline's and not the field's.
+    if (Math.abs(gx) > REACH_M || Math.abs(gz) > REACH_M) return null;
+    const y = height(gx, gz);
+    if (y === 'pietra') return null;
+    if (y === null || Number.isNaN(y)) continue;
+    if (eye.y + d[1] * t <= y - GRAZE_M) return { t, gx, gz };
+  }
+  return null;
+}
+
+/**
+ * Where a ray meets the world the LAW describes, or null within this leg's
+ * reach.
+ *
+ * TWO MARCHES, AND THE GRID IS ONLY THE SIEVE. The grid is the law SAMPLED at
+ * half a metre, which is the right instrument for throwing away the great
+ * majority of pixels -- the sky over the field's own skyline -- for four hundred
+ * array reads instead of four hundred calls. It is the wrong instrument for
+ * DECIDING, and it was measured being wrong: at the rim, where the terraces
+ * begin and a ray crosses the ground within a decimetre of it, a sample rounded
+ * to the nearest grid point says «ground here» where the law at the exact point
+ * says the ray is still in the air. That is four pixels out of a hundred and
+ * four plates, always on a rim crossing, and it is the GUARD being wrong about
+ * the world rather than the world being wrong.
+ *
+ * So a candidate is re-marched against columnSpec itself, exactly, at the very
+ * points the ray passes through. Candidates are rare by construction, so the
+ * cost of the second march is nothing, and what the leg asserts is the law and
+ * not a picture of it.
+ *
+ * @returns {{t: number, gx: number, gz: number}|null}
+ */
+function meetsGround(eye, d) {
+  if (!gridY) cutGrid();
+  const sieve = walkRay(eye, d, (gx, gz) => {
+    const k = Math.round((gz + REACH_M) / GRID_M) * GRID_N
+      + Math.round((gx + REACH_M) / GRID_M);
+    return gridStone[k] ? 'pietra' : gridY[k];
+  });
+  if (!sieve) return null;
+  return walkRay(eye, d, lawY);
+}
+
+/**
+ * Sky under the horizon where the ground is, counted, at one pose.
+ *
+ * @param {object} plate  the raw frame
+ * @param {object} read   the six numbers the CAMERA read back, not the six asked
+ * @returns {{n: number, far: number[], box: object|null}}
+ */
+function skyOnGround(plate, read) {
+  const {
+    data, width, height, channels,
+  } = plate;
+  const ray = makeRay({ width, height, pose: read });
+  const eye = read.position;
+  let n = 0;
+  let box = null;
+  const far = [];
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const i = (y * width + x) * channels;
+      if (data[i] + data[i + 1] + data[i + 2] > 6) continue;
+      const d = ray(x, y);
+      // Over the horizontal there is sky by arithmetic, and it belongs there.
+      if (d[1] >= -1e-4) continue;
+      const met = meetsGround(eye, d);
+      if (!met) continue;
+      n += 1;
+      far.push(met.t);
+      box = box ? {
+        x0: Math.min(box.x0, x), x1: Math.max(box.x1, x),
+        y0: Math.min(box.y0, y), y1: Math.max(box.y1, y),
+      } : {
+        x0: x, x1: x, y0: y, y1: y,
+      };
+    }
+  }
+  far.sort((a, b) => a - b);
+  return { n, far, box };
+}
+
+/**
+ * One plate at one aimed pose, with the six numbers the camera actually read.
+ *
+ * The pose is ASKED and the camera is READ: setDevPose normalises a bearing and
+ * hands back what it settled on, and a projector fed the number that was asked
+ * for rather than the number that landed is the drift U-GRADE-1 closed.
+ *
+ * AND IT WAITS FOR THE PICTURE, WHICH IS NOT THE SAME AS WAITING A WHILE.
+ * A walker moves two and a half metres in a second and the clipmap keeps up; a
+ * guard PUTS the camera two and a half metres on and photographs it, which is a
+ * teleport, and a frame taken while a tile is still in a queue is a frame of an
+ * ARRIVAL and not of a walk. Measured: on a fixed pause of 700 ms this leg read
+ * four pixels over a hundred and four plates on one run and ZERO on the next,
+ * at the same stations, with the same predicate -- which is the signature of a
+ * picture still landing and not of a traversal. `hub.groundReady()` is the
+ * field's own «every tile of both windows is in its picture» (campo.ready), the
+ * same sentence the arrival veil lifts on, so the leg asks THAT and then gives
+ * the frame its settle.
+ */
+async function aimedPlate(world, sharp, pose, { settle = 400 } = {}) {
+  const read = await world.page.evaluate(({ p, on }) => {
+    for (const child of window.farfield.scene.children) {
+      const name = child.name || '';
+      if (name.startsWith('v8-avatar')) continue;
+      child.visible = on.includes(name);
+    }
+    return window.setDevPose(p);
+  }, {
+    p: {
+      x: pose.x, y: WALK_EYE, z: pose.z, yaw: pose.yaw, pitch: pose.pitch, fov: FOV,
+    },
+    on: GROUND,
+  });
+  await world.page.waitForFunction(
+    () => window.farfield.hub.groundReady(), null, { timeout: 30000, polling: 100 },
+  );
+  await world.page.waitForTimeout(settle);
+  const png = await world.page.screenshot({ type: 'png' });
+  const { data, info } = await sharp(png).raw().toBuffer({ resolveWithObject: true });
+  return {
+    plate: {
+      data, channels: info.channels, width: info.width, height: info.height,
+    },
+    read: {
+      position: { x: read.x, y: read.y, z: read.z },
+      yaw: read.yaw,
+      pitch: read.pitch,
+      fov: read.fov,
+    },
+  };
+}
+
+/**
+ * THE INJECTION, AND IT IS THE CURE ITSELF TAKEN BACK OUT.
+ *
+ * One program and a uniform, which is tools/bench/bench-sky.mjs's own lesson:
+ * two materials are two pipelines and two runs are two noise floors, so the
+ * arm and the null have to be one compile with a branch between them. The seam
+ * cut here is the line THE TRAVERSAL THAT RAN OUT stands on, so `uClose` at
+ * nought is the tip before U-SUOLO-3, to the line -- and a leg that cannot be
+ * made to fail by putting the defect back is not holding anything.
+ *
+ * @returns {string} 'ok', or why the seam could not be cut
+ */
+async function closure(world, on) {
+  return world.page.evaluate((flag) => {
+    const mesh = window.farfield.scene.getObjectByName('ground-campo');
+    if (!mesh) return 'la maglia del campo non c\'e\'';
+    const u = mesh.material.uniforms;
+    if (!u.uClose) {
+      const before = mesh.material.fragmentShader;
+      u.uClose = { value: 1 };
+      mesh.material.fragmentShader = before
+        .replace('uniform int uSteps;', 'uniform int uSteps;\n  uniform float uClose;')
+        .replace('if (!escaped && !hit.found) {', 'if (uClose > 0.5 && !escaped && !hit.found) {');
+      if (mesh.material.fragmentShader === before) return 'la cucitura da tagliare non c\'e\' piu\'';
+      mesh.material.needsUpdate = true;
+    }
+    u.uClose.value = flag ? 1 : 0;
+    return 'ok';
+  }, on);
+}
+
+// ===========================================================================
+// LEG 4 -- THE VISITOR'S PAGE.
 //
 // THE BAND AND THE FLOOR ARE E-SUOLO-VIS1'S OWN. The bottom fifth of the
 // committente's window, read by hue: with the meadow drawn it is 0.1% sky and
@@ -424,16 +803,59 @@ if (flags.includes('--self')) {
     caught: bandSky(band([51, 80, 28]), [0, 1]) <= VISITOR_FLOOR,
   });
 
+  // LEG 3'S OWN PREDICATE, OFFLINE, AGAINST THE LAW IT IS WRITTEN ON. A ray
+  // dropped at the middle of the meadow has to meet the ground; the same ray
+  // turned upwards must not; and a ray dropped where the 06 stands must come
+  // back with nothing owed, because the block is what stands on that column.
+  const eyeHere = { x: 8, y: 1.7, z: 4 };
+  cases.push({
+    what: 'un raggio che scende nel prato incontra la terra della legge',
+    caught: Boolean(meetsGround(eyeHere, [0.5, -0.5, 0.707])),
+  });
+  cases.push({
+    what: 'e lo stesso raggio rovesciato in su non incontra niente',
+    caught: meetsGround(eyeHere, [0.5, 0.5, 0.707]) === null,
+  });
+  // A COLUMN THE MASONRY STANDS ON, read off the law rather than guessed at:
+  // the frame leg 3 photographs has the monoliths hidden, so a pixel that lands
+  // on one of these would read as a hole on every plate that passed one.
+  cases.push({
+    what: 'un raggio che scende sulla pianta di un monolite non chiede terra a nessuno',
+    caught: lawY(7.85, -5.35) === 'pietra'
+      && meetsGround({ x: 7.85, y: 1.7, z: -7.35 }, [0, -0.6, 0.8]) === null,
+  });
+  // AND THE GRAZE, BY THE RAY IT WAS MEASURED ON. The top corner of the station
+  // prato 17.5 m at bearing 210: it comes within 1.3 mm of the law's surface at
+  // 29.75 m and crosses it at 29.80, which is a place the picture cannot tell
+  // apart from air. The same eye a degree steeper is a metre under and is.
+  cases.push({
+    what: "un raggio che sfiora la legge per un millimetro non e' un buco",
+    caught: meetsGround({ x: 2.5, y: 1.7, z: 8 }, [-0.0665, -0.0571, 0.9962]) === null,
+  });
+  cases.push({
+    what: 'e lo stesso occhio un grado piu ripido ha la sua terra',
+    caught: Boolean(meetsGround({ x: 2.5, y: 1.7, z: 8 }, [-0.0664, -0.0745, 0.9950])),
+  });
+  // AND THE TERRACES PAST THE RIM, which is where the poses this unit pinned
+  // were looking and where a predicate written on the plateau's own plane said
+  // there was nothing to answer for. At pitch -3.9 the meeting is at 97 m.
+  cases.push({
+    what: `oltre l'orlo (${PLATEAU} m) la legge ha ancora terra sotto un raggio radente`,
+    caught: (() => {
+      const met = meetsGround({ x: 16.7, y: 1.7, z: 4 }, [
+        Math.cos(3.9 * Math.PI / 180), -Math.sin(3.9 * Math.PI / 180), 0,
+      ]);
+      return Boolean(met) && met.t > PLATEAU;
+    })(),
+  });
+
   if (!missing.length && !FAST) {
-    // AND THE ONE INJECTION THAT GOES THROUGH THE PAGE: the engine that draws
-    // the corridor taken out of the frame, at the pose the defect was found at.
+    // AND THE INJECTIONS THAT GO THROUGH THE PAGE.
     const server = await serveRepo(REUSE);
     const world = await openWorld({ chromium, port: server.port, width: 960, height: 540 });
     const pose = POSES[1];
     const whole = await groundPlate(world, sharp, pose, { settle: 1600 });
     const cut = await groundPlate(world, sharp, pose, { hide: ['ground-voxel'], settle: 900 });
-    await world.close();
-    await server.stop();
     cases.push({
       what: `il quadro dietro il 06 come sta e' intero (${undrawn(whole).n} px vuoti)`,
       caught: undrawn(whole).n === 0,
@@ -441,6 +863,42 @@ if (flags.includes('--self')) {
     cases.push({
       what: `e senza il magazzino del selciato e' bucato (${undrawn(cut).n} px vuoti)`,
       caught: undrawn(cut).n > 0,
+    });
+
+    // LEG 3'S OWN, AND IT IS THE CURE TAKEN BACK OUT. The four stations U-SUOLO-3
+    // pinned the defect at, read with the closure on and with it off, in ONE
+    // opening and ONE program. Measured on this tip: 0 px against 2712.
+    const PINNED = [
+      { id: 'A', x: 16.7, z: 4, yaw: 270, pitch: -26 },
+      { id: 'B', x: 15.5, z: 4, yaw: 270, pitch: -26 },
+      { id: 'C', x: 8, z: 14.45, yaw: 180, pitch: -26 },
+      { id: 'D', x: -2.313, z: 20.423, yaw: 90, pitch: -26 },
+    ];
+    const sweep = async () => {
+      let n = 0;
+      for (const station of PINNED) {
+        // eslint-disable-next-line no-await-in-loop
+        const { plate, read } = await aimedPlate(world, sharp, station, { settle: 700 });
+        n += skyOnGround(plate, read).n;
+      }
+      return n;
+    };
+    const armed = await closure(world, true);
+    const withClosure = armed === 'ok' ? await sweep() : -1;
+    await closure(world, false);
+    const withoutClosure = armed === 'ok' ? await sweep() : -1;
+    await closure(world, true);
+    await world.close();
+    await server.stop();
+    cases.push({
+      what: armed === 'ok'
+        ? `le quattro pose di U-SUOLO-3 con la traversata chiusa: ${withClosure} px`
+        : `la cucitura non si e' potuta tagliare: ${armed}`,
+      caught: armed === 'ok' && withClosure === 0,
+    });
+    cases.push({
+      what: `e con la chiusura tolta, che e' il tip di prima: ${withoutClosure} px`,
+      caught: withoutClosure > 0,
     });
   }
 
@@ -471,9 +929,9 @@ for (const e of law.extra) {
     e.n ? `${e.n} colonne di troppo` : '');
 }
 
-if (missing.length) report.skip(`manca ${missing.join(' e ')}: le gambe 2 e 3 non si possono fotografare`);
+if (missing.length) report.skip(`manca ${missing.join(' e ')}: le gambe 2, 3 e 4 non si possono fotografare`);
 if (FAST) {
-  report.note('--fast: le gambe 2 e 3 non sono state corse, quindi un buco che la legge non vede passa');
+  report.note('--fast: le gambe 2, 3 e 4 non sono state corse, quindi un buco che la legge non vede passa');
   report.end();
 }
 
@@ -506,13 +964,36 @@ try {
   }
   report.line(`     la peggiore: ${worst.id}, ${worst.n} px`
     + (worst.n ? ` in [${worst.box.x0}-${worst.box.x1}, ${worst.box.y0}-${worst.box.y1}]` : ''));
+
+  // -------------------------------------------------------------- LEG 3
+  report.line(`  3. IL CAMMINO CON LA ROTAZIONE -- ${WALK_ROT.length} lastre,`
+    + ` ${WALK_COVER.yaws} imbardate, pitch ${WALK_COVER.pitches.join('/')}, 30 m su sentiero e prato,`
+    + ` cielo sotto l'orizzonte dove la legge da' terra entro ${REACH_M} m`);
+  let rot = { n: -1 };
+  let holed = 0;
+  let total = 0;
+  for (const station of WALK_ROT) {
+    // eslint-disable-next-line no-await-in-loop
+    const { plate, read } = await aimedPlate(world, sharp, station);
+    const found = skyOnGround(plate, read);
+    total += found.n;
+    if (found.n) holed += 1;
+    if (found.n > rot.n) {
+      rot = { ...found, id: `${station.id} imbardata ${station.yaw} pitch ${station.pitch}` };
+    }
+  }
+  report.check(holed === 0, `${WALK_ROT.length} stazioni: nessun pixel di cielo sopra la terra`,
+    holed ? `${holed} lastre bucate, ${total} px in tutto, la peggiore ${rot.id}`
+      + ` con ${rot.n} px a ${rot.far[0].toFixed(1)}..${rot.far[rot.far.length - 1].toFixed(1)} m`
+      + ` in [${rot.box.x0}-${rot.box.x1}, ${rot.box.y0}-${rot.box.y1}]`
+      : 'zero px su zero lastre');
   await world.close();
   world = null;
 
-  // -------------------------------------------------------------- LEG 3
+  // -------------------------------------------------------------- LEG 4
   visitor = await openVisitor({ chromium, port: server.port, width: VISITOR.width, height: VISITOR.height });
   const person = await visitor.person();
-  report.line(`  3. IL VISITATORE -- ${VISITOR.width}x${VISITOR.height}, ${person} persona`
+  report.line(`  4. IL VISITATORE -- ${VISITOR.width}x${VISITOR.height}, ${person} persona`
     + `, fascia ${SUOLO_VIS[0]}..${SUOLO_VIS[1]}, pavimento ${VISITOR_FLOOR}`);
   report.check(person === 'terza', 'la pagina consegnata arriva in terza persona', person);
   const walk = [];
@@ -554,4 +1035,5 @@ try {
   if (server) await server.stop().catch(() => {});
 }
 
-report.end(`${RADII.length} raggi, ${POSES.length + WALK_SN.length + WALK_WE.length} lastre`);
+report.end(`${RADII.length} raggi, `
+  + `${POSES.length + WALK_SN.length + WALK_WE.length + WALK_ROT.length} lastre`);
