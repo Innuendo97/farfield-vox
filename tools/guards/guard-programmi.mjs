@@ -146,7 +146,7 @@ const REUSE = PORT_FLAG ? Number(PORT_FLAG.slice(7)) : null;
 // because the halo is taken down and put back up.
 const FAMILIES = [
   { id: 'cielo', what: 'the sky dome', has: ['uSkyRamp', 'uSunDisc'], lacks: ['uFogColour'], owed: 1 },
-  { id: 'campo', what: 'the meadow field, raymarched', has: ['tField', 'tFar'], owed: 1 },
+  { id: 'campo', what: 'the meadow field, raymarched', has: ['tField', 'tFar'], undefines: ['CAMPO_RESOLVE'], owed: 1 },
   { id: 'selciato', what: 'the paving of the hub', has: ['uPebMix'], owed: 1 },
   { id: 'cubi', what: 'the greedy cubes (today: the trees)', has: ['uShadeMap'], owed: 1 },
   { id: 'monoliti', what: 'the masonry of the five blocks', has: ['tInk'], owed: 1 },
@@ -155,7 +155,7 @@ const FAMILIES = [
   { id: 'rocce', what: 'the rocks and the slabs', has: ['uSlabFalloff'], owed: 1 },
   { id: 'pietre-sciolte', what: 'the loose stones', has: ['uArrisPigment'], lacks: ['uJoint'], owed: 1 },
   { id: 'colline', what: 'the hills of the cornice', has: ['uPalette', 'uAirPale'], owed: 1 },
-  { id: 'campo-ricomposto', what: 'the earth brought back to full resolution', has: ['tCampo', 'tCampoDepth'], owed: 1 },
+  { id: 'campo-ricomposto', what: 'the earth brought back to full resolution', has: ['tCampo', 'tCampoDepth'], lacks: ['tField'], owed: 1 },
   { id: 'lago', what: 'the water of the cornice', has: ['uWater'], owed: 1 },
   { id: 'nuvole', what: 'the weather, cumuli of cubes', has: ['uCloudSun', 'uCloudTerms'], owed: 1 },
   { id: 'manto', what: 'the carpet and the tufts', has: ['tAtlas', 'uCutoff'], owed: 1 },
@@ -178,8 +178,18 @@ const FAMILIES = [
 // honest shape of a leg that is armed and has nothing to bite on. Bringing it
 // under leg 1 needs a harness that can walk the body to a face; that is written
 // down as this unit's residue and not smuggled in as a pass.
+//
+// AND THE SECOND ONE IS THE GROUND'S OWN, AND IT IS A DIFFERENT KIND OF LAZY.
+// The recomposition that marches the edges of the ground at full resolution
+// (U-CAMPO-6, `camporimarcia`) is the field's own program with one define
+// turned on, and the handle that is off does not BUILD it -- which is the whole
+// of how that null is kept. So a page opened with no handle has two programs on
+// the ground and not three, exactly as it should, and this entry exists so that
+// the third is CHECKED the day a page does build it, and reported as absent
+// when it does not.
 const LAZY = [
   { id: 'pannelli', what: 'a face of a monolith, opened', has: ['uScroll', 'uSelect'], owed: 0 },
+  { id: 'campo-bordi', what: 'the edges of the ground, marched at the frame own pixel', has: ['tField', 'tCampo'], defines: ['CAMPO_RESOLVE'], owed: 0 },
 ];
 
 // ------------------------------------------------------------------ the bands
@@ -298,8 +308,16 @@ export function census(programs, families) {
   const ambiguous = [];
   for (const program of programs) {
     const names = new Set(program.stages.flatMap((s) => s.uniforms));
+    // AND WHICH DOORS OF THE SOURCE ARE OPEN. Two programs cut from ONE text --
+    // the field and the recomposition that marches its edges -- declare exactly
+    // the same names, because the declarations the other door would use are
+    // still in the source behind a `#ifdef`. The define is the only thing that
+    // tells them apart, so a fingerprint is allowed to name one.
+    const defs = new Set(program.stages.flatMap((s) => s.defines || []));
     const hits = families.filter((f) => f.has.every((u) => names.has(u))
-      && !(f.lacks || []).some((u) => names.has(u)));
+      && !(f.lacks || []).some((u) => names.has(u))
+      && (f.defines || []).every((d) => defs.has(d))
+      && !(f.undefines || []).some((d) => defs.has(d)));
     if (hits.length === 0) unknown.push({ index: program.index, names: [...names] });
     else if (hits.length > 1) ambiguous.push({ index: program.index, ids: hits.map((f) => f.id) });
     else named.get(hits[0].id).push(program.index);
@@ -664,6 +682,7 @@ for (const family of FAMILIES) {
 for (const family of LAZY) {
   const found = seen.named.get(family.id);
   if (found.length) report.line(`  ok    ${family.id.padEnd(16)} ${family.what}  [${found.join(' ')}]`);
+  else if (family.id === 'campo-bordi') report.note(`${family.id}: ${family.what} is built only when the address asks for it, so a page with no handle has none -- not checked`);
   else report.note(`${family.id}: ${family.what} is built on a keypress, so pose P never has one -- not checked`);
 }
 report.check(seen.ambiguous.length === 0, 'no fingerprint matches two families',

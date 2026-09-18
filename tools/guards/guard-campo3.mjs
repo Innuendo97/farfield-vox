@@ -231,18 +231,28 @@ report.check(/mesh\.layers\.set\(CAMPO_LAYER\);/.test(MATERIAL),
 report.check(givesTheLayerBack(POST),
   'e il telaio lo toglie al mondo quando il passaggio c e, e glielo rimette quando non c e');
 
-report.check(/resolve\.visible = fieldScale < 1;/.test(FIELD),
-  'la ricomposizione si vede solo sotto a uno');
+// LA RICOMPOSIZIONE SI VEDE SOLO SOTTO A UNO, E DA U-CAMPO-6 LE
+// RICOMPOSIZIONI SONO DUE. La seconda marcia i pixel di bordo a piena
+// risoluzione (`camporimarcia`) e sta nello stesso posto della prima; la regola
+// non e' cambiata e si e' allargata di una riga -- a scala uno non se ne vede
+// nessuna, e sotto a uno se ne vede esattamente UNA, mai due, che disegnerebbe
+// il suolo due volte, e mai nessuna, che non lo disegnerebbe affatto.
+report.check(/const composing = fieldScale < 1;/.test(FIELD)
+  && /resolve\.visible = composing && !marching;/.test(FIELD)
+  && /if \(remarch\) remarch\.visible = marching;/.test(FIELD),
+  'la ricomposizione si vede solo sotto a uno, e delle due se ne vede una sola');
 
 // LO STESSO POSTO NELL'ORDINE. Il campo spedisce a renderOrder 10 -- ultimo
 // degli opachi, dietro il cielo e lo skyline, davanti ai fiori trasparenti -- e
 // ognuna di quelle relazioni porta peso: la copertura si fonde contro un cielo
 // che c'e' gia', e la profondita' di tutta la prateria entra nel buffer prima
 // che i fiori ci passino sopra. Le due maglie devono stare nello stesso posto o
-// non sono due versioni di una cosa.
+// non sono due versioni di una cosa. Da U-CAMPO-6 sono TRE -- il marciatore, la
+// ricomposizione e la ricomposizione che marcia i bordi -- e la regola vale
+// sulle tre allo stesso modo e per la stessa ragione.
 const orders = [...MATERIAL.matchAll(/mesh\.renderOrder = (\d+);/g)].map((m) => Number(m[1]));
-report.check(orders.length === 2 && orders[0] === orders[1],
-  'le due maglie stanno nello STESSO posto nell ordine degli opachi',
+report.check(orders.length === 3 && orders.every((o) => o === orders[0]),
+  'le tre maglie stanno nello STESSO posto nell ordine degli opachi',
   `renderOrder ${orders.join(' e ')}`);
 
 // ================================================= 2. LA COPERTURA, TRE PORTE

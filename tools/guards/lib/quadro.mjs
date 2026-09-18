@@ -274,7 +274,7 @@ const RECORDER = () => {
       out.log = gl.getProgramInfoLog(record.program) || '';
     }
     for (const shader of record.shaders) {
-      const stage = { stage: '?', compiled: null, log: '', uniforms: [], lines: 0 };
+      const stage = { stage: '?', compiled: null, log: '', uniforms: [], defines: [], lines: 0 };
       try {
         stage.stage = gl.getShaderParameter(shader, gl.SHADER_TYPE) === gl.VERTEX_SHADER
           ? 'vertex' : 'fragment';
@@ -287,6 +287,16 @@ const RECORDER = () => {
         // more than the frame it is reporting on. The compiler's own log is
         // what a failure needs, and that comes back whole.
         stage.uniforms = [...source.matchAll(/^\s*uniform\s+\w+\s+(\w+)/gm)].map((m) => m[1]);
+        // AND WHICH DOORS OF IT ARE OPEN, which is a second fingerprint and not
+        // a convenience. The names above are read off the SOURCE, because a
+        // uniform nobody used is stripped by the linker and would vanish from
+        // the census; but a source is also allowed to carry a declaration
+        // behind a `#ifdef` that this build does not take, and then two
+        // programs cut from ONE text declare the same names and are told apart
+        // by nothing at all. The ground is exactly that since U-CAMPO-6: the
+        // marcher and the recomposition that marches its edges are one text
+        // with two doors, and the define is which one was opened.
+        stage.defines = [...source.matchAll(/^\s*#define\s+(\w+)/gm)].map((m) => m[1]);
       } catch { /* the program was disposed of; `alive` already says so */ }
       out.stages.push(stage);
     }
