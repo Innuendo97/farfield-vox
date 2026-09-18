@@ -113,6 +113,24 @@ import { SPAWN } from '../layout.js';
  *                  a occhio, e se il committente la preferisce si accende con
  *                  una lettera. Senza memoria non ha effetto: un raggio
  *                  spostato e mai sommato è solo un altro scintillio
+ *   camporimarcia=1[,portata]
+ *                  LA RI-MARCIA DEI PIXEL DI BORDO A PIENA RISOLUZIONE, spenta
+ *                  di default e spenta in ciò che si spedisce. Dove i quattro
+ *                  texel intorno a un pixel non sono d'accordo — il cancello ne
+ *                  scarta uno, la copertura è frazionaria, o uno ha trovato
+ *                  suolo e un altro no — il pixel smette di sceglierne uno e
+ *                  marcia UN RAGGIO SUO, alla direzione del pixel del
+ *                  fotogramma, attraverso lo stesso march() e lo stesso
+ *                  shade(), e scrive colore, copertura e profondità suoi.
+ *                  Altrove è la ricomposizione di oggi, texel per texel, con la
+ *                  memoria sotto se accesa. «portata» è quanti metri dal texel
+ *                  di riferimento vale la pena tirare un raggio, e senza di
+ *                  essa vale CAMPO_REMARCH_REACH (20 m): è la leva del costo.
+ *                  `camporimarcia=0` è esattamente ciò che si spedisce, e non
+ *                  perché un ramo valga nought ma perché il programma che
+ *                  marcia non viene nemmeno costruito. Vale solo dove il campo
+ *                  ha un bersaglio suo: a campores=1 il suolo è già marciato al
+ *                  pixel del fotogramma e non c'è nessuna ricomposizione
  *   campozone=0    bind the NEUTRAL zone instead of the delivered map, which
  *                  is the null arm this term is priced against: one fetch and
  *                  one multiply, in the field and in the three programs of the
@@ -179,6 +197,21 @@ function memoriaAsked(raw) {
  */
 const MEMORIA_DEFAULT = 0.95;
 
+/**
+ * La ri-marcia dei bordi come la chiede un indirizzo: `0`, `1` o `1,portata`.
+ *
+ * Letta a parte da «non detto», come la memoria sopra e per la stessa ragione:
+ * un banco che tiene il braccio nullo dev'essere capace di SCRIVERLO, e una
+ * regola che trattasse `0` come assente gli restituirebbe il default.
+ */
+function rimarciaAsked(raw) {
+  if (raw === null) return null;
+  const n = raw.split(',').map(Number);
+  if (!(n[0] > 0)) return { on: false, reach: null };
+  const reach = n.length > 1 && Number.isFinite(n[1]) && n[1] > 0 ? n[1] : null;
+  return { on: true, reach };
+}
+
 /** Two numbers off an address, for the handles that come in pairs. */
 function pairAsked(raw) {
   if (!raw) return null;
@@ -216,6 +249,7 @@ function asked() {
     campoRes: query.get('campores') === null ? null : Number(query.get('campores')),
     campoMemoria: memoriaAsked(query.get('campomemoria')),
     campoJitter: query.get('campojitter') === '1',
+    campoRimarcia: rimarciaAsked(query.get('camporimarcia')),
   };
 }
 
@@ -360,6 +394,15 @@ const layer = {
       layer.campo.setMemory(
         wanted.campoMemoria ? wanted.campoMemoria.weight : 0, wanted.campoJitter,
       );
+      // E SE I BORDI DEL SUOLO DEVONO MARCIARE DA SÉ. Chiesta QUI, nello stesso
+      // passo in cui il campo nasce e prima che l'arrivo scaldi qualunque cosa,
+      // perché il programma che marcia è grande e va compilato dal driver sui
+      // suoi thread e non sul fotogramma che lo disegnerebbe per primo — che è
+      // tutto il mestiere di warm() in ../../core/post.js. Spenta se l'indirizzo
+      // non dice niente, e spenta è ciò che si spedisce.
+      if (wanted.campoRimarcia && wanted.campoRimarcia.on) {
+        layer.campo.setRemarch(true, wanted.campoRimarcia.reach);
+      }
       // AND WHERE THE ADDRESS SAYS NOTHING, THE TIER'S OWN FRACTION -- REPLAYED
       // ONTO A FIELD THAT DID NOT EXIST WHEN THE TIER WAS CHOSEN.
       //

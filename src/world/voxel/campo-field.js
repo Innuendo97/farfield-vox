@@ -8,7 +8,9 @@ import {
   CAMPO, CAMPO_BEARINGS, CAMPO_BIAS, CAMPO_FAR, CAMPO_HORIZON_REACH,
   campoCoarseSpan, campoFarOrigin, campoHorizon, campoSkyBound,
 } from './campo.js';
-import { campoBox, campoMaterial, campoResolve } from './campo-material.js';
+import {
+  CAMPO_REMARCH_REACH, campoBox, campoMaterial, campoRemarch, campoResolve,
+} from './campo-material.js';
 import { CAMPO_MEMORY, campoUniforms } from '../../core/post.js';
 
 // THE TWO WINDOWS THE GROUND IS KEPT IN, AND THE ONE CALL THAT MOVES THEM.
@@ -199,7 +201,8 @@ export function createCampo({
   //
   // Asking for the seat is what tells the post chain there is a field to draw
   // apart, so it is asked for once, here, at the moment the field is built.
-  const resolve = campoResolve(campoUniforms());
+  const seat = campoUniforms();
+  const resolve = campoResolve(seat);
   // AND ONE DIAL FOR BOTH SIDES OF THE SEAM. `campodebug` is written on the
   // FIELD's uniforms by src/world/layers/v1-suolo.js, and the recomposition
   // carried a uDebug of its own that nothing ever wrote: every mode it
@@ -210,6 +213,53 @@ export function createCampo({
   resolve.material.uniforms.uDebug = material.uniforms.uDebug;
   resolve.visible = false;
   group.add(resolve);
+
+  // ==========================================================================
+  //          AND A THIRD MESH, WHICH IS THE RECOMPOSITION THAT MARCHES
+  // ==========================================================================
+  //
+  // THREE MESHES, ONE FIELD, AND STILL EXACTLY ONE OF THEM DRAWS. The marcher
+  // above stands on CAMPO_LAYER, so the frame decides whether the ground is
+  // drawn at the frame's own pixel or into a buffer of its own; the plain
+  // recomposition puts that buffer back; and this one puts it back AND fires a
+  // ray of its own wherever the four texels under a pixel do not agree (see
+  // campoRemarch in ./campo-material.js and the CAMPO_RESOLVE half of its
+  // FRAGMENT). Which of the two recompositions is on is applyResolve() below,
+  // and it can never be both.
+  //
+  // IT IS BUILT ONLY WHEN SOMEBODY ASKS, AND THAT IS THE NULL. A program this
+  // size is a compile the driver has to do, and warm() in src/core/post.js
+  // compiles every material that is IN THE SCENE, visible or not -- so a world
+  // that never wants the re-march must not have this mesh at all, or every
+  // arrival pays for a program no frame will ever draw. Asked for, it is built
+  // here, before the arrival warms anything, and the compile lands on the
+  // driver's own threads instead of on the frame that would have paid it.
+  //
+  // AND WHAT THAT BUYS IS A NULL THAT IS NOT AN ARGUMENT ABOUT A BRANCH: with
+  // the handle off, the mesh that draws is the mesh that has always drawn, with
+  // the program that has always drawn, and the byte of the frame is today's
+  // because it is the same draw and not because a uniform was nought.
+  let remarch = null;
+  let remarchWanted = false;
+  let remarchReach = CAMPO_REMARCH_REACH;
+
+  function buildRemarch() {
+    if (remarch) return remarch;
+    remarch = campoRemarch(seat, material, resolve.material.uniforms, remarchReach);
+    remarch.material.uniforms.uDebug = material.uniforms.uDebug;
+    remarch.visible = false;
+    group.add(remarch);
+    return remarch;
+  }
+
+  /** Which of the two recompositions draws, and it is never both and never two. */
+  function applyResolve() {
+    const composing = fieldScale < 1;
+    const marching = composing && remarchWanted && remarch !== null;
+    resolve.visible = composing && !marching;
+    if (remarch) remarch.visible = marching;
+  }
+
   let fieldScale = 1;
 
   const stats = {
@@ -616,7 +666,7 @@ export function createCampo({
      */
     setScale(scale) {
       fieldScale = Math.min(1, Math.max(0.25, Number(scale) || 1));
-      resolve.visible = fieldScale < 1;
+      applyResolve();
       return fieldScale;
     },
 
@@ -652,6 +702,74 @@ export function createCampo({
 
     /** What was asked for, read back rather than deduced. */
     memory() { return { weight: CAMPO_MEMORY.weight, jitter: CAMPO_MEMORY.jitter }; },
+
+    /**
+     * WHETHER THE EDGES OF THE GROUND ARE RESOLVED AT THE FRAME'S OWN PIXEL.
+     *
+     * The recomposition weighs four texels of a buffer that stands at a
+     * fraction of a side, and where those four do not agree -- an arris, a rim,
+     * the lip of a terrace -- it is right not to average them and wrong to have
+     * to choose one, because either answer is a step of one to three pixels
+     * that jumps a whole texel when the view moves by a fraction of one. Turned
+     * on, those pixels stop choosing and march a ray of their own, at the
+     * frame's resolution, through the same march() and shade() as everything
+     * else on this ground.
+     *
+     * OFF IS WHAT SHIPS, AND OFF IS A DIFFERENT DRAW AND NOT A DEAD BRANCH: the
+     * marching material is not built until this is first asked for, and the
+     * plain recomposition is the mesh that goes on drawing. Ask for it once, at
+     * the moment the layer is built, and warm() has it before the arrival; ask
+     * for it later and the driver compiles it on the frame it is first drawn,
+     * which is a hitch a bench takes on purpose and a visitor never should.
+     *
+     * IT IS NOT A PROMISE THAT IT RUNS, on the same rule as setMemory: at scale
+     * one the ground is marched at the frame's own pixel already and there is
+     * no recomposition at all, so there is nothing to sharpen and this draws
+     * nothing. remarch() reports what actually happened.
+     *
+     * @param {boolean} on    whether the edges march
+     * @param {number} reach  how far from the pixel's own tap an edge is still
+     *                        worth a ray, in metres. Left out, what is already
+     *                        set, which starts at CAMPO_REMARCH_REACH.
+     */
+    setRemarch(on, reach = null) {
+      const want = Boolean(on);
+      const metres = Number(reach);
+      if (Number.isFinite(metres) && metres > 0) remarchReach = metres;
+      if (want) buildRemarch();
+      if (remarch) remarch.material.uniforms.uRemarchReach.value = remarchReach;
+      remarchWanted = want;
+      applyResolve();
+      return remarchWanted && remarch !== null;
+    },
+
+    /**
+     * THE BENCH'S TWO ARMS ON THE RE-MARCH, and neither is a thing a visitor
+     * can reach: `all` fires a ray at EVERY pixel inside the reach, which is
+     * the same work laid out coherently and is how the price of the divergence
+     * is read; `show` paints the pixels that fired one red and the rest of the
+     * ground black, which is how they are counted.
+     */
+    setRemarchProbe({ all = null, show = null } = {}) {
+      if (!remarch) return null;
+      const u = remarch.material.uniforms;
+      if (all !== null) u.uRemarchAll.value = all ? 1 : 0;
+      if (show !== null) u.uRemarchShow.value = show ? 1 : 0;
+      return { all: u.uRemarchAll.value === 1, show: u.uRemarchShow.value === 1 };
+    },
+
+    /** What the re-march is doing, read back rather than deduced. */
+    remarch() {
+      const u = remarch ? remarch.material.uniforms : null;
+      return {
+        asked: remarchWanted,
+        built: remarch !== null,
+        drawing: remarch !== null && remarch.visible,
+        reach: remarchReach,
+        all: u ? u.uRemarchAll.value === 1 : false,
+        show: u ? u.uRemarchShow.value === 1 : false,
+      };
+    },
 
     /**
      * The renderer, which this needs for one thing only: the copy.
