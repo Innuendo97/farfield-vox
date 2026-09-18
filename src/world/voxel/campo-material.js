@@ -236,11 +236,165 @@ const VERTEX = /* glsl */`
   }
 `;
 
+/**
+ * THE FOUR TAPS, THEIR GATE AND THE RIM: ONE TEXT, READ BY TWO PROGRAMS.
+ *
+ * The recomposition is compiled twice on purpose -- once as the small program
+ * that only ever weighs texels (RESOLVE_FRAGMENT, at the foot of this file)
+ * and once as a door into the field's OWN program, which can also march (the
+ * CAMPO_RESOLVE half of FRAGMENT below) -- and the one thing that must not
+ * follow from that is two opinions about which texel a pixel belongs to. So
+ * the uniforms, the taps, the gate and the rim are spliced into both from
+ * HERE, character for character; what the marching one adds it adds BETWEEN
+ * them and nowhere else, and what it may not do is move the picture the
+ * handle is off in.
+ */
+const RESOLVE_UNIFORMS = /* glsl */`
+  uniform sampler2D tCampo;
+  uniform sampler2D tCampoDepth;
+  uniform vec2 uCampoSize;
+  uniform float uCampoOn;
+  uniform vec2 uFrameSize;
+  uniform float uEdge;
+  uniform float uEdgeFloor;
+  uniform float uCoverage;
+`;
+
+/** From the four taps to rgb, depth, mass, cover and dropped. */
+const RESOLVE_CORE = /* glsl */`
+    // The null, and it is a whole pixel of nothing: with no field buffer bound
+    // there is no ground to put back, and the field's own mesh is drawn in the
+    // world's pass instead. See CAMPO_LAYER in src/core/post.js.
+    if (uCampoOn < 0.5) discard;
+
+    // Where this pixel's CENTRE falls in the reduced buffer, in texel units
+    // with the half texel taken off, so «base» is the lower left of the four
+    // that surround it -- the footing a bilinear tap stands on.
+    vec2 t = (gl_FragCoord.xy / uFrameSize) * uCampoSize - 0.5;
+    vec2 base = floor(t);
+    vec2 f = t - base;
+    ivec2 lim = ivec2(uCampoSize) - 1;
+    ivec2 b = ivec2(base);
+
+    ivec2 at[4];
+    at[0] = clamp(b,               ivec2(0), lim);
+    at[1] = clamp(b + ivec2(1, 0), ivec2(0), lim);
+    at[2] = clamp(b + ivec2(0, 1), ivec2(0), lim);
+    at[3] = clamp(b + ivec2(1, 1), ivec2(0), lim);
+
+    vec4 c[4];
+    float d[4];
+    float w[4];
+    w[0] = (1.0 - f.x) * (1.0 - f.y);
+    w[1] = f.x * (1.0 - f.y);
+    w[2] = (1.0 - f.x) * f.y;
+    w[3] = f.x * f.y;
+    for (int i = 0; i < 4; i++) {
+      c[i] = texelFetch(tCampo, at[i], 0);
+      d[i] = texelFetch(tCampoDepth, at[i], 0).x;
+    }
+
+    // I MODI DI DIAGNOSI, prima di ogni cancello: quello che il quadro LEGGE,
+    // separato da quello che ne fa. 3 il colore del texel, 4 la sua copertura,
+    // 5 la sua profondita', 6 il quadro intero in magenta.
+    //
+    // E SOPRA IL 6 IL TEXEL PASSA COM'E'. I modi del CAMPO stanno sull'altra
+    // sponda della stessa cucitura -- uDebug e' un solo seggio, condiviso per
+    // riferimento (campoResolve(seat)) -- e il 7 di U-SUOLO-3 dipinge di verde
+    // le traversate CHIUSE. Una ricomposizione che ci mettesse sopra il proprio
+    // magenta cancellerebbe la ricevuta prima che qualcuno la conti; e la
+    // profondita' resta quella vera, perche' il selciato del corridoio va
+    // ancora composto con la terra e non davanti a essa.
+    if (uDebug > 2.5) {
+      int r0 = (f.x >= 0.5 ? 1 : 0) + (f.y >= 0.5 ? 2 : 0);
+      vec3 show = uDebug < 3.5 ? c[r0].rgb
+        : uDebug < 4.5 ? vec3(c[r0].a)
+        : uDebug < 5.5 ? vec3(pow(d[r0], 64.0))
+        : uDebug < 6.5 ? (c[r0].a > 0.0 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 1.0))
+        : c[r0].rgb;
+      fragColour = vec4(show, 1.0);
+      gl_FragDepth = (uDebug > 5.5 && uDebug < 6.5) ? 0.0 : d[r0];
+      return;
+    }
+
+    // THE TAP THIS PIXEL IS ACTUALLY IN, which is the one the gate clusters
+    // around. Not the nearest of the four and not the mean of them: a pixel
+    // belongs to one texel of the reduced buffer, and at an edge the honest
+    // answer is the side of the edge it is on.
+    int ref = (f.x >= 0.5 ? 1 : 0) + (f.y >= 0.5 ? 2 : 0);
+    if (c[ref].a <= 0.0) {
+      // It fell on sky. Then this pixel is on the rim, and what it clusters
+      // around is the heaviest neighbour that DID find ground -- so the colour
+      // comes from the ridge and the coverage from how much of the pixel the
+      // ridge holds.
+      float best = -1.0;
+      for (int i = 0; i < 4; i++) {
+        if (c[i].a > 0.0 && w[i] > best) { best = w[i]; ref = i; }
+      }
+      if (best < 0.0) discard;
+    }
+    float dr = d[ref];
+
+    float gx = min(abs(d[1] - d[0]), abs(d[3] - d[2]));
+    float gy = min(abs(d[2] - d[0]), abs(d[3] - d[1]));
+    float tol = uEdge * (gx + gy) + uEdgeFloor;
+
+    vec3 rgb = vec3(0.0);
+    float depth = 0.0;
+    float mass = 0.0;
+    // The whole neighbourhood's coverage, gate or no gate: what is being asked
+    // here is how much of this pixel is ground at all, and a tap dropped for
+    // standing on the far side of an arris is still ground.
+    float cover = 0.0;
+    float dropped = 0.0;
+    for (int i = 0; i < 4; i++) {
+      float a = c[i].a;
+      cover += w[i] * a;
+      float keep = (a > 0.0 && abs(d[i] - dr) <= tol) ? 1.0 : 0.0;
+      dropped += (a > 0.0 ? 1.0 : 0.0) * (1.0 - keep);
+      float m = w[i] * a * keep;
+      rgb += c[i].rgb * m;
+      depth += d[i] * m;
+      mass += m;
+    }
+    if (mass <= 0.0) discard;
+    rgb /= mass;
+    depth /= mass;`;
+
+/** And from those to the rim, the diagnosis and the pixel. */
+const RESOLVE_TAIL = /* glsl */`
+
+    // NOUGHT IS THE RIM THAT SHIPPED and one is the rim the coverage pays for.
+    // The binary arm rounds at a half rather than at anything above nothing,
+    // because a rim that turned on at the first lit texel would grow the meadow
+    // by a texel into the sky -- which is the one thing a recomposition is not
+    // allowed to do, and the name for it is a halo.
+    float alpha = mix(step(0.5, cover), clamp(cover, 0.0, 1.0), uCoverage);
+    if (alpha <= 0.0) discard;
+
+    if (uDebug > 0.5) {
+      // 1: where the gate did work, which is where the field's own depth breaks
+      //    -- the arrises, the rim, the lip of a terrace.
+      // 2: the coverage itself, which is where the ridge meets the sky.
+      vec3 mark = uDebug > 1.5 ? vec3(alpha) : mix(rgb, vec3(1.0, 0.1, 0.0), min(1.0, dropped));
+      fragColour = vec4(mark, alpha);
+      gl_FragDepth = depth;
+      return;
+    }
+
+    fragColour = vec4(rgb, alpha);
+    gl_FragDepth = depth;`;
+
 const FRAGMENT = /* glsl */`
   precision highp float;
   precision highp int;
 
+#ifndef CAMPO_RESOLVE
+  // THE POINT ON THE BOX THIS FRAGMENT STANDS ON, which is how the marcher
+  // aims its ray. The recomposition has no box: its quad is handed over in
+  // clip space and it unprojects instead. See the CAMPO_RESOLVE half below.
   in vec3 vWorld;
+#endif
   out vec4 fragColour;
 
   uniform sampler2D tField;
@@ -1230,6 +1384,189 @@ const FRAGMENT = /* glsl */`
     return vec4(colour, 1.0);
   }
 
+#ifdef CAMPO_RESOLVE
+
+  // ==========================================================================
+  //      THE OTHER DOOR INTO THIS PROGRAM: THE RECOMPOSITION THAT MARCHES
+  // ==========================================================================
+  //
+  // THE DEFECT, IN THE COMMITTENTE'S OWN WORDS. «Bordi a scaletta che tremano»
+  // on the meadow and on the earth, worse at the low tier. The field asks its
+  // question ONCE PER TEXEL of a buffer that stands at a fraction of a side, so
+  // the ground is decided at 0.75, 0.43 and 0.38 of a screen pixel; the four
+  // taps of the recomposition weigh those texels but by design do NOT blend
+  // across an arris, because at the edge of a cube the honest answer is the
+  // side the pixel is on. Every silhouette therefore lands on a step of one to
+  // three pixels, and the step jumps a whole texel when the view moves by a
+  // fraction of one -- which it always does, because the body breathes.
+  //
+  // U-CAMPO-5 built the temporal memory and took 3 to 20% off the sparkle at no
+  // cost at all, and THE STAIRCASE DID NOT MOVE: the plates show the same
+  // steps. It cannot move, because a sum of frames each decided at a third of a
+  // pixel is still a picture decided at a third of a pixel.
+  //
+  // THE CURE, AND IT IS THE ROAD THE COMMITTENTE CHOSE. Where the four texels
+  // DO NOT AGREE, the pixel stops choosing between them and asks the question
+  // itself: one ray, at the frame's own resolution, down the frame's own
+  // direction, through the same two pictures, with the same march() and the
+  // same shade(). Which is why this is a DEFINE on the field's own program and
+  // not a second shader: a second shader would be a second opinion about what a
+  // blade looks like, and the one property this campaign is built on is that
+  // there is one arithmetic for the ground.
+  //
+  // WHERE IT DOES NOT MARCH: past uRemarchReach metres from the tap the pixel
+  // stands on. At twenty metres a ten centimetre cube is already under the
+  // pixel and a step of one pixel is not a step anybody can see; and the reach
+  // is the whole of the cost, because both the number of pixels that disagree
+  // and the length of the march they would pay grow with what is in frame.
+  //
+  // WHAT IT DOES NOT TOUCH. Everywhere the four agree this is the
+  // recomposition of today, texel for texel, with the memory underneath it if
+  // the memory is on -- and the same is true of the marcher's own fragment,
+  // which is not one character different. The null is not an argument about a
+  // branch either: the handle that is off does not BUILD this program, and the
+  // mesh that draws is the one that has always drawn (see campoRemarch and
+  // setRemarch in ../voxel/campo-field.js).
+
+  // WHETHER THE EDGE MARCHES AT ALL, and it is a uniform inside a program that
+  // only exists when the handle asked for it: the handle decides which MESH
+  // draws, and this decides nothing on a frame nobody asked for.
+  uniform float uRemarch;
+  /** How far from the reference tap, in METRES, an edge is still worth a ray. */
+  uniform float uRemarchReach;
+  // THE BENCH'S OWN ARM FOR THE DIVERGENCE, and it is a measurement and not a
+  // taste. The pixels that disagree are SCATTERED: in a warp of thirty two,
+  // four may march and twenty eight wait for them, so the march is paid for by
+  // pixels that never take it. At one, every pixel inside the reach marches --
+  // the same work laid out coherently -- and the two costs divided by their two
+  // pixel counts are what says whether a mask pass would buy anything.
+  uniform float uRemarchAll;
+  // AND WHERE IT MARCHED, for the count: red where the ray was fired, black on
+  // the ground where it was not, in front of everything so a plate can be
+  // counted. The sky is left alone, and the arm is counted against the same
+  // plate with uRemarch at nought, which is the control.
+  uniform float uRemarchShow;
+  // THE FRAME'S OWN UNPROJECTION. The quad is handed over in clip space and has
+  // no vWorld to take a direction from, so the direction is solved here -- and
+  // the same matrix answers the other question, which is how far away in METRES
+  // the tap this pixel stands on is, for the reach.
+  uniform mat4 uInvViewProjection;
+${RESOLVE_UNIFORMS}
+  void main() {${RESOLVE_CORE}
+
+    // ---------------------------------------------- AND HERE THE EDGE MARCHES
+    //
+    // THREE QUESTIONS, AND A PIXEL THAT ANSWERS YES TO ANY OF THEM IS A PIXEL
+    // WHOSE FOUR TEXELS ARE NOT DESCRIBING ONE SURFACE.
+    //
+    //   THE GATE DROPPED A TAP. Two of these taps stand on either side of an
+    //   arris, a rim or the lip of a terrace, and their depths are further
+    //   apart than the local slope allows -- so the recomposition is already
+    //   refusing to average them, rightly, and that refusal IS the step.
+    //
+    //   THE COVERAGE IS A FRACTION. Some of this pixel is ground and some of it
+    //   is not, at the reduced buffer's own resolution.
+    //
+    //   ONE TAP FOUND GROUND AND ANOTHER FOUND NONE. Which is the same edge the
+    //   coverage sees, asked of the taps instead of of their weighted sum, so
+    //   that a pixel sitting on a texel centre -- where one weight is one and
+    //   the other three are nought, and the fraction collapses -- is not missed.
+    //
+    // AND THE REACH IS MEASURED TO THE TAP AND NOT ALONG THE RAY, because the
+    // ray has not been fired yet: the reference tap's own depth, unprojected at
+    // this pixel, is where the ground under this pixel already is.
+    if (uRemarch > 0.5) {
+      bool anyGround = false;
+      bool anySky = false;
+      for (int i = 0; i < 4; i++) {
+        if (c[i].a > 0.0) anyGround = true; else anySky = true;
+      }
+      bool disagree = dropped > 0.0 || (cover > 0.0 && cover < 1.0)
+        || (anyGround && anySky);
+      vec3 eye = cameraPosition;
+      vec2 ndc = (gl_FragCoord.xy / uFrameSize) * 2.0 - 1.0;
+      vec4 atRef = uInvViewProjection * vec4(ndc, dr * 2.0 - 1.0, 1.0);
+      float refDist = distance(atRef.xyz / atRef.w, eye);
+      bool go = (disagree || uRemarchAll > 0.5) && refDist <= uRemarchReach;
+      if (uRemarchShow > 0.5) {
+        fragColour = vec4(go ? 1.0 : 0.0, 0.0, 0.0, 1.0);
+        gl_FragDepth = 0.0;
+        return;
+      }
+      if (go) {
+        // THE DIRECTION OF THE PIXEL AND NOT OF THE TEXEL, which is the whole
+        // of what this buys. Unprojected on the far plane, so it is the ray the
+        // frame's own projection draws through this pixel's centre, whatever
+        // lens the camera is wearing and wherever the walker is standing.
+        vec4 atFar = uInvViewProjection * vec4(ndc, 1.0, 1.0);
+        vec3 dir = normalize(atFar.xyz / atFar.w - eye);
+        // No axis exactly nought, exactly as the marcher's own fragment nudges
+        // them, so that every reciprocal below is a number.
+        dir.x = abs(dir.x) < 1e-6 ? 1e-6 : dir.x;
+        dir.y = abs(dir.y) < 1e-6 ? 1e-6 : dir.y;
+        dir.z = abs(dir.z) < 1e-6 ? 1e-6 : dir.z;
+        vec3 inv = 1.0 / dir;
+        // WHERE THE RAY ENTERS THE WINDOW, solved and not interpolated, because
+        // the box draws its back faces and the walker stands inside it.
+        //
+        // AND THESE TEN LINES ARE THE MARCHER'S OWN, WRITTEN A SECOND TIME ON
+        // PURPOSE. Lifting them into a function both mains call would rewrite
+        // the marcher's fragment -- and the marcher's fragment is drawn on
+        // every frame, at every tier, whether this handle is on or off, so the
+        // one thing it may not do is move a byte of the picture this handle is
+        // supposed to leave exactly alone. march() and shade(), which are the
+        // hundreds of lines that actually decide what the ground looks like,
+        // are not written twice and are the reason this is a define.
+        vec3 lo = vec3(uFarBounds.x, uHeight.x, uFarBounds.y);
+        vec3 hi = vec3(uFarBounds.z, uHeight.y, uFarBounds.w);
+        vec3 ea = (lo - eye) * inv;
+        vec3 eb = (hi - eye) * inv;
+        vec3 nearT = min(ea, eb);
+        vec3 farT = max(ea, eb);
+        float tEnter = max(max(nearT.x, nearT.y), max(nearT.z, 0.0));
+        float tLeave = min(farT.x, min(farT.y, farT.z));
+        if (tLeave > tEnter) {
+          // The dither of the detail, the pixel's own and not the frame's, and
+          // at the uDither that ships (nought) it is exactly one half and the
+          // ladder does not move at all.
+          float dither = uDither * (pigHash(gl_FragCoord.x, gl_FragCoord.y) - 0.5) + 0.5;
+          Hit hit = march(eye, dir, inv, tEnter, tLeave, dither);
+          vec4 own = shade(dir, hit);
+          // ITS OWN COLOUR, ITS OWN COVERAGE AND ITS OWN DEPTH.
+          //
+          // THE COVERAGE OF ONE RAY IS ONE OR NOUGHT, and that is not a
+          // shortcut: at the frame's own pixel the question «is this pixel
+          // ground» HAS an answer, where at a third of a pixel it only ever had
+          // a fraction. It is handed back through «cover» rather than written
+          // over 'alpha', so it goes through the same rim rule the reduced
+          // buffer's own coverage goes through below and uCoverage keeps
+          // meaning what it means.
+          //
+          // AND NOUGHT IS AN ANSWER TOO. A ray that finds nothing, or that
+          // stops on the corridor -- which shade() stands aside on, because
+          // src/world/path.js draws that stone -- leaves the coverage at nought
+          // and the pixel is discarded below. That is the sharpening this
+          // buys at the foot of the paving as much as on an arris: today the
+          // recomposition would reach for the heaviest neighbour that found
+          // ground and paint a texel of meadow over the kerb.
+          //
+          // AND THE DEPTH IS THE RAY'S OWN, so the flowers, the feet of the
+          // monoliths and the walker keep cutting this pixel exactly where they
+          // cut the texels around it -- per whole pixel, as they already did.
+          cover = own.a;
+          if (own.a > 0.0) {
+            rgb = own.rgb;
+            vec4 clip = uViewProjection * vec4(eye + dir * hit.t, 1.0);
+            depth = (clip.z / clip.w) * 0.5 + 0.5;
+          }
+        }
+      }
+    }
+${RESOLVE_TAIL}
+  }
+
+#else
+
   void main() {
     vec3 eye = cameraPosition;
     vec3 dir0 = normalize(vWorld - eye);
@@ -1385,6 +1722,7 @@ const FRAGMENT = /* glsl */`
     gl_FragDepth = (clip.z / clip.w) * 0.5 + 0.5;
 #endif
   }
+#endif
 `;
 
 /**
@@ -1715,137 +2053,9 @@ const RESOLVE_FRAGMENT = /* glsl */`
   precision highp int;
 
   out vec4 fragColour;
+${RESOLVE_UNIFORMS}  uniform float uDebug;
 
-  uniform sampler2D tCampo;
-  uniform sampler2D tCampoDepth;
-  uniform vec2 uCampoSize;
-  uniform float uCampoOn;
-  uniform vec2 uFrameSize;
-  uniform float uEdge;
-  uniform float uEdgeFloor;
-  uniform float uCoverage;
-  uniform float uDebug;
-
-  void main() {
-    // The null, and it is a whole pixel of nothing: with no field buffer bound
-    // there is no ground to put back, and the field's own mesh is drawn in the
-    // world's pass instead. See CAMPO_LAYER in src/core/post.js.
-    if (uCampoOn < 0.5) discard;
-
-    // Where this pixel's CENTRE falls in the reduced buffer, in texel units
-    // with the half texel taken off, so «base» is the lower left of the four
-    // that surround it -- the footing a bilinear tap stands on.
-    vec2 t = (gl_FragCoord.xy / uFrameSize) * uCampoSize - 0.5;
-    vec2 base = floor(t);
-    vec2 f = t - base;
-    ivec2 lim = ivec2(uCampoSize) - 1;
-    ivec2 b = ivec2(base);
-
-    ivec2 at[4];
-    at[0] = clamp(b,               ivec2(0), lim);
-    at[1] = clamp(b + ivec2(1, 0), ivec2(0), lim);
-    at[2] = clamp(b + ivec2(0, 1), ivec2(0), lim);
-    at[3] = clamp(b + ivec2(1, 1), ivec2(0), lim);
-
-    vec4 c[4];
-    float d[4];
-    float w[4];
-    w[0] = (1.0 - f.x) * (1.0 - f.y);
-    w[1] = f.x * (1.0 - f.y);
-    w[2] = (1.0 - f.x) * f.y;
-    w[3] = f.x * f.y;
-    for (int i = 0; i < 4; i++) {
-      c[i] = texelFetch(tCampo, at[i], 0);
-      d[i] = texelFetch(tCampoDepth, at[i], 0).x;
-    }
-
-    // I MODI DI DIAGNOSI, prima di ogni cancello: quello che il quadro LEGGE,
-    // separato da quello che ne fa. 3 il colore del texel, 4 la sua copertura,
-    // 5 la sua profondita', 6 il quadro intero in magenta.
-    //
-    // E SOPRA IL 6 IL TEXEL PASSA COM'E'. I modi del CAMPO stanno sull'altra
-    // sponda della stessa cucitura -- uDebug e' un solo seggio, condiviso per
-    // riferimento (campoResolve(seat)) -- e il 7 di U-SUOLO-3 dipinge di verde
-    // le traversate CHIUSE. Una ricomposizione che ci mettesse sopra il proprio
-    // magenta cancellerebbe la ricevuta prima che qualcuno la conti; e la
-    // profondita' resta quella vera, perche' il selciato del corridoio va
-    // ancora composto con la terra e non davanti a essa.
-    if (uDebug > 2.5) {
-      int r0 = (f.x >= 0.5 ? 1 : 0) + (f.y >= 0.5 ? 2 : 0);
-      vec3 show = uDebug < 3.5 ? c[r0].rgb
-        : uDebug < 4.5 ? vec3(c[r0].a)
-        : uDebug < 5.5 ? vec3(pow(d[r0], 64.0))
-        : uDebug < 6.5 ? (c[r0].a > 0.0 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 1.0))
-        : c[r0].rgb;
-      fragColour = vec4(show, 1.0);
-      gl_FragDepth = (uDebug > 5.5 && uDebug < 6.5) ? 0.0 : d[r0];
-      return;
-    }
-
-    // THE TAP THIS PIXEL IS ACTUALLY IN, which is the one the gate clusters
-    // around. Not the nearest of the four and not the mean of them: a pixel
-    // belongs to one texel of the reduced buffer, and at an edge the honest
-    // answer is the side of the edge it is on.
-    int ref = (f.x >= 0.5 ? 1 : 0) + (f.y >= 0.5 ? 2 : 0);
-    if (c[ref].a <= 0.0) {
-      // It fell on sky. Then this pixel is on the rim, and what it clusters
-      // around is the heaviest neighbour that DID find ground -- so the colour
-      // comes from the ridge and the coverage from how much of the pixel the
-      // ridge holds.
-      float best = -1.0;
-      for (int i = 0; i < 4; i++) {
-        if (c[i].a > 0.0 && w[i] > best) { best = w[i]; ref = i; }
-      }
-      if (best < 0.0) discard;
-    }
-    float dr = d[ref];
-
-    float gx = min(abs(d[1] - d[0]), abs(d[3] - d[2]));
-    float gy = min(abs(d[2] - d[0]), abs(d[3] - d[1]));
-    float tol = uEdge * (gx + gy) + uEdgeFloor;
-
-    vec3 rgb = vec3(0.0);
-    float depth = 0.0;
-    float mass = 0.0;
-    // The whole neighbourhood's coverage, gate or no gate: what is being asked
-    // here is how much of this pixel is ground at all, and a tap dropped for
-    // standing on the far side of an arris is still ground.
-    float cover = 0.0;
-    float dropped = 0.0;
-    for (int i = 0; i < 4; i++) {
-      float a = c[i].a;
-      cover += w[i] * a;
-      float keep = (a > 0.0 && abs(d[i] - dr) <= tol) ? 1.0 : 0.0;
-      dropped += (a > 0.0 ? 1.0 : 0.0) * (1.0 - keep);
-      float m = w[i] * a * keep;
-      rgb += c[i].rgb * m;
-      depth += d[i] * m;
-      mass += m;
-    }
-    if (mass <= 0.0) discard;
-    rgb /= mass;
-    depth /= mass;
-
-    // NOUGHT IS THE RIM THAT SHIPPED and one is the rim the coverage pays for.
-    // The binary arm rounds at a half rather than at anything above nothing,
-    // because a rim that turned on at the first lit texel would grow the meadow
-    // by a texel into the sky -- which is the one thing a recomposition is not
-    // allowed to do, and the name for it is a halo.
-    float alpha = mix(step(0.5, cover), clamp(cover, 0.0, 1.0), uCoverage);
-    if (alpha <= 0.0) discard;
-
-    if (uDebug > 0.5) {
-      // 1: where the gate did work, which is where the field's own depth breaks
-      //    -- the arrises, the rim, the lip of a terrace.
-      // 2: the coverage itself, which is where the ridge meets the sky.
-      vec3 mark = uDebug > 1.5 ? vec3(alpha) : mix(rgb, vec3(1.0, 0.1, 0.0), min(1.0, dropped));
-      fragColour = vec4(mark, alpha);
-      gl_FragDepth = depth;
-      return;
-    }
-
-    fragColour = vec4(rgb, alpha);
-    gl_FragDepth = depth;
+  void main() {${RESOLVE_CORE}${RESOLVE_TAIL}
   }
 `;
 
@@ -1921,6 +2131,117 @@ export function campoResolve(seat) {
     if (target) SCRATCH.set(target.width, target.height);
     else renderer.getDrawingBufferSize(SCRATCH);
     material.uniforms.uFrameSize.value.copy(SCRATCH);
+  };
+  return mesh;
+}
+
+/**
+ * THE DEFAULT REACH OF THE RE-MARCH, IN METRES.
+ *
+ * TWENTY, and the argument is a size and not a taste. A ten centimetre cube at
+ * twenty metres subtends 0.10 / 20 = 5 milliradians; one pixel of the high
+ * tier's frame at 44.2 degrees over 845 rows subtends 0.96 milliradians of
+ * height, so the cube is about five pixels and ITS ARRIS is under one -- which
+ * is the distance at which a step of one pixel stops being a step and starts
+ * being the edge itself. Past it the reduced texel is the honest answer and the
+ * ray would be paid for nothing. It is the one lever the cost is in, so it is a
+ * handle (`camporimarcia=1,PORTATA`) and it is measured at 10, 20 and 40 in the
+ * verbale rather than argued here.
+ */
+export const CAMPO_REMARCH_REACH = 20;
+
+/**
+ * THE OTHER HALF OF THE RECOMPOSITION: THE ONE THAT CAN MARCH.
+ *
+ * Same quad, same order, same blending and the same gate as campoResolve --
+ * because it is the same text (RESOLVE_CORE, RESOLVE_TAIL) -- with the field's
+ * whole program under it, so that a pixel whose four texels disagree can fire
+ * its own ray through march() and shade() instead of choosing between them.
+ *
+ * THE UNIFORMS ARE THE FIELD'S OWN, BY REFERENCE AND NOT BY COPY. Spreading
+ * them takes the `{ value }` holders themselves, so every writer the field
+ * already has -- the window's bounds, the ring of the detail, the zone as it
+ * lands, the sun, the cut -- reaches this program on the same frame it reaches
+ * the marcher, and there is no second place keeping a stale answer. FOUR are
+ * deliberately NOT shared, and each of them is a property of the pass and not
+ * of the world:
+ *
+ *   uPixelScale, WHICH IS THE WHOLE OF POINT SEVEN. Every term of shade() that
+ *   filters below the pixel -- the joint, the arris, the prefilter that widens
+ *   a slim blade -- divides by the footprint of one pixel, and the marcher's
+ *   own is the footprint of a texel of a buffer at 0.75 or 0.5 of a side. A ray
+ *   fired at the FRAME's pixel and filtered at the texel's would draw a joint
+ *   two and a half times too wide on the very pixels this exists to sharpen. So
+ *   this material reads the buffer that is bound when IT draws, which is the
+ *   frame.
+ *
+ *   uViewProjection and uInvViewProjection, the same matrix in both
+ *   directions: the quad is handed over in clip space and has no vWorld, so the
+ *   ray is unprojected rather than interpolated, and the depth it writes goes
+ *   back through the forward matrix exactly as the marcher's does.
+ *
+ *   uJitter, WHICH IS NOUGHT HERE AND STAYS NOUGHT. The sub-texel offset exists
+ *   so that a ground sampled once per texel may be sampled somewhere new each
+ *   frame and the frames added up; the accumulation is the reduced buffer's and
+ *   this pixel is not in it. A re-marched edge has ONE ray and no history --
+ *   the same bargain the masonry has always had -- and moving it under nothing
+ *   would be the sparkle of U-CAMPO-5's second arm with no sum to pay for it.
+ *
+ * @param {object} seat   the chain's own four, from campoUniforms()
+ * @param {object} field  the marcher's material, for its uniforms
+ * @param {object} gate   the plain recomposition's uniforms, so the tolerance
+ *                        of the gate and the rim rule are ONE object for both
+ *                        halves and a bench cannot move one without the other
+ * @param {number} reach  how far an edge is worth a ray, in metres
+ */
+export function campoRemarch(seat, field, gate = null, reach = CAMPO_REMARCH_REACH) {
+  const material = new ShaderMaterial({
+    glslVersion: GLSL3,
+    defines: { CAMPO_RESOLVE: '1' },
+    uniforms: {
+      ...field.uniforms,
+      ...seat,
+      uFrameSize: { value: new Vector2(1, 1) },
+      uEdge: gate ? gate.uEdge : { value: 2.0 },
+      uEdgeFloor: gate ? gate.uEdgeFloor : { value: 1e-5 },
+      uCoverage: gate ? gate.uCoverage : { value: 1 },
+      uRemarch: { value: 1 },
+      uRemarchReach: { value: reach },
+      uRemarchAll: { value: 0 },
+      uRemarchShow: { value: 0 },
+      uViewProjection: { value: new Matrix4() },
+      uInvViewProjection: { value: new Matrix4() },
+      uPixelScale: { value: 0.002 },
+      uJitter: { value: new Vector2(0, 0) },
+    },
+    vertexShader: RESOLVE_VERTEX,
+    fragmentShader: FRAGMENT,
+    blending: CustomBlending,
+    blendSrc: SrcAlphaFactor,
+    blendDst: OneMinusSrcAlphaFactor,
+    transparent: false,
+    side: DoubleSide,
+    fog: false,
+    depthWrite: true,
+    depthTest: true,
+  });
+
+  const mesh = new Mesh(new PlaneGeometry(2, 2), material);
+  mesh.name = 'ground-campo-remarch';
+  mesh.frustumCulled = false;
+  mesh.renderOrder = 10;
+  mesh.onBeforeRender = (renderer, scene, camera) => {
+    const u = material.uniforms;
+    const target = renderer.getRenderTarget();
+    if (target) SCRATCH.set(target.width, target.height);
+    else renderer.getDrawingBufferSize(SCRATCH);
+    u.uFrameSize.value.copy(SCRATCH);
+    // THE FRAME'S OWN FOOTPRINT, the same arithmetic campoBox does for the
+    // marcher and read off the buffer that is bound HERE, which is the frame.
+    const fov = (camera.fov ?? 45) * Math.PI / 180;
+    u.uPixelScale.value = SCRATCH.y > 0 ? 2 * Math.tan(fov / 2) / SCRATCH.y : 0.002;
+    u.uViewProjection.value.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    u.uInvViewProjection.value.copy(u.uViewProjection.value).invert();
   };
   return mesh;
 }
