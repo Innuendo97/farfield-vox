@@ -94,18 +94,25 @@ import { SPAWN } from '../layout.js';
  *                  LA MEMORIA TEMPORALE DEL SUOLO, spenta di default e spenta
  *                  in ciò che si spedisce. Il campo accumula i propri
  *                  fotogrammi precedenti, riproiettati dalla propria
- *                  profondità, mentre il raggio si sposta di meno di un texel a
- *                  ogni fotogramma: i bordi convergono a un'immagine
- *                  sovracampionata invece di scattare a ogni respiro. `peso` è
- *                  quanto del passato un texel tiene, e senza di esso vale
- *                  0,875. `campomemoria=0` è esattamente ciò che si spedisce,
- *                  fino all'ultimo byte del fotogramma. Vale solo dove il campo
- *                  ha un bersaglio suo: a campores=1 non esiste e non viene
- *                  forzata (src/core/post.js)
- *   campojitter=0  la memoria SENZA lo spostamento del raggio, che è la metà da
- *                  cui viene la convergenza: serve a sapere quanto compra
- *                  ciascuna delle due. Senza memoria non ha effetto, perché un
- *                  raggio spostato e mai sommato è solo un altro scintillio
+ *                  profondità: un texel che nel fotogramma prima stava nello
+ *                  stesso posto del mondo torna a valere, e i bordi smettono di
+ *                  scattare a ogni respiro. «peso» è quanto del passato un
+ *                  texel tiene, e senza di esso vale 0,95. `campomemoria=0` è
+ *                  esattamente ciò che si spedisce, fino all'ultimo byte del
+ *                  fotogramma. Vale solo dove il campo ha un bersaglio suo: a
+ *                  campores=1 non esiste e non viene forzata (src/core/post.js)
+ *   campojitter=1  AGGIUNGE lo spostamento sub-texel del raggio sotto la
+ *                  memoria, e di suo è SPENTO. Misurato, non compra: al tier
+ *                  alto, sul respiro, la memoria da sola legge 9,80 / 8,91 /
+ *                  7,37 / 5,88 livelli contro i 10,20 / 9,60 / 8,08 / 5,90 del
+ *                  suolo senza memoria, e con lo scarto legge 9,81 / 8,73 /
+ *                  7,14 / 5,69, che è la stessa cosa. Al movimento RIDOTTO
+ *                  invece lo scarto COSTA — 4,05 contro 2,47 livelli — e cioè
+ *                  fa il contrario di quello che quella scelta chiede. Resta
+ *                  come maniglia perché la sovracampionatura dei bordi si vede
+ *                  a occhio, e se il committente la preferisce si accende con
+ *                  una lettera. Senza memoria non ha effetto: un raggio
+ *                  spostato e mai sommato è solo un altro scintillio
  *   campozone=0    bind the NEUTRAL zone instead of the delivered map, which
  *                  is the null arm this term is priced against: one fetch and
  *                  one multiply, in the field and in the three programs of the
@@ -208,7 +215,7 @@ function asked() {
     campoZone: query.get('campozone') !== '0',
     campoRes: query.get('campores') === null ? null : Number(query.get('campores')),
     campoMemoria: memoriaAsked(query.get('campomemoria')),
-    campoJitter: query.get('campojitter') !== '0',
+    campoJitter: query.get('campojitter') === '1',
   };
 }
 
