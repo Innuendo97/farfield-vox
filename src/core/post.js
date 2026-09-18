@@ -1,6 +1,6 @@
 import {
-  ClampToEdgeWrapping, DataTexture, DepthTexture, HalfFloatType, LinearFilter,
-  LinearSRGBColorSpace, Mesh, NearestFilter, NoBlending, NoToneMapping, OrthographicCamera,
+  AlwaysDepth, ClampToEdgeWrapping, DataTexture, DepthTexture, GLSL3, HalfFloatType, LinearFilter,
+  LinearSRGBColorSpace, Matrix4, Mesh, NearestFilter, NoBlending, NoToneMapping, OrthographicCamera,
   FloatType, PlaneGeometry, RGBAFormat, RGBFormat, RedFormat, Scene, ShaderMaterial, Texture,
   UnsignedByteType, UnsignedInt101111Type, UnsignedIntType, Vector2, Vector3, Vector4,
   WebGLRenderTarget,
@@ -177,6 +177,16 @@ const FULLSCREEN_VERTEX = /* glsl */`
   varying vec2 vUv;
   void main() {
     vUv = uv;
+    gl_Position = vec4(position.xy, 0.0, 1.0);
+  }
+`;
+
+// The same two triangles for a program written in the modern dialect, where a
+// `varying` is a syntax error and the one pass that needs the dialect -- the
+// ground's memory, which fetches whole texels and cannot do it with a filter in
+// the way -- reads its own place off gl_FragCoord and wants no interpolant.
+const FULLSCREEN_VERTEX_300 = /* glsl */`
+  void main() {
     gl_Position = vec4(position.xy, 0.0, 1.0);
   }
 `;
@@ -2574,6 +2584,38 @@ const CAMPO_SEAT = {
   uCampoOn: { value: 0 },
 };
 
+/**
+ * THE SUB-TEXEL OFFSET OF THE FIELD'S RAYS, one object behind every copy.
+ *
+ * The marcher declares `uJitter` and takes this by reference
+ * (src/world/voxel/campo-material.js), the frame writes it once before the
+ * field's pass, and NOUGHT is the world that shipped: a nought added to the
+ * rotated grid's own offset leaves the same float, so the null is not a
+ * near-enough but the same arithmetic, and the frame's byte is the frame's
+ * byte. It is only ever moved while the memory below is accumulating, because
+ * a ground sampled somewhere new every frame and never added up is a ground
+ * that sparkles on purpose.
+ */
+export const CAMPO_JITTER = { value: new Vector2(0, 0) };
+
+/**
+ * THE GROUND'S MEMORY, as it is ASKED FOR rather than as it is spent.
+ *
+ * Two numbers and no buffers: `weight` is how much of the accumulated past the
+ * ground keeps (nought is off, and off is what ships), `jitter` is whether the
+ * ray moves under the accumulation at all. The address writes them through
+ * src/world/layers/v1-suolo.js and the field's own object
+ * (src/world/voxel/campo-field.js setMemory), and the frame reads them here --
+ * the same seam, in the same direction, that campoScale already travels.
+ *
+ * WHY A PLAIN OBJECT AND NOT A SETTER ON THE RENDERER. The handle belongs to
+ * the ground and the buffers belong to the frame, and the one thing that must
+ * not happen is a third place that believes it knows the answer: the governor
+ * settles the tier, the address may overrule it, and the pass reads whatever
+ * the two of them left here on the frame it draws.
+ */
+export const CAMPO_MEMORY = { weight: 0, jitter: false };
+
 // How many materials have sat down. Like the depth service: a chain nobody
 // reads from allocates no buffer, splits no render, and reports nought.
 let campoSeats = 0;
@@ -2589,6 +2631,195 @@ export function campoUniforms() {
   campoSeats++;
   return { ...CAMPO_SEAT };
 }
+
+// =============================================================================
+//                    THE GROUND'S MEMORY, AND WHAT IT IS FOR
+// =============================================================================
+//
+// THE DEFECT. The field asks its question ONCE PER TEXEL of a buffer that is
+// three quarters of a side at the high tier and a half at the other two, so the
+// ground is decided at 0.75, 0.43 and 0.38 of a screen pixel; the recomposition
+// above weighs four of those texels but by design does not blend across an
+// arris, so every edge of every cube lands on a step of one to three pixels.
+// None of that moves while nothing moves -- and something always moves, because
+// the body BREATHES (1.2 mm and 0.045 degrees, src/core/presence.js), which is
+// about one pixel, which is enough to make the rim texels change sides. The
+// committente reads that as «bordi a scaletta che tremano».
+//
+// THE CURE, and it is the oldest one there is: sample somewhere else each frame
+// and add the frames up. One ray a texel is one ray a texel whatever is done
+// afterwards, but eight frames of one ray, each aimed at a different eighth of
+// the texel, carry eight samples of it -- so the edge stops being a step that
+// snaps and becomes a gradient that stands. The two halves have to be together:
+// the offset alone moves the step around (worse, and measurably), and the
+// accumulation alone has nothing new to add up.
+//
+// WHAT IS REPROJECTED, AND WHY IT IS ALLOWED TO BE. The ground is STATIC: no
+// blade of this meadow moves on its own, and everything that does move in the
+// frame -- the walker, the flowers, the markers -- is drawn in the world's own
+// pass and is not in this buffer at all. So a texel's world point is recovered
+// from its own depth, projected with the camera the PREVIOUS frame was drawn
+// with, and that is where its past is. There is no velocity buffer to keep and
+// none to be wrong.
+//
+// AND THE THREE WAYS IT IS REFUSED, because a memory that is never refused is a
+// smear:
+//   1. the past has to be ON THE SCREEN it was drawn on -- outside [0,1] there
+//      is nothing to read, which is the rim of the frame and a turn of the head;
+//   2. the past has to be THE SAME PLACE, and the gate says so IN METRES: the
+//      texel's world point, and the world point the past texel was written at,
+//      have to be within about one texel's own footprint of each other. That is
+//      what a disocclusion fails -- ground that was behind the ridge last frame
+//      reads back a point ON the ridge, metres away -- and it is what the
+//      offset does NOT fail, because an offset of less than a texel moves the
+//      point it hits by less than a texel.
+//
+//      IT WAS FIRST BUILT AS THE RECOMPOSITION'S OWN GATE, a tolerance read off
+//      the local slope of the buffer's depth, and that is MEASURED TO BE THE
+//      WRONG GATE HERE, which is worth writing down. That gate compares two
+//      texels of ONE frame, where the only thing between them is the slope;
+//      this one compares one texel of TWO frames, where the offset has moved
+//      the ray -- and at an arris the offset moves the hit onto the other
+//      surface, which is a depth a slope tolerance refuses. So the memory was
+//      refused exactly at the edges it exists to hold still: with the slope
+//      gate the ground at rest read 2.54 levels of its own flicker and the
+//      breath 6.85; with the gate in metres, 0.66 and 4.01. Both readings are
+//      in the verbale;
+//   3. and whatever survives both is STRETCHED INTO THE NEIGHBOURHOOD of what
+//      this frame actually marched (the min and max of the nine texels around
+//      it). This is the one that pays for the walk: a past that is merely close
+//      enough is still a past from before the step, and a colour clamped into
+//      the 3x3 of the present cannot be a trail of where the walker was.
+const CAMPO_MEMORY_FRAGMENT = /* glsl */`
+  precision highp float;
+  precision highp int;
+
+  out vec4 fragColour;
+
+  uniform sampler2D tRaw;
+  uniform sampler2D tRawDepth;
+  uniform sampler2D tPast;
+  uniform sampler2D tPastDepth;
+  uniform vec2 uSize;
+  uniform mat4 uInvViewProj;
+  uniform mat4 uPrevViewProj;
+  uniform mat4 uPrevInvViewProj;
+  uniform float uWeight;
+  uniform float uPast;
+  // How many of a texel's OWN FOOTPRINT ON THE GROUND two world points may be
+  // apart and still be the same place.
+  uniform float uGate;
+
+  /** The world point a texel of this buffer stands on, off its own depth. */
+  vec3 standsOn(mat4 undo, vec2 uv, float depth) {
+    vec4 p = undo * vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+    return p.xyz / p.w;
+  }
+
+  void main() {
+    ivec2 lim = ivec2(uSize) - 1;
+    ivec2 at = clamp(ivec2(gl_FragCoord.xy), ivec2(0), lim);
+    vec4 raw = texelFetch(tRaw, at, 0);
+    float d = texelFetch(tRawDepth, at, 0).x;
+
+    // THE DEPTH IS THE MARCHER'S, CARRIED THROUGH UNTOUCHED, and that is a
+    // decision and not an omission. The recomposition's gate reads the depth of
+    // the buffer it is handed and clusters the four taps around it: fed a depth
+    // blended between two frames it would be gating this frame's colours with
+    // last frame's geometry, and at an arris that is precisely the disagreement
+    // the gate exists to resolve. A place is not a quantity. Measured both
+    // ways -- see the verbale -- and the carried depth is what holds the arris.
+    gl_FragDepth = d;
+
+    // THE RAW FRAME IS THE ANSWER until something has been PROVED about the
+    // past, so every refusal below is a plain return.
+    fragColour = raw;
+    if (uPast < 0.5 || uWeight <= 0.0) return;
+    // A texel no ray landed in is the sky coming through the recomposition, and
+    // a past blended into it would grow the ridge by a texel: a halo, which is
+    // the one thing this buffer is not allowed to do.
+    if (raw.a <= 0.0) return;
+
+    // WHERE THIS TEXEL STANDS IN THE WORLD, off its own depth and the inverse
+    // of the very matrix the marcher wrote that depth with.
+    vec2 uv = (vec2(at) + 0.5) / uSize;
+    vec3 here = standsOn(uInvViewProj, uv, d);
+
+    vec4 prev = uPrevViewProj * vec4(here, 1.0);
+    if (prev.w <= 0.0) return;
+    vec3 ndc = prev.xyz / prev.w;
+    vec2 puv = ndc.xy * 0.5 + 0.5;
+    if (puv.x < 0.0 || puv.x > 1.0 || puv.y < 0.0 || puv.y > 1.0) return;
+
+    vec4 past = texture(tPast, puv);
+    if (past.a <= 0.0) return;
+
+    // THE GATE, AND IT IS IN METRES ON THE GROUND.
+    //
+    // Where the past texel actually STOOD, undone with the matrix it was
+    // written under, against where this texel stands now. And the tolerance is
+    // THIS TEXEL'S OWN FOOTPRINT, measured rather than assumed: how far the
+    // world point moves when the texel moves by one, left-right and up-down,
+    // taking the NEARER of the two sides each way. That last part is the whole
+    // of it -- a meadow seen at a grazing angle puts metres of ground inside
+    // one texel, so a tolerance figured from the distance alone refuses every
+    // texel in the near field; and at an arris one side of the pair jumps the
+    // height of a cube, so taking the nearer side keeps the tolerance honest
+    // exactly where a disocclusion has to be refused.
+    vec3 xm = standsOn(uInvViewProj, uv - vec2(1.0 / uSize.x, 0.0),
+      texelFetch(tRawDepth, clamp(at - ivec2(1, 0), ivec2(0), lim), 0).x);
+    vec3 xp = standsOn(uInvViewProj, uv + vec2(1.0 / uSize.x, 0.0),
+      texelFetch(tRawDepth, clamp(at + ivec2(1, 0), ivec2(0), lim), 0).x);
+    vec3 ym = standsOn(uInvViewProj, uv - vec2(0.0, 1.0 / uSize.y),
+      texelFetch(tRawDepth, clamp(at - ivec2(0, 1), ivec2(0), lim), 0).x);
+    vec3 yp = standsOn(uInvViewProj, uv + vec2(0.0, 1.0 / uSize.y),
+      texelFetch(tRawDepth, clamp(at + ivec2(0, 1), ivec2(0), lim), 0).x);
+    float foot = min(length(xm - here), length(xp - here))
+      + min(length(ym - here), length(yp - here));
+    vec3 was = standsOn(uPrevInvViewProj, puv, texture(tPastDepth, puv).x);
+    if (length(was - here) > uGate * foot) return;
+
+    // AND THE NEIGHBOURHOOD, which is what separates a memory from a trail.
+    vec4 lo = raw;
+    vec4 hi = raw;
+    for (int j = -1; j <= 1; j++) {
+      for (int i = -1; i <= 1; i++) {
+        vec4 n = texelFetch(tRaw, clamp(at + ivec2(i, j), ivec2(0), lim), 0);
+        if (n.a <= 0.0) continue;
+        lo = min(lo, n);
+        hi = max(hi, n);
+      }
+    }
+    fragColour = mix(raw, clamp(past, lo, hi), uWeight);
+  }
+`;
+
+// THE OFFSETS, AND THEY ARE A SEQUENCE AND NOT A RANDOM NUMBER.
+//
+// Halton on bases two and three: every prefix of it covers the texel evenly, so
+// the frames that have arrived so far are always well spread rather than well
+// spread only once the cycle has closed -- which matters because the walker
+// turns their head and the accumulation restarts wherever the sequence happens
+// to be. Eight of them, centred on the texel, because eight is where the
+// convergence of a weight near nine tenths has settled, and a longer cycle is a
+// longer wait before a disoccluded edge has its samples.
+export const CAMPO_JITTER_CYCLE = 8;
+
+function halton(index, base) {
+  let f = 1;
+  let r = 0;
+  let i = index;
+  while (i > 0) {
+    f /= base;
+    r += f * (i % base);
+    i = Math.floor(i / base);
+  }
+  return r;
+}
+
+const CAMPO_JITTER_SEQUENCE = Array.from({ length: CAMPO_JITTER_CYCLE }, (_, i) => [
+  halton(i + 1, 2) - 0.5, halton(i + 1, 3) - 0.5,
+]);
 
 export function createPostPipeline(gl) {
   // The scene is drawn in light units and stays that way until the composite;
@@ -2606,6 +2837,46 @@ export function createPostPipeline(gl) {
     uniforms,
     depthTest: false,
     depthWrite: false,
+    blending: NoBlending,
+  });
+
+  /**
+   * THE GROUND'S MEMORY. See CAMPO_MEMORY_FRAGMENT above for what it does.
+   *
+   * IT WRITES DEPTH, WHICH IS WHY IT IS NOT BUILT WITH `pass` ABOVE. The
+   * recomposition is handed a colour and a depth from the same texel, and the
+   * depth it is handed has to be the marcher's own -- so this pass carries it
+   * through gl_FragDepth into the buffer it writes. A write to the depth
+   * attachment only happens while the depth TEST is on, so the test is on and
+   * set to ALWAYS: every fragment of two triangles covering the buffer, in the
+   * order they are drawn, which is the order of one draw.
+   */
+  const campoMemory = new ShaderMaterial({
+    glslVersion: GLSL3,
+    vertexShader: FULLSCREEN_VERTEX_300,
+    fragmentShader: CAMPO_MEMORY_FRAGMENT,
+    uniforms: {
+      tRaw: { value: null },
+      tRawDepth: { value: null },
+      tPast: { value: null },
+      tPastDepth: { value: null },
+      uSize: { value: new Vector2(1, 1) },
+      uInvViewProj: { value: new Matrix4() },
+      uPrevViewProj: { value: new Matrix4() },
+      uPrevInvViewProj: { value: new Matrix4() },
+      uWeight: { value: 0 },
+      uPast: { value: 0 },
+      // FOUR OF THE TEXEL'S OWN FOOTPRINT, and it is a measurement rather than
+      // a taste. One and a half refuses the offset itself and the ground kept
+      // 2.19 levels of flicker under the breath it should have removed; eight
+      // lets a disocclusion through and the neighbourhood clamp has to catch
+      // it alone. At four the breath reads 4.90 against the 6.14 of the world
+      // without a memory, and nothing was seen to smear. In the verbale.
+      uGate: { value: 4 },
+    },
+    depthTest: true,
+    depthFunc: AlwaysDepth,
+    depthWrite: true,
     blending: NoBlending,
   });
 
@@ -3160,6 +3431,28 @@ export function createPostPipeline(gl) {
   // it; what the field antialiases with is `uRays`, its own sub pixel budget,
   // and the pixels this pass gives back are what pays for a second one.
   let campoSamples = 0;
+  // THE PING PONG THE GROUND REMEMBERS ITSELF IN, and null for as long as
+  // nobody has asked for a memory. Two targets, each colour AND depth: the
+  // memory pass writes one while reading the other, the recomposition is handed
+  // whichever was written, and the depth travels with the colour because the
+  // gate that reads the pair has to read one frame's worth of both.
+  let campoPast = [null, null];
+  // Which of the two the LAST memory pass wrote. The next one reads it.
+  let campoPastAt = 0;
+  // Whether there is a past worth reading at all: false on the first frame of
+  // an accumulation and on every frame after the buffers changed shape, because
+  // a past read out of a buffer of another size is not a past.
+  let campoPastReady = false;
+  // Where the sequence of offsets stands. It counts frames and nothing else.
+  let campoJitterAt = 0;
+  // Whether the ground's camera moved between the last two frames it was
+  // marched for. It decides whether the offset advances, and it is read a frame
+  // late on purpose: the camera's matrices are only up to date once three has
+  // rendered with it, and the offset has to be chosen BEFORE that render.
+  let campoViewMoved = true;
+  const campoViewProj = new Matrix4();
+  const campoPrevViewProj = new Matrix4();
+  const campoPrevInvViewProj = new Matrix4();
   let bloomTargets = [];
   let focusTargets = [];
   let raysTargets = [];
@@ -3309,6 +3602,9 @@ export function createPostPipeline(gl) {
     const h = Math.max(1, Math.round(height * campoScale));
     if (campoTarget && campoTarget.width === w && campoTarget.height === h
       && campoTarget.samples === campoSamples) return;
+    // A past kept across a change of shape is a past read out of the wrong
+    // buffer, so the accumulation starts again from the frame that is drawn now.
+    campoPastReady = false;
     if (campoTarget) {
       if (campoTarget.depthTexture) campoTarget.depthTexture.dispose();
       campoTarget.dispose();
@@ -3326,12 +3622,55 @@ export function createPostPipeline(gl) {
     });
   }
 
+  /**
+   * The pair the memory accumulates in, at the field buffer's own shape.
+   *
+   * LINEAR AND NOT NEAREST, which is the one place in this chain where that is
+   * the right answer: what reads these is the memory pass's own reprojection,
+   * at a place between texels that a bilinear tap is the honest reading of. The
+   * recomposition reads the same texture with texelFetch, which no filter
+   * touches -- so the nearest sampling it was built on is not given up.
+   */
+  function allocateCampoPast(w, h) {
+    if (campoPast[0] && campoPast[0].width === w && campoPast[0].height === h) return;
+    disposeCampoPast();
+    campoPast = [0, 1].map(() => new WebGLRenderTarget(w, h, {
+      format: RGBAFormat,
+      type: HalfFloatType,
+      colorSpace: LinearSRGBColorSpace,
+      minFilter: LinearFilter,
+      magFilter: LinearFilter,
+      depthBuffer: true,
+      depthTexture: makeDepthTexture(w, h),
+      stencilBuffer: false,
+      samples: 0,
+    }));
+    campoPastReady = false;
+    campoViewMoved = true;
+  }
+
+  function disposeCampoPast() {
+    for (const target of campoPast) {
+      if (!target) continue;
+      if (target.depthTexture) target.depthTexture.dispose();
+      target.dispose();
+    }
+    campoPast = [null, null];
+    campoPastReady = false;
+  }
+
   /** Puts the seat back where a resolve reads it as "there is no field here". */
   function restCampo() {
     CAMPO_SEAT.tCampo.value = CAMPO_REST;
     CAMPO_SEAT.tCampoDepth.value = CAMPO_DEPTH_REST;
     CAMPO_SEAT.uCampoSize.value.set(1, 1);
     CAMPO_SEAT.uCampoOn.value = 0;
+    // AND THE RAY GOES BACK TO THE CENTRE OF ITS TEXEL. A frame drawn whole has
+    // no buffer for an offset to be accumulated in, so an offset left behind
+    // here would be a ground sampled off centre and never added up -- which is
+    // the sparkle this was built to remove, bought at the price of itself.
+    CAMPO_JITTER.value.set(0, 0);
+    campoPastReady = false;
   }
 
   function allocateBloom() {
@@ -3650,6 +3989,7 @@ export function createPostPipeline(gl) {
           campoTarget.dispose();
           campoTarget = null;
         }
+        disposeCampoPast();
         restCampo();
       } else if (campoTarget) {
         allocateCampo();
@@ -3672,6 +4012,12 @@ export function createPostPipeline(gl) {
         scale: campoScale,
         samples: campoSamples,
         on: CAMPO_SEAT.uCampoOn.value === 1,
+        memory: CAMPO_MEMORY.weight,
+        jitter: CAMPO_MEMORY.jitter,
+        // Whether the pass actually has a past to read on the NEXT frame,
+        // which is the only honest answer to "is it accumulating".
+        accumulating: campoPastReady,
+        jitterAt: campoJitterAt % CAMPO_JITTER_CYCLE,
         seats: campoSeats,
         width: campoTarget ? campoTarget.width : 0,
         height: campoTarget ? campoTarget.height : 0,
@@ -3719,9 +4065,46 @@ export function createPostPipeline(gl) {
       // land on the masonry -- and now it is a whole pixel of masonry that
       // decides, not a half resolution guess at one.
       const campoing = campoScale < 1 && campoSeats > 0;
+      // AND WHETHER THE GROUND IS REMEMBERING ITSELF THIS FRAME, which is a
+      // question only a frame that has a buffer of its own may answer yes to:
+      // at a fraction of one the ground is drawn in the world's own pass, at
+      // the frame's own pixel, and there is nothing to accumulate in and
+      // nothing that would be improved by it. It is DECLARED rather than
+      // forced -- see campoStats, which reports it, and the handle in
+      // src/world/layers/v1-suolo.js, which may ask for it anywhere.
+      const remembering = campoing && CAMPO_MEMORY.weight > 0;
       if (campoing) {
         allocateCampo();
         if (slot) clock.begin(slot, 'campo');
+        // THE OFFSET, BEFORE THE RAYS ARE AIMED.
+        //
+        // It moves only while there is an accumulation to add the frames up in
+        // -- the offset alone is the same sparkle in another place, and it is a
+        // handle of its own (`campojitter`) so that the two halves can be
+        // priced apart -- AND ONLY WHILE THE VIEW ITSELF IS MOVING.
+        //
+        // THAT SECOND CONDITION IS THE WHOLE OF WHAT A STILL CAMERA IS OWED,
+        // and it was measured before it was written. An accumulation of weight
+        // w fed a signal that changes every frame does not converge: it cycles,
+        // at (1 - w) of the change, and with the offset moving under a ground
+        // whose detail is smaller than a texel that change is about twenty
+        // levels -- so a camera holding perfectly still read ONE FULL LEVEL of
+        // flicker that the world it replaces reads NOUGHT of. A ground that
+        // does not move has nothing new to add up, so the offset stands where
+        // it stands, the marched frame stops changing, and the accumulation
+        // converges to it: the still picture is a still picture again, and the
+        // sub-texel samples are spent on the frames that actually have motion
+        // in them -- which is every frame the walker is in, because the body
+        // breathes.
+        if (remembering && CAMPO_MEMORY.jitter) {
+          if (campoViewMoved) {
+            const [jx, jy] = CAMPO_JITTER_SEQUENCE[campoJitterAt % CAMPO_JITTER_CYCLE];
+            CAMPO_JITTER.value.set(jx, jy);
+            campoJitterAt += 1;
+          }
+        } else {
+          CAMPO_JITTER.value.set(0, 0);
+        }
         worldCamera.layers.set(CAMPO_LAYER);
         // CLEARED TO NOTHING, AND IT HAS TO BE SAID OUT LOUD. The fourth channel
         // of this buffer is the field's COVERAGE, and the recomposition reads a
@@ -3741,6 +4124,48 @@ export function createPostPipeline(gl) {
         CAMPO_SEAT.tCampoDepth.value = campoTarget.depthTexture;
         CAMPO_SEAT.uCampoSize.value.set(campoTarget.width, campoTarget.height);
         CAMPO_SEAT.uCampoOn.value = 1;
+
+        // ------------------------------------------------ AND WHAT IT KEEPS
+        //
+        // Between the marching and the recomposition, and nowhere else: the
+        // pass reads the frame that was just marched and the frame it wrote
+        // last time, and what the recomposition is then handed is the sum. The
+        // camera's own matrix is taken AFTER the render above, where three has
+        // already brought it up to date, and it is the same product the
+        // marcher's uViewProjection is -- so the depth in that buffer and the
+        // matrix that undoes it are one pair and not two readings.
+        if (remembering) {
+          allocateCampoPast(campoTarget.width, campoTarget.height);
+          const write = campoPast[1 - campoPastAt];
+          const read = campoPast[campoPastAt];
+          campoViewProj.multiplyMatrices(
+            worldCamera.projectionMatrix, worldCamera.matrixWorldInverse,
+          );
+          const u = campoMemory.uniforms;
+          u.tRaw.value = campoTarget.texture;
+          u.tRawDepth.value = campoTarget.depthTexture;
+          u.tPast.value = read.texture;
+          u.tPastDepth.value = read.depthTexture;
+          u.uSize.value.set(campoTarget.width, campoTarget.height);
+          u.uInvViewProj.value.copy(campoViewProj).invert();
+          u.uPrevViewProj.value.copy(campoPrevViewProj);
+          u.uPrevInvViewProj.value.copy(campoPrevInvViewProj);
+          u.uWeight.value = CAMPO_MEMORY.weight;
+          u.uPast.value = campoPastReady ? 1 : 0;
+          draw(campoMemory, write);
+          campoViewMoved = !campoPrevViewProj.equals(campoViewProj);
+          campoPrevViewProj.copy(campoViewProj);
+          campoPrevInvViewProj.copy(u.uInvViewProj.value);
+          campoPastAt = 1 - campoPastAt;
+          campoPastReady = true;
+          CAMPO_SEAT.tCampo.value = write.texture;
+          CAMPO_SEAT.tCampoDepth.value = write.depthTexture;
+        } else {
+          // A memory switched off is a memory that has to be BEGUN again when
+          // it comes back: the buffers it kept are of a world the camera has
+          // since walked out of.
+          campoPastReady = false;
+        }
       } else if (CAMPO_SEAT.uCampoOn.value !== 0) {
         restCampo();
       }
@@ -4349,6 +4774,7 @@ export function createPostPipeline(gl) {
         campoTarget.dispose();
       }
       campoTarget = null;
+      disposeCampoPast();
       restCampo();
       fallbackLut.dispose();
       quad.geometry.dispose();
