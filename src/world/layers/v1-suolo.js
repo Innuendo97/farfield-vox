@@ -90,6 +90,22 @@ import { SPAWN } from '../layout.js';
  *                  monoliths: 1 is the frame drawn whole (the null), 0.75 and
  *                  0.5 draw the earth into a buffer of their own and put it
  *                  back at the frame's pixel. U-CAMPO-3.
+ *   campomemoria=1[,peso]
+ *                  LA MEMORIA TEMPORALE DEL SUOLO, spenta di default e spenta
+ *                  in ciò che si spedisce. Il campo accumula i propri
+ *                  fotogrammi precedenti, riproiettati dalla propria
+ *                  profondità, mentre il raggio si sposta di meno di un texel a
+ *                  ogni fotogramma: i bordi convergono a un'immagine
+ *                  sovracampionata invece di scattare a ogni respiro. `peso` è
+ *                  quanto del passato un texel tiene, e senza di esso vale
+ *                  0,875. `campomemoria=0` è esattamente ciò che si spedisce,
+ *                  fino all'ultimo byte del fotogramma. Vale solo dove il campo
+ *                  ha un bersaglio suo: a campores=1 non esiste e non viene
+ *                  forzata (src/core/post.js)
+ *   campojitter=0  la memoria SENZA lo spostamento del raggio, che è la metà da
+ *                  cui viene la convergenza: serve a sapere quanto compra
+ *                  ciascuna delle due. Senza memoria non ha effetto, perché un
+ *                  raggio spostato e mai sommato è solo un altro scintillio
  *   campozone=0    bind the NEUTRAL zone instead of the delivered map, which
  *                  is the null arm this term is priced against: one fetch and
  *                  one multiply, in the field and in the three programs of the
@@ -122,6 +138,39 @@ function ringAsked(raw) {
     snap: n.length > 2 && Number.isFinite(n[2]) && n[2] >= 0 ? n[2] : null,
   };
 }
+
+/**
+ * The ground's memory as an address asks for it: `0`, `1` or `1,peso`.
+ *
+ * Read apart from «not given», like the ring above and for the same reason: a
+ * bench holding the null arm has to be able to SPELL the null, and a rule that
+ * treated `0` as absent would hand that arm back the default.
+ */
+function memoriaAsked(raw) {
+  if (raw === null) return null;
+  const n = raw.split(',').map(Number);
+  if (!(n[0] > 0)) return { weight: 0 };
+  const weight = n.length > 1 && Number.isFinite(n[1]) && n[1] >= 0 && n[1] <= 1
+    ? n[1] : MEMORIA_DEFAULT;
+  return { weight };
+}
+
+/**
+ * QUANTO DEL PASSATO UN TEXEL TIENE quando l'indirizzo non lo dice.
+ *
+ * VENTUNO VENTESIMI, E IL NUMERO E' UNA MISURA E POI UN COMPROMESSO. Al tier
+ * basso, sul respiro del corpo e nelle due finestre vicine della guardia, il
+ * suolo senza memoria legge 6,14 e 5,89 livelli; con la memoria legge 5,96 e
+ * 4,91 a 0,90, 5,00 e 4,05 a 0,98. Piu' peso, meno scintillio. Dall'altra parte
+ * c'e' il tempo che l'accumulo ci mette a dimenticare dove il visitatore era:
+ * dieci fotogrammi dopo un arresto, il suolo e' ancora a 1,4-2,3 livelli dalla
+ * sua immagine assestata a 0,95, e a 0,98 sarebbe il doppio. 0,95 e' il mezzo
+ * misurato fra i due, e NON e' una scelta tecnica fino in fondo: quanta
+ * morbidezza vale quanta lentezza e' una cosa che si guarda, non che si calcola,
+ * e la domanda e' nel verbale per il committente. `campomemoria=1,0.9` e
+ * `campomemoria=1,0.98` aprono gli altri due bracci senza toccare una riga.
+ */
+const MEMORIA_DEFAULT = 0.95;
 
 /** Two numbers off an address, for the handles that come in pairs. */
 function pairAsked(raw) {
@@ -158,6 +207,8 @@ function asked() {
     campoDebug: Number(query.get('campodebug')) || 0,
     campoZone: query.get('campozone') !== '0',
     campoRes: query.get('campores') === null ? null : Number(query.get('campores')),
+    campoMemoria: memoriaAsked(query.get('campomemoria')),
+    campoJitter: query.get('campojitter') !== '0',
   };
 }
 
@@ -294,6 +345,14 @@ const layer = {
       }
       layer.campoResFromAddress = wanted.campoRes !== null
         && Number.isFinite(wanted.campoRes);
+      // AND WHETHER THE GROUND KEEPS ITS OWN PREVIOUS FRAMES. Spenta se
+      // l'indirizzo non dice niente, e spenta è ciò che si spedisce: il
+      // committente decide dopo gli affiancati. Il peso viaggia fino ai
+      // bersagli del fotogramma per riferimento, come uCampoSize viaggia in
+      // senso contrario -- vedi setMemory in ../voxel/campo-field.js.
+      layer.campo.setMemory(
+        wanted.campoMemoria ? wanted.campoMemoria.weight : 0, wanted.campoJitter,
+      );
       // AND WHERE THE ADDRESS SAYS NOTHING, THE TIER'S OWN FRACTION -- REPLAYED
       // ONTO A FIELD THAT DID NOT EXIST WHEN THE TIER WAS CHOSEN.
       //
