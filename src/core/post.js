@@ -2842,6 +2842,17 @@ const CAMPO_JITTER_SEQUENCE = Array.from({ length: CAMPO_JITTER_CYCLE }, (_, i) 
  * under it the offset holds, the marched frame settles and the accumulation
  * converges onto it, which is also what the perfectly still camera of a guard
  * gets, from the same rule and for the same reason.
+ *
+ * WHAT IT DID NOT CLOSE, because a floor of one number cannot: at the high tier
+ * the reduced breath still crosses it on about a fifth of its frames (its
+ * ninetieth is 0.0086 of a texel against this 0.005), and with the offset turned
+ * on there the same leg reads 3.83 levels against the 2.21 of the memory alone.
+ * That is one of the two readings that keep the offset opt in -- see campojitter
+ * in src/world/layers/v1-suolo.js -- rather than something this floor hides. A
+ * floor in texels is also a floor that means different things at the two tiers,
+ * the buffer being twice the height at the high one for the same angle, and a
+ * floor in degrees would not have that fault: it is written down because the
+ * next session to touch this will want to know.
  */
 const CAMPO_JITTER_FLOOR = 0.005;
 
