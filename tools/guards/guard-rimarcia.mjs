@@ -323,6 +323,51 @@ const suolo = read('src/world/layers/v1-suolo.js');
 
 report.check(/export const CAMPO_REMARCH_REACH = 20;/.test(marcher),
   'la portata nasce dichiarata in metri, nel posto in cui il programma la legge');
+
+// ---------------------------------------------------------------------------
+// E LA PORTA, CHE SI CHIUDE DAVVERO.
+//
+// Il marciatore e la ricomposizione che marcia sono UN testo con due ingressi,
+// e questo e' comodo finche' la porta tiene: il programma che disegna a ogni
+// fotogramma, a ogni tier, con o senza la maniglia, e' quello con
+// CAMPO_RESOLVE non definito, e quel programma dev'essere lo stesso di prima.
+// Qui il testo passa per un preprocessore da due soldi — solo #ifdef, #ifndef,
+// #else, #endif, che sono i soli che questo sorgente usa — e si pretende che da
+// quella parte non sia rimasto NIENTE della ri-marcia: non un tap del bersaglio
+// ridotto, non un uniforme della portata, non una riga del secondo main. Se
+// qualcosa filtra, il programma del marciatore e' cambiato, e con esso il
+// fotogramma che questa maniglia doveva lasciare esattamente com'era.
+function preprocess(text, defined) {
+  const out = [];
+  const stack = [];
+  for (const line of text.split('\n')) {
+    const t = line.trim();
+    if (t.startsWith('#ifdef ')) { stack.push(defined.has(t.slice(7).trim())); continue; }
+    if (t.startsWith('#ifndef ')) { stack.push(!defined.has(t.slice(8).trim())); continue; }
+    if (t === '#else') { stack[stack.length - 1] = !stack[stack.length - 1]; continue; }
+    if (t === '#endif') { stack.pop(); continue; }
+    if (stack.every((f) => f)) out.push(line);
+  }
+  return { text: out.join('\n'), balanced: stack.length === 0 };
+}
+const OPEN = 'const FRAGMENT = /* glsl */`\n';
+const from = marcher.indexOf(OPEN);
+const to = marcher.indexOf('`;\n', from);
+const FRAGMENT = from >= 0 && to > from ? marcher.slice(from + OPEN.length, to) : '';
+const marching = preprocess(FRAGMENT, new Set(['CAMPO_DEPTH', 'CAMPO_RESOLVE']));
+const walking = preprocess(FRAGMENT, new Set(['CAMPO_DEPTH']));
+const LEAKS = ['tCampo', 'uRemarch', 'uInvViewProjection', 'uCoverage', 'uEdgeFloor'];
+const leaked = LEAKS.filter((n) => walking.text.includes(n));
+report.check(FRAGMENT.length > 0 && walking.balanced && marching.balanced,
+  'il programma del campo ha due ingressi e le loro porte sono in pari',
+  `${FRAGMENT.split('\n').length} righe di sorgente`);
+report.check(leaked.length === 0,
+  'e da quella del marciatore non filtra niente della ri-marcia',
+  leaked.length ? `filtrano ${leaked.join(' ')}` : `nessuno di ${LEAKS.join(' ')}`);
+report.check(walking.text.includes('vec3 dir0 = normalize(vWorld - eye);')
+  && marching.text.includes('uInvViewProjection * vec4(ndc, 1.0, 1.0)')
+  && !marching.text.includes('vec3 dir0 = normalize(vWorld - eye);'),
+  'e ciascuna delle due mira il proprio raggio come puo\': il box, o la disproiezione');
 report.check(/const RESOLVE_CORE = /.test(marcher) && /const RESOLVE_TAIL = /.test(marcher),
   'le prese, il cancello e il bordo sono UN testo, non due');
 report.check((marcher.match(/\$\{RESOLVE_CORE\}/g) || []).length === 2
@@ -382,6 +427,14 @@ if (process.argv.includes('--self')) {
   // questo lavoro esiste per affilare.
   const texelFoot = marcher.replace('uRemarchFoot: { value: 0 },',
     'uRemarchFoot: { value: 1 },');
+  // LA PORTA GIRATA AL CONTRARIO: la meta' che marcia finisce dalla parte del
+  // marciatore, cioe' nel programma che disegna a ogni fotogramma con la
+  // maniglia spenta. E' il modo in cui «un testo, due ingressi» smette di
+  // essere gratis senza che niente si rompa a vista.
+  const swung = preprocess(
+    FRAGMENT.replace('#ifdef CAMPO_RESOLVE', '#ifndef CAMPO_RESOLVE'),
+    new Set(['CAMPO_DEPTH']),
+  );
   selfTest('guard-rimarcia', [
     {
       what: 'un pixel ri-marciato che tiene la profondita\' media dei texel',
@@ -421,6 +474,10 @@ if (process.argv.includes('--self')) {
     {
       what: 'un\'impronta del pixel presa dal texel ridotto invece che dal fotogramma',
       caught: !/uRemarchFoot: \{ value: 0 \},/.test(texelFoot),
+    },
+    {
+      what: 'la ri-marcia che filtra nel programma del marciatore, e gli sposta il byte',
+      caught: LEAKS.some((n) => swung.text.includes(n)) && leaked.length === 0,
     },
   ]);
 }
