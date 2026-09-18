@@ -2821,6 +2821,30 @@ const CAMPO_JITTER_SEQUENCE = Array.from({ length: CAMPO_JITTER_CYCLE }, (_, i) 
   halton(i + 1, 2) - 0.5, halton(i + 1, 3) - 0.5,
 ]);
 
+/**
+ * HOW FAR THE VIEW HAS TO MOVE, IN TEXELS, BEFORE THE OFFSET MOVES WITH IT.
+ *
+ * A TWO HUNDREDTH OF A TEXEL, AND EVERY DIGIT OF IT IS A READING.
+ *
+ * The first thing this number taught was how violent the defect is. A breathing
+ * body swings the view by NINE THOUSANDTHS of a texel a frame at the low tier
+ * and twenty four at the high one -- a fortieth of a screen pixel -- and that is
+ * what moves the ground by six and eleven levels. Nothing about this is
+ * parallax; it is one ray a texel changing its mind about which blade it is
+ * looking at, which is exactly what E-SCINTILLIO1 said it was.
+ *
+ * The second thing is where the floor belongs. The walker who asks for less
+ * movement gets the same breath at a twelfth: one and a half thousandths of a
+ * texel at the low tier, two and a half at the high one. That is a view which
+ * is, for this purpose, standing still -- and an offset moving under it was the
+ * loudest thing left in the frame, putting 2.04 levels where the world without
+ * it had 1.06. So the floor sits between the two readings, nearer the quiet one:
+ * under it the offset holds, the marched frame settles and the accumulation
+ * converges onto it, which is also what the perfectly still camera of a guard
+ * gets, from the same rule and for the same reason.
+ */
+const CAMPO_JITTER_FLOOR = 0.005;
+
 export function createPostPipeline(gl) {
   // The scene is drawn in light units and stays that way until the composite;
   // the renderer must not apply a curve of its own on the way.
@@ -3445,11 +3469,18 @@ export function createPostPipeline(gl) {
   let campoPastReady = false;
   // Where the sequence of offsets stands. It counts frames and nothing else.
   let campoJitterAt = 0;
-  // Whether the ground's camera moved between the last two frames it was
+  // Whether the ground's camera moved ENOUGH between the last two frames it was
   // marched for. It decides whether the offset advances, and it is read a frame
   // late on purpose: the camera's matrices are only up to date once three has
   // rendered with it, and the offset has to be chosen BEFORE that render.
   let campoViewMoved = true;
+  let campoViewShift = 0;
+  // The point the question is asked of, ten metres in front of the eye, and the
+  // two places it lands in: a rotation is what moves this ground, and a rotation
+  // does not show up in a camera's position at all.
+  const campoProbe = new Vector3();
+  const campoProbeNow = new Vector3();
+  const campoProbeWas = new Vector3();
   const campoViewProj = new Matrix4();
   const campoPrevViewProj = new Matrix4();
   const campoPrevInvViewProj = new Matrix4();
@@ -4018,6 +4049,7 @@ export function createPostPipeline(gl) {
         // which is the only honest answer to "is it accumulating".
         accumulating: campoPastReady,
         jitterAt: campoJitterAt % CAMPO_JITTER_CYCLE,
+        shift: campoViewShift,
         seats: campoSeats,
         width: campoTarget ? campoTarget.width : 0,
         height: campoTarget ? campoTarget.height : 0,
@@ -4153,7 +4185,18 @@ export function createPostPipeline(gl) {
           u.uWeight.value = CAMPO_MEMORY.weight;
           u.uPast.value = campoPastReady ? 1 : 0;
           draw(campoMemory, write);
-          campoViewMoved = !campoPrevViewProj.equals(campoViewProj);
+          // HOW FAR THE VIEW MOVED, IN TEXELS OF THIS BUFFER, and the answer is
+          // asked of a point rather than of the matrices: a quarter of a degree
+          // of yaw moves this ground across the screen and moves the camera's
+          // position by nothing at all.
+          campoProbe.set(0, 0, -10).applyMatrix4(worldCamera.matrixWorld);
+          campoProbeNow.copy(campoProbe).applyMatrix4(campoViewProj);
+          campoProbeWas.copy(campoProbe).applyMatrix4(campoPrevViewProj);
+          campoViewShift = Math.max(
+            Math.abs(campoProbeNow.x - campoProbeWas.x) * 0.5 * campoTarget.width,
+            Math.abs(campoProbeNow.y - campoProbeWas.y) * 0.5 * campoTarget.height,
+          );
+          campoViewMoved = campoViewShift > CAMPO_JITTER_FLOOR;
           campoPrevViewProj.copy(campoViewProj);
           campoPrevInvViewProj.copy(u.uInvViewProj.value);
           campoPastAt = 1 - campoPastAt;
