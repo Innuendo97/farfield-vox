@@ -9,7 +9,7 @@ import {
   campoCoarseSpan, campoFarOrigin, campoHorizon, campoSkyBound,
 } from './campo.js';
 import { campoBox, campoMaterial, campoResolve } from './campo-material.js';
-import { campoUniforms } from '../../core/post.js';
+import { CAMPO_MEMORY, campoUniforms } from '../../core/post.js';
 
 // THE TWO WINDOWS THE GROUND IS KEPT IN, AND THE ONE CALL THAT MOVES THEM.
 //
@@ -622,6 +622,36 @@ export function createCampo({
 
     /** What the field is marching at, read back rather than deduced. */
     scale() { return fieldScale; },
+
+    /**
+     * WHETHER THE GROUND REMEMBERS ITS OWN PREVIOUS FRAMES, and how much.
+     *
+     * The buffers are the frame's (src/core/post.js, CAMPO_MEMORY_FRAGMENT) and
+     * the handle is the ground's, so this writes the one object both sides
+     * hold -- the same seam campoUniforms travels the other way along, and for
+     * the same reason: one object behind every copy, so a number typed into the
+     * address reaches the pass on the very next frame and there is no second
+     * place keeping a stale copy of the answer.
+     *
+     * It is NOT a promise that the memory runs. At a fraction of one the ground
+     * is marched at the frame's own pixel and there is no buffer to accumulate
+     * in; the frame declares that by leaving the pass out, and campoStats()
+     * reports what actually happened.
+     *
+     * @param {number} weight   how much of the accumulated past a texel keeps.
+     *                          Nought is off, and off is what ships.
+     * @param {boolean} jitter  whether the ray is moved inside its texel under
+     *                          the accumulation. False prices the half of this
+     *                          that is the accumulation alone.
+     */
+    setMemory(weight, jitter = true) {
+      CAMPO_MEMORY.weight = Math.min(1, Math.max(0, Number(weight) || 0));
+      CAMPO_MEMORY.jitter = Boolean(jitter);
+      return CAMPO_MEMORY.weight;
+    },
+
+    /** What was asked for, read back rather than deduced. */
+    memory() { return { weight: CAMPO_MEMORY.weight, jitter: CAMPO_MEMORY.jitter }; },
 
     /**
      * The renderer, which this needs for one thing only: the copy.

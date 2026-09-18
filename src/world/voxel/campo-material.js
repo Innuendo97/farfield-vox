@@ -3,7 +3,7 @@ import {
   Mesh, OneMinusSrcAlphaFactor, PlaneGeometry, RedFormat, ShaderMaterial, SrcAlphaFactor, Vector2,
   Vector3, Vector4,
 } from 'three';
-import { CAMPO_LAYER } from '../../core/post.js';
+import { CAMPO_JITTER, CAMPO_LAYER } from '../../core/post.js';
 import { SCENE_LIGHT_GLSL, SCENE_LIGHT_UNIFORMS } from '../../core/sky.js';
 import { FACE_LIGHT_GLSL, faceLightUniforms } from '../face-light.js';
 import { FOG_GLSL, GROUND_EXPOSURE, fogUniforms } from '../air.js';
@@ -319,6 +319,17 @@ const FRAGMENT = /* glsl */`
   // (uHorizon above is the SUN's march and has nothing to do with it.)
   uniform vec4 uSkyRing[${CAMPO_BEARINGS / 4}];
   uniform mat4 uViewProjection;
+  // THE SUB-TEXEL OFFSET OF THE WHOLE PIXEL'S WORTH OF RAYS, in texels of the
+  // buffer this program is drawing into, and NOUGHT is the world that ships.
+  //
+  // It is a second hand on the same dial the rotated grid of «off» below turns:
+  // where that one spreads several rays inside ONE frame, this one moves the
+  // whole pattern between frames, so that a ground sampled once a texel is
+  // sampled in a different place each time and the frames may be added up. It
+  // is written by src/core/post.js (CAMPO_JITTER), shared by reference, and it
+  // is nought on every frame the memory is not accumulating -- which is what
+  // makes the null exact: adding a nought to the offset leaves the same float.
+  uniform vec2 uJitter;
 
   // The families' own numbers, read out of the settings objects of
   // ./material.js and never written again here.
@@ -1301,6 +1312,9 @@ const FRAGMENT = /* glsl */`
       else if (rays == 4) off = (k == 0) ? vec2(-0.375, -0.125)
         : (k == 1) ? vec2(-0.125, 0.375)
         : (k == 2) ? vec2(0.125, -0.375) : vec2(0.375, 0.125);
+      // AND THE WHOLE PATTERN MOVES, once per frame and by less than a texel.
+      // Nought leaves every ray exactly where phase one aimed it.
+      off += uJitter;
       vec3 dir = normalize(dir0 + ddx * off.x + ddy * off.y);
       // No axis exactly nought, so that every reciprocal below is a number: a
       // ray straight down the y axis would otherwise never leave its own column.
@@ -1581,6 +1595,10 @@ export function campoMaterial({
         value: Array.from({ length: CAMPO_BEARINGS / 4 }, () => new Vector4(10, 10, 10, 10)),
       },
       uViewProjection: { value: new Matrix4() },
+      // THE POST CHAIN'S OWN, BY REFERENCE AND NOT BY VALUE. The frame decides
+      // the offset because the frame is what owns the buffer the offsets are
+      // being added up in; this program only aims the ray it is handed.
+      uJitter: CAMPO_JITTER,
       // The meadow's own pigment, shared with the cubes by construction: these
       // are voxelSettings()' numbers and not a second table.
       uAlbedo: { value: ground.albedo },
