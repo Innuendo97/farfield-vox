@@ -2209,6 +2209,25 @@ export function campoRemarch(seat, field, gate = null, reach = CAMPO_REMARCH_REA
       uRemarchReach: { value: reach },
       uRemarchAll: { value: 0 },
       uRemarchShow: { value: 0 },
+      /**
+       * WHOSE PIXEL THE FILTERS BELOW THE PIXEL ARE MEASURED IN, AND IT IS A
+       * BENCH ARM AND NOT A TASTE.
+       *
+       * Nought -- what this material is for -- is the FRAME's, because that is
+       * the resolution the ray is fired at. One is the reduced TEXEL's, which
+       * is wrong for a ray fired at the frame's pixel and is exactly why it is
+       * here: every term of shade() and march() that filters below the pixel
+       * divides by this, and one of them is not a shading term at all. It is
+       * the prefilter that widens a slim blade back to its whole cell where the
+       * cell is no bigger than a couple of pixels (see the inset in march()),
+       * and at the frame's footprint that widening lets go two and a half times
+       * further out -- so a re-marched pixel draws a blade SLIM where the texels
+       * beside it drew it FAT. That is a difference of geometry and not of
+       * light, and whether it is a part of what the re-march costs in
+       * frame-to-frame change is a number and not an argument. This is how the
+       * number is taken.
+       */
+      uRemarchFoot: { value: 0 },
       uViewProjection: { value: new Matrix4() },
       uInvViewProjection: { value: new Matrix4() },
       uPixelScale: { value: 0.002 },
@@ -2238,8 +2257,11 @@ export function campoRemarch(seat, field, gate = null, reach = CAMPO_REMARCH_REA
     u.uFrameSize.value.copy(SCRATCH);
     // THE FRAME'S OWN FOOTPRINT, the same arithmetic campoBox does for the
     // marcher and read off the buffer that is bound HERE, which is the frame.
+    // The bench may ask for the reduced texel's instead; see uRemarchFoot.
     const fov = (camera.fov ?? 45) * Math.PI / 180;
-    u.uPixelScale.value = SCRATCH.y > 0 ? 2 * Math.tan(fov / 2) / SCRATCH.y : 0.002;
+    const rows = u.uRemarchFoot.value > 0.5 && u.uCampoSize.value.y > 1
+      ? u.uCampoSize.value.y : SCRATCH.y;
+    u.uPixelScale.value = rows > 0 ? 2 * Math.tan(fov / 2) / rows : 0.002;
     u.uViewProjection.value.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     u.uInvViewProjection.value.copy(u.uViewProjection.value).invert();
   };

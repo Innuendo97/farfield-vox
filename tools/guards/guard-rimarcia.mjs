@@ -340,10 +340,10 @@ report.check(/bool go = \(disagree \|\| uRemarchAll > 0\.5\) && refDist <= uRema
 report.check(/vec4 clip = uViewProjection \* vec4\(eye \+ dir \* hit\.t, 1\.0\);\n\s*depth = \(clip\.z \/ clip\.w\) \* 0\.5 \+ 0\.5;/.test(marcher),
   'il pixel ri-marciato scrive la profondita\' del proprio raggio');
 report.check((marcher.match(/uPixelScale: \{ value: 0\.002 \},/g) || []).length === 2
-  && /u\.uPixelScale\.value = SCRATCH\.y > 0 \? 2 \* Math\.tan\(fov \/ 2\) \/ SCRATCH\.y : 0\.002;/
-    .test(marcher),
+  && /uRemarchFoot: \{ value: 0 \},/.test(marcher)
+  && /u\.uPixelScale\.value = rows > 0 \? 2 \* Math\.tan\(fov \/ 2\) \/ rows : 0\.002;/.test(marcher),
   'e filtra il giunto e l\'arris sull\'impronta del pixel del FOTOGRAMMA, non del texel',
-  'due impronte, una per bersaglio, ciascuna letta dal buffer legato quando disegna');
+  'due impronte, una per bersaglio, e quella della ri-marcia nasce sul fotogramma');
 report.check(/uJitter: \{ value: new Vector2\(0, 0\) \},/.test(marcher),
   'e non passa dalla storia: un raggio solo, e nessuno scarto sotto cui sommarlo');
 
@@ -376,15 +376,12 @@ if (process.argv.includes('--self')) {
     'bool go = (disagree || uRemarchAll > 0.5) && refDist <= uRemarchReach;',
     'bool go = (disagree || uRemarchAll > 0.5);',
   );
-  // L'impronta del TEXEL al posto di quella del fotogramma: la ricomposizione
-  // che marcia smette di calcolarsi la propria e si tiene quella che le e'
-  // arrivata dal campo, che sta a una frazione di lato -- e allora il giunto e
-  // l'arris del pixel ri-marciato sono larghi due volte e mezzo il vero, sui
-  // soli pixel che questo lavoro esiste per affilare.
-  const texelFoot = marcher.replace(
-    'u.uPixelScale.value = SCRATCH.y > 0 ? 2 * Math.tan(fov / 2) / SCRATCH.y : 0.002;',
-    'void 0;',
-  );
+  // L'impronta del TEXEL spedita al posto di quella del fotogramma: il braccio
+  // di banco lasciato acceso di suo. Allora il giunto e l'arris del pixel
+  // ri-marciato sono larghi due volte e mezzo il vero, sui soli pixel che
+  // questo lavoro esiste per affilare.
+  const texelFoot = marcher.replace('uRemarchFoot: { value: 0 },',
+    'uRemarchFoot: { value: 1 },');
   selfTest('guard-rimarcia', [
     {
       what: 'un pixel ri-marciato che tiene la profondita\' media dei texel',
@@ -423,7 +420,7 @@ if (process.argv.includes('--self')) {
     },
     {
       what: 'un\'impronta del pixel presa dal texel ridotto invece che dal fotogramma',
-      caught: !/u\.uPixelScale\.value = SCRATCH\.y > 0 \? 2 \* Math\.tan\(fov \/ 2\) \/ SCRATCH\.y : 0\.002;/.test(texelFoot),
+      caught: !/uRemarchFoot: \{ value: 0 \},/.test(texelFoot),
     },
   ]);
 }

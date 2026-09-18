@@ -750,12 +750,17 @@ export function createCampo({
      * is read; `show` paints the pixels that fired one red and the rest of the
      * ground black, which is how they are counted.
      */
-    setRemarchProbe({ all = null, show = null } = {}) {
+    setRemarchProbe({ all = null, show = null, foot = null } = {}) {
       if (!remarch) return null;
       const u = remarch.material.uniforms;
       if (all !== null) u.uRemarchAll.value = all ? 1 : 0;
       if (show !== null) u.uRemarchShow.value = show ? 1 : 0;
-      return { all: u.uRemarchAll.value === 1, show: u.uRemarchShow.value === 1 };
+      if (foot !== null) u.uRemarchFoot.value = foot === 'texel' ? 1 : 0;
+      return {
+        all: u.uRemarchAll.value === 1,
+        show: u.uRemarchShow.value === 1,
+        foot: u.uRemarchFoot.value === 1 ? 'texel' : 'fotogramma',
+      };
     },
 
     /** What the re-march is doing, read back rather than deduced. */
@@ -768,6 +773,7 @@ export function createCampo({
         reach: remarchReach,
         all: u ? u.uRemarchAll.value === 1 : false,
         show: u ? u.uRemarchShow.value === 1 : false,
+        foot: u && u.uRemarchFoot.value === 1 ? 'texel' : 'fotogramma',
       };
     },
 
