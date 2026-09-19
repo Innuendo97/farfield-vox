@@ -5,6 +5,7 @@ import { builtHeightAt, cameraSolids, groundHeightAt as meadowHeightAt } from '.
 import { ROCK_BLOCKERS } from './rocks.js';
 import { MONOLITHS, PLATFORM } from './layout.js';
 import { LAYERS, layer, layersAt } from './layers/registry.js';
+import { mark } from '../core/steps.js';
 
 const DEG = Math.PI / 180;
 
@@ -329,7 +330,15 @@ export function buildHub() {
       // twice, and a layer that builds nothing may still have a frame's worth of
       // work to do.
       const frame = { elapsed, eye, delta, pitchDegrees };
-      for (const l of LAYERS) l.update(frame);
+      // E OGNI LAYER SI DICHIARA PER NOME AL CRONOMETRO DEL GIRO. Il passo
+      // `mondo` di src/main.js e' la somma di questi, e sapere che costa tre
+      // millisecondi senza sapere quale dei sette li spende e' sapere che il
+      // fotogramma e' lento. Spento fuori da `?dev`: vedi src/core/steps.js.
+      for (const l of LAYERS) {
+        mark(l.id);
+        l.update(frame);
+      }
+      mark('mondo/coda');
     },
   };
 }

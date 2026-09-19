@@ -95,6 +95,35 @@ export function createDevHud(root) {
         `cpu      ${(extra.cpuMs ?? 0).toFixed(2)} ms`,
       ];
 
+      // DOVE VA IL MILLISECONDO DEL FILO PRINCIPALE (E-LINUX1).
+      //
+      // La riga `cpu` sopra e' il passo intero e su una macchina dove la GPU e'
+      // il collo si perde nel rumore; su Firefox sotto X11, che non ha glthread
+      // e paga ogni chiamata GL su questo filo, e' meta' del difetto. Qui sotto
+      // c'e' la stessa grandezza divisa per passo del giro, e si legge come si
+      // legge la tabella degli stadi della GPU venti righe piu' in basso.
+      //
+      // SOLO I PASSI SOPRA TRE DECIMI DI MILLISECONDO, e il resto sommato in
+      // una riga sola. Un riquadro con venticinque righe da 0,01 ms e' un
+      // riquadro che nessuno legge, e cio' che questo strumento deve far vedere
+      // e' chi spende -- non l'elenco di chi esiste.
+      const passi = typeof extra.passi === 'function' ? extra.passi() : extra.passi;
+      if (passi) {
+        lines.push(`  passi  p50   p95   (${passi.frames} fotogrammi)`);
+        let resto50 = 0;
+        let resto95 = 0;
+        for (const passo of passi.passi) {
+          if (passo.p50 < 0.3 && passo.p95 < 0.3) {
+            resto50 += passo.p50;
+            resto95 += passo.p95;
+            continue;
+          }
+          lines.push(`  ${passo.nome.padEnd(12).slice(0, 12)} ${passo.p50.toFixed(2)}  ${passo.p95.toFixed(2)}`);
+        }
+        lines.push(`  ${'(sotto 0,3)'.padEnd(12)} ${resto50.toFixed(2)}  ${resto95.toFixed(2)}`);
+        lines.push(`  ${'= somma'.padEnd(12)} ${passi.somma.p50.toFixed(2)}  ${passi.somma.p95.toFixed(2)}`);
+      }
+
       if (quality) {
         const pending = quality.pending ? ` -> ${quality.pending.id}` : '';
         lines.push(

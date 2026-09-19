@@ -32,6 +32,9 @@ import { LOOK, choose } from './world/avatar/look.js';
 import {
   createDevHud, createGradePanel, isClockFrozen, isDevMode,
 } from './ui/devhud.js';
+import {
+  armSteps, beginFrame, endFrame, mark, readSteps,
+} from './core/steps.js';
 
 const canvas = document.getElementById('stage');
 const ui = document.getElementById('ui');
@@ -552,6 +555,8 @@ input.onKey((code, event) => {
 
 let grassVisible = true;
 let cloudsVisible = true;
+// Il conto delle chiamate GL, quando qualcuno l'ha chiesto. Vedi piu' sotto.
+let glCounter = null;
 // What the last frame cost, and what the driver has answered for since the
 // last time anybody looked. The two are only different while a query is still
 // in the queue.
@@ -561,6 +566,11 @@ let lastTimings = null;
 
 const dev = isDevMode() ? createDevHud(ui) : null;
 const grade = isDevMode() ? createGradePanel(ui, renderer.post) : null;
+// IL CRONOMETRO PER PASSO, acceso solo dove il riquadro lo e'. `?dev&passi=0`
+// lo spegne lasciando acceso tutto il resto, che e' l'unico modo di misurare
+// quanto costa lo strumento stesso: due aperture della stessa pagina, una con
+// e una senza, tutto il resto identico. Vedi src/core/steps.js.
+armSteps(isDevMode() && new URLSearchParams(window.location.search).get('passi') !== '0');
 if (dev) {
   // THE ONE SEAT A POSE IS IMPOSED THROUGH, built where the walker, the lens and
   // the arrival veil are all in scope, and only where a pose can be imposed at
@@ -860,6 +870,10 @@ if (import.meta.env.DEV && isDevMode()) {
   window.farfield = {
     scene, camera, player, renderer, assets, hub, hud, overlay, interaction,
     quality, bench, calibrate, presence, veil, input, audio, reticle, eye,
+    // IL SEGGIO DEL CRONOMETRO, che e' come il banco legge la tabella dei passi
+    // senza passare per il riquadro. La funzione e non la lettura, per la stessa
+    // ragione scritta dove il riquadro la riceve.
+    steps: readSteps,
   };
 
   loadAllSections().then((sections) => {
@@ -867,6 +881,19 @@ if (import.meta.env.DEV && isDevMode()) {
       const pending = pendingEntries(section);
       console.info(`${section.id} ${section.chiave}: ${Math.round(section.copertura * 100)}% coperto, ${pending.length} voci in attesa`);
     }
+  });
+
+  // IL CONTO DELLE CHIAMATE AL DRIVER, dietro una maniglia sua (`?dev&gl`) e
+  // non dentro `?dev`. L'avvolgimento del contesto costa, e una misura del
+  // TEMPO presa con questo acceso misurerebbe l'avvolgimento; quel che si legge
+  // di qui sono numeri di chiamate, che sono gli stessi con o senza. Il
+  // contesto si riprende dalla tela e non dal renderer perche' `getContext` con
+  // lo stesso nome torna quello che c'e' gia': e' lo stesso oggetto che three
+  // sta usando, non un secondo.
+  import('./dev/glcount.js').then(({ countGlCalls, isGlCountEnabled }) => {
+    if (!isGlCountEnabled()) return;
+    glCounter = countGlCalls(canvas.getContext('webgl2'));
+    window.farfield.gl = glCounter;
   });
 
   import('./dev/baketest.js').then(async ({ isBakeTestEnabled, mountBakeTest }) => {
@@ -893,12 +920,17 @@ resize();
 new Loop()
   .add((delta, now) => {
     const started = performance.now();
+    // OGNI SEZIONE DEL GIRO SI DICHIARA, e fuori da `?dev` ogni `mark` e' un
+    // ritorno su un booleano: vedi src/core/steps.js.
+    beginFrame(started);
+    mark('banco');
     // The calibration turns the eye itself and the walker has not been given
     // the world yet, so for those three seconds the body takes no orders.
     if (bench.active) {
       if (input.engaged) bench.stop();
       else bench.step(delta, freshCostMs, player);
     }
+    mark('corpo');
     // A room being read is a walker standing still: the world behind it stays
     // visible, and a body drifting off under an open page is a body that
     // arrives somewhere nobody chose.
@@ -915,15 +947,18 @@ new Loop()
     player.applyTo(camera);
     // The arrival composition is over the moment the walker walks out of it.
     if (player.speed > FIRST_STEP_SPEED) veil.firstStep();
+    mark('concetto');
     // After the body, never instead of it: the lean towards an opened face is a
     // move of the eye, and the walker keeps every key while it is held.
     interaction.update(delta, player.position);
     interaction.applyCamera(camera);
+    mark('presenza');
     // And the body itself last of all, on top of wherever the eye ended up:
     // nothing downstream of here has to know that the point it is drawing from
     // belongs to somebody standing.
     presence.update(delta, player.motionInto(motion));
     presence.applyTo(camera);
+    mark('occhio');
     // And the eye over the body, once the camera has stopped moving for this
     // frame. What it accommodates to is read out of the depth buffer on the
     // GPU; what it takes from here is the face the interaction is offering —
@@ -945,7 +980,9 @@ new Loop()
     // with it. The camera and the position are passed and no longer read — see
     // the note over update() in src/core/audio.js for why the signature is left
     // as wide as it is rather than narrowed from this side.
+    mark('audio');
     audio.update(delta, presence.state, camera, player.position);
+    mark('interfaccia');
     hud.setHeading(player.yawDegrees);
     // The mark in the middle of the frame, told what is within reach and
     // whether anything else has the mouse. It reads the motion the body was
@@ -955,9 +992,12 @@ new Loop()
     // compared against the last one, and nothing at all outside the mode.
     touch?.update(interaction.state);
     worldSeconds = now / 1000;
+    mark('mondo');
     hub.update(worldSeconds, player.position, delta, player.pitchDegrees);
+    mark('consegna');
     renderer.render(scene, camera);
 
+    mark('governatore');
     // What that frame cost, by the driver's clock where there is one and by the
     // interval between callbacks where there is not.
     const timings = renderer.timings();
@@ -968,10 +1008,19 @@ new Loop()
     if (timings) lastTimings = timings;
     quality.sample(freshCostMs, { lookRate: player.lookRate, speed: player.speed });
 
+    // IL PASSO DELLA CPU SI CHIUDE QUI, PRIMA DEL RIQUADRO. Quel che il
+    // riquadro costa e' un costo dello sviluppo e non del mondo, e sommarlo
+    // sarebbe misurare lo strumento insieme alla cosa.
+    const cpuMs = performance.now() - started;
     if (dev) {
+      mark('riquadro');
       const buffer = renderer.post.quality;
       dev.update(delta, now, renderer.stats(), {
-        cpuMs: performance.now() - started,
+        cpuMs,
+        // La funzione e non la lettura: il riquadro si ridipinge cinque volte
+        // al secondo e chiamarla a ogni fotogramma sarebbe allocare cinquanta
+        // volte per ogni volta che qualcuno guarda.
+        passi: readSteps,
         position: `${player.position.x.toFixed(1)} ${player.position.z.toFixed(1)}`,
         speed: `${player.speed.toFixed(2)} m/s`,
         buffer: buffer ? `${buffer.format} x${buffer.samples}` : '',
@@ -981,6 +1030,8 @@ new Loop()
         stages: lastTimings,
         grass: hub.vegetationStats(),
       });
+      if (glCounter) glCounter.frame();
     }
+    endFrame();
   })
   .start();
