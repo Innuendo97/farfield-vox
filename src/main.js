@@ -398,7 +398,9 @@ function recapturePointer() {
 // it cannot hold, and the levers are cheap to set on an empty scene.
 const quality = createQuality({ renderer, hub });
 quality.start();
-renderer.setTiming(true);
+// The clock the governor is steered by, and the eleven stages ONLY where a
+// panel reads them: see setTiming in src/core/renderer.js.
+renderer.setTiming(true, isDevMode());
 const bench = createBenchmark({ renderer, pose: POSE_SPAWN, ui });
 
 // What the world sounds like. It listens for the first gesture itself and takes

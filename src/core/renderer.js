@@ -134,7 +134,18 @@ export class Renderer {
   /** What that buffer actually is, read back rather than deduced. */
   campoStats() { return this.#post.campoStats(); }
 
-  setTiming(on) { return this.#post.setTiming(on); }
+  /**
+   * The driver's clock, and whether it is asked for the frame or for the stages.
+   *
+   * ELEVEN QUERIES ARE NOT ELEVEN TIMES ONE (U-PERF-7, E-LINUX1). The governor
+   * reads one number, `total`; the eleven stages are read by the development
+   * panel and by nothing else. Eleven timer queries are twenty two begin/end
+   * calls and up to eleven SYNCHRONOUS reads a frame -- the one family of GL
+   * call that a driver cannot queue, because it answers -- and on a browser
+   * with no GL thread they are paid on the same thread that moves the body.
+   * So `stages` is off unless somebody is looking.
+   */
+  setTiming(on, stages = false) { return this.#post.setTiming(on, stages); }
 
   /** What the GPU spent on the last timed frame, in milliseconds, or null. */
   timings() { return this.#post.timings(); }

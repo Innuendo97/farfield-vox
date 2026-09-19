@@ -2091,9 +2091,17 @@ function identityLut(size = LUT_SIZE) {
 // frame, the chain with its own pyramid -- and read together they hid which of
 // the two a post budget was actually spending. `bloom` keeps its name and now
 // means the threshold alone; the down and up chain is `sfocatura`.
+//
+// E `tutto` E' IL DODICESIMO, CHE NON E' UNO STADIO (U-PERF-7, E-LINUX1). Il
+// governatore ha bisogno di UN numero -- quanto e' costato il fotogramma -- e
+// legge `total`, che e' la somma degli altri undici. Gli undici li legge solo
+// il riquadro di sviluppo. Undici query sono ventidue chiamate di
+// begin/endQuery e fino a undici letture sincrone per fotogramma addosso a ogni
+// visitatore, per una tabella che nessun visitatore vede: fuori da `?dev` il
+// fotogramma si cronometra INTERO, con una query sola, e `total` e' lei.
 const CLOCK_STAGES = [
   'prepass', 'campo', 'scene', 'depth', 'soft', 'bloom', 'sfocatura', 'probe', 'eye', 'rays',
-  'composite',
+  'composite', 'tutto',
 ];
 
 /**
@@ -2145,7 +2153,7 @@ function createGpuClock(gl) {
   let open = null;
   const last = {
     prepass: 0, scene: 0, depth: 0, soft: 0, bloom: 0, probe: 0, eye: 0, rays: 0,
-    composite: 0, total: 0,
+    composite: 0, tutto: 0, total: 0,
   };
   let fresh = false;
   // Why a frame went untimed, so the answer is a number rather than a theory.
@@ -2196,8 +2204,30 @@ function createGpuClock(gl) {
   function drain() {
     while (live > 0) {
       const slot = ring[head];
-      const ready = slot.active.every(
-        (stage) => context.getQueryParameter(slot.queries[stage], context.QUERY_RESULT_AVAILABLE),
+      // UNA DOMANDA AL DRIVER E NON UNDICI, E LA RAGIONE E' SCRITTA VENTI RIGHE
+      // PIU' SU (U-PERF-7, E-LINUX1).
+      //
+      // «Timer queries on one context complete in the order they were issued»:
+      // e' la legge su cui questo anello e' costruito -- e' il perche' si
+      // guarda solo la testa della coda -- e vale dentro un fotogramma
+      // esattamente come vale fra un fotogramma e l'altro. Se l'ULTIMO stadio
+      // aperto e' tornato, sono tornati tutti quelli aperti prima.
+      //
+      // `every` chiedeva invece uno stadio alla volta, e una domanda al driver
+      // non e' una chiamata come le altre: `getQueryParameter` TORNA UN VALORE,
+      // quindi svuota la coda dei comandi e aspetta il giro. Contate sotto
+      // `?dev&gl`, erano 13,6 al fotogramma al tier basso, il 3,2 % di tutte le
+      // chiamate GL del fotogramma e la sola famiglia che il filo paga per
+      // intero anche dove c'e' glthread -- e su Firefox sotto X11, che glthread
+      // non ce l'ha, tutto il resto si paga qui insieme a queste.
+      //
+      // E NON E' UN'OTTIMIZZAZIONE DEL CASO BUONO: quando la testa NON e'
+      // pronta `every` si fermava alla prima, cioe' a una domanda; quando era
+      // pronta ne faceva undici. Il caso che costava e' quello in cui il
+      // fotogramma riusciva, cioe' quasi tutti.
+      const lastStage = slot.active[slot.active.length - 1];
+      const ready = lastStage === undefined || context.getQueryParameter(
+        slot.queries[lastStage], context.QUERY_RESULT_AVAILABLE,
       );
       if (!ready) return;
       collect(slot);
@@ -3556,6 +3586,9 @@ export function createPostPipeline(gl) {
 
   const clock = createGpuClock(gl);
   let timing = false;
+  // Se il fotogramma si cronometra per STADIO o intero. Acceso solo dove c'e'
+  // qualcuno che legge la tabella, cioe' sotto `?dev`: vedi CLOCK_STAGES.
+  let stageTiming = false;
   // Something to draw before the world, into a buffer of its own, timed apart
   // from the frame it stands behind. Null on every path that has not asked for
   // one, which is every path but a development key.
@@ -4073,9 +4106,13 @@ export function createPostPipeline(gl) {
       gl.info.autoReset = false;
       gl.info.reset();
       const slot = timing && clock ? clock.take() : null;
+      // UNA QUERY SOLA QUANDO NESSUNO LEGGE LA TABELLA. Aperta qui e chiusa
+      // dove si chiude l'ultimo stadio, cosi' che misuri esattamente cio' che
+      // gli undici misuravano sommati.
+      if (slot && !stageTiming) clock.begin(slot, 'tutto');
 
       if (prepass) {
-        if (slot) clock.begin(slot, 'prepass');
+        if (slot && stageTiming) clock.begin(slot, 'prepass');
         prepass(gl);
       }
 
@@ -4118,7 +4155,7 @@ export function createPostPipeline(gl) {
       const remembering = campoing && CAMPO_MEMORY.weight > 0;
       if (campoing) {
         allocateCampo();
-        if (slot) clock.begin(slot, 'campo');
+        if (slot && stageTiming) clock.begin(slot, 'campo');
         // THE OFFSET, BEFORE THE RAYS ARE AIMED.
         //
         // It moves only while there is an accumulation to add the frames up in
@@ -4224,7 +4261,7 @@ export function createPostPipeline(gl) {
         restCampo();
       }
 
-      if (slot) clock.begin(slot, 'scene');
+      if (slot && stageTiming) clock.begin(slot, 'scene');
       gl.setRenderTarget(sceneTarget);
       // Taken out of the world's pass when there is somewhere else to put it,
       // and PUT BACK INTO IT when there is not — so a material that joined the
@@ -4255,7 +4292,7 @@ export function createPostPipeline(gl) {
       // attachment is a renderbuffer and the texture is only its resolve) what
       // comes back is the previous pass. Both readings are in
       // v0-fondazione/profondita/uscite/ricircolo.json.
-      if (slot && softing) clock.begin(slot, 'depth');
+      if (slot && stageTiming && softing) clock.begin(slot, 'depth');
       if (softing) {
         lift.uniforms.tDepth.value = sceneTarget.depthTexture;
         lift.uniforms.uCameraRange.value.set(worldCamera.near, worldCamera.far);
@@ -4273,7 +4310,7 @@ export function createPostPipeline(gl) {
       // additives are accumulated from black and added back at the composite,
       // which is exact — and never into the scene target, which is what keeps
       // that target's resolve at one for the frame.
-      if (slot && softing) clock.begin(slot, 'soft');
+      if (slot && stageTiming && softing) clock.begin(slot, 'soft');
       if (softing) {
         worldCamera.layers.set(SOFT_DEPTH_LAYER);
         gl.setRenderTarget(softGlowTarget);
@@ -4282,7 +4319,7 @@ export function createPostPipeline(gl) {
       }
       const glowTexture = softing ? softGlowTarget.texture : SOFT_GLOW_REST;
 
-      if (slot) clock.begin(slot, 'bloom');
+      if (slot && stageTiming) clock.begin(slot, 'bloom');
       if (stages.bloom) {
         prefilter.uniforms.tSource.value = sceneTarget.texture;
         prefilter.uniforms.tGlow.value = glowTexture;
@@ -4290,7 +4327,7 @@ export function createPostPipeline(gl) {
         prefilter.uniforms.uKnee.value = params.bloomKnee;
         draw(prefilter, bloomTargets[0]);
 
-        if (slot) clock.begin(slot, 'sfocatura');
+        if (slot && stageTiming) clock.begin(slot, 'sfocatura');
         for (let i = 1; i < bloomTargets.length; i++) {
           const source = bloomTargets[i - 1];
           down.uniforms.tSource.value = source.texture;
@@ -4361,7 +4398,7 @@ export function createPostPipeline(gl) {
       // pixel is not even bound.
       const veiling = stages.glare && eye.glare * params.eye.glareStrength > 0;
       const probing = probeTargets.length === 2 && (focusing || marching || veiling);
-      if (slot && probing) clock.begin(slot, 'probe');
+      if (slot && stageTiming && probing) clock.begin(slot, 'probe');
       if (probing) {
         const now = (typeof performance === 'object' ? performance.now() : Date.now()) / 1000;
         const dt = lastProbeAt === 0 ? 1 / 60 : Math.min(0.25, Math.max(1e-4, now - lastProbeAt));
@@ -4414,7 +4451,7 @@ export function createPostPipeline(gl) {
       // clock already answers "nobody drew this" with a zero, and the difference
       // between a measured nothing and a declared nothing is the difference
       // between "cheap" and "not there".
-      if (slot && focusing) clock.begin(slot, 'eye');
+      if (slot && stageTiming && focusing) clock.begin(slot, 'eye');
       if (focusing) {
         const tanHalf = Math.tan(worldCamera.fov * Math.PI / 360);
         defocus.uniforms.tSource.value = sceneTarget.texture;
@@ -4456,7 +4493,7 @@ export function createPostPipeline(gl) {
       // decision about a DRAW: the amount fades smoothly and the picture with
       // it, but whether a pass runs is a yes or a no, and a sun sliding along
       // the frame edge would otherwise toggle it every frame.
-      if (slot && marching) clock.begin(slot, 'rays');
+      if (slot && stageTiming && marching) clock.begin(slot, 'rays');
       if (marching) {
         const e2 = params.eye;
         sunrays.uniforms.tSource.value = sceneTarget.texture;
@@ -4485,7 +4522,7 @@ export function createPostPipeline(gl) {
         draw(up, raysTargets[1]);
       }
 
-      if (slot) clock.begin(slot, 'composite');
+      if (slot && stageTiming) clock.begin(slot, 'composite');
       composite.uniforms.tScene.value = sceneTarget.texture;
       composite.uniforms.tGlow.value = glowTexture;
       composite.uniforms.tBloom.value = bloomTargets[0].texture;
@@ -4797,7 +4834,11 @@ export function createPostPipeline(gl) {
      * three tenths of a millisecond a frame, and two of the six repetitions
      * read the same either way.
      */
-    setTiming(on) { timing = Boolean(on) && clock !== null; return timing; },
+    setTiming(on, stages = false) {
+      timing = Boolean(on) && clock !== null;
+      stageTiming = timing && Boolean(stages);
+      return timing;
+    },
 
     /** The last complete reading of the driver's clock, in milliseconds. */
     timings() { return clock ? clock.read() : null; },
