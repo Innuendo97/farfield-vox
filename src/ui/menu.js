@@ -27,14 +27,21 @@ const ITEMS = [
   { id: 'musica', label: 'Musica', note: 'Rada, e presente' },
 ];
 
-// Auto first and named as what it is. A walker who picks one of the other three
+// Auto first and named as what it is. A walker who picks one of the other four
 // is telling the world to stop deciding, and it stops: the governor only ever
 // moves a tier nobody has asked for by hand.
+//
+// AND «Minima» IS THE FIFTH, which is a row and not a footnote (E-LINUX1). It
+// is the one tier that takes things out of the world rather than drawing the
+// same world smaller, so it is the one a walker has to be able to ask for and
+// to leave: a machine that goes to pieces is answered by the row, and a walker
+// who would rather have the grass back than the frames takes it back here.
 const QUALITY_CHOICES = [
   ['auto', 'Auto'],
   ['alta', 'Alta'],
   ['media', 'Media'],
   ['bassa', 'Bassa'],
+  ['minima', 'Minima'],
 ];
 
 // The same three-way shape, for the same reason: a walker who has said anything

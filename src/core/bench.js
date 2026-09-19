@@ -49,7 +49,13 @@ const SWEEP_DEGREES = 0;
 // Where the fallback puts its lines, as a multiple of the interval the display
 // is offering. Under a sixth over is a machine keeping up; past three fifths
 // over is a machine that has already halved its frame rate.
-const LAG_THRESHOLDS = { high: 1.15, medium: 1.6 };
+// AND THE LOWEST OF THEM IS THE ONE THE COMMITTENTE'S OWN LAPTOP SET
+// (E-LINUX1). Firefox on X11 has no timer query to offer, so that machine falls
+// down this branch and nowhere else: it reads 42,5 ms of frame against a
+// 16,7 ms display interval at the tier BASSO, which is 2,54. Past 2,4 the
+// machine has not merely lost a tier, it has lost more than half its frames,
+// and the tier under `basso` is the only answer left that is not a stutter.
+const LAG_THRESHOLDS = { high: 1.15, medium: 1.6, low: 2.4 };
 
 const NOTE_STYLE = [
   'position:absolute',
@@ -89,14 +95,16 @@ export function tierForGpuMs(ms) {
   if (ms < BENCH_THRESHOLDS.discrete) return 'oltre';
   if (ms < BENCH_THRESHOLDS.high) return 'alto';
   if (ms < BENCH_THRESHOLDS.medium) return 'medio';
-  return 'basso';
+  if (ms < BENCH_THRESHOLDS.low) return 'basso';
+  return 'minimo';
 }
 
 /** And which one an interval that is only ever the refresh rate asks for. */
 export function tierForLag(ratio) {
   if (ratio < LAG_THRESHOLDS.high) return 'alto';
   if (ratio < LAG_THRESHOLDS.medium) return 'medio';
-  return 'basso';
+  if (ratio < LAG_THRESHOLDS.low) return 'basso';
+  return 'minimo';
 }
 
 /**
