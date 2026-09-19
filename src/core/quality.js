@@ -177,9 +177,9 @@ export const TIERS = [
     // touching it. The disc's reach is measured: see the block over TIERS.
     voxelDiscRadius: 14,   // [V1] metres of ten centimetre ground from the centre
     groundDetail: { near: 9, step: 1.45, lag: 300 },     // [V1] the ring in metres, the band in ms
-    // [U-CAMPO-3, E-CAMPO6-B] LA FRAZIONE DI LATO A CUI LA TERRA E' MARCIATA,
-    // ed e' UN NUMERO SOLO SU TUTTI E QUATTRO I TIER: il committente l'ha
-    // comprato, e la riga qui sotto dice con che cosa.
+    // [U-CAMPO-3, E-CAMPO6-B, E-DECISIONI28] LA FRAZIONE DI LATO A CUI LA TERRA
+    // E' MARCIATA -- e la cosa che i quattro numeri hanno in comune NON e' la
+    // frazione, e' il PIXEL CHE NE ESCE. Vedi in fondo a questa nota.
     //
     // TRE QUARTI, E FU DECISO DUE VOLTE. A quattro volte la grandezza naturale,
     // affiancato al nativo, il prato VICINO a mezzo lato si vede diverso -- i
@@ -212,6 +212,35 @@ export const TIERS = [
     // accanto e NON e' stato scelto: costa il doppio e lascia il reticolo
     // aperto. Resta dietro `?camporimarcia=`, che e' dove sta cio' che nessuno
     // ha comprato.
+    //
+    // ------------------------------------------------------------------------
+    // E IL TIER MEDIO NON PORTA TRE QUARTI, PORTA 0,65, PERCHE' QUESTA RIGA NON
+    // E' UNA FRAZIONE: E' UN PIXEL (E-DECISIONI28, 2026-09-19).
+    //
+    // Quel che chiude il reticolo non e' `campoScale`, e' quanti pixel del
+    // FOTOGRAMMA copre un texel del suolo -- cioe' `1 / (scale * campoScale)`,
+    // perche' il bersaglio della terra e' una frazione del fotogramma e il
+    // fotogramma e' gia' una frazione della finestra. Misurato, banda 5-6 m:
+    //
+    //     2,66 px per texel   reticolo 1,102     (basso a mezzo lato)
+    //     2,35 px             1,092              (medio a mezzo lato)
+    //     1,78 px             1,005              (basso a tre quarti)
+    //     1,33 px             1,006              (alto a tre quarti)
+    //
+    // Sotto i due pixel il reticolo e' chiuso e resta chiuso: fra 1,78 e 1,33
+    // non si guadagna piu' niente. Il tier medio disegna il fotogramma a 0,85
+    // di lato, quindi tre quarti di terra su quello facevano 1,57 px per texel
+    // -- piu' fini del tier BASSO, per un tier che deve costare MENO -- e la
+    // misura lo ha detto col prezzo: 17,73 ms di mediana alla posa P, a 0,27 ms
+    // dai 18 di CEILING_MS qui sotto, cioe' un tier che sulla macchina di
+    // chiunque sia un po' piu' lento scende da solo. Un tier che scende da solo
+    // e' l'unica parte di tutto questo che il visitatore VEDE.
+    //
+    // 0,65 su 0,85 fa 1,81 px per texel, che e' il pixel del tier BASSO nuovo
+    // (1,78) a un centesimo: stesso reticolo chiuso, e la mediana torna sotto
+    // il tetto del governatore con margine invece che con un decimo di
+    // millisecondo. E' la strada (d) che il committente ha scelto.
+    // ------------------------------------------------------------------------
     campoScale: 0.75,
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
@@ -236,7 +265,7 @@ export const TIERS = [
     // touching it. The disc's reach is measured: see the block over TIERS.
     voxelDiscRadius: 14,   // [V1] metres of ten centimetre ground from the centre
     groundDetail: { near: 6, step: 1.75, lag: 300 },     // [V1] the ring in metres, the band in ms
-    campoScale: 0.75,      // [E-CAMPO6-B] la frazione di lato: vedi la nota al tier alto
+    campoScale: 0.65,      // [E-DECISIONI28] su un fotogramma a 0,85 fa 1,81 px per texel: vedi la nota al tier alto
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
