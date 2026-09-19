@@ -372,14 +372,15 @@ if (traces.length === 0) {
 // lasciava al tre quarti che si spedisce sette punti di margine su
 // quarantotto, cioe' gateava una scala che il mondo non disegna piu'.
 //
-// E DAL 2026-09-19 IL MEZZO LATO NON LO DISEGNA PIU' NESSUNO (E-CAMPO6-B): il
-// committente ha comprato i tre quarti anche sui tier medio e basso, e ha
-// comprato con essi +3,3 ms al tier basso alla posa P. La riga «posa fittata,
-// basso» qui sopra resta la ricevuta di com'era e NON e' piu' la ricevuta di
-// cio' che si spedisce -- la terra al tier basso costa ora la quota di un tre
-// quarti, e la scheda che la misura e' quella che questa gamba vuole. La legge
-// del tetto non cambia di una riga proprio perche' e' una legge della SCALA:
-// la scheda porta la sua, e il tetto la segue.
+// E DAL 2026-09-19 IL MEZZO LATO NON LO DISEGNA PIU' NESSUNO (E-CAMPO6-B, poi
+// E-DECISIONI28): il tier basso spedisce 0,75 e il tier medio 0,65, e la riga
+// «posa fittata, basso» qui sopra resta la ricevuta di com'era e NON e' piu' la
+// ricevuta di cio' che si spedisce. La legge del tetto non cambia di una riga
+// proprio perche' e' una legge della SCALA e non un numero: la scheda porta la
+// sua frazione, `earthCeiling` la legge da li', e a 0,65 il tetto vale 0,52
+// senza che nessuno lo scriva. E' la stessa ragione per cui un tetto fisso a
+// 0,55 fu tolto: una guardia stantia costringe a spegnerla invece che a
+// crederle.
 //
 // E IL TETTO ORA E' UNA LEGGE DELLA SCALA E NON UN NUMERO: un bersaglio a
 // frazione `s` di lato porta `s*s` dei pixel, quindi non puo' costare piu' di

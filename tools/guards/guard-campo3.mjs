@@ -456,26 +456,52 @@ report.check(Math.abs(onScreen - 2 * Math.tan((eye.fov * Math.PI / 180) / 2) / S
 
 // ======================================================================= I TIER
 //
-// E IL PAVIMENTO DELLA FRAZIONE DI LATO, CHE DAL 2026-09-19 E' TRE QUARTI SU
-// OGNI TIER (E-CAMPO6-B). Non e' un gusto: sotto i tre quarti il RETICOLO DEL
-// TEXEL traspare, ed e' misurato. Al tier basso a mezzo lato la terra e' decisa
-// una volta ogni 2,66 pixel e i salti di livello che un occhio chiama bordo
-// cadono sui confini dei texel 1,104 volte piu' spesso di quanto ci cadrebbero
-// a caso (U-CAMPO-6 §4.2); a tre quarti quello stesso numero e' 1,005, cioe'
-// nessun reticolo. Il committente ha comprato la differenza a +3,3 ms al tier
-// basso, quindi un tier che tornasse sotto la renderebbe un acquisto perso.
+// E IL TETTO DEL PIXEL DELLA TERRA, CHE NON E' UN TETTO SULLA FRAZIONE.
 //
-// IL TETTO NON E' SCRITTO QUI, e la ragione e' che non c'e': una frazione piu'
-// ALTA e' piu' pixel e meno reticolo, e chi la alza paga un prezzo che la
-// scheda del costo rende visibile da sola.
-const CAMPO_SCALE_FLOOR = 0.75;
+// E-CAMPO6-B aveva portato `campoScale` a tre quarti su tutti e quattro i tier
+// e questa gamba, scritta allora, chiedeva «nessun tier sotto 0,75». Era la
+// legge giusta scritta sulla variabile sbagliata, e E-DECISIONI28 lo ha reso
+// visibile: il tier medio disegna il FOTOGRAMMA a 0,85 di lato, quindi tre
+// quarti di terra su di esso davano 1,57 pixel per texel -- piu' fini del tier
+// BASSO, per un tier che deve costare meno -- e costavano 17,73 ms di mediana,
+// a 0,27 dal tetto del governatore. A 0,65 il medio fa 1,81 px per texel, che
+// e' il pixel del basso (1,78) a un centesimo, e la frazione e' SOTTO 0,75.
+//
+// QUINDI CIO' CHE SI GATEA E' IL PIXEL: `1 / (scale * campoScale)`, quanti
+// pixel del fotogramma copre un texel del suolo. Misurato, banda 5-6 m, con il
+// reticolo dei salti forti (U-CAMPO-6 §4.2 e U-CAMPO-7 §3.2):
+//
+//     2,66 px per texel   reticolo 1,102     (basso a mezzo lato)
+//     2,35 px             1,092              (medio a mezzo lato)
+//     1,81 px             1,025              (medio oggi)
+//     1,78 px             1,005              (basso oggi)
+//     1,57 px             1,004              (medio a tre quarti, non spedito)
+//     1,33 px             1,006              (alto oggi)
+//
+// Il reticolo si chiude fra 2,35 e 1,81 e sotto non si guadagna quasi piu'
+// niente. Il tetto sta a 1,85 px: sopra, il committente perde cio' che ha
+// comprato; sotto, si spendono millisecondi che nessuno ha chiesto e la scheda
+// del costo li fa vedere da sola, quindi un pavimento non serve e non e'
+// scritto.
+//
+// E IL PIXEL NON E' TUTTA LA STORIA, il che e' scritto qui perche' la tabella
+// sopra lo dice da sola: 1,81 legge 1,025 e 1,78 legge 1,005, e tre centesimi
+// di pixel non valgono due centesimi di reticolo. Quel che manca e' il ring del
+// dettaglio (il medio sta a near 6 / step 1,75, il basso a 4,5 / 2) e la scala
+// del FOTOGRAMMA, che al medio e' 0,85 e al basso 0,75 -- un fotogramma piu'
+// fine rende il reticolo della terra piu' visibile a parita' di texel. Il pixel
+// e' il termine che comanda e il tetto sta su quello; gli altri due muovono il
+// numero di qualche centesimo e sono di chi possiede il ring.
+const TEXEL_PX_CEILING = 1.85;
+const texelPx = (tier) => 1 / ((tier.scale || 1) * (tier.campoScale || 1));
 for (const tier of TIERS) {
   report.check(typeof tier.campoScale === 'number' && tier.campoScale > 0
     && tier.campoScale <= 1,
     `il tier ${tier.id} dichiara il pixel della terra`, `campoScale ${tier.campoScale}`);
-  report.check(tier.campoScale >= CAMPO_SCALE_FLOOR,
-    `e il tier ${tier.id} non scende sotto i tre quarti di lato, dove il reticolo del texel traspare`,
-    `campoScale ${tier.campoScale} contro il pavimento ${CAMPO_SCALE_FLOOR}`);
+  report.check(texelPx(tier) <= TEXEL_PX_CEILING,
+    `e un texel del suolo al tier ${tier.id} non copre piu' di ${TEXEL_PX_CEILING} pixel del fotogramma, `
+    + 'che e dove il reticolo del texel torna a trasparire',
+    `${texelPx(tier).toFixed(2)} px = 1 / (${tier.scale} di fotogramma x ${tier.campoScale} di terra)`);
 }
 report.check(/renderer\.setCampoScale\(hub\.setCampoScale\(tier\.campoScale \?\? 1\)\);/.test(QUALITY),
   'e il governatore muove le due meta della leva con UN numero',
@@ -564,14 +590,20 @@ if (process.argv.includes('--self')) {
     })() });
   casi.push({ what: 'un tier che non dichiara il pixel della terra',
     caught: [{ id: 'x' }].some((t) => typeof t.campoScale !== 'number') });
-  // E IL RITORNO AL MEZZO LATO, che e' il difetto che il pavimento esiste per
+  // E IL RITORNO AL MEZZO LATO, che e' il difetto che il tetto esiste per
   // prendere: un tier tornato a 0,5 disegna un mondo per cui il committente ha
   // gia' pagato la differenza, e nulla nel codice glielo impedirebbe.
-  casi.push({ what: 'un tier che torna a mezzo lato, cioe che ridisapre il reticolo del texel',
-    caught: [...TIERS, { id: 'x', campoScale: 0.5 }]
-      .some((t) => t.campoScale < CAMPO_SCALE_FLOOR) });
+  casi.push({ what: 'un tier che torna a mezzo lato, cioe che riapre il reticolo del texel',
+    caught: [...TIERS, { id: 'x', scale: 0.85, campoScale: 0.5 }]
+      .some((t) => texelPx(t) > TEXEL_PX_CEILING) });
+  // E IL DIFETTO CHE UN TETTO SULLA FRAZIONE NON AVREBBE PRESO, che e' come
+  // questa gamba si e' accorta di essere scritta sulla variabile sbagliata: una
+  // frazione onorevole su un fotogramma gia' ridotto da' un pixel grosso.
+  casi.push({ what: 'e una frazione da tre quarti su un fotogramma a mezzo lato, che un tetto sulla frazione avrebbe lasciato passare',
+    caught: texelPx({ scale: 0.5, campoScale: 0.75 }) > TEXEL_PX_CEILING
+      && 0.75 >= 0.75 });
   casi.push({ what: 'e i tier veri, che NON devono essere chiamati difetto',
-    caught: !TIERS.some((t) => t.campoScale < CAMPO_SCALE_FLOOR) });
+    caught: !TIERS.some((t) => texelPx(t) > TEXEL_PX_CEILING) });
 
   // =====================================================================
   // I LETTORI, NEI TRE VERSI CHE CONTANO.

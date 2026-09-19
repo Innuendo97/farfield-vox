@@ -234,12 +234,53 @@ const AT_TODAY = {
   0.5: { native: 11.115, march: 2.310, share: 2.310 / 11.115 },
 };
 
-/** Does a march at this fraction of a side cost no more than its share of pixels? */
+/**
+ * Does a march at this fraction of a side cost no more than its share of pixels?
+ *
+ * NULL, AND NOT `true`, WHERE THERE IS NO CARD. It returned `true` and the leg
+ * below went green on a fraction nobody had ever measured -- which is how
+ * E-DECISIONI28 nearly slipped through: the tier medio moved to 0.65, 0.65 is
+ * not a key of the table, and the one leg that prices the ground's target
+ * stopped biting without a single line turning red. A guard that cannot answer
+ * has to SAY it cannot answer.
+ */
 export function marchIsSubProportional(scale, add = 0) {
   const seen = AT_TODAY[scale];
-  if (!seen) return true;
+  if (!seen) return null;
   return (seen.march + add) / seen.native <= scale * scale;
 }
+
+// ---------------------------------------------------------------------------
+// AND THE READING THAT DOES NOT AGREE WITH THE TWO ROWS ABOVE, WRITTEN DOWN
+// RATHER THAN RECONCILED (U-CAMPO-7, 2026-09-19).
+//
+// Taking the row this table lacks meant marching the tier medio at four
+// fractions inside ONE opening and timing the `campo` stage of the driver's own
+// clock, with the native read at 0.999 -- because at one exactly the frame
+// leaves the ground in the world's pass and there is no stage to time at all.
+// Three rounds, the order reversed on alternate rounds, spread under 1 %:
+//
+//     0.999   1606x717   16.439 ms    (the native, by construction 100 %)
+//     0.75    1206x539    9.747 ms    59.3 % of it, against 56.3 % of the pixels
+//     0.65    1045x467    7.529 ms    45.8 %,        against 42.3 %
+//     0.5      804x359    4.821 ms    29.3 %,        against 25.0 %
+//
+// SO WITHIN ONE PASS THE MARCH IS SUPER-PROPORTIONAL, at every fraction, and
+// this table says sub. The two are not the same measurement and that is the
+// whole of the discrepancy: the rows above read the native as the ground drawn
+// in the WORLD's pass (`mondo-campores1`), which is multisampled at two, while
+// every reduced arm draws into the field's own target, which deliberately is
+// not. That receipt therefore carries a saving that belongs to the samples and
+// not to the fraction. The reading here changes one thing only -- the size of
+// the target -- and finds the fixed costs of a march that a smaller target does
+// not shrink.
+//
+// NEITHER IS EDITED AWAY HERE. The law over this table is the coordinator's to
+// restate, the rows above keep their own provenance and their own leg, and the
+// finding is carried to the verbale (U-CAMPO-7 §3.8) instead of being folded
+// into a number. What this file does today is stop pretending to have an answer
+// for a fraction it has never measured.
+// ---------------------------------------------------------------------------
 
 
 /**
@@ -366,8 +407,21 @@ if (process.argv.includes('--self')) {
       caught: !marchIsSubProportional(0.5, 11.115 * 0.25 - 2.310 + 0.01),
     },
     {
-      what: 'a scale nobody measured is not asserted about',
-      caught: marchIsSubProportional(0.6, 1e6),
+      // AND IT REFUSES TO ANSWER RATHER THAN ANSWERING «YES». Until today this
+      // case read `caught: marchIsSubProportional(0.6, 1e6)` and a march a
+      // million milliseconds over its share came back TRUE, because nobody had
+      // measured six tenths. That is not «not asserted about», that is a green
+      // light: the predicate now says null and the leg above declares it.
+      what: 'a scale nobody measured is REFUSED, not waved through, even a million ms over its share',
+      caught: marchIsSubProportional(0.6, 1e6) === null
+        && marchIsSubProportional(0.65) === null,
+    },
+    {
+      // And the fraction the tier medio actually ships is one of those: the day
+      // somebody measures it and writes the row, this case goes MISS and asks
+      // to be rewritten, which is the point of it.
+      what: 'and the fraction the tier medio ships is exactly such a scale today',
+      caught: campoScalesOf(read(QUALITY)).some((t) => marchIsSubProportional(t.campoScale) === null),
     },
     {
       what: 'a normalised format promoted into the shipping ladder is caught',
@@ -588,11 +642,19 @@ for (const tier of campoScales) {
   report.check(earth < scene,
     `and at the tier ${tier.id} it costs less of the frame than the scene's own pixel does`,
     `${earth.toFixed(1)} bytes per frame pixel against ${scene.toFixed(1)}`);
-  report.check(marchIsSubProportional(tier.campoScale),
-    `and what the march costs at ${tier.campoScale} of a side is no more than the share of `
-    + 'pixels it was given',
-    `${(100 * (AT_TODAY[tier.campoScale] || {}).share).toFixed(1)} % of the native march `
-    + `against ${(100 * tier.campoScale * tier.campoScale).toFixed(1)} % of the pixels`);
+  const verdict = marchIsSubProportional(tier.campoScale);
+  if (verdict === null) {
+    report.note(`the tier ${tier.id} marches at ${tier.campoScale} of a side and AT_TODAY has no `
+      + 'row for that fraction, so this leg has nothing to bite on -- it is declared instead of '
+      + 'passed. The reading taken at that fraction is in the block over AT_TODAY and the law is '
+      + "the coordinator's to restate");
+  } else {
+    report.check(verdict,
+      `and what the march costs at ${tier.campoScale} of a side is no more than the share of `
+      + 'pixels it was given',
+      `${(100 * (AT_TODAY[tier.campoScale] || {}).share).toFixed(1)} % of the native march `
+      + `against ${(100 * tier.campoScale * tier.campoScale).toFixed(1)} % of the pixels`);
+  }
 }
 
 // ------------------------------------------------ the two directions, in light
