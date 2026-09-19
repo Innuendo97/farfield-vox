@@ -126,6 +126,18 @@ export class Player {
   #reachFrom = 1;
   #reachT = 1;
   #rigEye = { x: 0, y: 0, z: 0, arm: 0 };
+  // What the boom is asked about, and what it is allowed. Two bags that are
+  // FILLED and handed over rather than built: see the call in applyTo, and
+  // SPAN over boxClear in src/core/avatar.js for why this path counts objects.
+  #boomBody = {
+    x: 0, z: 0, stance: 0, yaw: 0,
+  };
+  #boomOpts = { reach: 1, solids: null, eyeHeight: EYE_HEIGHT };
+  // Where the edge of the world is from here, and how hard it pushes back.
+  // Written into once a frame rather than built: same reason.
+  #edge = {
+    radius: 0, nx: 0, nz: 0, damping: 1,
+  };
   // What the camera cannot pass through. Not the same list as #blockers: that
   // one is a footprint, and a camera also has to know how TALL a thing is --
   // a rock a knee high is not in the way of an eye at a metre and a half.
@@ -422,12 +434,11 @@ export class Player {
     const dx = this.position.x - AREA_CENTER.x;
     const dz = this.position.z - AREA_CENTER.z;
     const r = Math.hypot(dx, dz) || 1e-6;
-    return {
-      radius: r,
-      nx: dx / r,
-      nz: dz / r,
-      damping: falloff(r, AREA_SOFT_RADIUS, AREA_HARD_RADIUS),
-    };
+    this.#edge.radius = r;
+    this.#edge.nx = dx / r;
+    this.#edge.nz = dz / r;
+    this.#edge.damping = falloff(r, AREA_SOFT_RADIUS, AREA_HARD_RADIUS);
+    return this.#edge;
   }
 
   #resolveBlockers() {
@@ -520,11 +531,19 @@ export class Player {
     // being out at all, not on which person was asked for: mid-switch the camera
     // is on the arm, and at the end of it, it is the eye.
     if (this.#reach > 0) {
+      // The two bags are filled rather than built: they are handed in, read,
+      // and dropped, sixty times a second. See SPAN over boxClear in
+      // src/core/avatar.js for why this path counts its objects.
+      this.#boomBody.x = this.position.x;
+      this.#boomBody.z = this.position.z;
+      this.#boomBody.stance = stance;
+      this.#boomBody.yaw = this.#yawF.x;
+      this.#boomOpts.reach = this.#reach;
+      this.#boomOpts.solids = this.#solids;
       thirdPersonEye(
-        this.#rigEye,
-        { x: this.position.x, z: this.position.z, stance, yaw: this.#yawF.x },
+        this.#rigEye, this.#boomBody,
         this.#pitchF.x, PITCH_LIMIT, this.#groundHeight, AVATAR.height,
-        { reach: this.#reach, solids: this.#solids, eyeHeight: EYE_HEIGHT },
+        this.#boomOpts,
       );
       camera.position.set(this.#rigEye.x, this.#rigEye.y, this.#rigEye.z);
     } else {

@@ -187,15 +187,25 @@ export function bodyFade(arm) {
  * The camera sits to the avatar's RIGHT, which is what puts the avatar to the
  * camera's LEFT — the two pictures both draw him left of the middle, at u 0.40.
  */
+// The answer for the height it was last asked about. The height is a constant
+// of the figure and this is called once a frame from the boom, so the map holds
+// exactly one entry for the life of a page -- and returns it instead of
+// building the same four numbers sixty times a second.
+const RIG_METRES = new Map();
+
 export function rigMetres(height = AVATAR.height) {
+  const held = RIG_METRES.get(height);
+  if (held) return held;
   const planar = RIG.planar * height;
   const lateral = RIG.lateral * height;
-  return {
+  const made = {
     behind: Math.sqrt(Math.max(0, planar * planar - lateral * lateral)),
     lateral,
     above: RIG.aboveFeet * height,
     planar,
   };
+  RIG_METRES.set(height, made);
+  return made;
 }
 
 // ---------------------------------------------------------------- the arm
@@ -290,44 +300,91 @@ export function armFraction(pitch, limit, rest = RIG.pitch * DEG) {
  * @returns {number} 1 if the segment misses, otherwise the fraction at which it
  *                   first meets the box, never less than 0.
  */
+// THE SLAB'S OWN INTERVAL, KEPT WHERE IT CANNOT BE ALLOCATED (U-PERF-7).
+//
+// The three slab tests narrow one interval between them, so the interval has to
+// outlive each call -- which is what made it a closure over two locals. A
+// closure is an allocation, and `boxClear` is called up to twice per solid per
+// frame: with the twenty odd blocks, rocks and loose stones this world hands a
+// camera boom, the two closures and the two points were the largest single
+// source of short lived objects in the frame (measured by reading, and then by
+// counting the frame's own allocations at the reference pose). It is one
+// interval on one thread with no re-entry, so it lives here.
+const SPAN = { lo: 0, hi: 1 };
+
+/**
+ * One axis of the slab test, narrowing SPAN.
+ *
+ * @returns {boolean} false the moment the interval closes, which is a miss
+ */
+function slab(p0, p1, min, max) {
+  const d = p1 - p0;
+  if (Math.abs(d) < 1e-9) return p0 >= min && p0 <= max;
+  let t0 = (min - p0) / d;
+  let t1 = (max - p0) / d;
+  if (t0 > t1) { const swap = t0; t0 = t1; t1 = swap; }
+  if (t0 > SPAN.lo) SPAN.lo = t0;
+  if (t1 < SPAN.hi) SPAN.hi = t1;
+  return SPAN.hi >= SPAN.lo;
+}
+
 export function boxClear(from, to, b, pad = 0) {
   const s = Math.sin(b.rotationY);
   const c = Math.cos(b.rotationY);
-  const local = (p) => {
-    const dx = p.x - b.x;
-    const dz = p.z - b.z;
-    return { x: dx * c - dz * s, y: p.y, z: dx * s + dz * c };
-  };
-  const a = local(from);
-  const e = local(to);
+  // Both ends into the box's own frame, by hand. It was a `local` closure
+  // returning a point; it is the same six multiplications written out, and the
+  // arithmetic is identical to the bit -- which is what guard-avatar holds.
+  const adx = from.x - b.x;
+  const adz = from.z - b.z;
+  const edx = to.x - b.x;
+  const edz = to.z - b.z;
+  const ax = adx * c - adz * s;
+  const az = adx * s + adz * c;
+  const bx = edx * c - edz * s;
+  const bz = edx * s + edz * c;
   const ex = b.halfWidth + pad;
   const ez = b.halfDepth + pad;
-  const y0 = b.y0 - pad;
-  const y1 = b.y1 + pad;
-  let lo = 0;
-  let hi = 1;
-  const slab = (p0, p1, min, max) => {
-    const d = p1 - p0;
-    if (Math.abs(d) < 1e-9) return p0 >= min && p0 <= max;
-    let t0 = (min - p0) / d;
-    let t1 = (max - p0) / d;
-    if (t0 > t1) { const swap = t0; t0 = t1; t1 = swap; }
-    if (t0 > lo) lo = t0;
-    if (t1 < hi) hi = t1;
-    return hi >= lo;
-  };
-  if (!slab(a.x, e.x, -ex, ex)) return 1;
-  if (!slab(a.z, e.z, -ez, ez)) return 1;
-  if (!slab(a.y, e.y, y0, y1)) return 1;
-  if (lo > 1) return 1;
-  return Math.max(0, lo);
+  SPAN.lo = 0;
+  SPAN.hi = 1;
+  if (!slab(ax, bx, -ex, ex)) return 1;
+  if (!slab(az, bz, -ez, ez)) return 1;
+  if (!slab(from.y, to.y, b.y0 - pad, b.y1 + pad)) return 1;
+  if (SPAN.lo > 1) return 1;
+  return Math.max(0, SPAN.lo);
 }
 
-/** The same over a list: the earliest meeting wins. */
+/**
+ * The same over a list: the earliest meeting wins.
+ *
+ * AND MOST OF THE LIST IS NOT WITHIN REACH OF A FIVE METRE ARM. The boom is at
+ * most a few metres long and the list is every solid in the hub -- six blocks,
+ * the platform, the piles, the loose stone -- so the honest test is run on
+ * twenty odd boxes twice a frame to find the one or two that could possibly be
+ * met. The two rejects below are CONSERVATIVE and therefore change no answer:
+ *
+ *   * a box whose whole height stands clear of the segment's own height band,
+ *     padding included, cannot be met by it;
+ *   * a box whose centre is further from the pivot, in plan, than the segment's
+ *     planar length plus the padding plus the box's OWN circumradius cannot
+ *     reach any point of the segment.
+ *
+ * `hypot(halfWidth, halfDepth)` is the circumradius of the footprint whatever
+ * its rotation, which is why the rotation does not enter here.
+ */
 export function armClear(from, to, solids, pad = 0) {
   let f = 1;
   if (!solids) return f;
+  const dx = to.x - from.x;
+  const dz = to.z - from.z;
+  const span = Math.sqrt(dx * dx + dz * dz);
+  const loY = (from.y < to.y ? from.y : to.y) - pad;
+  const hiY = (from.y > to.y ? from.y : to.y) + pad;
   for (const b of solids) {
+    if (b.y1 + pad < loY || b.y0 - pad > hiY) continue;
+    const cx = b.x - from.x;
+    const cz = b.z - from.z;
+    const far = span + pad + Math.hypot(b.halfWidth, b.halfDepth);
+    if (cx * cx + cz * cz > far * far) continue;
     const t = boxClear(from, to, b, pad);
     if (t < f) f = t;
   }
@@ -421,14 +478,21 @@ export function thirdPersonEye(
   // wall, and it has already had its say. Nothing else moves: the aim, the
   // offsets and the retraction are untouched, and where the boom was clear of
   // everything the answer is the same to the bit.
-  const pivot = { x: body.x, y: pivotY, z: body.z };
-  const shorten = (f) => {
-    if (!(f < 1)) return;
-    x = pivot.x + (x - pivot.x) * f;
-    y = pivot.y + (y - pivot.y) * f;
-    z = pivot.z + (z - pivot.z) * f;
-  };
-  shorten(armClear(pivot, { x, y, z }, opts.solids, GROUND_CLEARANCE));
+  // The pivot and the tip are written into two points that outlive the call
+  // rather than built twice a frame: see SPAN over boxClear for why this file
+  // counts its objects.
+  PIVOT.x = body.x;
+  PIVOT.y = pivotY;
+  PIVOT.z = body.z;
+  TIP.x = x;
+  TIP.y = y;
+  TIP.z = z;
+  let cut = armClear(PIVOT, TIP, opts.solids, GROUND_CLEARANCE);
+  if (cut < 1) {
+    x = PIVOT.x + (x - PIVOT.x) * cut;
+    y = PIVOT.y + (y - PIVOT.y) * cut;
+    z = PIVOT.z + (z - PIVOT.z) * cut;
+  }
 
   // NOW THE TURF, at the place the arm reached. The clearance is a head's
   // worth, so the near plane never bites into it.
@@ -442,12 +506,20 @@ export function thirdPersonEye(
   // over the same list rather than a loop: the lift is vertical and the boxes
   // are convex, so one correction closes it, and a guard walks every bearing
   // round every block to say that it does.
-  shorten(armClear(pivot, { x, y, z }, opts.solids, GROUND_CLEARANCE));
+  TIP.x = x;
+  TIP.y = y;
+  TIP.z = z;
+  cut = armClear(PIVOT, TIP, opts.solids, GROUND_CLEARANCE);
+  if (cut < 1) {
+    x = PIVOT.x + (x - PIVOT.x) * cut;
+    y = PIVOT.y + (y - PIVOT.y) * cut;
+    z = PIVOT.z + (z - PIVOT.z) * cut;
+  }
 
   out.x = x;
   out.y = y;
   out.z = z;
-  out.arm = Math.hypot(x - pivot.x, y - pivot.y, z - pivot.z);
+  out.arm = Math.hypot(x - PIVOT.x, y - PIVOT.y, z - PIVOT.z);
   return out;
 }
 
@@ -464,5 +536,10 @@ const EYE_TO_CROWN = EYE_HEIGHT - AVATAR.height;
 
 /** How close to anything solid the camera is allowed to get, in metres. */
 const GROUND_CLEARANCE = 0.25;
+
+// The two ends of the boom, written into rather than built: see SPAN over
+// boxClear. Nothing keeps a reference to either past the call that fills them.
+const PIVOT = { x: 0, y: 0, z: 0 };
+const TIP = { x: 0, y: 0, z: 0 };
 
 export { EYE_TO_CROWN, GROUND_CLEARANCE, DEG };
