@@ -30,7 +30,27 @@ function hintRow(keys, label) {
   return row;
 }
 
-function welcome() {
+/**
+ * A row of the greeting for a hand that has no keys.
+ *
+ * The caps are the only thing that changes: the gesture stands where the keys
+ * stood, in the same box, at the same pitch, so the block keeps the shape the
+ * reference framing drew for it.
+ */
+function gestureRow(gesture, label) {
+  const row = document.createElement('li');
+  row.className = 'hud-hint';
+  const said = document.createElement('span');
+  said.className = 'hud-hint-gesture';
+  said.textContent = gesture;
+  const text = document.createElement('span');
+  text.className = 'hud-hint-label';
+  text.textContent = label;
+  row.append(said, text);
+  return row;
+}
+
+function welcome(touch) {
   const el = document.createElement('aside');
   el.className = 'hud-welcome';
   el.setAttribute('aria-label', 'Introduzione');
@@ -44,19 +64,48 @@ function welcome() {
     <ul class="hud-hints"></ul>
   `;
   const hints = el.querySelector('.hud-hints');
-  hints.append(hintRow(['W', 'A', 'S', 'D'], 'per muoverti'), hintRow(['E'], 'per interagire'));
+  if (touch) {
+    hints.append(
+      gestureRow('Pollice a sinistra', 'per camminare'),
+      gestureRow('Trascina a destra', 'per guardarti intorno'),
+      gestureRow('Tocca', 'per interagire'),
+    );
+  } else {
+    hints.append(hintRow(['W', 'A', 'S', 'D'], 'per muoverti'), hintRow(['E'], 'per interagire'));
+  }
   return el;
 }
 
-function interact() {
-  const el = document.createElement('div');
+/**
+ * The offer at the foot of the frame.
+ *
+ * WITH A MOUSE IT IS A NOTICE: the cap says E, and what acts is the keyboard.
+ * WITH FINGERS IT IS THE BUTTON ITSELF (E-DECISIONI27) — there is no E to
+ * press, so the notice has to be the thing you press. It becomes a real button
+ * with the rhombus of the world's own markers where the cap was, and it keeps
+ * the position, the wording and the fade it always had.
+ */
+function interact(touch) {
+  const el = document.createElement(touch ? 'button' : 'div');
   el.className = 'hud-interact';
-  el.setAttribute('role', 'status');
-  const cap = keycap('E');
+  if (touch) {
+    el.type = 'button';
+    el.classList.add('is-touch');
+    // A button is announced as one; what changes inside it still has to be read
+    // out, and `status` is not a thing you can also press.
+    el.setAttribute('aria-live', 'polite');
+  } else {
+    el.setAttribute('role', 'status');
+  }
+  const sign = touch ? document.createElement('span') : keycap('E');
+  if (touch) {
+    sign.className = 'hud-interact-mark';
+    sign.setAttribute('aria-hidden', 'true');
+  }
   const label = document.createElement('span');
   label.className = 'hud-interact-label';
   label.textContent = 'Interagisci';
-  el.append(cap, label);
+  el.append(sign, label);
   return { el, label };
 }
 
@@ -113,8 +162,10 @@ function commandButton(label, key) {
 const HEADINGS = ['nord', 'nord-est', 'est', 'sud-est', 'sud', 'sud-ovest', 'ovest', 'nord-ovest'];
 
 export function createHud(root, options = {}) {
-  const welcomeEl = welcome();
-  const prompt = interact();
+  const touch = Boolean(options.touch);
+  const welcomeEl = welcome(touch);
+  const prompt = interact(touch);
+  if (touch) prompt.el.addEventListener('click', () => options.onInteract?.());
   const compassEl = compass();
   const ring = compassEl.querySelector('.hud-compass-ring');
 

@@ -110,6 +110,22 @@ const CONTROLS = [
   ['TAB', 'aprire e chiudere questo menu'],
 ];
 
+// AND THE SAME LIST FOR A HAND WITH NO KEYS.
+//
+// It is a second list and not a translation of the first: the gestures do not
+// map onto the keys one for one — running has no button of its own because it
+// is in how far the stick is pushed, and the two halves of the screen are one
+// idea the keyboard has no word for. See src/ui/touch.js.
+const GESTURES = [
+  ['Pollice nella metà sinistra', 'camminare: la direzione è l’angolo, il passo è quanto spingi'],
+  ['Spingi fino all’orlo', 'correre'],
+  ['Trascina nella metà destra', 'guardarti intorno'],
+  ['Tocca una pietra vicina', 'aprire il monolite, poi la voce scelta'],
+  ['Scorri in su e in giù', 'passare da una voce all’altra a pannelli aperti'],
+  ['Indietro', 'tornare indietro di un passo'],
+  ['Menu', 'aprire e chiudere questo menu'],
+];
+
 /**
  * A sub-row inside the figure block: a small label and the choices under it.
  *
@@ -130,16 +146,23 @@ function subRow(label, list, onChoose) {
   return { wrap, buttons };
 }
 
-function controlList() {
+function controlList(touch) {
   const list = document.createElement('dl');
   list.className = 'menu-controls';
-  for (const [keys, what] of CONTROLS) {
+  for (const [keys, what] of touch ? GESTURES : CONTROLS) {
     const term = document.createElement('dt');
-    for (const key of keys.split(' ')) {
-      const cap = document.createElement('kbd');
-      cap.className = 'keycap';
-      cap.textContent = key;
-      term.appendChild(cap);
+    if (touch) {
+      const said = document.createElement('span');
+      said.className = 'menu-gesture';
+      said.textContent = keys;
+      term.appendChild(said);
+    } else {
+      for (const key of keys.split(' ')) {
+        const cap = document.createElement('kbd');
+        cap.className = 'keycap';
+        cap.textContent = key;
+        term.appendChild(cap);
+      }
     }
     const desc = document.createElement('dd');
     desc.textContent = what;
@@ -157,7 +180,7 @@ function controlList() {
  */
 export function createMenu(root, {
   contentUrl = 'cv/', onOpen, onClose, quality = {}, motion = {}, sound = {}, music = {},
-  figura = {},
+  figura = {}, touch = false,
 } = {}) {
   const el = document.createElement('div');
   el.className = 'menu';
@@ -305,15 +328,26 @@ export function createMenu(root, {
     list.appendChild(row);
 
     if (item.id === 'comandi') {
-      controls = controlList();
+      controls = controlList(touch);
       controls.hidden = true;
       row.appendChild(controls);
     }
   }
 
-  const hint = document.createElement('p');
+  // THE WAY OUT, AND WITH FINGERS IT HAS TO BE A THING AND NOT A SENTENCE.
+  //
+  // «TAB o Esc per tornare al mondo» names two keys that are not on the screen,
+  // and the scrim of this panel takes pointer events — so the Menu button in
+  // the command line is behind it and cannot be tapped a second time. Without
+  // this a walker who opened the menu on a telephone could not close it.
+  const hint = document.createElement(touch ? 'button' : 'p');
   hint.className = 'menu-hint';
-  hint.textContent = 'TAB o Esc per tornare al mondo';
+  if (touch) {
+    hint.type = 'button';
+    hint.textContent = 'Chiudi';
+  } else {
+    hint.textContent = 'TAB o Esc per tornare al mondo';
+  }
 
   panel.append(list, hint);
   el.appendChild(panel);
@@ -438,6 +472,8 @@ export function createMenu(root, {
 
     toggle() { api.setOpen(!open); },
   };
+
+  if (touch) hint.addEventListener('click', () => api.setOpen(false));
 
   // Clicking away from the panel is the same as asking to go back to the world.
   el.addEventListener('mousedown', (event) => {

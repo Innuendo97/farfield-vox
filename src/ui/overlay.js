@@ -23,10 +23,22 @@ const FADE_MS = 560;
 // the frame changes rather than jumps.
 const REDUCED_FADE_MS = 160;
 
-export function createStartOverlay(root) {
+/**
+ * The way in.
+ *
+ * @param {Element} root
+ * @param {boolean} options.touch whether this page is walked with fingers, in
+ *   which case the invitation names the gesture that works and the second line
+ *   names the two halves of the screen instead of four keys and a lock.
+ */
+export function createStartOverlay(root, { touch = false } = {}) {
   const el = document.createElement('div');
   el.className = 'overlay-start';
-  el.innerHTML = `
+  el.innerHTML = touch ? `
+    <h1>Farfield</h1>
+    <p>Tocca per esplorare</p>
+    <p class="overlay-keys">Pollice a sinistra per camminare · Trascina a destra per guardare</p>
+  ` : `
     <h1>Farfield</h1>
     <p>Clicca per esplorare</p>
     <p class="overlay-keys">WASD per muoverti · Shift per correre · Esc per liberare il mouse</p>

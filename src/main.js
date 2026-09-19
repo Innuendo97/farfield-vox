@@ -23,6 +23,7 @@ import { createBenchmark, tierOf } from './core/bench.js';
 import { buildHub } from './world/hub.js';
 import { needsAt } from './world/layers/registry.js';
 import { createStartOverlay } from './ui/overlay.js';
+import { createTouchControls, touchWanted } from './ui/touch.js';
 import { createSkyVeil } from './ui/veil.js';
 import { createDevPose } from './dev/pose.js';
 import { createHud } from './ui/hud.js';
@@ -44,10 +45,6 @@ const CV_FALLBACK_URL = `${CV_URL}#edizione-testuale`;
 const LEAVE_MS = 2600;
 
 const AWAY = {
-  touch: 'Questo mondo si attraversa a piedi, con la tastiera e il mouse, e su un '
-    + 'dispositivo senza tasti non c’è modo di camminarci. L’edizione esplorabile da '
-    + 'mobile arriverà più avanti: intanto qui sotto c’è tutto il materiale, in una '
-    + 'pagina da leggere.',
   webgl: 'Questo browser non riesce a disegnare il mondo in 3D: gli manca WebGL2. '
     + 'Tutto quello che il mondo contiene è però scritto anche in una pagina da leggere.',
 };
@@ -55,16 +52,17 @@ const AWAY = {
 /**
  * Why this machine is not going to be given the world, or null if it is.
  *
- * A coarse pointer with no fine one anywhere is a screen with no mouse, and
- * this world is walked with a mouse and four keys. WebGL2 is the other half:
- * every surface here is a baked texture drawn through one composite pass, and
- * there is no version of that without it.
+ * THERE USED TO BE A SECOND REASON HERE, AND IT WAS THE SCREEN ITSELF: a coarse
+ * pointer with no fine one anywhere was read as a machine this world could not
+ * be walked on, and a telephone was shown the courtesy note — «l'edizione
+ * esplorabile da mobile arriverà più avanti» — and sent to the readable
+ * edition. That sentence is what this session answers. The commands are on the
+ * glass now (src/ui/touch.js), so a screen with no keyboard walks, and the one
+ * thing left that this world genuinely cannot be built without is WebGL2: every
+ * surface here is a baked texture drawn through one composite pass, and there
+ * is no version of that without it.
  */
 function whyNotWalkable() {
-  const media = window.matchMedia;
-  if (media && media('(pointer: coarse)').matches && !media('(any-pointer: fine)').matches) {
-    return 'touch';
-  }
   try {
     const probe = document.createElement('canvas').getContext('webgl2');
     if (!probe) return 'webgl';
@@ -280,8 +278,10 @@ if (INTRO) {
           // the interface, over eyes that have just finished opening.
           hud.arrive();
           // And the way back in, for a lock the browser refused: the walker
-          // must never be left with a world and no way to take the mouse.
-          if (!input.locked) overlay.setVisible(true);
+          // must never be left with a world and no way to take the mouse. With
+          // fingers there is no mouse to take and the lock was never asked for,
+          // so «senza blocco» does not mean «senza mondo» any more.
+          if (!input.locked && !input.touch) overlay.setVisible(true);
         },
       });
     })
@@ -329,7 +329,17 @@ const eye = createEye();
 // Filled by the walker each frame and never replaced.
 const motion = {};
 const input = new Input().attach(canvas);
-const overlay = createStartOverlay(ui);
+// WHICH HAND IS WALKING, DECIDED ONCE AND BEFORE ANYTHING READS IT.
+//
+// Everything below branches on input.touch and nothing recomputes it: the
+// opening scene's gesture, the prompt, the menu and the body all have to agree
+// about which page this is, and a second reading of the machine is a second
+// opinion. Outside the mode nothing on this page changes at all — no listener
+// is registered, no element is built, no handle is published — which is what
+// the desk's byte comparison stands on.
+input.touch = touchWanted();
+if (input.touch) document.body.classList.add('is-touch');
+const overlay = createStartOverlay(ui, { touch: input.touch });
 // Behind the opening scene there is nothing to click into: the scene takes the
 // gesture itself and hands the world over when it is finished. The prompt is
 // put away before it has been painted once, and comes back at the end of the
@@ -344,6 +354,12 @@ let interaction = null;
 input.onLockChange((locked) => {
   if (!menuOpen() && !interaction?.holdsPointer) overlay.setVisible(!locked);
 });
+// AND WITH FINGERS THERE IS NO LOCK TO CHANGE, so the prompt is taken down by
+// the thing that actually happened. It is the one signal in the mode: the lock
+// is never asked for, so pointerlockchange never fires, so without this the
+// world would be walked from behind «Tocca per esplorare» for ever. Nothing
+// below ever puts it back up in the mode — see onAwake and recapturePointer.
+if (input.touch) input.onEngage(() => overlay.setVisible(false));
 
 /**
  * Hands the mouse to the menu and takes it back afterwards.
@@ -355,10 +371,18 @@ input.onLockChange((locked) => {
  */
 function releasePointer() {
   overlay.setVisible(false);
-  document.exitPointerLock();
+  // There is nothing to hand over with fingers: the panels of this interface
+  // take their own taps whether or not the world is being walked, and exiting a
+  // lock that was never taken is a call with nothing on the other end of it.
+  if (!input.touch) document.exitPointerLock();
 }
 
 function recapturePointer() {
+  // AND NOTHING TO TAKE BACK EITHER. This used to be the one place a refused
+  // lock put the way-in prompt back up, which on a telephone was every time:
+  // the walker closed a panel and was handed «Clicca per esplorare» over a
+  // world they were already standing in.
+  if (input.touch) return;
   if (!input.engaged) { overlay.setVisible(true); return; }
   const granted = canvas.requestPointerLock();
   if (granted && typeof granted.catch === 'function') granted.catch(() => overlay.setVisible(true));
@@ -388,6 +412,12 @@ const audio = createAudio({ base: import.meta.env.BASE_URL, auto: !isDevMode() &
 
 const hud = createHud(ui, {
   contentUrl: CV_URL,
+  // The interface says the gestures instead of the keys, and the prompt at the
+  // foot of the frame becomes the button it has always looked like. The menu is
+  // handed it too, for its own list of commands and for a way out that is a
+  // thing on the screen rather than the name of a key.
+  touch: input.touch,
+  onInteract: () => input.command('KeyE'),
   // Held back only under the opening scene, and let go at the end of the
   // waking (see onAwake above). With the scene off this is false and the
   // display arrives exactly where it always arrived.
@@ -467,11 +497,34 @@ interaction = createInteraction({
   recapturePointer,
 });
 
+// AND THE FINGERS, WHICH EXIST ONLY IN THE MODE.
+//
+// Built after the interaction because the stick has to be able to ask which of
+// the four states the walker is in — a tap means E within reach of a stone and
+// nothing at all in the middle of a meadow — and it asks through a function
+// rather than holding the handle, so this file stays the only place that knows
+// how the two are joined.
+const touch = input.touch
+  ? createTouchControls({
+    root: ui,
+    surface: canvas,
+    input,
+    state: () => interaction.state,
+    // Where the walker is, for the proofs of this mode and nothing else: the
+    // page a telephone gets has no ?dev and therefore no window.farfield, and a
+    // walk of one metre has to be readable as a number rather than guessed at
+    // from a photograph. See src/ui/touch.js, which publishes it.
+    probe: () => ({
+      x: player.position.x, z: player.position.z, yaw: player.yawDegrees,
+    }),
+  })
+  : null;
+
 // While the menu is up the world holds still: the keys belong to the panel, and
 // a player walking behind an open menu is a player who arrives somewhere they
 // did not choose.
 const IDLE_INPUT = {
-  locked: false, engaged: false, running: false,
+  locked: false, engaged: false, running: false, touch: false,
   axis: () => ({ x: 0, z: 0 }),
   drainLook: () => ({ x: 0, y: 0 }),
 };
@@ -898,6 +951,9 @@ new Loop()
     // whether anything else has the mouse. It reads the motion the body was
     // just given, which is where the placed poses it has to stay out of are.
     reticle.update(motion, interaction.state, menuOpen() || overlay.visible);
+    // And «Indietro», which is the Esc of a hand with no keys. One string
+    // compared against the last one, and nothing at all outside the mode.
+    touch?.update(interaction.state);
     worldSeconds = now / 1000;
     hub.update(worldSeconds, player.position, delta, player.pitchDegrees);
     renderer.render(scene, camera);
