@@ -153,7 +153,7 @@ export const TIERS = [
     // grain is fine, at 18 it is five and it starts to read as steps. The
     // bottom tier buys back the frames it does not have with a wider band.
     groundDetail: { near: 9, step: 1.45, lag: 300 },     // [V1] the ring in metres, the band in ms
-    campoScale: 0.75,     // [U-CAMPO-3] la frazione di lato: vedi la nota al tier alto
+    campoScale: 0.75,      // [U-CAMPO-3] la frazione di lato: vedi la nota al tier alto
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
@@ -177,11 +177,11 @@ export const TIERS = [
     // touching it. The disc's reach is measured: see the block over TIERS.
     voxelDiscRadius: 14,   // [V1] metres of ten centimetre ground from the centre
     groundDetail: { near: 9, step: 1.45, lag: 300 },     // [V1] the ring in metres, the band in ms
-    // [U-CAMPO-3] LA FRAZIONE DI LATO A CUI LA TERRA E' MARCIATA, e i due
-    // numeri di questa riga sono l'unica cosa che questa unita' abbia deciso
-    // per conto di chi guarda.
+    // [U-CAMPO-3, E-CAMPO6-B] LA FRAZIONE DI LATO A CUI LA TERRA E' MARCIATA,
+    // ed e' UN NUMERO SOLO SU TUTTI E QUATTRO I TIER: il committente l'ha
+    // comprato, e la riga qui sotto dice con che cosa.
     //
-    // TRE QUARTI IN ALTO, MEZZO SOTTO. A quattro volte la grandezza naturale,
+    // TRE QUARTI, E FU DECISO DUE VOLTE. A quattro volte la grandezza naturale,
     // affiancato al nativo, il prato VICINO a mezzo lato si vede diverso -- i
     // grumi di terra del sentiero ai piedi diventano piu' grossi -- e a tre
     // quarti no. E' esattamente il criterio che il coordinatore ha posto, e la
@@ -193,11 +193,25 @@ export const TIERS = [
     // che la leva del FOTOGRAMMA a 0,85 non poteva dare (E-PERF5 §6.1: stesso
     // p95, e «la scritta del monolite si ammorbidisce col prato»).
     //
-    // E SOTTO SI SCENDE A MEZZO PERCHE' LI' IL QUADRO E' GIA' RIDOTTO. Il tier
-    // medio disegna a 0,85 di lato e il basso a 0,75: il prato vicino e' gia'
-    // piu' morbido di quello a cui il confronto a quattro volte e' stato fatto,
-    // e cio' che quel confronto separa non si separa piu'. Quel che si compra
-    // e' il cancello, che e' l'unica ragione per cui quei due tier esistono.
+    // E SOTTO SI SALE A TRE QUARTI ANCHE LI', PER DECISIONE DEL COMMITTENTE
+    // (E-CAMPO6-B, 2026-09-19). Questa riga diceva l'opposto -- «sotto si
+    // scende a mezzo perche' li' il quadro e' gia' ridotto» -- e la ragione era
+    // onesta e cieca a una cosa sola: il confronto a quattro volte chiede se il
+    // prato e' piu' MORBIDO, e il difetto del mezzo lato non e' la morbidezza.
+    // E' il RETICOLO DEL TEXEL che traspare. Al tier basso la terra e' decisa
+    // una volta ogni 2,66 pixel, e i salti di livello che un occhio chiama
+    // bordo cadono sui confini dei texel 1,104 volte piu' spesso di quanto ci
+    // cadrebbero a caso (U-CAMPO-6 §4.2, banda 5-6 m): e' la «scaletta» che il
+    // committente vedeva, contata. A tre quarti lo stesso numero e' 1,005, che
+    // e' come dire nessun reticolo.
+    //
+    // IL PREZZO E' DICHIARATO E ACCETTATO: +3,3 ms al tier basso alla posa P,
+    // da 9,98 a 13,31 di mediana, dentro il cancello dei 14 ms di quel tier. E
+    // il braccio che chiudeva la scaletta senza toccare questa riga -- la
+    // ri-marcia dei soli pixel di bordo, 1,050 a +6,5 ms -- e' stato misurato
+    // accanto e NON e' stato scelto: costa il doppio e lascia il reticolo
+    // aperto. Resta dietro `?camporimarcia=`, che e' dove sta cio' che nessuno
+    // ha comprato.
     campoScale: 0.75,
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
@@ -222,7 +236,7 @@ export const TIERS = [
     // touching it. The disc's reach is measured: see the block over TIERS.
     voxelDiscRadius: 14,   // [V1] metres of ten centimetre ground from the centre
     groundDetail: { near: 6, step: 1.75, lag: 300 },     // [V1] the ring in metres, the band in ms
-    campoScale: 0.5,       // [U-CAMPO-3] la frazione di lato: vedi la nota al tier alto
+    campoScale: 0.75,      // [E-CAMPO6-B] la frazione di lato: vedi la nota al tier alto
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
@@ -239,7 +253,7 @@ export const TIERS = [
     // ground is how much of it there is. 119 614 triangles against 151 470.
     voxelDiscRadius: 12,   // [V1] metres of ten centimetre ground from the centre
     groundDetail: { near: 4.5, step: 2, lag: 400 },      // [V1] the ring in metres, the band in ms
-    campoScale: 0.5,       // [U-CAMPO-3] la frazione di lato: vedi la nota al tier alto
+    campoScale: 0.75,      // [E-CAMPO6-B] la frazione di lato: vedi la nota al tier alto
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
