@@ -331,6 +331,8 @@ const presence = createPresence({ frozen: isClockFrozen() });
 const eye = createEye();
 // Filled by the walker each frame and never replaced.
 const motion = {};
+// And what the governor is told about that motion, same rule.
+const motionOut = { lookRate: 0, speed: 0 };
 const input = new Input().attach(canvas);
 // WHICH HAND IS WALKING, DECIDED ONCE AND BEFORE ANYTHING READS IT.
 //
@@ -1008,7 +1010,11 @@ new Loop()
     freshCostMs = renderer.hasGpuClock ? (timings ? timings.total : 0) : delta * 1000;
     if (freshCostMs > 0) lastCostMs = freshCostMs;
     if (timings) lastTimings = timings;
-    quality.sample(freshCostMs, { lookRate: player.lookRate, speed: player.speed });
+    // Riempito e non costruito, per la ragione scritta sopra FRAME in
+    // src/world/hub.js: il governatore lo legge e lo lascia cadere.
+    motionOut.lookRate = player.lookRate;
+    motionOut.speed = player.speed;
+    quality.sample(freshCostMs, motionOut);
 
     // IL PASSO DELLA CPU SI CHIUDE QUI, PRIMA DEL RIQUADRO. Quel che il
     // riquadro costa e' un costo dello sviluppo e non del mondo, e sommarlo

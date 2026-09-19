@@ -584,6 +584,11 @@ const PALE_PER_SKY = new Vector3(...AIR_PALE).divide(
   new Vector3().copy(SCENE_LIGHT_UNIFORMS.uSkyLight.value),
 );
 
+// Il cielo com'era l'ultima volta che l'aria l'ha guardato. Un NaN di
+// partenza, cosi' che il primo confronto non sia mai uguale e la prima
+// chiamata scriva comunque.
+const skyWas = new Vector3(NaN, NaN, NaN);
+
 /**
  * Tells the air where the eye is, and what hour it is.
  *
@@ -593,8 +598,20 @@ const PALE_PER_SKY = new Vector3(...AIR_PALE).divide(
  */
 export function setAir(eyeHeight) {
   AIR.uEyeHeight.value = eyeHeight;
-  AIR.uFogColour.value.copy(SCENE_LIGHT_UNIFORMS.uSkyLight.value).multiply(AIR_PER_SKY);
-  AIR.uAirPale.value.copy(SCENE_LIGHT_UNIFORMS.uSkyLight.value).multiply(PALE_PER_SKY);
+  // E IL COLORE DELL'ARIA SI RIFA' QUANDO IL CIELO SI MUOVE, CHE NON E' A OGNI
+  // FOTOGRAMMA (U-PERF-7).
+  //
+  // L'altezza dell'occhio cambia a ogni respiro ed e' giusto che questa riga la
+  // scriva sempre. Le due righe sotto invece sono funzioni di `uSkyLight` e di
+  // nient'altro, e `uSkyLight` si muove quando si muove l'ORA -- un preset, una
+  // sera, mai un fotogramma. Erano due copie e due moltiplicazioni di Vector3
+  // per fotogramma per un valore che stava fermo per minuti.
+  const sky = SCENE_LIGHT_UNIFORMS.uSkyLight.value;
+  if (sky.x !== skyWas.x || sky.y !== skyWas.y || sky.z !== skyWas.z) {
+    skyWas.copy(sky);
+    AIR.uFogColour.value.copy(sky).multiply(AIR_PER_SKY);
+    AIR.uAirPale.value.copy(sky).multiply(PALE_PER_SKY);
+  }
   return AIR;
 }
 

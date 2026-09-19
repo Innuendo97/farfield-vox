@@ -229,6 +229,8 @@ export function createHud(root, options = {}) {
 
   let headingDeg = 0;
   let drawnDeg = null;
+  // Quale degli otto nomi la bussola dice adesso: vedi setHeading.
+  let drawnHeading = null;
 
   return {
     menu,
@@ -259,8 +261,22 @@ export function createHud(root, options = {}) {
       if (drawnDeg !== null && Math.abs(headingDeg - drawnDeg) < HEADING_EPSILON) return;
       drawnDeg = headingDeg;
       ring.style.transform = `rotate(${headingDeg.toFixed(2)}deg)`;
+      // E IL NOME DELLA DIREZIONE SI SCRIVE QUANDO IL NOME CAMBIA, CHE NON E'
+      // QUANDO CAMBIA L'ANGOLO (U-PERF-7, E-LINUX1).
+      //
+      // Il quadrante gira a ogni dodicesimo di grado, che e' la soglia sopra --
+      // giusta, perche' e' un `transform` e lo muove il compositore. Il nome ne
+      // ha otto in tutto il giro e cambia ogni quarantacinque gradi: scritto
+      // sulla stessa soglia, `setAttribute` partiva TRECENTOSETTANTACINQUE
+      // volte per ogni volta che aveva qualcosa di nuovo da dire, e non e' una
+      // scrittura da compositore -- e' l'albero di accessibilita' che si
+      // invalida, su un elemento con un `role`. Piu' la stringa che si costruiva
+      // per arrivarci.
       const bearing = ((-headingDeg % 360) + 360) % 360;
-      compassEl.setAttribute('aria-label', `Bussola: ${HEADINGS[Math.round(bearing / 45) % 8]}`);
+      const named = Math.round(bearing / 45) % 8;
+      if (named === drawnHeading) return;
+      drawnHeading = named;
+      compassEl.setAttribute('aria-label', `Bussola: ${HEADINGS[named]}`);
     },
 
     /** Shows or hides the prompt that says the key in front of you does something. */

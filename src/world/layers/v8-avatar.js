@@ -185,7 +185,12 @@ const layer = {
       layer.painted = LOOK.revision;
     }
 
-    for (const [kind, body] of Object.entries(layer.bodies)) {
+    // `Object.entries` costruisce un array esterno e un array di due elementi
+    // per corpo, a ogni fotogramma. I nomi sono gli stessi da quando il layer
+    // e' stato costruito: si leggono una volta e si tengono.
+    for (const corpo of CORPI) {
+      const kind = corpo.id;
+      const body = layer.bodies[kind];
       // ONE FLAG AND NOT AN ADD AND A REMOVE. They are out of the frame for the
       // whole of the first person, which is most of the time, and taking a mesh
       // out of a scene costs the renderer a re-sort — on a key press, which is

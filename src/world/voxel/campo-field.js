@@ -615,19 +615,28 @@ export function createCampo({
    *
    * A STILL WINDOW ANSWERS THE WORLD AND NOT THE WALKER: see campoFarOrigin.
    */
+  // Dove una finestra CHIEDE di stare, prima che qualcuno decida se muoverla.
+  // Vedi windowAt.
+  const ASKED = { cx: 0, cz: 0 };
+
   function windowAt(w, x, z) {
     if (w.shape.still) return campoFarOrigin(w.shape);
     const tiles = w.shape.side / w.shape.tile;
-    return {
-      cx: Math.floor(Math.floor(x / w.shape.cell) / w.shape.tile) - tiles / 2 + 1,
-      cz: Math.floor(Math.floor(z / w.shape.cell) / w.shape.tile) - tiles / 2 + 1,
-    };
+    // SCRITTA E NON COSTRUITA, e chi la TIENE se ne fa una copia (vedi moveTo):
+    // era un oggetto per fotogramma per finestra, buttato via sui fotogrammi in
+    // cui la finestra non si e' mossa, che sono quasi tutti. L'unico chiamante
+    // e' moveTo, che legge i due interi e poi decide.
+    ASKED.cx = Math.floor(Math.floor(x / w.shape.cell) / w.shape.tile) - tiles / 2 + 1;
+    ASKED.cz = Math.floor(Math.floor(z / w.shape.cell) / w.shape.tile) - tiles / 2 + 1;
+    return ASKED;
   }
 
   function moveTo(w, x, z) {
     const p = windowAt(w, x, z);
     if (w.centre && w.centre.cx === p.cx && w.centre.cz === p.cz) return;
-    w.centre = p;
+    // La copia, perche' `p` puo' essere la scratch di windowAt: una finestra che
+    // tenesse quella si ritroverebbe il centro dell'altra al fotogramma dopo.
+    w.centre = { cx: p.cx, cz: p.cz };
     if (!w.shape.still) stats.moves += 1;
     const tiles = w.shape.side / w.shape.tile;
     const wanted = [];

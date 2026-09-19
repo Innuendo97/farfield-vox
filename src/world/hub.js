@@ -9,6 +9,11 @@ import { mark } from '../core/steps.js';
 
 const DEG = Math.PI / 180;
 
+// Che cosa un layer riceve a ogni fotogramma. Vedi hub.update.
+const FRAME = {
+  elapsed: 0, eye: null, delta: 0, pitchDegrees: 0,
+};
+
 // THE HUB, WHICH NO LONGER KNOWS WHAT THE WORLD IS MADE OF.
 //
 // It used to name every piece twice: once to build it and once to hang it, with
@@ -329,7 +334,15 @@ export function buildHub() {
       // at this arrival": a layer with a foot in both arrivals would be updated
       // twice, and a layer that builds nothing may still have a frame's worth of
       // work to do.
-      const frame = { elapsed, eye, delta, pitchDegrees };
+      // Riempita e non costruita: e' passata a sette layer, letta, e buttata,
+      // sessanta volte al secondo. Nessuno ne tiene un riferimento oltre la
+      // chiamata -- e se qualcuno lo facesse, terrebbe un fotogramma vecchio,
+      // che e' un difetto suo e non di questa riga.
+      FRAME.elapsed = elapsed;
+      FRAME.eye = eye;
+      FRAME.delta = delta;
+      FRAME.pitchDegrees = pitchDegrees;
+      const frame = FRAME;
       // E OGNI LAYER SI DICHIARA PER NOME AL CRONOMETRO DEL GIRO. Il passo
       // `mondo` di src/main.js e' la somma di questi, e sapere che costa tre
       // millisecondi senza sapere quale dei sette li spende e' sapere che il

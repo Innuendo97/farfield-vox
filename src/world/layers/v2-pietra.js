@@ -183,7 +183,9 @@ const layer = {
     // itself only happens when the answer changes. See createMasonry's atRange:
     // the near wall is sixteen times the triangles of the far one, and past
     // NEAR_METRES it buys a fifth of a pixel of relief.
-    if (eye) for (const [, piece] of layer.built) if (piece.atRange) piece.atRange(eye);
+    // `.values()` e non `.entries()`: la chiave non serve, e ogni voce di
+    // `entries()` e' un array di due elementi costruito per essere buttato.
+    if (eye) for (const piece of layer.built.values()) if (piece.atRange) piece.atRange(eye);
   },
 };
 
