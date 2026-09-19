@@ -125,6 +125,23 @@ report.check(under.running === false && over.running === true,
 report.check(joystickAxis(0, 0).running === false,
   'e un pollice fermo non corre');
 
+// E L'ANELLO DISEGNATO E' L'ANELLO CHE IL CAMMINO MISURA.
+//
+// La levetta ha una proprieta' che nessuna delle righe qui sopra puo' vedere:
+// il cerchio contro cui l'OCCHIO valuta quanto sta spingendo e' un numero nel
+// foglio, e il raggio contro cui il CAMMINO lo valuta e' un numero in touch.js.
+// Se i due si separano, un pollice sull'orlo del cerchio disegnato non corre —
+// o corre molto prima di arrivarci — e nessuna prova di aritmetica se ne
+// accorge, perche' l'aritmetica e' giusta: sbagliato e' il disegno. Il raggio
+// e' gia' cambiato una volta (54 -> 40, E-DECISIONI29), che e' esattamente il
+// momento in cui due numeri in due file si perdono di vista.
+const ring = sheet.slice(sheet.indexOf('.touch-stick {'));
+const ringWidth = Number((/width: (\d+)px;/.exec(ring) || [])[1]);
+const ringMargin = Number((/margin: -(\d+)px 0 0 -\d+px;/.exec(ring) || [])[1]);
+report.check(ringWidth === TOUCH.radiusPx * 2 && ringMargin === TOUCH.radiusPx,
+  'l\'anello disegnato e\' largo due raggi, e sta centrato sul dito',
+  `${ringWidth} px e margine ${ringMargin} px contro un raggio di ${TOUCH.radiusPx}`);
+
 // ---------------------------------------------------------------------------
 // 2. IL TRASCINAMENTO: che cos'e' un tocco, e quanto gira un dito.
 // ---------------------------------------------------------------------------
@@ -173,6 +190,19 @@ report.check(/input\.touch = touchWanted\(\);/.test(main),
   'quale mano cammina si decide una volta sola, e nessuno la ricalcola');
 report.check(/if \(asked === '1'\) return true;/.test(touch) && /if \(asked === '0'\) return false;/.test(touch),
   'le maniglie ?tocco=1 e ?tocco=0 esistono, e l\'indirizzo vince in tutti e due i versi');
+// E LA MODALITA' LA DECIDE IL PUNTATORE PRIMARIO, E NIENT'ALTRO (E-DECISIONI29,
+// B). «Questa macchina riporta dei tocchi» e «questa macchina si usa col dito»
+// sono due domande diverse: alla prima un portatile con schermo touch risponde
+// di si' pur avendo mouse e tastiera, e si ritroverebbe i comandi a schermo e
+// il puntatore non piu' chiesto, cioe' perderebbe i comandi che aveva gia' in
+// mano. La riga da non far rientrare e' proprio quella.
+const wanted = touch.slice(touch.indexOf('export function touchWanted'));
+const wantedBody = wanted.slice(0, wanted.indexOf('\n}\n') + 2);
+report.check(/media\('\(pointer: coarse\)'\)/.test(wantedBody),
+  'la modalita\' si accende sul puntatore PRIMARIO grossolano');
+report.check(!/maxTouchPoints|ontouchstart|any-pointer/.test(wantedBody),
+  'e non su «la macchina riporta dei tocchi», che e\' un\'altra domanda',
+  'un portatile con schermo touch tiene mouse e tastiera');
 
 report.check(/if \(input\.locked \|\| input\.touch\) this\.look\(input\.drainLook\(\)\);/.test(player),
   'il corpo guarda anche senza blocco quando la mano e\' un dito');
@@ -225,6 +255,16 @@ report.check(strays.length === 0,
   strays.length ? strays.slice(0, 3).join(' | ') : `${selectors.length} selettori letti`);
 report.check(/if \(input\.touch\) document\.body\.classList\.add\('is-touch'\);/.test(main),
   'e la classe si mette solo quando la modalita\' e\' accesa');
+// LA BUSSOLA ESCE DALL'ANGOLO DEL POLLICE, E SOLO LI'. Sulla scrivania resta
+// dove il riferimento la disegna, che e' cio' su cui sta in piedi il byte di
+// questo ramo.
+const dial = sheet.slice(sheet.indexOf('body.is-touch .hud-compass'));
+const dialBody = dial.slice(dial.indexOf('{'), dial.indexOf('}') + 1);
+report.check(/right:/.test(dialBody) && /top:/.test(dialBody)
+  && /left: auto/.test(dialBody) && /bottom: auto/.test(dialBody),
+  'in modalita\' tocco la bussola sta in alto a destra, fuori dalla mano che cammina');
+report.check(/\.hud-compass \{\n  position: absolute;\n  left: 1\.59rem;/.test(sheet),
+  'e sulla scrivania e\' esattamente dove il riferimento la disegna');
 report.check(/const touch = input\.touch\s*\n\s*\? createTouchControls\(\{/.test(main),
   'i comandi a schermo non si costruiscono affatto sulla scrivania');
 report.check(/touch\?\.update\(interaction\.state\);/.test(main),
@@ -311,6 +351,20 @@ if (process.argv.includes('--self')) {
   // Il tocco d'ingresso che vale anche come comando, cioe' un visitatore a cui
   // il mondo si apre con una pila di pannelli che non ha chiesto.
   const entryActs = touch.replace("!held.opening && state() === 'vicino'", "state() === 'vicino'");
+  // La domanda sbagliata sul rilevamento, rimessa dentro: un portatile con
+  // schermo touch che perde il mouse.
+  const touchyLaptop = wantedBody.replace(
+    "return Boolean(media && media('(pointer: coarse)').matches);",
+    "if (media && media('(pointer: coarse)').matches) return true;\n"
+    + "  return (navigator.maxTouchPoints || 0) > 0;",
+  );
+  // E l'anello staccato dal raggio: il cerchio dice una spinta e il cammino ne
+  // fa un'altra, e l'orlo non e' piu' dove si vede.
+  const looseRing = ring.replace('width: 80px;', 'width: 108px;');
+  const looseWidth = Number((/width: (\d+)px;/.exec(looseRing) || [])[1]);
+  // E la bussola che si sposta anche sulla scrivania.
+  const dialMoved = sheet.replace('.hud-compass {\n  position: absolute;\n  left: 1.59rem;',
+    '.hud-compass {\n  position: absolute;\n  right: 1.59rem;');
   // E una regola di foglio che si applica anche alla scrivania.
   const deskTouched = `${block}\n.hud-footer { bottom: 1rem; }\n`;
   const straysThen = deskTouched
@@ -353,6 +407,18 @@ if (process.argv.includes('--self')) {
     {
       what: 'un tocco d\'ingresso che apre anche la pietra a cui si arriva',
       caught: !/!held\.opening && state\(\) === 'vicino'/.test(entryActs),
+    },
+    {
+      what: 'un portatile con schermo touch a cui la modalita\' porta via il mouse',
+      caught: /maxTouchPoints|ontouchstart|any-pointer/.test(touchyLaptop),
+    },
+    {
+      what: 'un anello disegnato piu\' largo del raggio che il cammino misura',
+      caught: looseWidth !== TOUCH.radiusPx * 2,
+    },
+    {
+      what: 'una bussola che si sposta anche sulla scrivania',
+      caught: !/\.hud-compass \{\n  position: absolute;\n  left: 1\.59rem;/.test(dialMoved),
     },
     {
       what: 'una regola di foglio della modalita\' che tocca anche la scrivania',
