@@ -156,6 +156,14 @@ const FAMILIES = [
   { id: 'pietre-sciolte', what: 'the loose stones', has: ['uArrisPigment'], lacks: ['uJoint'], owed: 1 },
   { id: 'colline', what: 'the hills of the cornice', has: ['uPalette', 'uAirPale'], owed: 1 },
   { id: 'campo-ricomposto', what: 'the earth brought back to full resolution', has: ['tCampo', 'tCampoDepth'], lacks: ['tField'], owed: 1 },
+  // AND THE GROUND'S MEMORY, WHICH SHIPS FROM 2026-09-19 (E-CAMPO6-B). It stood
+  // among the unnamed until today for the only honest reason there is: with the
+  // handle off by default the pass was never drawn, so the driver never compiled
+  // it and a census at pose P never saw it. Now the world asks for it while it
+  // builds, so it is drawn on every frame of every tier and belongs here rather
+  // than among the lazy. Its fingerprint is the pair nothing else declares: the
+  // frame before this one, and that frame's own depth.
+  { id: 'campo-memoria', what: 'the ground added to its own previous frames', has: ['tPast', 'tPastDepth'], owed: 1 },
   { id: 'lago', what: 'the water of the cornice', has: ['uWater'], owed: 1 },
   { id: 'nuvole', what: 'the weather, cumuli of cubes', has: ['uCloudSun', 'uCloudTerms'], owed: 1 },
   { id: 'manto', what: 'the carpet and the tufts', has: ['tAtlas', 'uCutoff'], owed: 1 },
