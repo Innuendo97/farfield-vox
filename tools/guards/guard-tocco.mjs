@@ -162,6 +162,13 @@ report.check(/if \(!input\.locked && !input\.touch\) overlay\.setVisible\(true\)
   'la scritta d\'ingresso torna solo fuori dalla modalita\' tocco');
 report.check(/if \(input\.touch\) input\.onEngage\(\(\) => overlay\.setVisible\(false\)\);/.test(main),
   'e col dito e\' l\'ingresso stesso a mandarla via, non il blocco');
+// IL TOCCO CHE FA ENTRARE NON E' UN COMANDO. Il mondo consegna il camminatore
+// a 4,19 m dalla faccia del sesto blocco e la portata di E e' 4,20: la pietra
+// e' gia' a portata quando si arriva, e senza questa riga il tocco che toglie
+// «Tocca per esplorare» apre anche i pannelli. Misurato sulla lastra verticale.
+report.check(/const opening = !input\.engaged;/.test(touch)
+  && /!held\.opening && state\(\) === 'vicino'/.test(touch),
+  'il tocco che fa entrare non apre anche la pietra davanti a cui si arriva');
 report.check(/input\.touch = touchWanted\(\);/.test(main),
   'quale mano cammina si decide una volta sola, e nessuno la ricalcola');
 report.check(/if \(asked === '1'\) return true;/.test(touch) && /if \(asked === '0'\) return false;/.test(touch),
@@ -301,6 +308,9 @@ if (process.argv.includes('--self')) {
     'if (this.#touch || this.#locked) return undefined;',
     'if (this.#locked) return undefined;',
   );
+  // Il tocco d'ingresso che vale anche come comando, cioe' un visitatore a cui
+  // il mondo si apre con una pila di pannelli che non ha chiesto.
+  const entryActs = touch.replace("!held.opening && state() === 'vicino'", "state() === 'vicino'");
   // E una regola di foglio che si applica anche alla scrivania.
   const deskTouched = `${block}\n.hud-footer { bottom: 1rem; }\n`;
   const straysThen = deskTouched
@@ -339,6 +349,10 @@ if (process.argv.includes('--self')) {
     {
       what: 'un blocco del puntatore chiesto lo stesso al dito',
       caught: !/if \(this\.#touch \|\| this\.#locked\) return undefined;/.test(lockAsked),
+    },
+    {
+      what: 'un tocco d\'ingresso che apre anche la pietra a cui si arriva',
+      caught: !/!held\.opening && state\(\) === 'vicino'/.test(entryActs),
     },
     {
       what: 'una regola di foglio della modalita\' che tocca anche la scrivania',

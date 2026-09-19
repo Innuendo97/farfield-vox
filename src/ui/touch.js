@@ -229,6 +229,15 @@ export function createTouchControls({
     // scrolling and selecting under a drag, and on a touch screen it is also
     // what stops the compatibility click ever being synthesised. So the one
     // thing that click was for is done directly. engage() is idempotent.
+    // AND WHETHER THIS IS THE ONE THAT LET THEM IN, WHICH IS NOT A COMMAND.
+    //
+    // Measured on the plate for this session: the walker arrives 4.19 m from
+    // the face of the sixth block and the reach of E is 4.20, so the world
+    // hands them a stone already within reach. The tap that took «Tocca per
+    // esplorare» away therefore ALSO opened it, and the first thing a visitor
+    // saw of this world was a stack of panels nobody asked for. A way in is a
+    // way in: it is answered by the world appearing, and by nothing else.
+    const opening = !input.engaged;
     input.engage();
     const left = event.clientX < half();
     if (left && stickId === null) {
@@ -241,6 +250,7 @@ export function createTouchControls({
       lookId = event.pointerId;
       live.set(event.pointerId, {
         role: 'sguardo',
+        opening,
         x: event.clientX,
         y: event.clientY,
         lastX: event.clientX,
@@ -316,7 +326,7 @@ export function createTouchControls({
     const kind = dragKind(
       event.clientX - held.x, event.clientY - held.y, event.timeStamp - held.at,
     );
-    if (kind === 'tocco' && state() === 'vicino') input.command('KeyE');
+    if (kind === 'tocco' && !held.opening && state() === 'vicino') input.command('KeyE');
   }
 
   surface.addEventListener('pointerdown', onDown);
