@@ -298,11 +298,22 @@ export const TIERS = [
     // una regola con un'eccezione non detta e' una regola che il primo lettore
     // in buona fede riapre.
     //
-    // DOVE E' ARRIVATO. Alla posa peggiore del mondo, sulla macchina di
-    // riferimento, questo tier legge 8,92 e 8,96 ms di mediana su due giri
-    // contro i 14,15 del tier basso: il cancello dei 9,5 e' preso. Diviso per
-    // il 2,11 di divario misurato, sull'HD 620 sono 18,8 ms di GPU contro i
-    // 33,3 che trenta fotogrammi al secondo concedono.
+    // DOVE E' ARRIVATO, E CHE COSA IL COMMITTENTE HA SCELTO (E-DECISIONI31).
+    //
+    // Alla posa peggiore del mondo, sulla macchina di riferimento, questo tier
+    // legge 9,56 ms di mediana su tre giri (9,66 / 9,56 / 9,50) contro i 14,33
+    // del tier basso. Il cancello che il mandato aveva posto -- 9,5 ms -- e'
+    // mancato di sei centesimi, e non e' un fallimento: prenderlo voleva dire
+    // riaprire il reticolo del texel del suolo, e il committente ha scelto di
+    // tenerlo chiuso. Vedi la nota sotto campoScale, che dice anche quale delle
+    // due ragioni della scelta la rimisura ha smentito.
+    //
+    // Diviso per il 2,11 di divario misurato, sull'HD 620 sono 20,2 ms di GPU
+    // alla mediana contro i 33,3 che trenta fotogrammi al secondo concedono.
+    // Il cammino di dieci secondi non porta un solo fotogramma sopra i 33,3 qui
+    // e ne porterebbe, la', il numero che quel 2,11 dice: e' il bersaglio del
+    // committente tenuto alla mediana con margine, e il p95 resta la coda che
+    // §7.3 del verbale lascia aperta.
     //
     // DA DOVE VIENE. Sul portatile del committente -- Intel HD Graphics 620,
     // Kaby Lake, Mesa iris su X11 -- il mondo al tier BASSO gira a 27 fotogrammi
@@ -330,20 +341,32 @@ export const TIERS = [
     // volta; qui sta il perche' di ogni numero.
     id: 'minimo',
     label: 'Minima',
-    // MEZZO LATO, che e' 0,44 dei pixel del tier basso e un quarto di quelli
-    // della finestra. E' la prima leva della lista ed e' stata stretta fino
-    // qui perche' il cancello lo chiedeva: la proposta del mandato stava a 0,6
-    // e leggeva 9,98 ms alla posa peggiore contro i 9,5 del cancello. A 0,5 la
-    // stessa misura legge 8,92 e 8,96 su due giri.
+    // 0,55 DI LATO, E IL NUMERO E' DETTATO DAL RETICOLO E NON DAI MILLISECONDI
+    // (E-DECISIONI31).
     //
-    // ED E' L'UNICA LEVA CHE ABBIA COMPRATO QUALCOSA, il che e' il contrario di
-    // quel che ci si aspettava e sta scritto sotto campoScale.
+    // Il committente ha scelto il braccio col RETICOLO CHIUSO: il suolo di
+    // questo tier tiene il tetto di E-DECISIONI28 -- 1,85 pixel della finestra
+    // per texel -- come il resto del mondo. Quel tetto e' `1 / (scala *
+    // campoScale)`, e `campoScale` non puo' passare l'uno senza che la terra
+    // smetta di avere un bersaglio suo (e con esso la memoria temporale). Il
+    // tetto mette quindi un PAVIMENTO sulla scala del fotogramma:
     //
-    // QUEL CHE COSTA E' LA SCRITTA INCISA, che e' il CONTENUTO di questo
-    // portfolio e non il suo sfondo: a mezzo lato le sei facce sono lette su
-    // 946 pixel di larghezza invece che su 1892. E' la meta' della domanda che
-    // le lastre affiancate pongono al committente.
-    scale: 0.5,
+    //     lato 0,50   il meglio possibile e' 2,00 px per texel   il tetto cade
+    //     lato 0,55   con terra a 0,99 fa 1,837                  il tetto tiene
+    //     lato 0,60   con terra a 0,95 fa 1,754                  il tetto tiene
+    //
+    // Cioe' 0,55 e' il lato PIU' PICCOLO su cui la scelta del committente e'
+    // realizzabile, e qualunque numero sotto lo e' solo a prezzo del tetto che
+    // la scelta esiste per tenere.
+    //
+    // E SOPRA NON SI SALE, PERCHE' NON COSTA NIENTE SALIRE E COSTA QUALCOSA
+    // ESSERE SCESI. Misurato alla posa peggiore col tetto tenuto: lato 0,60
+    // legge 10,28 ms, lato 0,55 legge 10,02, lato 0,50 (col tetto rotto a 2,04)
+    // legge 10,07. A texel del suolo fisso la scala del fotogramma muove la
+    // mediana di due decimi, e quel che compra e' la SCRITTA INCISA -- il
+    // contenuto di questo portfolio -- letta su 1041 pixel di larghezza invece
+    // che su 946. Si sceglie il lato piu' grande che il cancello concede.
+    scale: 0.55,
     // ZERO CAMPIONI, E IL COMMITTENTE LO HA ACCETTATO PER QUESTO TIER SOLO
     // (E-DECISIONI30). E-DECISIONI14 dice due campioni su OGNI tier e quella
     // legge vale ancora dove il mondo e' quello promesso; qui il patto e'
@@ -388,53 +411,79 @@ export const TIERS = [
     // ha meno fotogrammi ricompra la grana con una banda piu' larga.
     groundDetail: { near: 3.5, step: 2, lag: 500 },      // [V1] the ring in metres, the band in ms
     // ------------------------------------------------------------------
-    // LA FRAZIONE DI LATO DELLA TERRA, E QUI IL RETICOLO DEL TEXEL SI RIAPRE.
-    // E' LA DOMANDA APERTA DI QUESTA UNITA' E IL COMMITTENTE DEVE RISPONDERLA.
+    // LA FRAZIONE DI LATO DELLA TERRA, E IL RETICOLO DEL TEXEL RESTA CHIUSO
+    // ANCHE QUI: E' LA SCELTA DEL COMMITTENTE (E-DECISIONI31).
     //
-    // E-DECISIONI28 tiene ogni tier sotto 1,85 pixel della FINESTRA per texel
+    // E-DECISIONI28 tiene ogni tier sotto 1,85 pixel della finestra per texel
     // di suolo, che e' dove la «scaletta» che il committente vedeva torna a
-    // trasparire; questo tier sta a 4,00, cioe' 2,16 volte quel tetto. E' il
-    // permesso che E-DECISIONI30 ha dato -- «può togliere pixel E anche erba,
-    // fiori e nuvole» -- speso sulla cosa che ne aveva bisogno.
+    // trasparire. Questo tier poteva essere l'eccezione -- E-DECISIONI30 gli
+    // aveva dato il permesso di togliere cose dal quadro -- e NON LO E': il
+    // suolo del mondo spoglio e' lo stesso suolo del mondo intero. 0,55 di
+    // fotogramma per 0,99 di terra fa 1,837 px per texel.
     //
-    // PERCHE' PROPRIO QUI E NON ALTROVE: MISURATO, POSA PEGGIORE, TIER MINIMO,
-    // DUE GIRI ALTERNATI (il banco e' per-il-committente/lav/
-    // 2026-09-19-perf-7-griglia.mjs, la tabella intera sta nel verbale §A.5):
+    // CHE COSA E' COSTATO TENERLO, E LA RAGIONE CHE NON HA RETTO.
     //
-    //     scala   terra   px/texel   mediana   p95
-    //      0,60    0,50     3,33       9,98    12,6-15,2
-    //      0,60    0,90     1,85      10,28    13,8-14,0   <- tetto tenuto
-    //      0,55    0,50     3,64       9,66    11,9
-    //      0,55    0,98     1,86      10,02    12,8-13,0   <- tetto tenuto
-    //      0,50    0,50     4,00       8,92    11,8-16,1   <- questo tier
-    //      0,50    0,75     2,66      10,13    13,2-16,2
-    //      0,50    0,98     2,04      10,07    12,7-15,8
+    // La scelta e' stata fatta su due numeri, e la rimisura ne ha confermato uno
+    // e smentito l'altro. Sta scritto qui nei due versi perche' un commento che
+    // tiene in piedi il motivo sbagliato e' peggio di un commento che non c'e'.
     //
-    // SI LEGGE PER COLONNE E DICE UNA COSA SOLA: a pixel del texel FISSO la
-    // terra e' marciata sempre sullo stesso numero di texel -- (larghezza della
-    // finestra / pixel per texel)^2 -- qualunque sia la scala del fotogramma.
-    // Quindi sotto il tetto di E-DECISIONI28 la marcia della terra costa 6,4 ms
-    // dei 9,5 del cancello e NON SI MUOVE: le tre righe col tetto tenuto
-    // leggono 10,28 / 10,02 / 10,07 mentre il fotogramma va da 1135 a 946 pixel
-    // di lato. Cioe', tenuto il tetto, LA SCALA DEL FOTOGRAMMA NON E' PIU' UNA
-    // LEVA, e il cancello dei 9,5 ms non e' raggiungibile da nessuna parte.
+    // QUEL CHE HA RETTO -- il quadro. Il suolo di questo tier sta a 1,84 pixel
+    // della finestra per texel contro i 3,64 del braccio aperto: e' la stessa
+    // terra del resto del mondo, e la differenza si guarda, non si legge, sulla
+    // seconda e terza riga di 2026-09-19-perf-7-ritagli-4x.png.
     //
-    // E NON C'E' UN ALTRO POSTO DA CUI PRENDERE QUEL MILLISECONDO. Misurate una
-    // alla volta allo stesso tier e alla stessa posa: le nuvole 0,02 ms (10,28
-    // con, 10,30 senza: dentro il rumore), l'erba 0,19, il disco della terra da
-    // dieci a otto metri 0,25, e il bloom INTERO -- soglia piu' catena -- 0,13.
-    // Tutte insieme non fanno mezzo millisecondo su un divario di 1,36.
+    // QUEL CHE NON HA RETTO -- il p95. La scelta e' stata argomentata su «13,0
+    // contro 15,8 di p95», ma quei due numeri venivano da DUE STATISTICHE
+    // DIVERSE: il 13,0 era il percentile degli stadi su una finestra sola di
+    // dieci secondi (il banco della griglia), il 15,8 era il p95 ROTOLANTE del
+    // governatore su novanta fotogrammi (il banco della scheda), che e' quello
+    // che il riquadro mostra e su cui il governatore agisce. Rimisurato sulla
+    // scheda, posa peggiore, tre giri:
     //
-    // QUINDI LE DUE DECISIONI DEL COMMITTENTE NON POSSONO VALERE INSIEME su
-    // questo tier, ed e' una domanda di gusto e non di misura: o il tetto del
-    // reticolo scende di rango per il solo tier minimo (questa riga), o il
-    // cancello dei 9,5 ms sale a 10,3 e il suolo resta come nel resto del
-    // mondo -- che sull'HD 620 e' comunque ventidue millisecondi su
-    // trentatre'. Le lastre affiancate sono 2026-09-19-perf-7-ritagli-4x.png.
-    // guard-campo3 tiene il tetto su ogni altro tier e tiene QUESTO numero
-    // qui, cosi' che nessuno possa peggiorarlo in silenzio.
+    //                          mediana   p95    cammino p95   cammino max
+    //     reticolo chiuso       9,56    16,26      15,31         21,44
+    //     reticolo aperto       8,58    15,77      13,07         19,46
+    //
+    // cioe' il braccio scelto costa 0,98 ms di mediana e **non** rende p95: ne
+    // chiede altri 0,49, e 2,24 sul cammino di dieci secondi. Sull'HD 620, sul
+    // 2,11 di divario misurato, sono 20,2 ms di mediana e 34,3 di p95 contro i
+    // 18,1 e 33,3 del braccio aperto: nessuno dei due tiene i trenta fotogrammi
+    // al secondo al novantacinquesimo percentile, ed entrambi li tengono alla
+    // mediana con margine.
+    //
+    // QUINDI QUESTA RIGA E' UNA DECISIONE SUL QUADRO E NON SUI MILLISECONDI, e
+    // va riaperta se e solo se il committente cambia idea sul quadro. Il costo
+    // vero e' un millisecondo di mediana; il p95 non e' un argomento in nessuno
+    // dei due versi, perche' a quel percentile quel che si legge sono le
+    // tessere del suolo che arrivano dal worker sotto il respiro e non il costo
+    // di uno stato fermo (vedi `scene` p95 7,80 contro un p50 di 2,26).
+    //
+    // La tabella della griglia, che resta la misura pulita di COME le due leve
+    // si muovono insieme, e' nel verbale §A.5:
+    //
+    //     scala   terra   px/texel   mediana (griglia)
+    //      0,50    0,50     4,00       8,92
+    //      0,55    0,50     3,64       9,66
+    //      0,50    0,98     2,04      10,07
+    //      0,60    0,90     1,85      10,28
+    //      0,55    0,99     1,84      10,02   <- questo tier
+    //
+    // E SI LEGGE PER COLONNE, perche' e' la cosa che questa unita' ha scoperto:
+    // a pixel del texel FISSO la terra e' marciata sempre sullo stesso numero
+    // di texel -- (larghezza della finestra / px per texel)^2 -- qualunque sia
+    // la scala del fotogramma. Sotto il tetto la marcia costa 6,4 ms e non si
+    // muove, e le tre righe col tetto tenuto leggono 10,28 / 10,02 / 10,07
+    // mentre il fotogramma va da 1135 a 946 pixel di lato. Tenuto il tetto, LA
+    // SCALA DEL FOTOGRAMMA NON E' PIU' UNA LEVA DI QUESTO TIER: e' solo quanto
+    // grande si legge la scritta incisa.
+    //
+    // CHE E' ANCHE PERCHE' IL CANCELLO DEI 9,5 ms DI U-PERF-7 NON E' PRESO E
+    // NON E' UN DIFETTO: nuvole (0,02 ms), erba (0,19), disco della terra da
+    // dieci a otto metri (0,25) e bloom intero (0,16) messi insieme fanno 0,62
+    // su un divario di 1,44, e il solo posto da cui quel millisecondo poteva
+    // venire e' il tetto che il committente ha deciso di tenere.
     // ------------------------------------------------------------------
-    campoScale: 0.5,
+    campoScale: 0.99,
     // [V6] QUANTA DEL TEMPO SI DISEGNA, E RESTA NEUTRA ANCHE QUI, MISURATA.
     //
     // La leva e' dichiarata dal primo giorno e non l'ha mai letta nessuno, e
