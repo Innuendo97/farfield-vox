@@ -286,14 +286,188 @@ export const TIERS = [
     cloudsDetail: 1,       // [V6] how much of the weather is drawn
     nightGlow: 1,          // [V7] how much of the night's halo is afforded
   },
+  {
+    // ---------------------------------------------------------------------
+    // IL TIER SOTTO IL BASSO, E IL SOLO DI QUESTO FILE CHE PUO' TOGLIERE COSE
+    // DAL QUADRO (E-LINUX1, E-DECISIONI30).
+    //
+    // La regola in cima a questo file dice che l'identita' del quadro non e'
+    // un tier: una macchina piu' lenta riceve lo STESSO mondo su meno pixel e
+    // con meno erba dentro, mai un mondo diverso. Questo tier e' l'eccezione
+    // che il committente ha dichiarato in proprio, ed e' scritta qui perche'
+    // una regola con un'eccezione non detta e' una regola che il primo lettore
+    // in buona fede riapre.
+    //
+    // DOVE E' ARRIVATO. Alla posa peggiore del mondo, sulla macchina di
+    // riferimento, questo tier legge 8,92 e 8,96 ms di mediana su due giri
+    // contro i 14,15 del tier basso: il cancello dei 9,5 e' preso. Diviso per
+    // il 2,11 di divario misurato, sull'HD 620 sono 18,8 ms di GPU contro i
+    // 33,3 che trenta fotogrammi al secondo concedono.
+    //
+    // DA DOVE VIENE. Sul portatile del committente -- Intel HD Graphics 620,
+    // Kaby Lake, Mesa iris su X11 -- il mondo al tier BASSO gira a 27 fotogrammi
+    // al secondo in Brave e a 23 in Firefox, con punte da 67 a 100 ms: «va a
+    // scatti, quasi non fruibile». Le letture, dal riquadro di sviluppo e col
+    // tier scelto a mano:
+    //
+    //     Brave   Bassa   27,3 fps   36,7 ms   cpu 16,5   gpu 29,8 (orologio vero)
+    //     Brave   Alta    16,2       61,7      cpu  4,5   gpu 55,7
+    //     Firefox Bassa   23,5       42,5      cpu 26,0   gpu ~33,7 (stima)
+    //     Firefox Alta    14,5       69,1      cpu 18,0   gpu ~66,7 (stima)
+    //
+    // La GPU e' il collo: 29,8 ms al tier basso dove la macchina di riferimento
+    // ne spende 14,1, cioe' 2,11 volte piu' lenta. Il bersaglio che il
+    // committente ha posto sono 30 fotogrammi al secondo STABILI su quella
+    // scheda, che sono 20 ms di GPU e 12 di CPU per fotogramma la' -- e che
+    // sulla macchina di riferimento, divisi per quel 2,11, fanno il cancello
+    // che questo tier e' stato tarato contro: 9,5 ms di mediana alla POSA
+    // PEGGIORE del mondo, non alla posa P.
+    //
+    // L'ORDINE IN CUI SI E' SPESO e' quello della lista in cima al file, dal
+    // meno visibile al piu': prima i pixel, poi l'erba, poi il bloom -- e solo
+    // dopo le tre leve che questo tier ha il permesso di spendere e nessun
+    // altro. Quanto ciascuna abbia dato e' nel verbale, misurato una leva alla
+    // volta; qui sta il perche' di ogni numero.
+    id: 'minimo',
+    label: 'Minima',
+    // MEZZO LATO, che e' 0,44 dei pixel del tier basso e un quarto di quelli
+    // della finestra. E' la prima leva della lista ed e' stata stretta fino
+    // qui perche' il cancello lo chiedeva: la proposta del mandato stava a 0,6
+    // e leggeva 9,98 ms alla posa peggiore contro i 9,5 del cancello. A 0,5 la
+    // stessa misura legge 8,92 e 8,96 su due giri.
+    //
+    // ED E' L'UNICA LEVA CHE ABBIA COMPRATO QUALCOSA, il che e' il contrario di
+    // quel che ci si aspettava e sta scritto sotto campoScale.
+    //
+    // QUEL CHE COSTA E' LA SCRITTA INCISA, che e' il CONTENUTO di questo
+    // portfolio e non il suo sfondo: a mezzo lato le sei facce sono lette su
+    // 946 pixel di larghezza invece che su 1892. E' la meta' della domanda che
+    // le lastre affiancate pongono al committente.
+    scale: 0.5,
+    // ZERO CAMPIONI, E IL COMMITTENTE LO HA ACCETTATO PER QUESTO TIER SOLO
+    // (E-DECISIONI30). E-DECISIONI14 dice due campioni su OGNI tier e quella
+    // legge vale ancora dove il mondo e' quello promesso; qui il patto e'
+    // un altro, ed e' l'unico posto in cui vale. Quel che i due campioni
+    // ammorbidivano e' il bordo dei cubi della muratura e i fiori: la legge
+    // nuova, che le guardie tengono, e' «due campioni su ogni tier TRANNE il
+    // minimo».
+    samples: 0,
+    // E IL PIXEL DEL BUFFER DI SCENA NON SI TOCCA NEPPURE QUI, che e' la riga
+    // sopra TIERS: un tier puo' disegnare meno pixel, non puo' portare un
+    // intervallo di luce diverso, perche' la soglia del bloom, l'esposizione e
+    // i due gradi sono fittati sui numeri di QUESTO buffer.
+    sceneFormat: 'R11F_G11F_B10F',
+    // Un gradino sotto non esiste: BLOOM_TIERS in src/core/post.js ha `half` e
+    // `quarter` e nulla sotto, e il quarto e' gia' quel che spedisce il basso.
+    // E NON VALE LA PENA FARNE UNO: misurato a questo tier, l'alone INTERO --
+    // la soglia piu' la catena di discesa e risalita -- costa 0,13 ms di un
+    // fotogramma da nove. Un ottavo ne toglierebbe una frazione, per un alone
+    // piu' grosso di cosi' che smette di essere un alone.
+    bloom: 'quarter',
+    // L'ERBA, seconda leva della lista: l'unica cosa di questo mondo disegnata
+    // in tempo reale e l'unica il cui costo cresce con dove si guarda. 0,25 di
+    // densita' su un anello di otto metri contro 0,4 su dodici: un quarto delle
+    // carte del tier basso, contate: 3 ciuffi e 29 fiori posati contro 9 e 143.
+    // Resta erba davanti ai piedi, che e' cio' che il committente ha chiesto di
+    // non perdere -- e quel che si e' comprato togliendo il resto e' 0,19 ms,
+    // misurato spegnendola del tutto alla posa peggiore.
+    grass: { density: 0.25, radius: 8 },
+    // DIECI METRI, che e' l'unico braccio gia' prezzato sotto i dodici del tier
+    // basso: 85 412 triangoli contro 119 614, cioe' 0,71. Vedi il blocco sopra
+    // TIERS, dove i cinque bracci sono misurati. Otto metri sono stati provati
+    // accanto e NON presi: 0,25 ms in piu' di risparmio per due metri di mondo
+    // tolti da sotto i piedi, che a questo tier e' il rapporto peggiore della
+    // lista.
+    voxelDiscRadius: 10,   // [V1] metres of ten centimetre ground from the centre
+    // IL RING TIRATO DENTRO E LA BANDA ALLARGATA, che sono due cose diverse.
+    // Il ring a 3,5 m rispetta il vincolo della finestra vicina scritto al tier
+    // alto -- near * step^2 <= 19,2 -- con 3,5 * 4 = 14,0. La banda passa da
+    // 400 a 500 ms per la ragione scritta al tier oltre: la banda si spalma sui
+    // fotogrammi che ci cascano dentro, e una macchina che ne consegna 30 al
+    // secondo ne ha quindici in 500 ms dove a 18 ne avrebbe nove. Un tier che
+    // ha meno fotogrammi ricompra la grana con una banda piu' larga.
+    groundDetail: { near: 3.5, step: 2, lag: 500 },      // [V1] the ring in metres, the band in ms
+    // ------------------------------------------------------------------
+    // LA FRAZIONE DI LATO DELLA TERRA, E QUI IL RETICOLO DEL TEXEL SI RIAPRE.
+    // E' LA DOMANDA APERTA DI QUESTA UNITA' E IL COMMITTENTE DEVE RISPONDERLA.
+    //
+    // E-DECISIONI28 tiene ogni tier sotto 1,85 pixel della FINESTRA per texel
+    // di suolo, che e' dove la «scaletta» che il committente vedeva torna a
+    // trasparire; questo tier sta a 4,00, cioe' 2,16 volte quel tetto. E' il
+    // permesso che E-DECISIONI30 ha dato -- «può togliere pixel E anche erba,
+    // fiori e nuvole» -- speso sulla cosa che ne aveva bisogno.
+    //
+    // PERCHE' PROPRIO QUI E NON ALTROVE: MISURATO, POSA PEGGIORE, TIER MINIMO,
+    // DUE GIRI ALTERNATI (il banco e' per-il-committente/lav/
+    // 2026-09-19-perf-7-griglia.mjs, la tabella intera sta nel verbale §A.5):
+    //
+    //     scala   terra   px/texel   mediana   p95
+    //      0,60    0,50     3,33       9,98    12,6-15,2
+    //      0,60    0,90     1,85      10,28    13,8-14,0   <- tetto tenuto
+    //      0,55    0,50     3,64       9,66    11,9
+    //      0,55    0,98     1,86      10,02    12,8-13,0   <- tetto tenuto
+    //      0,50    0,50     4,00       8,92    11,8-16,1   <- questo tier
+    //      0,50    0,75     2,66      10,13    13,2-16,2
+    //      0,50    0,98     2,04      10,07    12,7-15,8
+    //
+    // SI LEGGE PER COLONNE E DICE UNA COSA SOLA: a pixel del texel FISSO la
+    // terra e' marciata sempre sullo stesso numero di texel -- (larghezza della
+    // finestra / pixel per texel)^2 -- qualunque sia la scala del fotogramma.
+    // Quindi sotto il tetto di E-DECISIONI28 la marcia della terra costa 6,4 ms
+    // dei 9,5 del cancello e NON SI MUOVE: le tre righe col tetto tenuto
+    // leggono 10,28 / 10,02 / 10,07 mentre il fotogramma va da 1135 a 946 pixel
+    // di lato. Cioe', tenuto il tetto, LA SCALA DEL FOTOGRAMMA NON E' PIU' UNA
+    // LEVA, e il cancello dei 9,5 ms non e' raggiungibile da nessuna parte.
+    //
+    // E NON C'E' UN ALTRO POSTO DA CUI PRENDERE QUEL MILLISECONDO. Misurate una
+    // alla volta allo stesso tier e alla stessa posa: le nuvole 0,02 ms (10,28
+    // con, 10,30 senza: dentro il rumore), l'erba 0,19, il disco della terra da
+    // dieci a otto metri 0,25, e il bloom INTERO -- soglia piu' catena -- 0,13.
+    // Tutte insieme non fanno mezzo millisecondo su un divario di 1,36.
+    //
+    // QUINDI LE DUE DECISIONI DEL COMMITTENTE NON POSSONO VALERE INSIEME su
+    // questo tier, ed e' una domanda di gusto e non di misura: o il tetto del
+    // reticolo scende di rango per il solo tier minimo (questa riga), o il
+    // cancello dei 9,5 ms sale a 10,3 e il suolo resta come nel resto del
+    // mondo -- che sull'HD 620 e' comunque ventidue millisecondi su
+    // trentatre'. Le lastre affiancate sono 2026-09-19-perf-7-ritagli-4x.png.
+    // guard-campo3 tiene il tetto su ogni altro tier e tiene QUESTO numero
+    // qui, cosi' che nessuno possa peggiorarlo in silenzio.
+    // ------------------------------------------------------------------
+    campoScale: 0.5,
+    // [V6] QUANTA DEL TEMPO SI DISEGNA, E RESTA NEUTRA ANCHE QUI, MISURATA.
+    //
+    // La leva e' dichiarata dal primo giorno e non l'ha mai letta nessuno, e
+    // questa unita' e' andata a vedere se valesse la pena darle un lettore. Il
+    // tempo e' UN DISEGNO -- una maglia sola di cubi, fusa, davanti alla cupola
+    // -- e il suo costo e' riempimento sui pixel di cielo che copre. Misurato
+    // al tier minimo, alla posa peggiore, col tetto del reticolo tenuto:
+    // 10,28 ms col tempo e 10,30 senza. Cioe' NIENTE, dentro il rumore della
+    // scrivania, su due giri.
+    //
+    // Toglierne meta' toglierebbe dunque meta' di niente, e costerebbe al
+    // visitatore meta' del cielo che questo mondo ha. Resta a uno, e resta
+    // dichiarata: il giorno in cui il tempo diventasse piu' di un disegno,
+    // questa riga ha gia' il posto dove scendere.
+    cloudsDetail: 1,
+    nightGlow: 1,          // [V7] how much of the night's halo is afforded
+  },
 ];
 
 // What the walker may ask for by hand. The best tier is not among them: it is
 // an answer about a machine, not a preference, and offering it on a machine
 // that cannot hold it would be offering a stutter.
-export const CHOICES = ['auto', 'alta', 'media', 'bassa'];
+// AND «Minima» IS AMONG THEM, unlike the best tier above it and for the
+// opposite reason. The top tier is withheld because offering it on a machine
+// that cannot hold it would be offering a stutter; this one is offered because
+// the machine that needs it is exactly the machine whose walker is most likely
+// to go looking for it by hand -- and because the bench, which runs once, can
+// be wrong about a laptop whose driver throttles after a minute.
+export const CHOICES = ['auto', 'alta', 'media', 'bassa', 'minima'];
 
-const CHOICE_TIER = { alta: 'alto', media: 'medio', bassa: 'basso' };
+const CHOICE_TIER = {
+  alta: 'alto', media: 'medio', bassa: 'basso', minima: 'minimo',
+};
 
 export const DEFAULT_TIER = 'medio';
 
@@ -301,7 +475,18 @@ export const DEFAULT_TIER = 'medio';
 // The budget for a frame on the target hardware is between eight and twelve
 // milliseconds; these sit just inside it, so a machine that lands on a boundary
 // is given the tier it can hold rather than the one it can just reach.
-export const BENCH_THRESHOLDS = { high: 9, medium: 13, discrete: 5 };
+// AND WHERE THE LOWEST LINE IS, WHICH IS THE ONE MEASURED ON A REAL MACHINE
+// RATHER THAN FITTED TO A BUDGET (E-LINUX1). The committente's HD 620 draws the
+// tier BASSO in 29,8 ms by the driver's own clock; the calibration runs at the
+// default tier, which is `medio` and costs that machine more, so anything it
+// reads over twenty milliseconds is a machine that cannot hold `basso` either
+// and is being handed a tier it will only fall out of. Twenty is a third of the
+// way between the thirteen above it and the thirty that machine actually reads,
+// which leaves room for a card that is merely slow without dropping it to a
+// tier that takes grass out of the world.
+export const BENCH_THRESHOLDS = {
+  high: 9, medium: 13, low: 20, discrete: 5,
+};
 
 // The governor.
 //
