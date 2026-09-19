@@ -149,6 +149,40 @@ function makeWindow(shape, job) {
 }
 
 /**
+ * LA MEMORIA TEMPORALE DEL SUOLO QUANDO L'INDIRIZZO NON DICE NIENTE, ed e'
+ * ACCESA: e' cio' che si spedisce dal 2026-09-19.
+ *
+ * STA QUI E NON NELLA MANIGLIA perche' qui e' dove la memoria e' definita dal
+ * lato del mondo -- setMemory, poche righe piu' sotto, e' la sola porta da cui
+ * si accende -- e una maniglia che portasse il numero dentro di se' sarebbe un
+ * letterale in un posto in cui nessuno lo va a cercare. `src/core/post.js` tiene
+ * l'oggetto che il FOTOGRAMMA legge e lo tiene SPENTO: la memoria non si accende
+ * mai da sola dalla parte del disegno, si accende perche' il mondo, costruendosi,
+ * lo chiede. Chi cambia idea cambia questa riga, e legge qui sotto perche'.
+ *
+ * VENTUNO VENTESIMI, E IL NUMERO E' UNA MISURA E POI UN COMPROMESSO. Al tier
+ * basso, sul respiro del corpo e nelle due finestre vicine della guardia, il
+ * suolo senza memoria legge 6,14 e 5,89 livelli; con la memoria legge 5,96 e
+ * 4,91 a 0,90, 5,00 e 4,05 a 0,98. Piu' peso, meno scintillio. Dall'altra parte
+ * c'e' il tempo che l'accumulo ci mette a dimenticare dove il visitatore era:
+ * dieci fotogrammi dopo un arresto, il suolo e' ancora a 1,4-2,3 livelli dalla
+ * sua immagine assestata a 0,95, e a 0,98 sarebbe il doppio. 0,95 e' il mezzo
+ * misurato fra i due, ed e' quello che il committente ha scelto guardando
+ * (E-CAMPO6-B, 2026-09-19): «la memoria temporale si accende di default su tutti
+ * i tier». `campomemoria=1,0.9` e `campomemoria=1,0.98` aprono gli altri due
+ * bracci senza toccare una riga, e `campomemoria=0` e' il fotogramma senza
+ * memoria, fino all'ultimo byte.
+ *
+ * E LO SCARTO SUB-TEXEL RESTA SPENTO, che e' l'altra meta' di questa riga e non
+ * un dettaglio omesso. Misurato: sotto la memoria non compra niente sul respiro
+ * (9,81 / 8,73 / 7,14 / 5,69 livelli contro 9,80 / 8,91 / 7,37 / 5,88 senza), e
+ * al movimento ridotto COSTA -- 4,05 contro 2,47 -- cioe' fa il contrario di
+ * quello che la memoria e' li' a fare. Si accende con `campojitter=1`, e chi la
+ * accende lo fa per guardare la sovracampionatura dei bordi, non per il numero.
+ */
+export const CAMPO_MEMORY_DEFAULT = { weight: 0.95, jitter: false };
+
+/**
  * The two clipmaps, the box they are drawn on, and the worker that fills them.
  *
  * @param {object} options
@@ -689,7 +723,8 @@ export function createCampo({
      * reports what actually happened.
      *
      * @param {number} weight   how much of the accumulated past a texel keeps.
-     *                          Nought is off, and off is what ships.
+     *                          Nought is off; what ships is CAMPO_MEMORY_DEFAULT
+     *                          above, and the reason is written beside it.
      * @param {boolean} jitter  whether the ray is moved inside its texel under
      *                          the accumulation. False prices the half of this
      *                          that is the accumulation alone.

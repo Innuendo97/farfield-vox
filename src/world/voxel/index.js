@@ -59,7 +59,7 @@ export {
 // through THIS half of the door is the live window and the box it is drawn on,
 // because those two build a three.js texture and a three.js material and the
 // pure half may not.
-export { createCampo } from './campo-field.js';
+export { CAMPO_MEMORY_DEFAULT, createCampo } from './campo-field.js';
 export { campoBox, campoMaterial } from './campo-material.js';
 // AND THE LIGHT BY PLACE, which is the ground's and is read by everything that
 // stands in it: the flowers and the sprays of ../vegetation.js take the same

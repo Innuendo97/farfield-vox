@@ -1,5 +1,5 @@
 import { createGroundVoxel } from '../ground-voxel.js';
-import { PLATEAU, createCampo, runInWorker } from '../voxel/index.js';
+import { CAMPO_MEMORY_DEFAULT, PLATEAU, createCampo, runInWorker } from '../voxel/index.js';
 import { SPAWN } from '../layout.js';
 
 // THE SOIL. Owned by V1.
@@ -90,16 +90,19 @@ import { SPAWN } from '../layout.js';
  *                  monoliths: 1 is the frame drawn whole (the null), 0.75 and
  *                  0.5 draw the earth into a buffer of their own and put it
  *                  back at the frame's pixel. U-CAMPO-3.
- *   campomemoria=1[,peso]
- *                  LA MEMORIA TEMPORALE DEL SUOLO, spenta di default e spenta
- *                  in ciò che si spedisce. Il campo accumula i propri
- *                  fotogrammi precedenti, riproiettati dalla propria
+ *   campomemoria=0|1[,peso]
+ *                  LA MEMORIA TEMPORALE DEL SUOLO, ACCESA di default e accesa
+ *                  in ciò che si spedisce (E-CAMPO6-B). Il campo accumula i
+ *                  propri fotogrammi precedenti, riproiettati dalla propria
  *                  profondità: un texel che nel fotogramma prima stava nello
  *                  stesso posto del mondo torna a valere, e i bordi smettono di
  *                  scattare a ogni respiro. «peso» è quanto del passato un
- *                  texel tiene, e senza di esso vale 0,95. `campomemoria=0` è
- *                  esattamente ciò che si spedisce, fino all'ultimo byte del
- *                  fotogramma. Vale solo dove il campo ha un bersaglio suo: a
+ *                  texel tiene, e senza di esso vale quello che si spedisce —
+ *                  CAMPO_MEMORY_DEFAULT in ../voxel/campo-field.js, dove la
+ *                  memoria è definita e dove sta scritto perché 0,95.
+ *                  `campomemoria=0` la SPEGNE, e quel che resta è il fotogramma
+ *                  senza memoria fino all'ultimo byte: è il braccio nullo del
+ *                  banco. Vale solo dove il campo ha un bersaglio suo: a
  *                  campores=1 non esiste e non viene forzata (src/core/post.js)
  *   campojitter=1  AGGIUNGE lo spostamento sub-texel del raggio sotto la
  *                  memoria, e di suo è SPENTO. Misurato, non compra: al tier
@@ -169,33 +172,23 @@ function ringAsked(raw) {
  *
  * Read apart from «not given», like the ring above and for the same reason: a
  * bench holding the null arm has to be able to SPELL the null, and a rule that
- * treated `0` as absent would hand that arm back the default.
+ * treated `0` as absent would hand that arm back the default. Ora che il
+ * default è ACCESO quella distinzione è l'unica cosa che tiene in piedi il
+ * braccio nullo: `campomemoria=0` deve arrivare fino in fondo come nought, e
+ * «non detto» deve arrivare come CAMPO_MEMORY_DEFAULT.
+ *
+ * IL PESO NON È SCRITTO QUI. Sta in ../voxel/campo-field.js, accanto alla porta
+ * da cui la memoria si accende, con la misura che lo motiva: una maniglia è il
+ * posto in cui un numero si LEGGE, non quello in cui si decide.
  */
 function memoriaAsked(raw) {
   if (raw === null) return null;
   const n = raw.split(',').map(Number);
   if (!(n[0] > 0)) return { weight: 0 };
   const weight = n.length > 1 && Number.isFinite(n[1]) && n[1] >= 0 && n[1] <= 1
-    ? n[1] : MEMORIA_DEFAULT;
+    ? n[1] : CAMPO_MEMORY_DEFAULT.weight;
   return { weight };
 }
-
-/**
- * QUANTO DEL PASSATO UN TEXEL TIENE quando l'indirizzo non lo dice.
- *
- * VENTUNO VENTESIMI, E IL NUMERO E' UNA MISURA E POI UN COMPROMESSO. Al tier
- * basso, sul respiro del corpo e nelle due finestre vicine della guardia, il
- * suolo senza memoria legge 6,14 e 5,89 livelli; con la memoria legge 5,96 e
- * 4,91 a 0,90, 5,00 e 4,05 a 0,98. Piu' peso, meno scintillio. Dall'altra parte
- * c'e' il tempo che l'accumulo ci mette a dimenticare dove il visitatore era:
- * dieci fotogrammi dopo un arresto, il suolo e' ancora a 1,4-2,3 livelli dalla
- * sua immagine assestata a 0,95, e a 0,98 sarebbe il doppio. 0,95 e' il mezzo
- * misurato fra i due, e NON e' una scelta tecnica fino in fondo: quanta
- * morbidezza vale quanta lentezza e' una cosa che si guarda, non che si calcola,
- * e la domanda e' nel verbale per il committente. `campomemoria=1,0.9` e
- * `campomemoria=1,0.98` aprono gli altri due bracci senza toccare una riga.
- */
-const MEMORIA_DEFAULT = 0.95;
 
 /**
  * La ri-marcia dei bordi come la chiede un indirizzo: `0`, `1` o `1,portata`.
@@ -386,13 +379,17 @@ const layer = {
       }
       layer.campoResFromAddress = wanted.campoRes !== null
         && Number.isFinite(wanted.campoRes);
-      // AND WHETHER THE GROUND KEEPS ITS OWN PREVIOUS FRAMES. Spenta se
-      // l'indirizzo non dice niente, e spenta è ciò che si spedisce: il
-      // committente decide dopo gli affiancati. Il peso viaggia fino ai
+      // AND WHETHER THE GROUND KEEPS ITS OWN PREVIOUS FRAMES. ACCESA se
+      // l'indirizzo non dice niente, e accesa è ciò che si spedisce: il
+      // committente l'ha scelta sugli affiancati (E-CAMPO6-B, 2026-09-19). Il
+      // default arriva da ../voxel/campo-field.js e non da questa riga, perché
+      // è là che la memoria è definita; qui c'è solo chi vince fra l'indirizzo
+      // e il default, e l'indirizzo vince sempre. Il peso viaggia fino ai
       // bersagli del fotogramma per riferimento, come uCampoSize viaggia in
       // senso contrario -- vedi setMemory in ../voxel/campo-field.js.
+      const memoria = wanted.campoMemoria ?? CAMPO_MEMORY_DEFAULT;
       layer.campo.setMemory(
-        wanted.campoMemoria ? wanted.campoMemoria.weight : 0, wanted.campoJitter,
+        memoria.weight, wanted.campoJitter || CAMPO_MEMORY_DEFAULT.jitter,
       );
       // E SE I BORDI DEL SUOLO DEVONO MARCIARE DA SÉ. Chiesta QUI, nello stesso
       // passo in cui il campo nasce e prima che l'arrivo scaldi qualunque cosa,
