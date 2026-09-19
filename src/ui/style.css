@@ -65,6 +65,18 @@ html, body {
   margin: 0;
   height: 100%;
   overflow: hidden;
+  /* The address bar of a telephone slides in and out and takes the viewport
+     with it, and `vh` is measured against the LARGEST it will ever be: with the
+     bar down, a hundred of them is taller than the screen and the bottom of the
+     interface — the compass, the command line, the prompt — is below the glass.
+     `dvh` is the viewport as it is at this moment, which is what these three
+     boxes have always meant. On a desk the two are the same number, so the
+     second line changes no pixel of any comparison this campaign has taken. */
+  height: 100dvh;
+  /* Nothing here scrolls, and a page that cannot scroll must not be allowed to
+     hand the gesture to the browser instead: without this a drag that turns the
+     head also drags the whole page down into a reload. */
+  overscroll-behavior: none;
   background: #0f1720;
   font-family: 'Farfield Sans', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   color: var(--ink);
@@ -74,7 +86,15 @@ html, body {
   display: block;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   cursor: pointer;
+  /* THE WORLD TAKES ITS OWN GESTURES. Every default the browser has for a
+     finger on a canvas — scroll, pan, double-tap to zoom, the four hundred
+     millisecond wait that goes with it — is a gesture taken away from the
+     walker, and the pointer events src/ui/touch.js listens for are the same
+     ones the browser would be stealing. It costs a desk nothing: there is
+     nothing to scroll and the pointer is captured. */
+  touch-action: none;
 }
 
 #ui {
@@ -83,6 +103,34 @@ html, body {
   pointer-events: none;
   font-family: inherit;
 }
+
+/* AND `touch-action: none` IS NOT WRITTEN HERE, WHICH IT WAS FOR AN HOUR.
+ *
+ * It looks like the obvious place for it and it is the wrong one, because the
+ * value is not simply inherited: a gesture is allowed only if EVERY element
+ * from the finger up to the box that would move it permits it. A `none` on this
+ * layer therefore reaches down and forbids panning inside every panel it
+ * contains — the menu, the room, the list of entries — and those are the only
+ * things on this page that are supposed to scroll at all. Measured: the menu
+ * on a telephone held sideways is taller than the screen, and with `none` here
+ * it could not be scrolled to the button that closes it.
+ *
+ * The world does not need it from here in any case: #stage is a SIBLING of this
+ * layer and carries its own, and a touch that lands on a part of the interface
+ * that takes no pointer events is delivered to the canvas underneath, where the
+ * canvas's own rule is the one that applies. */
+
+/* The buttons of the interface, on a screen where a button is a finger: no
+   double-tap zoom and none of the third of a second a browser waits to find out
+   whether a second tap is coming. Everything else these boxes could do to a
+   gesture, they keep. */
+.hud-command,
+.menu-item,
+.menu-hint,
+.room-close,
+.hud-interact.is-touch,
+.touch-back,
+.touch-turn-close { touch-action: manipulation; }
 
 /* Instant, and it has to stay instant: this is not something a walker ever
    sees. It is the switch every comparison against the reference throws before
@@ -730,4 +778,313 @@ html, body {
   }
 
   .reticle { transition: opacity 200ms ease; }
+}
+
+/* ------------------------------------------------- the commands on the glass
+ *
+ * Everything below is behind `body.is-touch`, which src/main.js writes once and
+ * only when the mode is on (see touchWanted() in src/ui/touch.js). A desk never
+ * matches any of it, which is the half of the promise a stylesheet has to keep:
+ * the other half is that nothing above this line was changed for the sake of a
+ * telephone.
+ *
+ * The three pictures — the stick, «Indietro» and the invitation to turn the
+ * telephone — are drawn in the family the world's own markers are drawn in: the
+ * outlined rhombus with a lit heart that hangs at the foot of every block, and
+ * the same hairline, the same teal and the same shadow as the rest of this
+ * interface.
+ */
+
+/* The keys are not on this screen, so the caps that name them are not on it
+   either. The words beside them are the offer and they stay. */
+body.is-touch .hud-command .keycap,
+body.is-touch .room-close .keycap { display: none; }
+
+/* The gesture where the keys stood: set in the caps' own size and weight, in
+   the mark's colour, so the block keeps the rhythm the reference drew. */
+.hud-hint-gesture,
+.menu-gesture {
+  font-size: 0.8125rem;
+  font-weight: 340;
+  letter-spacing: 0.02em;
+  color: var(--ui-mark);
+  text-shadow: var(--ui-shadow);
+}
+
+.hud-hint-gesture { white-space: nowrap; }
+
+/* THE EDGES OF THE TELEPHONE. A notch, a rounded corner and the bar at the
+   foot of the screen all eat into the frame, and every one of these four boxes
+   is measured from an edge. Added to the measure rather than replacing it, so
+   where the machine says nothing — which is every desk — the number is the
+   number the reference framing was read off. */
+body.is-touch .hud-welcome {
+  left: calc(2.5rem + env(safe-area-inset-left));
+  top: calc(2.578rem + env(safe-area-inset-top));
+}
+
+body.is-touch .hud-compass {
+  left: calc(1.59rem + env(safe-area-inset-left));
+  bottom: calc(1.94rem + env(safe-area-inset-bottom));
+}
+
+body.is-touch .hud-footer {
+  right: calc(2.625rem + env(safe-area-inset-right));
+  bottom: calc(2.5625rem + env(safe-area-inset-bottom));
+}
+
+body.is-touch .hud-interact {
+  bottom: calc(2.5625rem + env(safe-area-inset-bottom));
+}
+
+/* --------------------------------------------- the prompt, become the button
+ *
+ * With a mouse this is a notice and the keyboard is what acts. With fingers
+ * there is no E to press, so the notice IS the button (E-DECISIONI27). It keeps
+ * its place at the foot of the frame and its wording; what it gains is an
+ * outline, enough padding to be hit by a thumb, and the rhombus where the cap
+ * was. */
+.hud-interact.is-touch {
+  padding: 0.5rem 1rem;
+  min-height: 2.75rem;      /* 44px: the smallest thing a thumb reliably finds */
+  border: 1px solid var(--ui-line-strong);
+  border-radius: 1.5rem;
+  background: rgba(6, 13, 19, 0.55);
+  font: inherit;
+  color: inherit;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* It is only there to be pressed while it is being offered: an invisible button
+   at the foot of the frame would swallow taps meant for the world. */
+.hud-interact.is-touch:not(.is-on) { pointer-events: none; }
+
+.hud-interact-mark,
+.touch-mark {
+  width: 0.5rem;
+  height: 0.5rem;
+  background: var(--ui-mark);
+  transform: rotate(45deg);
+  box-shadow: 0 0 0 1px rgba(4, 11, 17, 0.4), 0 0 0.25rem rgba(158, 236, 249, 0.45);
+}
+
+/* ------------------------------------------------------------------ the stick
+ *
+ * It is not a control that sits on the screen waiting: it is drawn where the
+ * thumb lands and taken away when the thumb lifts (E-DECISIONI27), so the frame
+ * a walker looks at is the world and nothing else until they ask to move. The
+ * ring is the radius the arithmetic uses — TOUCH.radiusPx in src/ui/touch.js —
+ * so what the eye measures against is what the walk is measured against. */
+.touch-stick {
+  position: absolute;
+  width: 108px;             /* twice TOUCH.radiusPx, which is read in CSS pixels */
+  height: 108px;
+  margin: -54px 0 0 -54px;
+  border: 1px solid var(--ui-line);
+  border-radius: 50%;
+  background: rgba(6, 13, 19, 0.22);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 160ms var(--ui-ease), visibility 0s linear 160ms,
+    border-color 160ms var(--ui-ease);
+}
+
+.touch-stick.is-on {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 160ms var(--ui-ease), visibility 0s,
+    border-color 160ms var(--ui-ease);
+}
+
+/* The rim, which is the run. The ring itself says so — there is no second
+   control and nothing is written on the screen — and it says it the way the
+   reticle says a face is within reach: by coming up to full. */
+.touch-stick.is-running { border-color: var(--ui-mark); }
+
+.touch-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  background: var(--ui-mark);
+  /* The heart of the marker, and it is a rhombus like every other mark in this
+     world. The turn is written as `rotate` rather than folded into the
+     transform, because the transform is where the thumb's own offset goes and
+     it is rewritten on every move. */
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(4, 11, 17, 0.45), 0 0 0.5rem rgba(158, 236, 249, 0.5);
+  rotate: 45deg;
+}
+
+/* ----------------------------------------------------------------- «Indietro»
+ *
+ * The Esc of a hand with no keys, and it is up only while a stack is open. It
+ * stands opposite the command line, at the foot of the half of the screen the
+ * thumb that walks is already in, so it is reachable without changing grip. */
+.touch-back {
+  position: absolute;
+  left: calc(2.625rem + env(safe-area-inset-left));
+  bottom: calc(2.5625rem + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 0.5625rem;
+  padding: 0.5rem 1rem;
+  min-height: 2.75rem;
+  border: 1px solid var(--ui-line);
+  border-radius: 1.5rem;
+  background: rgba(6, 13, 19, 0.55);
+  font: inherit;
+  color: inherit;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity var(--ui-fade) var(--ui-ease), visibility 0s linear var(--ui-fade);
+}
+
+.touch-back.is-on {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: opacity var(--ui-fade) var(--ui-ease), visibility 0s;
+}
+
+.touch-back .touch-mark { transform: rotate(45deg) scale(0.9); }
+
+.touch-back-label {
+  font-size: 1rem;
+  font-weight: 300;
+  letter-spacing: 0.005em;
+  color: var(--ui-ink-soft);
+  text-shadow: var(--ui-shadow);
+}
+
+/* ------------------------------------------- the invitation to turn the phone
+ *
+ * The world works in both (E-DECISIONI27) and this says only that one of them
+ * is better. So it is a line of type and not a barrier: it never covers the
+ * middle of the frame, it goes by itself the moment the screen is wider than it
+ * is tall, and it can be sent away. */
+.touch-turn {
+  position: absolute;
+  left: 50%;
+  bottom: calc(7.5rem + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: min(22rem, 86vw);
+  padding: 0.55rem 0.6rem 0.55rem 1rem;
+  border: 1px solid var(--ui-line);
+  border-radius: 0.25rem;
+  background: rgba(6, 13, 19, 0.62);
+  transform: translateX(-50%);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--ui-fade-long) var(--ui-ease),
+    visibility 0s linear var(--ui-fade-long);
+}
+
+.touch-turn.is-on {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity var(--ui-fade-long) var(--ui-ease), visibility 0s;
+}
+
+.touch-turn-text {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 300;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  color: var(--ui-ink-soft);
+  text-shadow: var(--ui-shadow);
+}
+
+.touch-turn-close {
+  flex: 0 0 auto;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  font: inherit;
+  font-size: 1.25rem;
+  line-height: 1;
+  color: var(--ui-ink-soft);
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* --------------------------------------------------------- the menu, tappable
+ *
+ * The scrim of the panel takes pointer events, so the Menu button in the
+ * command line is behind it while it is up: on a telephone that would be a
+ * panel with no way out. The line that used to name two keys is the way out
+ * now — see src/ui/menu.js. */
+body.is-touch .menu-hint {
+  display: block;
+  width: 100%;
+  margin: 1.25rem 0 0;
+  padding: 0.6rem 1rem;
+  min-height: 2.75rem;
+  border: 1px solid var(--ui-line);
+  border-radius: 0.25rem;
+  background: rgba(6, 13, 19, 0.4);
+  font: inherit;
+  font-size: 0.875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ui-ink-soft);
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Every row of every panel has to be big enough for a thumb. */
+body.is-touch .menu-item,
+body.is-touch .hud-command,
+body.is-touch .room-close {
+  min-height: 2.75rem;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ------------------------------------- i pannelli che non ci stanno più
+ *
+ * WHAT WENT WRONG THE FIRST TIME THIS WAS MEASURED: the menu panel is centred
+ * in the frame and as tall as its own contents, and a telephone held sideways
+ * is four hundred and twelve pixels tall. The list of settings simply ran off
+ * both ends of the screen, and the button that closes it was somewhere below
+ * the glass. A walker who opened the menu could not close it.
+ *
+ * Two lines, and the second one is the one that is easy to forget: #ui above
+ * takes every gesture away from the browser (`touch-action: none`), so a box
+ * that scrolls inside it does NOT scroll — the finger that would have panned it
+ * is being handed to the world instead. `pan-y` gives the up and down back to
+ * the panel and keeps everything else. The room already scrolls its own body
+ * and its own detail, and needs the same permission for the same reason.
+ */
+body.is-touch .menu-panel {
+  max-height: calc(100dvh - 1.5rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+body.is-touch .room-body,
+body.is-touch .room-detail,
+body.is-touch .room-tabs {
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+/* A walker who has asked their machine for less motion keeps every one of
+   these and loses the movement they arrive by. */
+@media (prefers-reduced-motion: reduce) {
+  .touch-stick,
+  .touch-back,
+  .touch-turn { transition: opacity 120ms linear, visibility 0s; }
 }

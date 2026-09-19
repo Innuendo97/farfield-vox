@@ -2,7 +2,14 @@
 <html lang="it">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- `viewport-fit=cover` is what puts the world under the notch and the
+         rounded corners instead of inside a letterbox, and it is also what makes
+         env(safe-area-inset-*) answer with anything but nought: the interface
+         keeps its margins off the real edges of the glass (see body.is-touch in
+         src/ui/style.css). No `user-scalable=no`: pinching is a thing a reader
+         of the text edition may well need, and what the world has to take back
+         from the browser it takes with `touch-action` on the canvas alone. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="description" content="Portfolio esplorabile di Daniele Galasso, Software Engineer full stack: carriera, progetti, competenze e contatti da attraversare a piedi. Tutti i contenuti sono leggibili anche in edizione testuale." />
     <meta name="author" content="Daniele Galasso" />
     <meta name="robots" content="index, follow" />
