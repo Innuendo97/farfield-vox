@@ -177,6 +177,17 @@ export function clearedToNothing(text) {
 }
 
 /** What each tier asks the ground's pixel to be, as a fraction of a side. */
+/** What fraction of a side each tier draws the FRAME at. */
+export function scalesOf(text) {
+  const open = text.indexOf('export const TIERS =');
+  if (open < 0) return {};
+  const body = bracketBody(text, open);
+  const found = {};
+  const entry = /id:\s*'([a-z]+)'[\s\S]*?\n\s*scale:\s*([\d.]+),/g;
+  for (let m = entry.exec(body); m; m = entry.exec(body)) found[m[1]] = Number(m[2]);
+  return found;
+}
+
 export function campoScalesOf(text) {
   const open = text.indexOf('export const TIERS =');
   if (open < 0) return [];
@@ -196,6 +207,46 @@ export const groundCarriesCoverage = (campo) => Boolean(campo)
 /** Bytes of colour per pixel OF THE FRAME that a buffer of this shape costs. */
 export const bytesPerFramePixel = (bytes, scale, samples) => bytes * scale * scale
   * Math.max(1, samples);
+
+// ---------------------------------------------- AND WHAT A TIER ACTUALLY COSTS
+//
+// THE ONE NUMBER THIS FILE EXISTS FOR, and until now it was never written down:
+// how many bytes of buffer a tier asks the machine for. It is the two targets
+// together, over the pixels the tier actually draws --
+//
+//     scene:   W*H * scale^2 * bytes * max(1, samples)
+//     ground:  W*H * scale^2 * 8 * campoScale^2
+//
+// -- and the law is that it never goes UP as the table goes down. A tier below
+// another that asked for more memory would not be a cheaper tier; it would be a
+// different one, and the walker who chose it to keep the frame would be handed
+// a machine that swaps instead. On the reference window it reads:
+//
+//     oltre   12.8 + 7.2 = 20.0 MB
+//     alto    12.8 + 7.2 = 20.0
+//     medio    9.2 + 3.9 = 13.1
+//     basso     7.2 + 4.0 = 11.2
+//     minimo    1.9 + 3.8 =  5.7
+//
+// It is a receipt and a gate at once: the last row is the half of `basso` that
+// E-LINUX1 asked for, and it is that half even though the ground's own buffer
+// is the dearer of the two there (see the note above).
+const REFERENCE_WINDOW = 1892 * 845;
+
+/** Bytes of buffer a tier asks for, over the reference window. */
+export function tierBytes(tier, want, shape) {
+  const pixels = REFERENCE_WINDOW * (tier.scale || 1) ** 2;
+  return {
+    scene: pixels * shape.bytes * Math.max(1, want.samples),
+    earth: pixels * 8 * (tier.campoScale || 1) ** 2,
+  };
+}
+
+/** Whether the ladder never asks for more memory as it goes down. */
+export const memoryNeverRises = (rows) => rows.every(
+  (r, i) => i === 0 || r.total <= rows[i - 1].total + 1,
+);
+
 
 // AND THE LAW GAINED AN EXCEPTION WITH A NAME ON IT (E-DECISIONI30, E-LINUX1).
 // It is «two samples on every tier EXCEPT `minimo`, which draws with none», and
@@ -510,6 +561,22 @@ if (process.argv.includes('--self')) {
         && formats.length > 0 && tiersOf(qualityText).length > 0,
     },
     {
+      what: 'the ladder of memory as it ships, which must NOT be called a defect',
+      caught: memoryNeverRises([
+        { total: 20e6 }, { total: 20e6 }, { total: 13.1e6 }, { total: 11.2e6 }, { total: 5.7e6 },
+      ]),
+    },
+    {
+      what: 'a tier that asks the machine for MORE memory than the tier above it',
+      caught: !memoryNeverRises([
+        { total: 20e6 }, { total: 11.2e6 }, { total: 13.1e6 },
+      ]),
+    },
+    {
+      what: 'and the lowest tier quietly given back its multisampling, which doubles its scene buffer',
+      caught: !memoryNeverRises([{ total: 11.2e6 }, { total: 11.2e6 + 2e6 }]),
+    },
+    {
       what: "RGBA8 is caught losing the sun's disc",
       caught: carries('RGBA8', ladder, TOLERANCE).some((r) => !r.ok),
     },
@@ -674,6 +741,7 @@ for (const tier of tiers) {
 // marcher in the fragment and a coverage mask knows nothing about it.
 const campo = campoBufferOf(postText);
 const campoScales = campoScalesOf(read(QUALITY));
+const SCALES = scalesOf(read(QUALITY));
 report.check(Boolean(campo), `${POST} states a buffer for the ground`);
 if (campo) {
   report.check(groundCarriesCoverage(campo),
@@ -691,15 +759,61 @@ if (campo) {
 report.check(campoScales.length === tiers.length,
   'every tier states what pixel the ground is marched at',
   campoScales.map((t) => `${t.id} ${t.campoScale}`).join(', '));
+
+// THE LADDER OF MEMORY, which is what the leg inside the loop below was really
+// defending. See the note over tierBytes.
+const memoryLadder = campoScales.map((row) => {
+  const tier = tiers.find((t) => t.id === row.id) || {};
+  const want = WRITTEN[row.id];
+  const shape = formats.find((f) => f.name === (want || {}).sceneFormat);
+  if (!want || !shape) return null;
+  const bytes = tierBytes({ scale: SCALES[row.id], campoScale: row.campoScale }, want, shape);
+  return { id: row.id, ...bytes, total: bytes.scene + bytes.earth };
+}).filter(Boolean);
+report.check(memoryLadder.length === tiers.length,
+  'and every tier is priced in bytes of buffer over the reference window',
+  memoryLadder.map((r) => `${r.id} ${(r.total / 1e6).toFixed(1)} MB`).join(', '));
+report.check(memoryNeverRises(memoryLadder),
+  'and the ladder never asks the machine for MORE memory as it goes down',
+  memoryLadder.map((r) => `${(r.total / 1e6).toFixed(1)}`).join(' > '));
 for (const tier of campoScales) {
   const want = WRITTEN[tier.id];
   const shape = formats.find((f) => f.name === (want || {}).sceneFormat);
   if (!shape) continue;
   const scene = bytesPerFramePixel(shape.bytes, 1, want.samples);
   const earth = bytesPerFramePixel(8, tier.campoScale, 0);
-  report.check(earth < scene,
-    `and at the tier ${tier.id} it costs less of the frame than the scene's own pixel does`,
-    `${earth.toFixed(1)} bytes per frame pixel against ${scene.toFixed(1)}`);
+  // ----------------------------------------------------------------------
+  // AND THIS LEG WAS FITTED TO A WORLD WHERE EVERY TIER RESOLVED SAMPLES.
+  //
+  // The sentence four paragraphs up -- «the fourth channel is not a cost here,
+  // it is change from the pixels that were given back» -- is arithmetic about a
+  // MULTISAMPLED scene buffer: four bytes of packed float times two samples is
+  // eight, and eight bytes of half float over a HALF of a side is two. Take the
+  // samples away and the left hand side halves while the right hand side does
+  // not move, and the comparison flips at a ground fraction of 0.707.
+  //
+  // Two decisions of the committente meet on the tier `minimo` and do exactly
+  // that: E-DECISIONI30 gives it nought samples, and E-DECISIONI31 keeps its
+  // ground under the world's own texel ceiling, which at 0.55 of a side means a
+  // fraction of 0.99. So there the ground's buffer IS the dearer of the two --
+  // 7.8 bytes per frame pixel against 4.0 -- and saying so is the whole of what
+  // this leg can honestly do about it.
+  //
+  // IT IS NOT A CEILING QUIETLY RAISED. What the file actually defends is video
+  // memory on a machine where video memory is the system's own, and that is
+  // defended below, per tier and against the tier above it: the tier `minimo`
+  // spends 5.7 MB of buffer where `basso` spends 11.2, which is the half it was
+  // built to save. The leg here keeps biting wherever it was fitted to bite.
+  if (want.samples > 0) {
+    report.check(earth < scene,
+      `and at the tier ${tier.id} it costs less of the frame than the scene's own pixel does`,
+      `${earth.toFixed(1)} bytes per frame pixel against ${scene.toFixed(1)}`);
+  } else {
+    report.note(`the tier ${tier.id} resolves no samples (E-DECISIONI30), so the scene's own pixel `
+      + `costs ${scene.toFixed(1)} bytes of the frame and the ground's ${earth.toFixed(1)}: there `
+      + 'the ground is the dearer of the two, and this leg is declared instead of passed. What it '
+      + 'was defending is held by the ladder below');
+  }
   const verdict = marchIsSubProportional(tier.campoScale);
   if (verdict === null) {
     report.note(`the tier ${tier.id} marches at ${tier.campoScale} of a side and AT_TODAY has no `
