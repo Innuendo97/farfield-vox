@@ -55,8 +55,15 @@ const report = reporter('guard-rimarcia -- il bordo se lo marcia da se\', e solo
 // IL MODELLO: un suolo di 256 pixel, due superfici, un bersaglio ridotto.
 // ---------------------------------------------------------------------------
 const PIXELS = 256;
-// Quanti pixel sta un texel del bersaglio ridotto. 8/3 e' 1892/710, cioe'
-// esattamente il tier basso: scala del fotogramma 0,75 per campoScale 0,5.
+// Quanti pixel sta un texel del bersaglio ridotto. 8/3 e' 1892/710, che era
+// esattamente il tier basso FINO AL 2026-09-18: scala del fotogramma 0,75 per
+// campoScale 0,5. Da E-CAMPO6-B quel tier marcia a tre quarti di lato e un suo
+// texel copre 1,78 pixel, non 2,66 -- e il modello resta qui a 2,66 APPOSTA,
+// perche' la ri-marcia non si spedisce e cio' che questa guardia deve saper
+// dire e' che il rimedio funziona DOVE il reticolo si vede. Un modello tarato
+// sul mondo che il committente ha appena comprato misurerebbe il rimedio nel
+// punto in cui non serve piu' a nessuno. Il numero del tier basso di oggi e'
+// scritto qui accanto perche' chi riapre la questione non debba dedurlo.
 const SPAN = 8 / 3;
 const TEXELS = Math.ceil(PIXELS / SPAN) + 2;
 const NEAR_COLOUR = 210;

@@ -26,10 +26,22 @@ import { read, reporter, selfTest } from './lib.mjs';
 //   2. LO SFARFALLIO. Lo scarto sub-texel SENZA la somma non e' mezzo rimedio:
 //      e' lo stesso scintillio spostato di posto, un fotogramma alla volta,
 //      ed e' MISURABILMENTE peggio del niente.
-//   3. IL BYTE. A maniglia spenta il fotogramma dev'essere quello di oggi. Non
-//      «quasi»: la stessa immagine. Un nought sommato a uno scarto e' lo stesso
-//      float, un passo che non viene disegnato non sposta niente, e questa
-//      guardia lo pretende sia sul modello sia sul sorgente.
+//   3. IL BYTE DEL BRACCIO NULLO. Dal 2026-09-19 la memoria e' ACCESA in cio'
+//      che si spedisce (E-CAMPO6-B), quindi «a maniglia spenta il fotogramma e'
+//      quello di oggi» non e' piu' la legge e questa gamba dice quella nuova:
+//      `campomemoria=0` dev'essere il fotogramma SENZA memoria, e non
+//      «quasi» -- la stessa immagine, fino al float. E' il braccio nullo su cui
+//      ogni misura di questa campagna si appoggia, e il giorno che si sposta
+//      non si sposta una preferenza: si sposta il metro. Un nought sommato a
+//      uno scarto e' lo stesso float, un passo che non viene disegnato non
+//      sposta niente, e questa guardia lo pretende sia sul modello sia sul
+//      sorgente.
+//   4. E IL DEFAULT DICHIARATO. Una memoria accesa e' una cosa che si spedisce,
+//      quindi il peso dev'essere UNA COSTANTE CON UN NOME nel posto in cui la
+//      memoria e' definita -- non un letterale dentro la maniglia -- e
+//      l'oggetto che il FOTOGRAMMA legge deve continuare a nascere spento: la
+//      memoria si accende perche' il mondo, costruendosi, la chiede, mai da
+//      sola dalla parte del disegno.
 //
 // ===========================================================================
 // COME MISURA. Il modello qui sotto e' il passo di memoria in una dimensione:
@@ -286,11 +298,27 @@ report.check(drift(gated.last, AT_EDGE) < drift(gated.last, AWAY) * 3,
 const post = read('src/core/post.js');
 const suolo = read('src/world/layers/v1-suolo.js');
 const marcher = read('src/world/voxel/campo-material.js');
+const campo = read('src/world/voxel/campo-field.js');
 
+// LA LEGGE NUOVA IN QUATTRO RIGHE (E-CAMPO6-B, 2026-09-19). Il default e'
+// ACCESO, e proprio per questo le tre righe che lo reggono contano piu' di
+// prima: il peso ha un nome e sta dove la memoria e' definita, il fotogramma
+// continua a nascere spento, e il nought dell'indirizzo arriva fino in fondo.
 report.check(/const CAMPO_MEMORY = \{ weight: 0, jitter: false \}/.test(post),
-  'la memoria nasce SPENTA nel posto in cui il fotogramma la legge');
-report.check(/wanted\.campoMemoria \? wanted\.campoMemoria\.weight : 0,/.test(suolo),
-  'e l\'indirizzo che non dice niente la lascia spenta');
+  'la memoria nasce SPENTA nel posto in cui il fotogramma la legge: si accende '
+  + 'perche\' il mondo la chiede, mai da sola');
+report.check(/export const CAMPO_MEMORY_DEFAULT = \{ weight: 0\.95, jitter: false \};/.test(campo),
+  'e cio\' che si spedisce e\' una costante COL SUO NOME dove la memoria e\' '
+  + 'definita, non un letterale dentro una maniglia',
+  'CAMPO_MEMORY_DEFAULT = { weight: 0.95, jitter: false } in campo-field.js');
+report.check(/const memoria = wanted\.campoMemoria \?\? CAMPO_MEMORY_DEFAULT;/.test(suolo)
+  && /layer\.campo\.setMemory\(\s*memoria\.weight,/.test(suolo),
+  'e l\'indirizzo che non dice niente si prende QUELLA costante, non un numero '
+  + 'scritto una seconda volta');
+report.check(/function memoriaAsked\(raw\) \{\s*if \(raw === null\) return null;[\s\S]{0,200}?if \(!\(n\[0\] > 0\)\) return \{ weight: 0 \};/.test(suolo),
+  'e `campomemoria=0` resta nought fino in fondo: il braccio nullo del banco si '
+  + 'puo\' ancora SCRIVERE',
+  'e «non detto» resta distinto da «detto nought», che e\' cio\' che lo rende possibile');
 report.check(/CAMPO_JITTER\.value\.set\(0, 0\);/.test(post)
   && post.match(/CAMPO_JITTER\.value\.set\(0, 0\);/g).length >= 2,
   'lo scarto torna a nought su OGNI strada che non sta accumulando',
@@ -312,8 +340,16 @@ if (process.argv.includes('--self')) {
   // I DIFETTI VERI, iniettati nel modello e nel sorgente letto, uno per volta.
   const shutSource = post.replace('const CAMPO_MEMORY = { weight: 0, jitter: false }',
     'const CAMPO_MEMORY = { weight: 0.9, jitter: true }');
-  const loudHandle = suolo.replace('wanted.campoMemoria ? wanted.campoMemoria.weight : 0,',
-    'wanted.campoMemoria ? wanted.campoMemoria.weight : 0.9,');
+  // LA MANIGLIA CHE SI SCRIVE IL DEFAULT IN CASA: il numero torna a essere un
+  // letterale in un posto in cui nessuno lo va a cercare, e il giorno che il
+  // committente lo cambia ne restano due.
+  const ownPeso = suolo.replace('const memoria = wanted.campoMemoria ?? CAMPO_MEMORY_DEFAULT;',
+    'const memoria = wanted.campoMemoria ?? { weight: 0.95 };');
+  // E IL NOUGHT CHE NON SI PUO' PIU' SCRIVERE: `campomemoria=0` si prende il
+  // default, e il braccio nullo di ogni misura sparisce senza che nulla
+  // diventi rosso.
+  const deafZero = suolo.replace('if (!(n[0] > 0)) return { weight: 0 };',
+    'if (!(n[0] > 0)) return null;');
   const leakyJitter = post.replace(/CAMPO_JITTER\.value\.set\(0, 0\);/g, 'void 0;');
   selfTest('guard-memoria', [
     {
@@ -333,8 +369,12 @@ if (process.argv.includes('--self')) {
       caught: !/const CAMPO_MEMORY = \{ weight: 0, jitter: false \}/.test(shutSource),
     },
     {
-      what: 'un indirizzo muto che accende la memoria lo stesso',
-      caught: !/wanted\.campoMemoria \? wanted\.campoMemoria\.weight : 0,/.test(loudHandle),
+      what: 'una maniglia che si riscrive in casa il peso che si spedisce',
+      caught: !/const memoria = wanted\.campoMemoria \?\? CAMPO_MEMORY_DEFAULT;/.test(ownPeso),
+    },
+    {
+      what: 'un `campomemoria=0` che si becca il default, cioe un braccio nullo che sparisce',
+      caught: !/if \(!\(n\[0\] > 0\)\) return \{ weight: 0 \};/.test(deafZero),
     },
     {
       what: 'uno scarto lasciato sul raggio mentre nulla lo somma, che sposta il byte',
@@ -343,7 +383,7 @@ if (process.argv.includes('--self')) {
     {
       // Il nullo tolto di mezzo: il passo fonde lo stesso, a peso nought, e
       // quello che esce non e' piu' il fotogramma marciato. E' il difetto che
-      // «a maniglia spenta il byte e' quello di oggi» proibisce.
+      // «`campomemoria=0` e' il fotogramma senza memoria» proibisce.
       what: 'un passo che fonde lo stesso a peso nought, e sposta il byte',
       caught: !nullExact(
         remember(rawOnly, march(0, 0), 3, 2, { weight: 0, floorWeight: 0.05 }), rawOnly,

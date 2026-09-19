@@ -455,10 +455,27 @@ report.check(Math.abs(onScreen - 2 * Math.tan((eye.fov * Math.PI / 180) / 2) / S
   'chiesto al VALORE che il disegno scrive, e non alla riga che lo scrive');
 
 // ======================================================================= I TIER
+//
+// E IL PAVIMENTO DELLA FRAZIONE DI LATO, CHE DAL 2026-09-19 E' TRE QUARTI SU
+// OGNI TIER (E-CAMPO6-B). Non e' un gusto: sotto i tre quarti il RETICOLO DEL
+// TEXEL traspare, ed e' misurato. Al tier basso a mezzo lato la terra e' decisa
+// una volta ogni 2,66 pixel e i salti di livello che un occhio chiama bordo
+// cadono sui confini dei texel 1,104 volte piu' spesso di quanto ci cadrebbero
+// a caso (U-CAMPO-6 §4.2); a tre quarti quello stesso numero e' 1,005, cioe'
+// nessun reticolo. Il committente ha comprato la differenza a +3,3 ms al tier
+// basso, quindi un tier che tornasse sotto la renderebbe un acquisto perso.
+//
+// IL TETTO NON E' SCRITTO QUI, e la ragione e' che non c'e': una frazione piu'
+// ALTA e' piu' pixel e meno reticolo, e chi la alza paga un prezzo che la
+// scheda del costo rende visibile da sola.
+const CAMPO_SCALE_FLOOR = 0.75;
 for (const tier of TIERS) {
   report.check(typeof tier.campoScale === 'number' && tier.campoScale > 0
     && tier.campoScale <= 1,
     `il tier ${tier.id} dichiara il pixel della terra`, `campoScale ${tier.campoScale}`);
+  report.check(tier.campoScale >= CAMPO_SCALE_FLOOR,
+    `e il tier ${tier.id} non scende sotto i tre quarti di lato, dove il reticolo del texel traspare`,
+    `campoScale ${tier.campoScale} contro il pavimento ${CAMPO_SCALE_FLOOR}`);
 }
 report.check(/renderer\.setCampoScale\(hub\.setCampoScale\(tier\.campoScale \?\? 1\)\);/.test(QUALITY),
   'e il governatore muove le due meta della leva con UN numero',
@@ -473,8 +490,12 @@ report.check(/renderer\.setCampoScale\(hub\.setCampoScale\(tier\.campoScale \?\?
 //
 // I numeri di prima erano 26,51 -> 8,08 + 1,72 = 37%, presi a MEZZO lato su una
 // macchina CARICA (sette server altrui e due dozzine di Chrome). Erano giusti
-// per quello che erano e sbagliati come ricevuta del mondo: il mondo a mezzo
-// lato lo disegna solo il tier basso.
+// per quello che erano e sbagliati come ricevuta del mondo: allora il mezzo
+// lato lo disegnavano i due tier bassi, e oggi (E-CAMPO6-B, 2026-09-19) non lo
+// disegna piu' nessuno -- la frazione e' tre quarti su tutti e quattro i tier,
+// che e' esattamente la scala a cui questa scheda e' stata presa. La riga qui
+// sotto e' quindi la ricevuta del mondo che si spedisce e non piu' quella di un
+// solo tier.
 const AT_TODAY = { scala: 0.75, prima: 21.902, dopo: 9.480, ricomposizione: 1.114 };
 const quota = (AT_TODAY.dopo + AT_TODAY.ricomposizione) / AT_TODAY.prima;
 // IL TETTO E' UNA LEGGE DELLA SCALA E NON UN NUMERO, la stessa che tiene
@@ -543,6 +564,14 @@ if (process.argv.includes('--self')) {
     })() });
   casi.push({ what: 'un tier che non dichiara il pixel della terra',
     caught: [{ id: 'x' }].some((t) => typeof t.campoScale !== 'number') });
+  // E IL RITORNO AL MEZZO LATO, che e' il difetto che il pavimento esiste per
+  // prendere: un tier tornato a 0,5 disegna un mondo per cui il committente ha
+  // gia' pagato la differenza, e nulla nel codice glielo impedirebbe.
+  casi.push({ what: 'un tier che torna a mezzo lato, cioe che ridisapre il reticolo del texel',
+    caught: [...TIERS, { id: 'x', campoScale: 0.5 }]
+      .some((t) => t.campoScale < CAMPO_SCALE_FLOOR) });
+  casi.push({ what: 'e i tier veri, che NON devono essere chiamati difetto',
+    caught: !TIERS.some((t) => t.campoScale < CAMPO_SCALE_FLOOR) });
 
   // =====================================================================
   // I LETTORI, NEI TRE VERSI CHE CONTANO.

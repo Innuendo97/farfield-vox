@@ -211,6 +211,13 @@ export const bytesPerFramePixel = (bytes, scale, samples) => bytes * scale * sca
 //   three quarters (high tier)   21.902 -> 9.480 ms    43.3 % of 56.3 % of the pixels
 //   a half         (low tier)    11.115 -> 2.310 ms    20.8 % of 25.0 % of the pixels
 //
+// THE SECOND ROW IS A RECEIPT AND NO LONGER A TIER. Since E-CAMPO6-B
+// (2026-09-19) every tier marches at three quarters of a side, so nothing here
+// ships at a half any more; the row stays because the law this file states is
+// about a FRACTION and not about a tier, and two points on that law read better
+// than one. What the loop below asks of each tier is looked up by its own
+// fraction, so the day a tier moves the reading moves with it.
+//
 // AND IT IS SUB PROPORTIONAL, which is the finding and not a rounding: a
 // quarter of the pixels buys a fifth of the march, three quarters of a side
 // buys under eight tenths of it. The reason is in the field's own prefilter --
