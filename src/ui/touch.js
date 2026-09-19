@@ -35,10 +35,19 @@ export const TOUCH = {
    * How far from where the thumb landed counts as a full push, in CSS pixels.
    *
    * It is the radius the ring is drawn at as well, so what the eye sees is what
-   * the arithmetic uses. Fifty four pixels is about nine millimetres on a
-   * telephone: a thumb rolls that far without the hand moving.
+   * the arithmetic uses — guard-tocco reads the stylesheet and asserts that the
+   * ring is twice this, so the two cannot drift apart.
+   *
+   * FORTY, AND IT WAS FIFTY FOUR. Fifty four is about nine millimetres, which is
+   * how far a thumb rolls without the hand moving, and on the plate it came out
+   * as a ring covering a third of the height of a telephone held sideways: too
+   * much of the world under a control that is only there while it is being
+   * held. The committente ruled forty (E-DECISIONI29). What it costs is travel
+   * — the same pace now lives in fourteen fewer pixels, so the hand is finer —
+   * and what it buys is a ring that sits inside the pad of a thumb instead of
+   * around it.
    */
-  radiusPx: 54,
+  radiusPx: 40,
   /**
    * The dead zone, as a fraction of that radius.
    *
@@ -74,17 +83,29 @@ export const TOUCH = {
  * Whether this page is walked with fingers.
  *
  * The address wins, both ways: `?tocco=1` puts a desk into the mode so that it
- * can be photographed and measured, `?tocco=0` takes a telephone out of it. With
- * the address silent it is the machine's own answer — a coarse pointer, or a
- * screen that reports touch points at all (E-DECISIONI27).
+ * can be photographed and measured, `?tocco=0` takes a telephone out of it.
+ *
+ * WITH THE ADDRESS SILENT IT IS THE PRIMARY POINTER, AND NOTHING ELSE.
+ * `(pointer: coarse)` asks what the machine's MAIN pointing device is, and
+ * answers "a finger" only where a finger is how this page is meant to be used.
+ *
+ * It used to ask a second question as well — whether the machine reports touch
+ * points at all — and that question has a different subject: a laptop with a
+ * touch screen answers yes to it while having a mouse, a keyboard and a
+ * trackpad. Such a machine would have been given the commands on the glass AND
+ * would have stopped being offered the pointer lock, so its mouse would no
+ * longer have turned the head: a walker losing the controls they were already
+ * holding, for the sake of a screen they may never touch. The committente ruled
+ * the primary pointer alone (E-DECISIONI29, B). The cost is stated rather than
+ * hidden: a device that reports touch and calls its own pointer fine — some
+ * tablets with a pen — stays on the desk's controls until it says `?tocco=1`.
  */
 export function touchWanted(search = window.location.search) {
   const asked = new URLSearchParams(search).get('tocco');
   if (asked === '1') return true;
   if (asked === '0') return false;
   const media = typeof window.matchMedia === 'function' ? window.matchMedia : null;
-  if (media && media('(pointer: coarse)').matches) return true;
-  return 'ontouchstart' in window || (navigator.maxTouchPoints || 0) > 0;
+  return Boolean(media && media('(pointer: coarse)').matches);
 }
 
 /**
