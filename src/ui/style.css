@@ -823,9 +823,24 @@ body.is-touch .hud-welcome {
   top: calc(2.578rem + env(safe-area-inset-top));
 }
 
+/* AND THE DIAL GETS OUT OF THE THUMB'S CORNER (E-DECISIONI29).
+ *
+ * The stick is born where the thumb lands, and a thumb that walks lands at the
+ * bottom left — which is exactly where the reference framing puts the compass.
+ * On the first landscape plate the two were drawn over each other. The dial
+ * moves to the top right, where nothing else of this interface stands: the
+ * greeting is top left and the command line bottom right.
+ *
+ * ONLY HERE. The desk keeps the dial exactly where the reference drew it, which
+ * is what the byte comparison of this branch stands on — see §5 of the verbale:
+ * the two near bands read 0,0000 with peak 0. `left: auto` and `bottom: auto`
+ * are what release the two the rule above sets; without them a box would be
+ * pinned to all four edges and would stretch. */
 body.is-touch .hud-compass {
-  left: calc(1.59rem + env(safe-area-inset-left));
-  bottom: calc(1.94rem + env(safe-area-inset-bottom));
+  left: auto;
+  bottom: auto;
+  right: calc(1.59rem + env(safe-area-inset-right));
+  top: calc(1.94rem + env(safe-area-inset-top));
 }
 
 body.is-touch .hud-footer {
@@ -878,9 +893,15 @@ body.is-touch .hud-interact {
  * so what the eye measures against is what the walk is measured against. */
 .touch-stick {
   position: absolute;
-  width: 108px;             /* twice TOUCH.radiusPx, which is read in CSS pixels */
-  height: 108px;
-  margin: -54px 0 0 -54px;
+  /* TWICE TOUCH.radiusPx, in the CSS pixels that constant is read in, and
+     guard-tocco asserts the equality: the ring the eye measures a push against
+     has to be the ring the walk measures it against, and two numbers in two
+     files are two numbers that will disagree the first time one of them moves.
+     It moved once already — 108 to 80, E-DECISIONI29 — which is why the guard
+     now holds it. */
+  width: 80px;
+  height: 80px;
+  margin: -40px 0 0 -40px;
   border: 1px solid var(--ui-line);
   border-radius: 50%;
   background: rgba(6, 13, 19, 0.22);
@@ -907,8 +928,10 @@ body.is-touch .hud-interact {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 22px;
-  height: 22px;
+  /* Kept at the same share of the ring it had at fifty four: a heart that did
+     not shrink with its ring would fill it. */
+  width: 17px;
+  height: 17px;
   background: var(--ui-mark);
   /* The heart of the marker, and it is a rhombus like every other mark in this
      world. The turn is written as `rotate` rather than folded into the
