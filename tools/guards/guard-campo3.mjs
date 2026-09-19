@@ -494,15 +494,65 @@ report.check(Math.abs(onScreen - 2 * Math.tan((eye.fov * Math.PI / 180) / 2) / S
 // numero di qualche centesimo e sono di chi possiede il ring.
 const TEXEL_PX_CEILING = 1.85;
 const texelPx = (tier) => 1 / ((tier.scale || 1) * (tier.campoScale || 1));
+
+// ------------------------------------------------------------------------
+// E UN TIER SOLO STA SOPRA QUEL TETTO, CON UN TETTO SUO (U-PERF-7, E-LINUX1,
+// E-DECISIONI30).
+//
+// Il tier `minimo` esiste per una macchina che legge 29,8 ms di GPU dove la
+// macchina di riferimento ne legge 14,1, e il committente gli ha dato in
+// proprio il permesso di togliere cose dal quadro. Questa e' la cosa che ha
+// tolto, ed e' l'unica che avesse un millisecondo da dare -- misurato, posa
+// peggiore, due giri alternati (per-il-committente/lav/
+// 2026-09-19-perf-7-griglia.mjs):
+//
+//     px/texel 4,00   mediana  8,92 ms    <- quel che questo tier spedisce
+//     px/texel 2,04   mediana 10,07 ms
+//     px/texel 1,86   mediana 10,02 ms    <- tetto tenuto
+//     px/texel 1,85   mediana 10,28 ms    <- tetto tenuto
+//
+// A PIXEL DEL TEXEL FISSO la terra e' marciata sempre sullo stesso numero di
+// texel qualunque sia la scala del fotogramma, quindi sotto 1,85 la marcia
+// costa 6,4 ms dei 9,5 del cancello e non si muove: le tre righe col tetto
+// tenuto leggono la stessa mediana mentre il fotogramma passa da 1135 a 946
+// pixel di lato. Nuvole, erba, disco e bloom insieme non fanno mezzo
+// millisecondo. Le due decisioni del committente -- il reticolo chiuso e i 30
+// fotogrammi al secondo sull'HD 620 -- non valgono insieme su questo tier.
+//
+// E ALLORA PERCHE' UNA RIGA E NON UN BUCO. Un'eccezione scritta come un buco e'
+// il permesso che la sessione dopo estende al tier basso. Questa e' un NUMERO:
+// il minimo puo' stare a 4,00 e non a 4,01, e nessun altro tier puo' stare
+// sopra 1,85. Se il committente risponde «tieni il reticolo», questa riga
+// diventa 1,85 come le altre e la tabella sopra dice che cosa costa.
+const TEXEL_PX_BY_TIER = { minimo: 4.0 };
+const ceilingFor = (id) => TEXEL_PX_BY_TIER[id] ?? TEXEL_PX_CEILING;
+
+/** Se ogni tier sta sotto il proprio tetto. */
+export const texelUnderCeiling = (tiers) => tiers.every(
+  (t) => texelPx(t) <= ceilingFor(t.id) + 1e-9,
+);
+
 for (const tier of TIERS) {
   report.check(typeof tier.campoScale === 'number' && tier.campoScale > 0
     && tier.campoScale <= 1,
     `il tier ${tier.id} dichiara il pixel della terra`, `campoScale ${tier.campoScale}`);
-  report.check(texelPx(tier) <= TEXEL_PX_CEILING,
-    `e un texel del suolo al tier ${tier.id} non copre piu' di ${TEXEL_PX_CEILING} pixel del fotogramma, `
+  const ceiling = ceilingFor(tier.id);
+  report.check(texelPx(tier) <= ceiling + 1e-9,
+    `e un texel del suolo al tier ${tier.id} non copre piu' di ${ceiling} pixel della finestra, `
     + 'che e dove il reticolo del texel torna a trasparire',
     `${texelPx(tier).toFixed(2)} px = 1 / (${tier.scale} di fotogramma x ${tier.campoScale} di terra)`);
 }
+// E IL PERMESSO NON SI ESTENDE: una riga sola in quella tabella, e quella riga
+// e' del tier che il committente ha nominato.
+report.check(Object.keys(TEXEL_PX_BY_TIER).length === 1
+  && TEXEL_PX_BY_TIER.minimo !== undefined,
+  'e un tier solo ha un tetto suo, che e quello per cui il committente lo ha dato',
+  Object.keys(TEXEL_PX_BY_TIER).join(', ') || 'nessuno');
+report.note('il tier minimo marcia la terra a 4,00 pixel della finestra per texel contro il tetto '
+  + 'di 1,85 del mondo, per E-DECISIONI30. Tenendo il tetto la posa peggiore legge 10,28 ms '
+  + 'contro gli 8,92 di oggi e il cancello dei 9,5 di U-PERF-7 non e raggiungibile da nessuna '
+  + 'parte: e una domanda di gusto e sta col committente. Le lastre sono '
+  + '2026-09-19-perf-7-ritagli-4x.png');
 report.check(/renderer\.setCampoScale\(hub\.setCampoScale\(tier\.campoScale \?\? 1\)\);/.test(QUALITY),
   'e il governatore muove le due meta della leva con UN numero',
   'quello su cui il mondo si e posato, non quello che il tier voleva');
@@ -594,8 +644,22 @@ if (process.argv.includes('--self')) {
   // prendere: un tier tornato a 0,5 disegna un mondo per cui il committente ha
   // gia' pagato la differenza, e nulla nel codice glielo impedirebbe.
   casi.push({ what: 'un tier che torna a mezzo lato, cioe che riapre il reticolo del texel',
-    caught: [...TIERS, { id: 'x', scale: 0.85, campoScale: 0.5 }]
-      .some((t) => texelPx(t) > TEXEL_PX_CEILING) });
+    caught: !texelUnderCeiling([...TIERS, { id: 'x', scale: 0.85, campoScale: 0.5 }]) });
+  // ------------------------------------------------------------------
+  // E L'ECCEZIONE DEL TIER MINIMO, PIEGATA NEI TRE VERSI CHE CONTANO.
+  casi.push({ what: 'il tier minimo come si spedisce, che NON deve essere chiamato difetto',
+    caught: texelUnderCeiling(TIERS) });
+  casi.push({ what: 'e il minimo peggiorato di un centesimo oltre il numero dichiarato',
+    caught: !texelUnderCeiling(TIERS.map(
+      (t) => (t.id === 'minimo' ? { ...t, campoScale: 0.49 } : t))) });
+  casi.push({ what: 'il tier BASSO che si prende in prestito l eccezione del minimo',
+    caught: !texelUnderCeiling(TIERS.map(
+      (t) => (t.id === 'basso' ? { ...t, campoScale: 0.5 } : t))) });
+  casi.push({ what: 'e un tier nuovo che si chiama diversamente e marcia come il minimo',
+    caught: !texelUnderCeiling([...TIERS, { id: 'infimo', scale: 0.5, campoScale: 0.5 }]) });
+  casi.push({ what: 'mentre il minimo che TORNA sotto il tetto del mondo passa lo stesso',
+    caught: texelUnderCeiling(TIERS.map(
+      (t) => (t.id === 'minimo' ? { ...t, scale: 0.6, campoScale: 0.91 } : t))) });
   // E IL DIFETTO CHE UN TETTO SULLA FRAZIONE NON AVREBBE PRESO, che e' come
   // questa gamba si e' accorta di essere scritta sulla variabile sbagliata: una
   // frazione onorevole su un fotogramma gia' ridotto da' un pixel grosso.
@@ -603,7 +667,7 @@ if (process.argv.includes('--self')) {
     caught: texelPx({ scale: 0.5, campoScale: 0.75 }) > TEXEL_PX_CEILING
       && 0.75 >= 0.75 });
   casi.push({ what: 'e i tier veri, che NON devono essere chiamati difetto',
-    caught: !TIERS.some((t) => texelPx(t) > TEXEL_PX_CEILING) });
+    caught: texelUnderCeiling(TIERS) });
 
   // =====================================================================
   // I LETTORI, NEI TRE VERSI CHE CONTANO.

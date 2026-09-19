@@ -197,6 +197,28 @@ export const groundCarriesCoverage = (campo) => Boolean(campo)
 export const bytesPerFramePixel = (bytes, scale, samples) => bytes * scale * scale
   * Math.max(1, samples);
 
+// AND THE LAW GAINED AN EXCEPTION WITH A NAME ON IT (E-DECISIONI30, E-LINUX1).
+// It is «two samples on every tier EXCEPT `minimo`, which draws with none», and
+// the exception is the committente's own: the tier under `basso` exists for a
+// machine that reads 29,8 ms of GPU where the reference machine reads 14,1, and
+// he was shown what nought samples take off the borders of the masonry and the
+// flowers before he took it. It is written as a ROW and not as a hole, so that
+// a tier quietly moved off its row -- in either direction, and `minimo` raised
+// to two as much as `basso` dropped to nought -- is still a red.
+const WRITTEN = {
+  oltre: { samples: 2, sceneFormat: 'R11F_G11F_B10F' },
+  alto: { samples: 2, sceneFormat: 'R11F_G11F_B10F' },
+  medio: { samples: 2, sceneFormat: 'R11F_G11F_B10F' },
+  basso: { samples: 2, sceneFormat: 'R11F_G11F_B10F' },
+  minimo: { samples: 0, sceneFormat: 'R11F_G11F_B10F' },
+};
+
+/** Whether every tier sits on its own row of the table above, exactly. */
+export const samplesAsWritten = (rows, table) => rows.every(
+  (t) => Boolean(table[t.id]) && t.samples === table[t.id].samples,
+);
+
+
 // ============================================================== AT_TODAY, MEASURED
 //
 // 2026-09-08 (U-PERF-6), QUIET DESK: three runs of ninety readings a pose, high
@@ -444,9 +466,36 @@ if (process.argv.includes('--self')) {
       // four samples to two; two is what ships, so what has to be caught now is
       // a tier quietly RAISED -- which is the same lever spent in the other
       // direction, and the same 1.4 ms.
+      what: 'the tiers as they ship are NOT called a defect',
+      caught: samplesAsWritten(tiersOf(qualityText), WRITTEN),
+    },
+    {
       what: 'a tier whose multisampling was quietly raised to four is caught',
-      caught: tiersOf(qualityText).map((t, i) => (i === 0 ? { ...t, samples: 4 } : t))
-        .some((t) => t.samples !== 2),
+      caught: !samplesAsWritten(
+        tiersOf(qualityText).map((t, i) => (i === 0 ? { ...t, samples: 4 } : t)), WRITTEN,
+      ),
+    },
+    {
+      // AND THE EXCEPTION IS NOT A DOOR, WHICH IS THE CASE THIS TABLE GAINED
+      // WITH THE ROW. `minimo` draws with none by the committente's own word;
+      // that word says nothing about `basso`, and a session that read the
+      // exception as a permission would take the samples off a tier the
+      // committente still holds at two.
+      what: 'the tier basso quietly dropped to nought samples, borrowing the minimo exception',
+      caught: !samplesAsWritten(
+        tiersOf(qualityText).map((t) => (t.id === 'basso' ? { ...t, samples: 0 } : t)), WRITTEN,
+      ),
+    },
+    {
+      what: 'and the exception itself quietly raised back to two, which is the same lever the other way',
+      caught: !samplesAsWritten(
+        tiersOf(qualityText).map((t) => (t.id === 'minimo' ? { ...t, samples: 2 } : t)), WRITTEN,
+      ),
+    },
+    {
+      what: 'a tier this table has no row for at all is caught',
+      caught: !samplesAsWritten([...tiersOf(qualityText),
+        { id: 'infimo', samples: 0, sceneFormat: 'R11F_G11F_B10F' }], WRITTEN),
     },
     {
       // THE CASE THAT SAYS THE SLICES ARE NO LONGER PINNED TO A COLUMN. Both
@@ -557,26 +606,35 @@ report.line(`  ${formats.filter((f) => !f.shipped).map((f) => f.name).join(', ')
 
 // WHAT THE TIERS ARE HELD TO, LITERALLY.
 //
-// THE MULTISAMPLING IS TWO EVERYWHERE NOW, AND THE QUESTION THIS GUARD WAS
-// HOLDING OPEN IS ANSWERED. It said: «four everywhere but the lowest tier, and
-// that is a question standing with the committente and not a lever anybody may
-// spend quietly». He spent it -- E-DECISIONI14 (2), «anti-aliasing: la
-// raccomandazione», which is two samples on the borders of the cubes and the
-// milliseconds that frees put on the sampling of the ray. What made it cheap to
-// answer is that the ground stopped being triangles: multisampling is charged
-// per triangle EDGE, and four samples were buying 3.75 ms of softness on
-// 172 608 of them where they now buy 1.39 on the borders of one box.
+// THE MULTISAMPLING IS TWO ON EVERY TIER BUT ONE, AND THE QUESTION THIS GUARD
+// WAS HOLDING OPEN IS ANSWERED TWICE. It said: «four everywhere but the lowest
+// tier, and that is a question standing with the committente and not a lever
+// anybody may spend quietly». He spent it the first time in E-DECISIONI14 (2),
+// «anti-aliasing: la raccomandazione», which is two samples on the borders of
+// the cubes and the milliseconds that frees put on the sampling of the ray.
+// What made it cheap to answer is that the ground stopped being triangles:
+// multisampling is charged per triangle EDGE, and four samples were buying
+// 3.75 ms of softness on 172 608 of them where they now buy 1.39 on the borders
+// of one box.
+//
+// AND HE SPENT IT THE SECOND TIME IN E-DECISIONI30, for one tier and no other:
+// `minimo` draws with NONE. That tier exists for the machine of E-LINUX1, which
+// reads 29,8 ms of GPU at the tier `basso` where the reference machine reads
+// 14,1 -- and on a frame already at 0,6 of a side, what two samples are left to
+// antialias is the masonry and the flowers. The table above is a table of ROWS
+// for that reason: an exception written as a hole would let the next session
+// take the samples off `basso` too.
 //
 // The pixel is still the same on every tier, because the range of the light is
 // not a tier's to change, and THAT half of this table has not moved.
-const WRITTEN = {
-  oltre: { samples: 2, sceneFormat: 'R11F_G11F_B10F' },
-  alto: { samples: 2, sceneFormat: 'R11F_G11F_B10F' },
-  medio: { samples: 2, sceneFormat: 'R11F_G11F_B10F' },
-  basso: { samples: 2, sceneFormat: 'R11F_G11F_B10F' },
-};
 report.check(tiers.length === Object.keys(WRITTEN).length,
   `${QUALITY} states every tier`, tiers.map((t) => t.id).join(', '));
+// AND ONLY ONE OF THEM MAY DRAW WITHOUT MULTISAMPLING, which is the half of the
+// exception that keeps it from spreading: a second tier at nought samples is a
+// second helping of a decision that was made once, for one machine.
+report.check(Object.values(WRITTEN).filter((w) => w.samples === 0).length === 1,
+  'and exactly one row of this table draws with no multisampling at all',
+  Object.entries(WRITTEN).filter(([, w]) => w.samples === 0).map(([id]) => id).join(', ') || 'none');
 for (const tier of tiers) {
   const want = WRITTEN[tier.id];
   report.check(Boolean(want), `the tier ${tier.id} is one this guard knows`);
