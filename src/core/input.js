@@ -31,6 +31,17 @@ const MOVEMENT_KEYS = {
   KeyD: 'right', ArrowRight: 'right',
 };
 
+// AND THERE IS A SECOND HAND, WHICH HAS NO KEYS AND NO LOCK.
+//
+// On a screen with no mouse the two halves above are both refused: the lock is
+// never granted, so `#dx` is never fed, and there are no keys, so `axis()` is
+// always nought. The fingers arrive through `src/ui/touch.js`, which draws the
+// stick and reads the drags and knows nothing about what they mean — it says
+// only `setTouchAxis`, `addTouchLook` and `command`, and every piece of STATE
+// that comes out of them lives here, next to the keyboard's own. That is what
+// keeps src/core/player.js from ever learning that a finger exists: it asks the
+// same three questions it always asked and gets one answer each.
+
 export class Input {
   #element = null;
   #pressed = new Set();
@@ -38,6 +49,15 @@ export class Input {
   #dy = 0;
   #locked = false;
   #engaged = false;
+  // Whether this page is being walked with fingers. Set once, from the page's
+  // own reading of the machine and of the address (see touchWanted() in
+  // src/ui/touch.js); nothing below flips it on its own.
+  #touch = false;
+  // What the stick is pushing, in the same terms axis() answers in, and whether
+  // it is pushed to the rim. Written by the stick and read by the walker.
+  #touchX = 0;
+  #touchZ = 0;
+  #touchRunning = false;
   // Whether the raw stream has actually spoken. See the note at the top for why
   // this is an observation and not a feature test.
   #raw = false;
@@ -48,7 +68,7 @@ export class Input {
   // measuring harness reads it to put a number on input-to-pose; nothing in the
   // walk does.
   #lastMoveAt = 0;
-  #listeners = { lockChange: [], key: [] };
+  #listeners = { lockChange: [], key: [], engage: [] };
   #bound = {};
 
   attach(element) {
@@ -59,8 +79,18 @@ export class Input {
       move: (e) => this.#onMouseMove(e, false),
       rawMove: (e) => this.#onMouseMove(e, true),
       lock: () => this.#onLockChange(),
-      blur: () => { this.#pressed.clear(); this.#zoom = false; },
-      click: () => { this.#engaged = true; this.requestLock(); },
+      blur: () => {
+        this.#pressed.clear();
+        this.#zoom = false;
+        // A page that goes away under a thumb never gets the pointerup, and a
+        // stick left pushed is a walker still walking behind another window.
+        this.setTouchAxis(0, 0, false);
+      },
+      // The way in, and on a screen with no mouse it is ONLY the way in. There
+      // is nothing to ask the browser for: a lock requested from a phone is
+      // refused, the refusal puts the prompt back up, and the prompt back up is
+      // exactly the defect this session exists to remove.
+      click: () => { this.engage(); if (!this.#touch) this.requestLock(); },
       mouseDown: (e) => { if (e.button === 2 && this.#locked) this.#zoom = true; },
       mouseUp: (e) => { if (e.button === 2) this.#zoom = false; },
       // Under the lock the browser suppresses it anyway; this is for the moment
@@ -118,7 +148,18 @@ export class Input {
    * at once; the opening scene has to be able to do them one at a time, because
    * its gesture may be a key press.
    */
-  engage() { this.#engaged = true; }
+  engage() {
+    if (this.#engaged) return;
+    this.#engaged = true;
+    // WHO TAKES THE PROMPT DOWN WHEN THERE IS NO LOCK TO REPORT IT.
+    //
+    // On a mouse the way in is announced by pointerlockchange, and src/main.js
+    // has always hung the prompt on that one signal. A finger never produces
+    // it: the lock is neither asked for nor granted, so the page would be
+    // walked from behind «Tocca per esplorare» for ever. This is the same
+    // announcement made by the thing that actually happened.
+    for (const fn of this.#listeners.engage) fn();
+  }
 
   /**
    * Asks for the pointer, and HANDS BACK WHAT THE BROWSER ANSWERED.
@@ -131,18 +172,72 @@ export class Input {
    * browsers return nothing and the caller sees nothing.
    */
   requestLock() {
-    if (this.#locked) return undefined;
+    // AND IT IS NEVER ASKED FOR WITH FINGERS. Not «asked and refused»: not
+    // asked. A refusal is a rejected promise, a console line and a prompt that
+    // comes back up over a world the walker has already been let into, and all
+    // three of those are the defect rather than a consequence of it. The one
+    // seat that speaks to the browser about the pointer is here, so this is the
+    // one place the rule has to be written.
+    if (this.#touch || this.#locked) return undefined;
     return this.#element.requestPointerLock();
   }
 
   onLockChange(fn) { this.#listeners.lockChange.push(fn); return this; }
   onKey(fn) { this.#listeners.key.push(fn); return this; }
+  /** Called once, when the visitor has asked to come in. */
+  onEngage(fn) { this.#listeners.engage.push(fn); return this; }
+
+  /**
+   * A command that did not come from a key.
+   *
+   * The screen's own buttons — the interaction prompt at the foot, «Indietro»,
+   * a swipe through the panels — mean exactly what E, Esc and W/S mean, and
+   * they are delivered as those: one door into src/main.js's key handler and
+   * into src/world/interact.js, so a gesture and a key can never come to
+   * disagree about what the same thing does.
+   */
+  command(code) {
+    for (const fn of this.#listeners.key) fn(code, { repeat: false, preventDefault() {} });
+  }
+
+  /** The stick, in the terms axis() answers in, and whether it is at the rim. */
+  setTouchAxis(x, z, running) {
+    this.#touchX = x || 0;
+    this.#touchZ = z || 0;
+    this.#touchRunning = Boolean(running);
+  }
+
+  /**
+   * A drag, in the same pixels the mouse reports in.
+   *
+   * It is summed into the same pair drainLook() hands out, so the body sees one
+   * look and never asks where it came from. The scaling from finger to frame
+   * belongs to the fingers and is applied before this is called.
+   */
+  addTouchLook(dx, dy) {
+    if (!this.#touch) return;
+    this.#dx += dx;
+    this.#dy += dy;
+    this.#lastMoveAt = performance.now();
+  }
+
+  get touch() { return this.#touch; }
+
+  set touch(on) {
+    this.#touch = Boolean(on);
+    if (!this.#touch) this.setTouchAxis(0, 0, false);
+  }
 
   get locked() { return this.#locked; }
   // Walking survives losing the pointer lock (Esc, alt-tab): only the mouse look
   // needs the lock, and dropping the keys mid-stride feels like a malfunction.
   get engaged() { return this.#engaged; }
-  get running() { return this.#pressed.has('ShiftLeft') || this.#pressed.has('ShiftRight'); }
+  // Shift, or a stick pushed to the rim: the committente's choice, and it is
+  // one question with two hands answering it (E-DECISIONI27).
+  get running() {
+    return this.#touchRunning
+      || this.#pressed.has('ShiftLeft') || this.#pressed.has('ShiftRight');
+  }
   /** The right button, held under the lock: the ask to lean the lens in. */
   get zooming() { return this.#zoom; }
   /** Whether the look is being built from the raw report stream. */
@@ -162,7 +257,13 @@ export class Input {
       }
     }
     const length = Math.hypot(x, z);
-    return length > 1 ? { x: x / length, z: z / length } : { x, z };
+    if (length > 0) return length > 1 ? { x: x / length, z: z / length } : { x, z };
+    // AND THE STICK ONLY WHERE THE KEYS SAID NOTHING. A page can have both —
+    // ?tocco=1 on a desk is exactly that — and adding the two would give a
+    // walker who holds W and pushes the stick forward a push of two, which is
+    // the one thing the normalisation above exists to forbid. The keys win
+    // because a key is unambiguous and a thumb resting on glass is not.
+    return { x: this.#touchX, z: this.#touchZ };
   }
 
   // Returns the look delta accumulated since the previous call and clears it.

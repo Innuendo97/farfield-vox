@@ -295,7 +295,12 @@ export class Player {
   }
 
   update(dt, input) {
-    if (input.locked) this.look(input.drainLook());
+    // THE LOCK, OR FINGERS. The lock is what says a mouse's movement belongs to
+    // this world and not to the desktop; on a screen with no mouse there is no
+    // lock to be had and a drag can only ever have meant this world. The body
+    // learns nothing else about fingers: what arrives here is the same pair of
+    // pixels it has always drained. See src/core/input.js.
+    if (input.locked || input.touch) this.look(input.drainLook());
     this.#chase(dt);
     this.#run(dt);
 
