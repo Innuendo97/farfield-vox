@@ -186,8 +186,33 @@ report.check(/if \(input\.touch\) input\.onEngage\(\(\) => overlay\.setVisible\(
 report.check(/const opening = !input\.engaged;/.test(touch)
   && /!held\.opening && state\(\) === 'vicino'/.test(touch),
   'il tocco che fa entrare non apre anche la pietra davanti a cui si arriva');
-report.check(/input\.touch = touchWanted\(\);/.test(main),
-  'quale mano cammina si decide una volta sola, e nessuno la ricalcola');
+// QUALE MANO CAMMINA SI LEGGE UNA VOLTA SOLA, E ADESSO LA REGOLA E' CONTATA
+// INVECE CHE CITATA.
+//
+// Questa riga cercava la stringa `input.touch = touchWanted();`. La proprieta'
+// che difende non e' quella stringa: e' che la domanda si faccia UNA VOLTA e
+// che tutto il resto della pagina legga quell'unica risposta -- perche' una
+// seconda lettura e' un secondo parere su quale pagina si sta costruendo, e la
+// scena d'apertura, il prompt, il menu e il corpo devono essere d'accordo.
+//
+// E-DECISIONI33 ha spostato la lettura in cima al file senza toccare la
+// proprieta': l'inquadratura e' inchiodata a uno in modalita' tocco (src/ui/
+// touch.js ascolta i pointer sulla TELA, quindi un quadro piu' piccolo della
+// finestra lascerebbe le dita sul nulla), e l'inquadratura e' la prima cosa
+// della pagina che deve saperlo -- prima che `input` esista. Cosi' la chiamata
+// e' diventata `const TOUCH = touchWanted();` e `input.touch = TOUCH;`.
+//
+// Quindi la gamba adesso CONTA le letture invece di riconoscerne una, che e'
+// piu' forte di prima: la versione a stringa passava anche con tre chiamate in
+// giro per il file, purche' una fosse scritta cosi'.
+const readings = (main.match(/touchWanted\(\)/g) || []).length;
+report.check(
+  readings === 1
+    && /const TOUCH = touchWanted\(\);/.test(main)
+    && /input\.touch = TOUCH;/.test(main),
+  'quale mano cammina si decide una volta sola, e nessuno la ricalcola',
+  `${readings} lettura/e di touchWanted() in src/main.js`,
+);
 report.check(/if \(asked === '1'\) return true;/.test(touch) && /if \(asked === '0'\) return false;/.test(touch),
   'le maniglie ?tocco=1 e ?tocco=0 esistono, e l\'indirizzo vince in tutti e due i versi');
 // E LA MODALITA' LA DECIDE IL PUNTATORE PRIMARIO, E NIENT'ALTRO (E-DECISIONI29,
