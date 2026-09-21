@@ -148,30 +148,45 @@ export const GLINT_SWING = 0.34;
 export const GLINT_STILL_BASE = 0.07;
 export const GLINT_STILL_SWING = 0.20;
 
-/** AND THE TURNING SKY IS DRAWN AT HALF THE PIXEL IT USED TO BE.
+/** HOW FINELY THE TURNING SKY IS RECORDED, AND IT IS ONE, AND IT IS ONE BECAUSE
+ *  A HALF WAS MEASURED AND BOUGHT NOTHING.
  *
- *  The turning bitmap is a square whose side is the window's own diagonal —
- *  2214 px on the committente's window, four and nine tenths megapixels,
- *  nineteen and a half megabytes of backing store — and the compositor samples
- *  every frame of the visit out of it through a rotation. Measured
- *  (U-INQUADRATURA-1, §B.3) that cost 1.12 ms of frame and 1.44 ms of the
- *  DRIVER's own clock, over a ceiling of one millisecond: the night around the
- *  world shipped still because of it.
+ *  THE LEVER. The turning bitmap is a square whose side is the window's own
+ *  diagonal — 2214 px on the committente's window, four and nine tenths
+ *  megapixels, nineteen and a half megabytes of backing store — and the
+ *  compositor samples every frame of the visit out of it through a rotation. A
+ *  streak looked like the one thing in this sky that could afford to be
+ *  recorded more coarsely: it is a soft ramp along a chord with a round cap at
+ *  each end and no edge anywhere on it.
  *
- *  A streak is the one thing in this sky that can afford it. It is a soft ramp
- *  along a chord with a round cap at each end and no edge anywhere on it — the
- *  picture has no detail at the pixel to lose — so the whole of what halving
- *  the backing store takes away is a little of the thinnest streaks' bite, and
- *  the plate at four times says it cannot be found. What it buys is a quarter
- *  of the texels: four and nine tenths megapixels become one and two tenths,
- *  and a rotation reads them out of a texture a quarter the size.
+ *  THE REASON IT LOOKED NECESSARY WAS A MEASUREMENT, AND THE MEASUREMENT WAS
+ *  THE INSTRUMENT. U-INQUADRATURA-1 §B.3 put that layer at 1.12 ms of frame and
+ *  1.44 of the driver's own clock, over the committente's ceiling of one — and
+ *  that is why the night around the world shipped STILL. Measured again inside
+ *  ONE page, with the two arms alternating sixteen times so that nothing can
+ *  drift between them (per-il-committente/lav/…-costo-ab.mjs), the same layer
+ *  costs **0.25 ms of frame and 0.05 of the driver's clock**. The 1.12 was the
+ *  gap between two page loads forty seconds apart; see §A.4 of the verbale.
  *
- *  IT IS THE NIGHT'S OWN NUMBER AND NOT THE SCENE'S. src/ui/intro.js calls
- *  paintTrails() with no third argument and therefore draws exactly the bytes
- *  it has always drawn — the opening scene is a still picture held under type
- *  for twenty seconds and it is the one place in this project where the pixel
- *  of a streak is looked at closely. */
-export const TRAILS_RESOLUTION = 0.5;
+ *  SO THE ECONOMY HAS NOTHING TO BUY. At a half the same layer measured 12.607
+ *  ms against 12.579 at full — a thirtieth of a millisecond the wrong way
+ *  round, which is to say nothing — because what that layer costs is the
+ *  WINDOW's pixels it is composited over and not the texels it is read from.
+ *  And the plate at four times (…-scie-4x.png) says the half is NOT invisible:
+ *  the same streaks come back visibly softer. A softening that can be seen, for
+ *  a saving that cannot be measured, is not a trade.
+ *
+ *  WHAT IS GIVEN UP BY LEAVING IT AT ONE, said plainly: fourteen and seven
+ *  tenths of a megabyte of backing store, and a repaint of that bitmap that
+ *  takes about four times as long — which is paid once per size and never per
+ *  frame.
+ *
+ *  THE LEVER STAYS, with its measurement, because a machine that ever needs it
+ *  should not have to rediscover it. It is the NIGHT's number and never the
+ *  SCENE's: src/ui/intro.js calls paintTrails() with no third argument, which
+ *  is the one place in this project where the pixel of a streak is looked at
+ *  closely — a still picture held under type for twenty seconds. */
+export const TRAILS_RESOLUTION = 1;
 
 // ---------------------------------------------------------------- arithmetic
 
@@ -253,7 +268,7 @@ export function nightGeometry(width, height, quiet = null) {
 // because a dither is a property of the image grid and an image the browser
 // upscales still carries it.
 
-export function paintField(field, geom) {
+export function paintField(field, geom, stars = false) {
   const { poleX, poleY, rOut, rQuiet } = geom;
   // ROUNDED HERE AND NOWHERE ELSE, which is where the scene rounded it. A
   // window is allowed a fractional width under zoom, and moving the rounding
@@ -304,6 +319,12 @@ export function paintField(field, geom) {
     ctx.fillRect(x, y, 0.9, 0.9);
   }
   ctx.globalAlpha = 1;
+
+  // AND THE STARS THEMSELVES, WHERE THE SKY DOES NOT TURN. A third argument
+  // that the opening scene never passes, so the scene's ground is the ground it
+  // has always been, to the byte; the night around the world passes it exactly
+  // when it has no streaks to draw. See paintStars().
+  if (stars) paintStars(ctx, geom);
 }
 
 // ------------------------------------------------------------- the trails
@@ -313,6 +334,105 @@ export function paintField(field, geom) {
 // two and a third seconds apart were measured on this world — and anything
 // redrawn per frame simply stops. A rigid rotation about the pole IS the star
 // trail, so nothing is lost by giving it away to the compositor.
+
+/** One colour and one alpha, spelled the way the sky has always spelled them.
+ *  It is a function now because two places draw these stars and a second copy
+ *  of a colour string is a second thing to keep true. */
+const RGBA = (tint, alpha) => 'rgba(' + tint + ',' + alpha.toFixed(3) + ')';
+
+/**
+ * THE FIVE HUNDRED AND TWENTY STARS OF THIS SKY, DEALT ONCE AND READ TWICE.
+ *
+ * WHY THIS IS A FUNCTION AND NOT TWO LOOPS. The sky that TURNS draws each star
+ * as an arc -- an exposure -- and the sky that does NOT draws the same star as
+ * a point, because a still exposure IS a point (E-DECISIONI35, point 1). They
+ * have to be the SAME stars, in the same places, at the same brightnesses, or a
+ * machine that changed its mind about turning would deal itself a different
+ * sky; and two copies of a rejection sampler are two copies that drift the
+ * first time anybody touches one of them.
+ *
+ * SO THE DRAWS ARE HERE AND THE DRAWING IS OUTSIDE, and the ORDER of the draws
+ * is the whole contract: the generator is seeded with a constant, so the
+ * sequence of calls to it IS the sky. Every call below is exactly where it was
+ * when this lived inside paintTrails, which is what lets the opening scene go
+ * on drawing the same bytes -- and the handover plate HASHES those bytes rather
+ * than asserting it.
+ *
+ * @param {object} geom       from nightGeometry()
+ * @param {number} thinnest   the floor on a star's width, in CSS pixels
+ * @param {Function} visit    called once per star
+ */
+export function eachStar(geom, thinnest, visit) {
+  const { rOut, rQuiet } = geom;
+  const rand = seeded(0x9e3779b9);
+  const rhoQ = rQuiet / rOut;
+  for (let i = 0; i < TRAILS; i++) {
+    // Uniform per unit AREA -- r = R*sqrt(u) -- so a ring's share of the stars
+    // is its share of the sky, which is what makes the density rise with r on
+    // its own. Then the quiet gate, by rejection: near the pole almost nothing
+    // survives it, and the emptiness is a fact about the sampling rather than a
+    // mask laid over the result.
+    let r = 0;
+    let rho = 0;
+    for (let tries = 0; tries < 64; tries++) {
+      rho = Math.sqrt(rand());
+      r = rho * rOut;
+      if (rand() <= smoothstep(rhoQ, RHO_FULL_IN, rho)) break;
+    }
+
+    // The bell: a floor at the edge of the quiet so the band has no rim, full
+    // through the ring the eye is meant to land on, and down again into the
+    // corners so the frame closes.
+    const peak = TRAIL_FLOOR_ALPHA + (TRAIL_PEAK_ALPHA - TRAIL_FLOOR_ALPHA)
+      * smoothstep(rhoQ, RHO_FULL_IN, rho)
+      * (1 - smoothstep(RHO_FULL_OUT, RHO_DARK, rho));
+
+    const len = ((ARC_MIN_DEG + rand() * (ARC_MAX_DEG - ARC_MIN_DEG)) * Math.PI) / 180;
+    const a0 = rand() * Math.PI * 2;
+    const tint = TRAIL_TINTS[(rand() * TRAIL_TINTS.length) | 0];
+    const width = Math.max(thinnest, 0.9 + rand() * 1.1);
+    visit({
+      r, rho, peak, len, a0, tint, width,
+    });
+  }
+}
+
+/**
+ * THE SAME SKY, PHOTOGRAPHED SHORT: the stars as points.
+ *
+ * «Meglio il solo cielo stellato, i puntini luminosi delle stelle che
+ * brillano» -- and the first build of the still night took the streaks away and
+ * left nothing behind them. Looked at on the plate, brightened twice over, that
+ * band is a gradient with four grains of dust in it: it is not a starry sky, it
+ * is an empty one.
+ *
+ * The cure is not a new sky. It is THIS sky with the exposure shortened: the
+ * same five hundred and twenty stars dealt by eachStar, each drawn as the head
+ * of its own streak and nothing else -- same place, same brightness, same
+ * width. A machine that cannot afford to turn is not handed a different night;
+ * it is handed the same night in a shorter photograph, which is also why the
+ * two can be looked at side by side and argued about.
+ *
+ * DRAWN INTO THE GROUND AND NOT INTO A LAYER OF ITS OWN, which is the whole
+ * economy of it: the ground is painted once per size and never per frame, so
+ * five hundred and twenty filled discs cost one paint and nothing per frame --
+ * against the four megapixels and nine tenths of turning bitmap they replace.
+ * What still breathes over them is the twenty six glints, which is a real sky's
+ * own arrangement: many steady, and a few that visibly scintillate.
+ */
+export function paintStars(ctx, geom) {
+  ctx.save();
+  ctx.translate(geom.poleX, geom.poleY);
+  eachStar(geom, 1, ({ r, peak, a0, width }) => {
+    ctx.fillStyle = RGBA(TRAIL_HEAD, peak);
+    ctx.beginPath();
+    // The head of a stroke with a round cap is a disc of the stroke's own
+    // width, so this is that disc and not a size somebody chose.
+    ctx.arc(r * Math.cos(a0), r * Math.sin(a0), width / 2, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.restore();
+}
 
 export function paintTrails(trails, geom, resolution = 1) {
   const { poleX, poleY, rOut, rQuiet } = geom;
@@ -345,7 +465,6 @@ export function paintTrails(trails, geom, resolution = 1) {
   ctx.clearRect(-rOut, -rOut, side, side);
   ctx.lineCap = 'round';
 
-  const rand = seeded(0x9e3779b9);
   const rhoQ = rQuiet / rOut;
   // Never thinner than one physical pixel: a hairline that falls between two
   // pixels of the backing store is a hairline the eye reads as flicker when
@@ -362,32 +481,9 @@ export function paintTrails(trails, geom, resolution = 1) {
   // where it is looked at.
   const thinnest = 1 / grain;
 
-  for (let i = 0; i < TRAILS; i++) {
-    // Uniform per unit AREA — r = R·√u — so a ring's share of the stars is
-    // its share of the sky, which is what makes the density rise with r on
-    // its own. Then the quiet gate, by rejection: near the pole almost
-    // nothing survives it, and the emptiness is a fact about the sampling
-    // rather than a mask laid over the result.
-    let r = 0;
-    let rho = 0;
-    for (let tries = 0; tries < 64; tries++) {
-      rho = Math.sqrt(rand());
-      r = rho * rOut;
-      if (rand() <= smoothstep(rhoQ, RHO_FULL_IN, rho)) break;
-    }
-
-    // The bell: a floor at the edge of the quiet so the band has no rim, full
-    // through the ring the eye is meant to land on, and down again into the
-    // corners so the frame closes.
-    const peak = TRAIL_FLOOR_ALPHA + (TRAIL_PEAK_ALPHA - TRAIL_FLOOR_ALPHA)
-      * smoothstep(rhoQ, RHO_FULL_IN, rho)
-      * (1 - smoothstep(RHO_FULL_OUT, RHO_DARK, rho));
-
-    const len = ((ARC_MIN_DEG + rand() * (ARC_MAX_DEG - ARC_MIN_DEG)) * Math.PI) / 180;
-    const a0 = rand() * Math.PI * 2;
-    const tint = TRAIL_TINTS[(rand() * TRAIL_TINTS.length) | 0];
-    const width = Math.max(thinnest, 0.9 + rand() * 1.1);
-
+  eachStar(geom, thinnest, ({
+    r, peak, len, a0, tint, width,
+  }) => {
     // The head is the LEADING end, and the sky turns anticlockwise on the
     // screen, which in a coordinate system whose y points down is the
     // direction of decreasing angle. So the head is at a0 and the tail
@@ -400,15 +496,15 @@ export function paintTrails(trails, geom, resolution = 1) {
     const hx = r * Math.cos(a0);
     const hy = r * Math.sin(a0);
     const ramp = ctx.createLinearGradient(hx, hy, r * Math.cos(a0 + len), r * Math.sin(a0 + len));
-    ramp.addColorStop(0, `rgba(${TRAIL_HEAD},${peak.toFixed(3)})`);
-    ramp.addColorStop(0.18, `rgba(${tint},${(peak * 0.82).toFixed(3)})`);
-    ramp.addColorStop(1, `rgba(${tint},0)`);
+    ramp.addColorStop(0, RGBA(TRAIL_HEAD, peak));
+    ramp.addColorStop(0.18, RGBA(tint, peak * 0.82));
+    ramp.addColorStop(1, RGBA(tint, 0));
     ctx.strokeStyle = ramp;
     ctx.lineWidth = width;
     ctx.beginPath();
     ctx.arc(0, 0, r, a0, a0 + len);
     ctx.stroke();
-  }
+  });
 }
 
 // --------------------------------------------------------------- the glints
@@ -584,11 +680,13 @@ export function createNight({ root = document.body, animated = true, reduced = n
   }
 
   function repaint() {
-    paintField(field, geom);
-    // HALF THE PIXEL, AND ONLY HERE. The scene draws the same loops at the
-    // device's own grain; around the world the streaks are a backdrop behind a
-    // picture and the eye is never on them, so a quarter of the texels buys the
-    // rotation back. See TRAILS_RESOLUTION.
+    // AND THE STARS GO INTO THE GROUND WHERE THERE ARE NO STREAKS. A still sky
+    // is the same sky photographed short, not a sky with something taken out of
+    // it: see paintStars(). It costs one paint per size and nothing per frame.
+    paintField(field, geom, !turning);
+    // AND THE NIGHT PASSES ITS OWN GRAIN, which is currently the same as the
+    // scene's and was not always going to be: see TRAILS_RESOLUTION for what a
+    // half was measured to buy, and why it is at one.
     if (trails) paintTrails(trails, geom, TRAILS_RESOLUTION);
     glints = seedGlints(spark, geom);
     if (sparkTimer) twinkle(spark, glints, !turning);
