@@ -805,9 +805,34 @@ export function createQuality({ renderer, hub }) {
     },
 
     /** What the framing was decided to be, and whether its night turns. Read
-     *  only: they are written by setBenchmark below and by nothing else. */
+     *  only: they are written by setBenchmark and rememberFraming below, both
+     *  of which are the BENCH's seats, and by nothing else. */
     get fraction() { return fraction; },
     get notte() { return notte; },
+
+    /**
+     * A framing with no calibration behind it.
+     *
+     * THE ONE CASE, AND WHY IT IS A SEPARATE DOOR. When the calibration answers
+     * nothing — see framingFromWindowAlone() in src/core/bench.js for the
+     * measured reason — there is a framing to remember and NO TIER to settle:
+     * the machine said nothing about which tier it can hold, so the default
+     * stands and the governor goes on doing its job. setBenchmark cannot be
+     * used for that, because settling a tier is most of what it is.
+     *
+     * `benched` and `benchMs` are deliberately left where they are, which is
+     * usually null. That is what makes this heal rather than harden:
+     * needsBenchmark() sees no tier, so the NEXT visit asks the machine again —
+     * and asks it over the smaller frame this line just remembered, which is
+     * the frame the query ring can keep up with.
+     */
+    rememberFraming(next) {
+      if (!(next > 0) || next > 1 || next === fraction) return false;
+      fraction = next;
+      benchPixels = windowPixels();
+      store();
+      return true;
+    },
 
     /**
      * What the benchmark decided, which is only ever a starting point.

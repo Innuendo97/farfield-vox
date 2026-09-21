@@ -379,3 +379,63 @@ export function decideNight(verdict, benchPixels) {
   const factor = verdict.medianMs / modelMs(benchPixels);
   return NIGHT_SPIN_MS * factor < NIGHT_CEILING_MS ? 'animata' : 'ferma';
 }
+
+/**
+ * AND WHAT TO DO WHEN THE CALIBRATION ANSWERS NOTHING AT ALL.
+ *
+ * THE DEFECT THIS ANSWERS, MEASURED (E-DECISIONI33, point 5). finish() above
+ * throws the calibration away under forty readings, and on a large window it
+ * never gets forty: the driver's timer query ring is twelve deep, a slow frame
+ * takes longer than twelve frames to answer, the ring saturates, and almost
+ * four thousand frames go past uncounted. Measured on a first visit: 134
+ * readings on the reference window, TWO on a 3440x1440, ten on a 4K.
+ *
+ * What followed was the opposite of what this whole module is for. No verdict
+ * meant no tier, NO FRAMING, and no stored answer — so the page sat at the
+ * default tier on the whole of a 4.95 or 8.29 megapixel window, the governor
+ * watched it run hot and walked it down, and the ultrawide ended at `minimo`
+ * with every pixel of the window still being drawn. The visitor the framing
+ * exists for was the one visitor who never got one.
+ *
+ * WHAT THIS DOES INSTEAD, AND WHAT IT REFUSES TO DO. It answers the only
+ * question that can still be answered when the machine would not say anything:
+ * HOW BIG IS THE WINDOW. The model is the reference machine's own line, so what
+ * comes back is the framing the REFERENCE machine would need for this window —
+ * a stand-in, not a measurement, and it is used for the framing alone.
+ *
+ * IT NAMES NO TIER. The tier ladder is not this unit's to move and a machine
+ * that said nothing has said nothing about which tier it can hold; the default
+ * stands and the governor goes on doing its job. What changes is that it does
+ * its job over a frame that fits.
+ *
+ * AND IT IS REMEMBERED, which is the part that heals. The next visit starts at
+ * that framing, so the frame the calibration is asked to time is the smaller
+ * one — and a smaller frame is exactly what the query ring needs in order to
+ * keep up. A machine that could not answer is handed the conditions in which it
+ * can.
+ */
+export function framingFromWindowAlone(where) {
+  const ratio = where.ratio ?? deviceRatio();
+  const ceiling = where.ceilingMs ?? BENCH_THRESHOLDS.medium;
+  const rungs = FRACTIONS.map((fraction) => {
+    const frame = frameOf(fraction, where.width, where.height);
+    return {
+      fraction,
+      frame,
+      pixels: bufferPixels(frame, ratio, BENCH_SCALE),
+      overCeiling: frame.width * frame.height > PIXEL_CEILING,
+    };
+  }).map((rung) => ({ ...rung, predictedMs: modelMs(rung.pixels) }));
+
+  const allowed = rungs.filter((rung) => !rung.overCeiling);
+  const taken = allowed.find((rung) => rung.predictedMs < ceiling);
+  const chosen = taken || allowed[allowed.length - 1] || rungs[rungs.length - 1];
+  return {
+    fraction: chosen.fraction,
+    frame: chosen.frame,
+    pixels: chosen.pixels,
+    predictedMs: chosen.predictedMs,
+    rungs,
+    reason: taken ? 'la finestra sola, sotto il tetto del banco' : 'la finestra sola, pavimento',
+  };
+}

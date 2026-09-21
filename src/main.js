@@ -25,7 +25,7 @@ import {
   askedFraction, deviceRatio, frameOf, windowPixels,
 } from './core/inquadratura.js';
 import {
-  createBenchmark, decideFraming, decideNight, tierOf,
+  createBenchmark, decideFraming, decideNight, framingFromWindowAlone, tierOf,
 } from './core/bench.js';
 import { buildHub } from './world/hub.js';
 import { needsAt } from './world/layers/registry.js';
@@ -979,7 +979,28 @@ function calibrate(force = false) {
   bench.run().then((verdict) => {
     introBus?.report('bench', 1);
     const tier = tierOf(verdict);
-    if (!tier) return;
+    if (!tier) {
+      // THE CALIBRATION ANSWERED NOTHING, and on a large window that is the
+      // usual outcome rather than the rare one: see framingFromWindowAlone() in
+      // src/core/bench.js for the measured reason and for what is done about
+      // it. No tier is named -- the machine said nothing about tiers -- but the
+      // window's own size is still a fact, and it is enough to stop a 4K being
+      // drawn whole by a machine that could not be asked.
+      if (PINNED !== null) return;
+      const blind = framingFromWindowAlone({
+        width: window.innerWidth, height: window.innerHeight, ratio: deviceRatio(),
+      });
+      if (blind.fraction >= 1) return;
+      setFraction(blind.fraction);
+      applyNight(document.body.classList.contains('is-inquadrata'));
+      quality.rememberFraming(blind.fraction);
+      if (import.meta.env.DEV) {
+        console.info('calibrazione: nessun verdetto, inquadratura dalla sola finestra '
+          + `${blind.fraction} (${blind.frame.width}x${blind.frame.height}, `
+          + `${blind.predictedMs.toFixed(2)} ms previsti sul modello, ${blind.reason})`);
+      }
+      return;
+    }
     // WHAT THE BENCH READ, AND WHERE IT READ IT. The buffer is asked for AFTER
     // the three seconds and not before: nothing moves it during them — the
     // walker has no world yet and the governor is held — but a number taken on
