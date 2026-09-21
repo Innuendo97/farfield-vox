@@ -441,7 +441,23 @@ export async function openWorld({
   // a headless chromium holding a GPU behind it: eight sessions share this
   // machine and the first thing that happens after a red run is another run.
   try {
-    await page.goto(`http://127.0.0.1:${port}/?dev&t0&intro=0`, { waitUntil: 'load' });
+    // AND THE FRAMING IS PINNED WHOLE, WHICH IS THE SAME KIND OF DECISION AS
+    // `?dev&t0` BESIDE IT (U-INQUADRATURA-1).
+    //
+    // src/core/inquadratura.js lets the bench give this machine a picture
+    // SMALLER than its window, with night around it, decided from three seconds
+    // of measurement taken while the desk is doing whatever it happens to be
+    // doing. Every guard below this line photographs the WORLD -- a band of
+    // meadow, a census of programs, a floor under a colour -- and none of them
+    // is about how big the picture came out. Left to the bench, the rectangle
+    // they crop out of would change between two runs on the same tip, on eight
+    // worktrees, with the answer depending on how busy the machine was: a guard
+    // whose colour depends on the load is not a guard.
+    //
+    // So the world is opened at the framing every plate of this campaign was
+    // taken at, and `openVisitor` below deliberately does NOT do this -- see
+    // the note over it, which is E-SUOLO1's whole lesson.
+    await page.goto(`http://127.0.0.1:${port}/?dev&t0&intro=0&inquadratura=1`, { waitUntil: 'load' });
     await page.waitForFunction(
       () => window.farfield && window.farfield.hub && window.farfield.hub.groundReady(),
       null, { timeout: groundTimeoutMs, polling: 250 },
