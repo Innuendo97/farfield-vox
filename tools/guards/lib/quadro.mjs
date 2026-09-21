@@ -625,8 +625,28 @@ export async function openVisitor({
     // a first visit cannot be the thing a guard stands on.
     await page.addInitScript(({ w, h }) => {
       try {
+        // NUMBERED, AND THE NUMBER IS NOT DECORATION (U-INQUADRATURA-1). The
+        // deposit gained the framing the bench decided, and `pixels` changed
+        // meaning with it -- it is the WINDOW the calibration answered about
+        // and no longer the buffer it read. readStored() in
+        // src/core/quality.js throws away any record that is not this version,
+        // so a seed without it is not a returning visitor at all: it is a
+        // first one, the three seconds run, and the whole premise of this leg
+        // goes with them.
+        //
+        // `inquadratura: 1` is the second half of that premise. This page is
+        // the page as DELIVERED and nothing here may touch the address, so the
+        // framing has to be pinned the way a visitor's own machine pins it --
+        // through the state -- or the picture this leg photographs would be
+        // whatever the bench happened to decide while the desk was busy.
         window.localStorage.setItem('farfield.quality', JSON.stringify({
-          tier: 'medio', choice: 'auto', benchMs: 10, pixels: w * h,
+          v: 2,
+          tier: 'medio',
+          choice: 'auto',
+          benchMs: 10,
+          pixels: w * h,
+          inquadratura: 1,
+          notte: 'ferma',
         }));
       } catch { /* a browser that refuses to remember re-benches, and says so */ }
     }, { w: width, h: height });

@@ -317,9 +317,7 @@ if (INTRO) {
 // It is the bench's answer, taken once in the load and remembered with the rest
 // of the calibration, and the governor never touches it afterwards: see
 // src/core/inquadratura.js for why it is an area and not a scale, and
-// calibrate() below for how the answer is reached. The handle in the address
-// outranks both, which is how every plate and every guard of this session pins
-// the world instead of photographing a verdict.
+// calibrate() below for how the answer is reached.
 //
 // WHAT IT STARTS AT, AND WHY A RETURNING WALKER NEVER SEES IT MOVE.
 //
@@ -379,7 +377,11 @@ function applyNight(framed) {
     return;
   }
   if (night) {
-    if (night.animated === nightTurning) { night.relayout(); return; }
+    // WHAT WAS ASKED OF IT AND NOT WHAT IT DOES: a visitor who asked their
+    // machine for no motion has a still sky whatever the bench found, and
+    // comparing the verdict against THAT would tear the night down and build
+    // the identical thing again on every resize, for exactly those visitors.
+    if (night.asked === nightTurning) { night.relayout(); return; }
     // The verdict changed under it, which happens once: the bench answers while
     // the night is already up. A turn is a property the element is built with,
     // so it is rebuilt -- behind the opening scene, where there is nothing to

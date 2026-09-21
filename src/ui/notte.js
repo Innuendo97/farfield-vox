@@ -502,7 +502,22 @@ export function createNight({ root = document.body, animated = true, reduced = n
   const api = {
     /** The element, so a guard can find it and a caller can take it away. */
     get element() { return el; },
-    get animated() { return animated && !still; },
+
+    /**
+     * WHAT WAS ASKED FOR, AND WHAT CAME OUT, AND THEY ARE NOT THE SAME QUESTION.
+     *
+     * `asked` is the bench's verdict as it was handed in. `turning` is whether
+     * this sky is actually moving, which is the verdict AND the visitor's own
+     * setting: somebody who asked their machine for no motion gets a still sky
+     * whatever the bench found.
+     *
+     * A caller deciding whether to REBUILD must read `asked`. Reading `turning`
+     * would mean that, for exactly the visitors who asked for stillness, every
+     * resize found a night that disagreed with the verdict and tore it down to
+     * build the identical thing again.
+     */
+    get asked() { return animated; },
+    get turning() { return animated && !still; },
     get still() { return still; },
 
     /** Drawn, hung, and turning. */

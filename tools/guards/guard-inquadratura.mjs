@@ -336,10 +336,19 @@ if (!process.argv.includes('--self')) {
       args: ['--use-angle=d3d11', '--use-gl=angle', '--enable-gpu', '--ignore-gpu-blocklist'],
     });
     const WIN = { width: 1892, height: 845 };
-    const look = async (fraction) => {
+    const look = async (fraction, stored = null) => {
       const page = await browser.newPage({ viewport: WIN, deviceScaleFactor: 1 });
       try {
-        await page.goto(`http://127.0.0.1:${server.port}/?dev&t0&intro=0&inquadratura=${fraction}`,
+        // UN VISITATORE DI RITORNO, che e' uno STATO e non una maniglia: e'
+        // esattamente quel che il deposito contiene dopo una prima visita, e
+        // openVisitor in lib/quadro.mjs si regge sulla stessa idea.
+        if (stored) await page.addInitScript((record) => {
+          try {
+            window.localStorage.setItem('farfield.quality', JSON.stringify(record));
+          } catch { /* un browser che rifiuta di ricordare ri-calibra */ }
+        }, stored);
+        const pin = fraction === null ? '' : `&inquadratura=${fraction}`;
+        await page.goto(`http://127.0.0.1:${server.port}/?dev&t0&intro=0${pin}`,
           { waitUntil: 'load' });
         await page.waitForFunction(
           () => window.farfield && window.farfield.hub && window.farfield.hub.groundReady(),
@@ -369,6 +378,8 @@ if (!process.argv.includes('--self')) {
             // dev'essere PRIMA della tela.
             nightBeforeStage: kids.indexOf('notte') !== -1
               && kids.indexOf('notte') < kids.indexOf('stage'),
+            stored: window.localStorage.getItem('farfield.quality'),
+            benched: window.farfield.bench.active,
           };
         });
       } finally {
@@ -408,6 +419,75 @@ if (!process.argv.includes('--self')) {
         'e il buffer che ne esce sta sotto il tetto ai pixel',
         `${(small.buffer.width * small.buffer.height).toLocaleString('it-IT')} px`,
       );
+
+      // IL RICORDO. Un visitatore di ritorno non ripaga i tre secondi e non
+      // vede il quadro cambiare grandezza dietro la scena: l'inquadratura che
+      // il banco gli diede la volta scorsa e' quella del primo fotogramma.
+      const record = {
+        v: 2,
+        tier: 'medio',
+        choice: 'auto',
+        benchMs: 17.5,
+        pixels: WIN.width * WIN.height,
+        inquadratura: 0.75,
+        notte: 'ferma',
+      };
+      const remembered = frameOf(0.75, WIN.width, WIN.height, 1);
+      const back = await look(null, record);
+      report.check(
+        back.width === remembered.width && back.height === remembered.height,
+        "un visitatore di ritorno trova l'inquadratura che il deposito ricorda",
+        `voluto ${remembered.width}x${remembered.height}, trovato ${back.width}x${back.height}`,
+      );
+      report.check(
+        JSON.parse(back.stored).inquadratura === 0.75,
+        "e il deposito non e' stato riscritto: il banco non ha rigirato",
+      );
+
+      // LA NOTTE NON SI RIFA' A OGNI RIDIMENSIONAMENTO, E QUESTA RIGA E' QUI
+      // PERCHE' IL DIFETTO C'E' STATO.
+      //
+      // La notte si ricostruisce quando il verdetto del banco cambia sotto di
+      // lei, il che capita una volta per visita. Ma «gira» e «le e' stato detto
+      // di girare» sono due domande diverse: un visitatore che ha chiesto alla
+      // propria macchina NESSUN MOVIMENTO ha un cielo fermo qualunque cosa il
+      // banco abbia trovato, quindi un chiamante che confrontasse il verdetto
+      // con quel che la notte FA troverebbe, per quei visitatori soli, un
+      // disaccordo permanente -- e butterebbe giu' il cielo per ricostruirlo
+      // identico a ogni ridimensionamento, cioe' un ciclo per pixel su un
+      // milione e mezzo di pixel a ogni trascinamento del bordo.
+      //
+      // Si guarda dal di fuori, marchiando l'elemento e ridimensionando due
+      // volte: se e' ancora marchiato, e' ancora lui.
+      const reduced = await browser.newPage({
+        viewport: WIN, deviceScaleFactor: 1, reducedMotion: 'reduce',
+      });
+      try {
+        await reduced.goto(
+          `http://127.0.0.1:${server.port}/?dev&t0&intro=0&inquadratura=0.7&notte=animata`,
+          { waitUntil: 'load' },
+        );
+        await reduced.waitForSelector('.notte', { timeout: 120000 });
+        await reduced.evaluate(() => { document.querySelector('.notte').dataset.visto = '1'; });
+        for (const [w, h] of [[1600, 900], [1400, 800], [1892, 845]]) {
+          // eslint-disable-next-line no-await-in-loop
+          await reduced.setViewportSize({ width: w, height: h });
+          // eslint-disable-next-line no-await-in-loop
+          await reduced.waitForTimeout(500);
+        }
+        const survived = await reduced.evaluate(() => {
+          const n = document.querySelector('.notte');
+          return {
+            same: !!n && n.dataset.visto === '1',
+            count: document.querySelectorAll('.notte').length,
+          };
+        });
+        report.check(survived.same && survived.count === 1,
+          'con «nessun movimento» chiesto alla macchina, la notte non si rifa\' a ogni ridimensionamento',
+          survived.same ? `${survived.count} elemento` : 'e\' stata ricostruita');
+      } finally {
+        await reduced.close().catch(() => {});
+      }
     } finally {
       await browser.close().catch(() => {});
       await server.stop();
