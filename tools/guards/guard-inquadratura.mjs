@@ -1,7 +1,7 @@
-import { decideFraming } from '../../src/core/bench.js';
+import { decideFraming, framingFromWindowAlone } from '../../src/core/bench.js';
 import {
-  ASPECT_CEILING, askedFraction, bufferPixels, FRACTION_FLOOR, FRACTIONS, frameOf,
-  MODEL, PIXEL_CEILING, predictMs, windowPixels,
+  ASPECT_CEILING, ASPECT_FROM, askedFraction, bufferPixels, FRACTION_FLOOR, FRACTIONS,
+  frameOf, MODEL, PIXEL_CEILING, predictMs, windowPixels,
 } from '../../src/core/inquadratura.js';
 import { braceBody, read, reporter, selfTest } from './lib.mjs';
 
@@ -63,8 +63,11 @@ const FRAMED = FRACTIONS.filter((f) => f < 1);
 function ceilingHolds(frame_, windows = WINDOWS) {
   for (const w of windows) {
     for (const f of FRAMED) {
-      const frame = frame_(f, w.width, w.height, w.ratio);
-      if (bufferPixels(frame, w.ratio, 1) > PIXEL_CEILING) return false;
+      // IN CSS PIXELS (E-DECISIONI33): the ceiling is a question about the
+      // window, in the window's own units, so the same window answers the same
+      // way on every screen that displays it.
+      const frame = frame_(f, w.width, w.height);
+      if (frame.width * frame.height > PIXEL_CEILING) return false;
     }
   }
   return true;
@@ -116,6 +119,67 @@ function tierNeverMovesIt(source) {
   return seen === GOVERNOR_SEATS.length;
 }
 
+/**
+ * Does the FIRST step away from the whole window keep the window's own shape?
+ *
+ * E-DECISIONI33, point 2. The committente's window is 2.239:1, above sixteen by
+ * nine, so a proportion ceiling that applied at every fraction would make the
+ * first step cost WIDTH and not merely size -- and nine and nineteen twentieths
+ * are exactly the two rungs the bench answers on that machine.
+ */
+function firstStepKeepsTheShape(frame_) {
+  for (const w of WINDOWS) {
+    const shape = w.width / w.height;
+    if (shape <= ASPECT_CEILING) continue;
+    for (const f of FRACTIONS.filter((x) => x >= ASPECT_FROM && x < 1)) {
+      const frame = frame_(f, w.width, w.height);
+      // A framing the PIXEL ceiling shrank is not this rule's business: that
+      // one scales both sides together and leaves the shape where it was.
+      if (Math.abs(frame.width / frame.height - shape) > 0.02) return false;
+    }
+  }
+  return true;
+}
+
+/** And does the letterbox start below that, where it is meant to? */
+function letterboxStartsBelow(frame_) {
+  for (const w of WINDOWS) {
+    if (w.width / w.height <= ASPECT_CEILING) continue;
+    for (const f of FRACTIONS.filter((x) => x < ASPECT_FROM)) {
+      const frame = frame_(f, w.width, w.height);
+      if (frame.width / frame.height > ASPECT_CEILING + 0.01) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * With no verdict at all, is a big window still contained?
+ *
+ * E-DECISIONI33, point 5. The calibration answers nothing on exactly the
+ * windows this module exists for -- measured: two readings on an ultrawide, ten
+ * on a 4K, against 134 on the reference -- and what used to follow was the
+ * whole of a 4K drawn by a machine nobody could ask.
+ */
+function blindContains(blind) {
+  for (const w of WINDOWS) {
+    const out = blind({ width: w.width, height: w.height, ratio: w.ratio });
+    if (!out) return false;
+    if (out.frame.width * out.frame.height > PIXEL_CEILING) return false;
+    // And on a window that cannot be held it must actually CHOOSE something
+    // smaller rather than shrug and leave the window whole.
+    if (w.width * w.height > PIXEL_CEILING && out.fraction >= 1) return false;
+  }
+  return true;
+}
+
+/** Is the framing nailed to one wherever the walk is on glass? */
+function glassIsNeverFramed(source) {
+  // The pin has to outrank the handle too: `?inquadratura=0.6` on a telephone
+  // would be a page whose controls do not work.
+  return /const PINNED = TOUCH \? 1 : askedFraction\(\);/.test(source);
+}
+
 /** Is the night taken away wherever the picture is the whole window? */
 function nightOnlyWhenFramed(source) {
   const at = source.indexOf('function applyNight(');
@@ -138,7 +202,7 @@ report.line('   finestra            f=1 intatta   tetto 16:9   tetto ai pixel   
 
 let geometryOk = true;
 for (const w of WINDOWS) {
-  const whole = frameOf(1, w.width, w.height, w.ratio);
+  const whole = frameOf(1, w.width, w.height);
   const untouched = whole.width === w.width && whole.height === w.height && whole.framed === false;
 
   let aspectOk = true;
@@ -146,13 +210,14 @@ for (const w of WINDOWS) {
   let fractionOk = true;
   let worst = 0;
   for (const f of FRAMED) {
-    const frame = frameOf(f, w.width, w.height, w.ratio);
-    const pixels = bufferPixels(frame, w.ratio, 1);
+    const frame = frameOf(f, w.width, w.height);
+    const pixels = frame.width * frame.height;
     worst = Math.max(worst, pixels);
     if (pixels > PIXEL_CEILING) ceilingOk = false;
-    // A hundredth of slack: the sides are whole pixels and 16/9 of an integer
-    // is not one.
-    if (frame.width / frame.height > ASPECT_CEILING + 0.01) aspectOk = false;
+    // AND ONLY BELOW ASPECT_FROM (E-DECISIONI33): the first step away from the
+    // whole window keeps the window's own shape. A hundredth of slack, because
+    // the sides are whole pixels and 16/9 of an integer is not one.
+    if (f < ASPECT_FROM && frame.width / frame.height > ASPECT_CEILING + 0.01) aspectOk = false;
     // AND WHERE NEITHER CEILING BIT, THE FRACTION IS THE FRACTION. Half a pixel
     // of slack for the rounding of the side, which is where the only error is.
     if (frame.held === 'frazione' && Math.abs(frame.height - w.height * f) > 0.5) fractionOk = false;
@@ -168,7 +233,7 @@ report.check(ceilingHolds(frameOf), `nessuna inquadratura passa ${PIXEL_CEILING.
 
 // THE ONE WINDOW THAT MUST NOT MOVE AT ALL, which is the property every number
 // already measured in this repository stands on.
-const reference = frameOf(1, 1892, 845, 1);
+const reference = frameOf(1, 1892, 845);
 report.check(
   reference.width === 1892 && reference.height === 845
     && bufferPixels(reference, 1, 1) <= PIXEL_CEILING,
@@ -183,12 +248,18 @@ let heldOk = true;
 const heldSays = [];
 for (const f of [0.9, 0.8, 0.7, 0.6]) {
   for (const [w, h] of HELD) {
-    const frame = frameOf(f, w, h, 1);
+    const frame = frameOf(f, w, h);
     if (frame.held === 'pixel') continue;
     if (Math.abs(frame.fraction - f) > 1.5 / h) { heldOk = false; heldSays.push(`f=${f} su ${w}x${h} -> ${frame.fraction.toFixed(4)}`); }
   }
 }
 report.check(heldOk, 'la frazione e\' tenuta al ridimensionamento, non i pixel', heldSays.join(', '));
+
+// E-DECISIONI33 punto 2: il primo passo tiene la forma della finestra.
+report.check(firstStepKeepsTheShape(frameOf),
+  `da ${ASPECT_FROM} in su l'inquadratura tiene le proporzioni della finestra`);
+report.check(letterboxStartsBelow(frameOf),
+  `e sotto ${ASPECT_FROM} il tetto 16:9 morde`);
 
 // ===========================================================================
 // B. LA MANIGLIA
@@ -241,7 +312,7 @@ const bigSays = [];
 for (const w of WINDOWS) {
   const out = decideFraming({ medianMs: 0.5, source: 'gpu' },
     { width: w.width, height: w.height, ratio: w.ratio, benchPixels: 1154544 });
-  const pixels = bufferPixels(out.frame, w.ratio, 1);
+  const pixels = out.frame.width * out.frame.height;
   if (pixels > PIXEL_CEILING) { bigOk = false; bigSays.push(`${w.name.trim()} -> ${pixels}`); }
 }
 report.check(bigOk,
@@ -258,6 +329,19 @@ const lag = decideFraming(
 report.check(lag !== null && lag.fraction >= FRACTION_FLOOR && lag.fraction < 1,
   'il ramo senza orologio del driver decide un\'inquadratura e non si rompe',
   lag ? `f ${lag.fraction}, tier ${lag.tier}, ${lag.predictedMs.toFixed(1)} ms previsti su 16,7 di intervallo` : 'niente');
+
+// E-DECISIONI33 punto 5: IL BANCO CHE NON RISPONDE.
+report.line('');
+report.line("   verdetto nullo -- l'inquadratura dalla sola finestra:");
+for (const w of WINDOWS.filter((x) => x.ratio === 1)) {
+  const out = framingFromWindowAlone({ width: w.width, height: w.height, ratio: w.ratio });
+  report.line(`   ${w.name} ${String(w.width).padStart(4)}x${String(w.height).padEnd(5)} -> `
+    + `f ${String(out.fraction).padEnd(5)} ${`${out.frame.width}x${out.frame.height}`.padEnd(10)} `
+    + `${String(out.frame.width * out.frame.height).padStart(8)} px CSS   ${out.reason}`);
+}
+report.line('');
+report.check(blindContains(framingFromWindowAlone),
+  "senza verdetto l'inquadratura si sceglie dalla sola finestra, e contiene ogni schermo grande");
 
 // E IL MODELLO E' UN RAPPORTO: la stessa macchina, letta a due inquadrature
 // diverse, deve prevedere lo stesso costo per una terza.
@@ -289,6 +373,20 @@ report.check(/needsBenchmark\(windowPixels\(\)\)/.test(main),
   'PIXEL_TOLERANCE e\' riletta contro i pixel della FINESTRA e non del buffer');
 report.check(nightOnlyWhenFramed(main),
   'a inquadratura piena la notte non e\' montata, e quella che c\'era viene tolta');
+
+// E-DECISIONI33 punto 4: sul vetro l'inquadratura e' uno, inchiodata.
+report.check(glassIsNeverFramed(main),
+  "in modalita' tocco l'inquadratura e' inchiodata a uno, e la maniglia non la scavalca");
+report.check(/surface\.addEventListener\('pointerdown'/.test(read('src/ui/touch.js')),
+  "e la ragione regge ancora: src/ui/touch.js ascolta i pointer SULLA TELA");
+
+// E-DECISIONI33 punto 3: il velo d'arrivo e' del quadro, la scena resta sulla finestra.
+report.check(/body\.is-inquadrata \.sky-veil/.test(read('src/ui/style.css')),
+  "il velo d'arrivo prende la misura dell'inquadratura e non della finestra");
+report.check(/veil\.relayout\(\)/.test(main) && /relayout\(\) \{ paint\(\); \}/.test(read('src/ui/veil.js')),
+  "e viene ridipinto quando il banco muove l'inquadratura, non solo al ridimensionamento");
+report.check(!/is-inquadrata[\s\S]{0,400}?\.intro\b/.test(read('src/ui/style.css')),
+  'mentre il velo della SCENA resta sulla finestra');
 
 // LA SCENA D'APERTURA NON E' CAMBIATA, e il modo di dirlo in una guardia e' che
 // non ne esiste una SECONDA COPIA: ogni manopola del cielo sta in notte.js e
@@ -380,6 +478,17 @@ if (!process.argv.includes('--self')) {
               && kids.indexOf('notte') < kids.indexOf('stage'),
             stored: window.localStorage.getItem('farfield.quality'),
             benched: window.farfield.bench.active,
+            veil: (() => {
+              const v = document.querySelector('.sky-veil');
+              if (!v) return { width: 0, height: 0, left: 0, top: 0 };
+              const r = v.getBoundingClientRect();
+              return {
+                width: Math.round(r.width),
+                height: Math.round(r.height),
+                left: Math.round(r.left),
+                top: Math.round(r.top),
+              };
+            })(),
           };
         });
       } finally {
@@ -398,7 +507,7 @@ if (!process.argv.includes('--self')) {
       report.check(whole.nights === 0 && whole.framed === false,
         "a ?inquadratura=1 non c'e' nessuna notte montata e nessuna classe sul corpo");
 
-      const want = frameOf(0.7, WIN.width, WIN.height, 1);
+      const want = frameOf(0.7, WIN.width, WIN.height);
       const small = await look(0.7);
       report.check(small.width === want.width && small.height === want.height,
         "a ?inquadratura=0.7 la tela e' il rettangolo che l'aritmetica ha calcolato",
@@ -414,6 +523,21 @@ if (!process.argv.includes('--self')) {
         `${small.aspect.toFixed(4)} contro ${(want.width / want.height).toFixed(4)}`);
       report.check(small.nights === 1 && small.nightBeforeStage,
         "la notte c'e', una sola, e sta DIETRO la tela");
+      // E-DECISIONI33 punto 3: il velo d'arrivo sta sul QUADRO.
+      report.check(
+        Math.abs(small.veil.width - want.width) <= 1
+          && Math.abs(small.veil.height - want.height) <= 1
+          && Math.abs(small.veil.left - small.left) <= 1
+          && Math.abs(small.veil.top - small.top) <= 1,
+        "il velo d'arrivo sta esattamente sul quadro, non sulla finestra",
+        `velo ${small.veil.width}x${small.veil.height} a ${small.veil.left},${small.veil.top}`
+          + ` contro tela ${small.width}x${small.height} a ${small.left},${small.top}`,
+      );
+      report.check(
+        whole.veil.width === whole.window.width && whole.veil.height === whole.window.height,
+        "e a inquadratura piena torna la finestra intera, come e' sempre stato",
+        `${whole.veil.width}x${whole.veil.height}`,
+      );
       report.check(
         small.buffer.width * small.buffer.height <= PIXEL_CEILING,
         'e il buffer che ne esce sta sotto il tetto ai pixel',
@@ -432,7 +556,7 @@ if (!process.argv.includes('--self')) {
         inquadratura: 0.75,
         notte: 'ferma',
       };
-      const remembered = frameOf(0.75, WIN.width, WIN.height, 1);
+      const remembered = frameOf(0.75, WIN.width, WIN.height);
       const back = await look(null, record);
       report.check(
         back.width === remembered.width && back.height === remembered.height,
@@ -499,12 +623,12 @@ if (process.argv.includes('--self')) {
   // A ceiling that does not contain a 4K: the same geometry with the absolute
   // ceiling five times too high, which is exactly the defect "il tetto non
   // contiene un 4K".
-  const looseFrame = (f, w, h, r) => {
-    const out = frameOf(f, w, h, r);
+  const looseFrame = (f, w, h) => {
+    const out = frameOf(f, w, h);
     if (out.held !== 'pixel') return out;
     // Undo the pixel ceiling: the framing the fraction asked for, ceiling free.
     const height = h * f;
-    const width = Math.min(w * f, height * ASPECT_CEILING);
+    const width = f < ASPECT_FROM ? Math.min(w * f, height * ASPECT_CEILING) : w * f;
     return {
       width: Math.round(width), height: Math.round(height), fraction: f, framed: true, held: 'frazione',
     };
@@ -527,6 +651,35 @@ if (process.argv.includes('--self')) {
     'function applyNight(framed) {\n',
   );
 
+  // Un tetto 16:9 che morde gia' al primo passo: la finestra del committente
+  // perderebbe un quinto della sua larghezza per una frazione che doveva solo
+  // rimpicciolire il quadro.
+  const letterboxAtOnce = (f, w, h) => {
+    const height = h * f;
+    const width = Math.min(w * f, height * ASPECT_CEILING);
+    const out = frameOf(f, w, h);
+    if (out.held === 'pixel') return out;
+    return {
+      width: Math.round(width),
+      height: Math.round(height),
+      fraction: f,
+      framed: true,
+      held: 'sedici-noni',
+    };
+  };
+  // Un verdetto nullo che si stringe nelle spalle e lascia il 4K intero, che e'
+  // esattamente lo stato che E-DECISIONI33 punto 5 e' venuto a chiudere.
+  const blindShrugs = (where) => {
+    const out = framingFromWindowAlone(where);
+    return where.width * where.height > PIXEL_CEILING
+      ? { ...out, fraction: 1, frame: { width: where.width, height: where.height } }
+      : out;
+  };
+  const glassFramed = main.replace(
+    'const PINNED = TOUCH ? 1 : askedFraction();',
+    'const PINNED = askedFraction();',
+  );
+
   selfTest('inquadratura', [
     {
       what: 'un tetto ai pixel che non contiene un 4K',
@@ -545,9 +698,23 @@ if (process.argv.includes('--self')) {
       caught: !nightOnlyWhenFramed(nightAlways),
     },
     {
+      what: 'un tetto 16:9 che morde gia\' al primo passo via dalla finestra intera',
+      caught: !firstStepKeepsTheShape(letterboxAtOnce),
+    },
+    {
+      what: 'un verdetto nullo che lascia un 4K intero invece di contenerlo',
+      caught: !blindContains(blindShrugs),
+    },
+    {
+      what: 'la modalita\' tocco senza l\'inquadratura inchiodata a uno',
+      caught: !glassIsNeverFramed(glassFramed),
+    },
+    {
       what: 'la guardia riconosce comunque la sorgente buona',
       caught: ceilingHolds(frameOf) && floorHolds(decideFraming)
-        && tierNeverMovesIt(quality) && nightOnlyWhenFramed(main),
+        && tierNeverMovesIt(quality) && nightOnlyWhenFramed(main)
+        && firstStepKeepsTheShape(frameOf) && letterboxStartsBelow(frameOf)
+        && blindContains(framingFromWindowAlone) && glassIsNeverFramed(main),
     },
   ]);
 }
