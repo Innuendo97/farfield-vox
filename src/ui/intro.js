@@ -1859,7 +1859,7 @@ export function createIntro({
     lastPost = post;
     const now = typeof nowMs === 'number' ? nowMs : performance.now();
 
-      // ------------------------------------------------------------ the birth
+    // ------------------------------------------------------------ the birth
     //
     // The circle of the loading, growing into the picture. Two things move and
     // they are the same three numbers: the mask in the composite, which is what
