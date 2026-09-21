@@ -457,7 +457,19 @@ export async function openWorld({
     // So the world is opened at the framing every plate of this campaign was
     // taken at, and `openVisitor` below deliberately does NOT do this -- see
     // the note over it, which is E-SUOLO1's whole lesson.
-    await page.goto(`http://127.0.0.1:${port}/?dev&t0&intro=0&inquadratura=1`, { waitUntil: 'load' });
+    //
+    // AND SO IS THE FRAME ROUND IT, FOR EXACTLY THE SAME REASON
+    // (U-INQUADRATURA-2). src/core/cornice.js gives the picture rounded corners,
+    // a feathered edge and a halo of its own bloom spilt into a margin — and at
+    // the whole window it takes a thin margin OUT of the picture to make room
+    // for them (E-DECISIONI35, point 3). Every guard below this line crops a
+    // band out of that picture and asks about the meadow in it; a corner that
+    // is round and an edge that dissolves are not facts about the meadow, and a
+    // band read two and a half hundredths further in is a band of somewhere
+    // else. `?cornice=0` is the cut edge of sito-4, to the pixel, which is what
+    // every one of those numbers was measured against.
+    await page.goto(`http://127.0.0.1:${port}/?dev&t0&intro=0&inquadratura=1&cornice=0`,
+      { waitUntil: 'load' });
     await page.waitForFunction(
       () => window.farfield && window.farfield.hub && window.farfield.hub.groundReady(),
       null, { timeout: groundTimeoutMs, polling: 250 },

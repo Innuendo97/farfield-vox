@@ -449,7 +449,14 @@ if (!process.argv.includes('--self')) {
           } catch { /* un browser che rifiuta di ricordare ri-calibra */ }
         }, stored);
         const pin = fraction === null ? '' : `&inquadratura=${fraction}`;
-        await page.goto(`http://127.0.0.1:${server.port}/?dev&t0&intro=0${pin}`,
+        // E LA CORNICE E' SPENTA, perche' questa gamba e' dell'INQUADRATURA.
+        // src/core/cornice.js fa la tela piu' grande del quadro di un margine e
+        // a finestra intera toglie il margine sottile dal quadro: due cose vere
+        // e nessuna delle due e' l'aritmetica che si misura qui. A `?cornice=0`
+        // la tela E' il quadro ed e' il rettangolo che frameOf() ha calcolato,
+        // che e' la sola cosa di cui questa gamba parla. La cornice viva ha la
+        // sua guardia: tools/guards/guard-cornice-viva.mjs.
+        await page.goto(`http://127.0.0.1:${server.port}/?dev&t0&intro=0&cornice=0${pin}`,
           { waitUntil: 'load' });
         await page.waitForFunction(
           () => window.farfield && window.farfield.hub && window.farfield.hub.groundReady(),
@@ -591,7 +598,7 @@ if (!process.argv.includes('--self')) {
       });
       try {
         await reduced.goto(
-          `http://127.0.0.1:${server.port}/?dev&t0&intro=0&inquadratura=0.7&notte=animata`,
+          `http://127.0.0.1:${server.port}/?dev&t0&intro=0&cornice=0&inquadratura=0.7&notte=animata`,
           { waitUntil: 'load' },
         );
         await reduced.waitForSelector('.notte', { timeout: 120000 });
