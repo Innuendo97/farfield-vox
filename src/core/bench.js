@@ -294,7 +294,7 @@ export function decideFraming(verdict, where) {
     : LAG_CEILING * (verdict.intervalMs || verdict.medianMs);
 
   const rungs = FRACTIONS.map((fraction) => {
-    const frame = frameOf(fraction, where.width, where.height, ratio);
+    const frame = frameOf(fraction, where.width, where.height);
     const pixels = bufferPixels(frame, ratio, BENCH_SCALE);
     return {
       fraction,
@@ -307,7 +307,7 @@ export function decideFraming(verdict, where) {
       // because one means "no framing at all". So this is where a 4K panel is
       // stopped from being handed its whole self by a machine fast enough to
       // ask for it.
-      overCeiling: bufferPixels(frame, ratio, 1) > PIXEL_CEILING,
+      overCeiling: frame.width * frame.height > PIXEL_CEILING,
     };
   });
 

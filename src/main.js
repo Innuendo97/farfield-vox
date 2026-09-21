@@ -417,7 +417,7 @@ function applyNight(framed) {
  * to a guard and what the byte comparison stands on.
  */
 function applyFraming() {
-  const frame = frameOf(fraction, window.innerWidth, window.innerHeight, deviceRatio());
+  const frame = frameOf(fraction, window.innerWidth, window.innerHeight);
   if (frame.framed) {
     document.body.style.setProperty('--inquadratura-w', `${frame.width}px`);
     document.body.style.setProperty('--inquadratura-h', `${frame.height}px`);

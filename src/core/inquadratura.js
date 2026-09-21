@@ -56,27 +56,58 @@ export function deviceRatio(dpr = (typeof window === 'undefined' ? 1 : window.de
 /**
  * THE PROPORTION CEILING. «proporzioni della finestra con tetto 16:9».
  *
- * The framing takes the window's own shape, because a picture that did not
- * would put bars on a window the visitor chose the shape of. Up to sixteen by
- * nine. Past that — an ultrawide, a browser dragged out across two thirds of a
- * desk — the framing is as TALL as the fraction allows and sixteen ninths of
- * that wide, centred, and the rest is night. A world that filled a 21:9 window
- * would be a world seen through a letterbox: the hub is a ring of six stones
- * around a walker and what an ultrawide adds to it is meadow at the edges, at
- * the price of every pixel of it.
+ * Past sixteen by nine — an ultrawide, a browser dragged out across two thirds
+ * of a desk — the framing is as TALL as the fraction allows and sixteen ninths
+ * of that wide, centred, and the rest is night. A world that filled a 21:9
+ * window would be a world seen through a letterbox: the hub is a ring of six
+ * stones around a walker, and what an ultrawide adds to it is meadow at the
+ * edges at the price of every pixel of it.
  */
 export const ASPECT_CEILING = 16 / 9;
 
 /**
- * THE ABSOLUTE CEILING, IN PIXELS OF BUFFER, AND WHY IT IS THIS NUMBER.
+ * AND IT ONLY STARTS BELOW NINE TENTHS (E-DECISIONI33).
+ *
+ * The committente's own window is 2.239:1, which is ABOVE sixteen by nine. So
+ * a proportion ceiling that applied at every fraction would make the very first
+ * step away from the whole window cost WIDTH rather than size: at nine tenths
+ * the picture would go from 1892 px of width to 1521 in one move, and the world
+ * would lose a slice of meadow off each side for a fraction that was only ever
+ * meant to make it smaller.
+ *
+ * The bench answers nine or nineteen twentieths on that machine (§A.4), so this
+ * line is what decides what the committente actually gets: **the first step
+ * keeps the shape of the window**, and the letterbox rule is held back for the
+ * fractions where the picture is small enough that a 21:9 slice of it would be
+ * paying for meadow nobody looks at.
+ */
+export const ASPECT_FROM = 0.9;
+
+/**
+ * THE ABSOLUTE CEILING, IN CSS PIXELS, AND WHY IT IS COUNTED THAT WAY.
  *
  * The committente's window — the one every plate of this campaign is taken at,
- * and the one the tiers were fitted against — is 1892 x 845, which at a device
- * ratio of one is 1 598 740 pixels. This sits just above it. So the reference
- * machine does not move by a single pixel because of this line, which is the
- * property that lets every number already measured in this repository stand;
- * and a 4K panel, which would ask for 8 294 400 and five times the frame, is
- * contained.
+ * and the one the tiers were fitted against — is 1892 x 845, which is
+ * 1 598 740 CSS pixels. This sits just above it. So the reference machine does
+ * not move by a single pixel because of this line, which is the property that
+ * lets every number already measured in this repository stand; and a 4K panel,
+ * which would ask for 8 294 400 and five times the frame, is contained.
+ *
+ * CSS PIXELS AND NOT BUFFER PIXELS (E-DECISIONI33), and the difference is a
+ * whole class of screens. Counted in BUFFER pixels this ceiling reads the
+ * device ratio too, so the SAME window on a retina laptop counts 2.25 times
+ * over and the framing shrinks to a little over three quarters — on a machine
+ * that is very often the faster one, and for a picture that is physically no
+ * larger. The committente asked for a ceiling on how much of the SCREEN the
+ * world occupies, not a second tax on a screen that happens to be dense; and
+ * the device ratio already has its own ceiling one screen up (MAX_PIXEL_RATIO,
+ * 1.5), which is where that particular purchase is argued.
+ *
+ * WHAT THAT COSTS, DECLARED: a dense screen really does draw up to 2.25 times
+ * the pixels of a coarse one at the same framing, and this line does not stop
+ * it. What stops it there is the bench, which measures that machine and hands
+ * back a smaller fraction if it needs one — which is the right instrument for a
+ * question about a machine. This one is for a question about a window.
  *
  * IT IS PAID FOR BY REDUCING THE FRACTION AND NEVER THE SCALE. That is the
  * whole argument of this module: a big monitor gets a picture of the size the
@@ -115,13 +146,17 @@ export const FRACTIONS = [1, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7, 0.65, 0.6];
  * every ultrawide in order to make a curve continuous at a point nobody stands
  * on.
  *
+ * IT TAKES NO DEVICE RATIO, and that is the second half of E-DECISIONI33: both
+ * ceilings are now questions about the WINDOW, in the window's own units, so
+ * the same window answers the same way on every screen that displays it. See
+ * PIXEL_CEILING.
+ *
  * @param {number} fraction      how much of the window's SIDE, 0..1
  * @param {number} windowWidth   the window, in CSS pixels
  * @param {number} windowHeight
- * @param {number} ratio         the device ratio the buffer will be built at
  * @returns {{width:number,height:number,fraction:number,framed:boolean,held:string}}
  */
-export function frameOf(fraction, windowWidth, windowHeight, ratio = 1) {
+export function frameOf(fraction, windowWidth, windowHeight) {
   const w0 = Math.max(1, Math.round(windowWidth));
   const h0 = Math.max(1, Math.round(windowHeight));
   const asked = Number.isFinite(fraction) ? fraction : 1;
@@ -133,20 +168,21 @@ export function frameOf(fraction, windowWidth, windowHeight, ratio = 1) {
   const f = Math.max(0.05, asked);
 
   // The fraction is of the SIDE, so it is read off the height and the width
-  // follows the window's own shape until the proportion ceiling stops it.
+  // follows the window's own shape — all the way, down to ASPECT_FROM, where
+  // the proportion ceiling starts. See the note over ASPECT_FROM for why the
+  // first step keeps the window's shape.
   let height = h0 * f;
   let width = w0 * f;
   let held = 'frazione';
-  if (width > height * ASPECT_CEILING) {
+  if (f < ASPECT_FROM && width > height * ASPECT_CEILING) {
     width = height * ASPECT_CEILING;
     held = 'sedici-noni';
   }
 
   // AND THE PIXEL CEILING LAST, because it is the only one that can overrule
   // the fraction the bench chose rather than merely shape it.
-  const r = Math.max(0.1, ratio);
-  if (Math.floor(width * r) * Math.floor(height * r) > PIXEL_CEILING) {
-    const shrink = Math.sqrt(PIXEL_CEILING / (width * r * height * r));
+  if (Math.round(width) * Math.round(height) > PIXEL_CEILING) {
+    const shrink = Math.sqrt(PIXEL_CEILING / (width * height));
     width *= shrink;
     height *= shrink;
     held = 'pixel';
