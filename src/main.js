@@ -331,7 +331,30 @@ if (INTRO) {
 //
 // And with neither, ONE: the whole window, which is what this page has always
 // drawn, until the bench says otherwise behind the opening scene.
-const PINNED = askedFraction();
+// WHICH HAND IS WALKING, READ ONCE AND READ HERE, because the framing is the
+// first thing on the page that has to know. It used to be read a hundred lines
+// down, beside the prompt and the body; it is the same single call, moved up,
+// and `input.touch` is set from THIS constant further down, so that nothing on
+// this page ever asks the question twice.
+const TOUCH = touchWanted();
+
+/**
+ * AND ON GLASS THE FRAMING IS ONE, NAILED (E-DECISIONI33, point 4).
+ *
+ * THE REASON IS NOT SPEED -- the committente reports that a telephone is
+ * fluidissimo and the bench would very likely answer one anyway. It is that a
+ * framing smaller than the window would BREAK THE WALK. src/ui/touch.js listens
+ * for pointers on the CANVAS (`surface: canvas`, four listeners on #stage), so
+ * every finger that lands on the night around a smaller picture lands on
+ * nothing: the walker cannot turn their head by dragging outside the frame, and
+ * on a telephone held upright that band is a large share of the glass.
+ *
+ * So the mode does not get a framing at all, and the handle does not overrule
+ * it: `?inquadratura=0.6` on a telephone would be a page whose controls do not
+ * work, which is not a thing to leave reachable. The day touch.js listens on
+ * the window instead of on the canvas, this line is the one to reconsider.
+ */
+const PINNED = TOUCH ? 1 : askedFraction();
 let fraction = PINNED ?? readStored()?.fraction ?? 1;
 
 // ------------------------------------------------------- the night around it
@@ -489,7 +512,7 @@ const input = new Input().attach(canvas);
 // opinion. Outside the mode nothing on this page changes at all — no listener
 // is registered, no element is built, no handle is published — which is what
 // the desk's byte comparison stands on.
-input.touch = touchWanted();
+input.touch = TOUCH;
 if (input.touch) document.body.classList.add('is-touch');
 const overlay = createStartOverlay(ui, { touch: input.touch });
 // Behind the opening scene there is nothing to click into: the scene takes the
