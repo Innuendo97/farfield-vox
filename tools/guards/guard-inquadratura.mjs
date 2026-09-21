@@ -214,9 +214,12 @@ for (const w of WINDOWS) {
     const pixels = frame.width * frame.height;
     worst = Math.max(worst, pixels);
     if (pixels > PIXEL_CEILING) ceilingOk = false;
-    // AND ONLY BELOW ASPECT_FROM (E-DECISIONI33): the first step away from the
-    // whole window keeps the window's own shape. A hundredth of slack, because
-    // the sides are whole pixels and 16/9 of an integer is not one.
+    // AND ONLY BELOW ASPECT_FROM (E-DECISIONI33, value settled by E-DECISIONI34
+    // at four fifths): the steps away from the whole window that the reference
+    // machine can actually land on all keep the window's own shape. The
+    // threshold is read from the module and never written here, so the day it
+    // moves again this leg moves with it. A hundredth of slack, because the
+    // sides are whole pixels and 16/9 of an integer is not one.
     if (f < ASPECT_FROM && frame.width / frame.height > ASPECT_CEILING + 0.01) aspectOk = false;
     // AND WHERE NEITHER CEILING BIT, THE FRACTION IS THE FRACTION. Half a pixel
     // of slack for the rounding of the side, which is where the only error is.

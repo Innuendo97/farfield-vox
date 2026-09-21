@@ -66,22 +66,44 @@ export function deviceRatio(dpr = (typeof window === 'undefined' ? 1 : window.de
 export const ASPECT_CEILING = 16 / 9;
 
 /**
- * AND IT ONLY STARTS BELOW NINE TENTHS (E-DECISIONI33).
+ * AND IT ONLY STARTS BELOW FOUR FIFTHS (E-DECISIONI33, then E-DECISIONI34).
  *
- * The committente's own window is 2.239:1, which is ABOVE sixteen by nine. So
- * a proportion ceiling that applied at every fraction would make the very first
- * step away from the whole window cost WIDTH rather than size: at nine tenths
- * the picture would go from 1892 px of width to 1521 in one move, and the world
- * would lose a slice of meadow off each side for a fraction that was only ever
- * meant to make it smaller.
+ * The committente's own window is 2.239:1, which is ABOVE sixteen by nine. So a
+ * proportion ceiling that applied at every fraction would make the very first
+ * step away from the whole window cost WIDTH rather than size: the picture would
+ * go from 1892 px of width to 1521 in one move, and the world would lose a slice
+ * of meadow off each side for a fraction that was only ever meant to make it
+ * smaller. That is why there is a threshold at all.
  *
- * The bench answers nine or nineteen twentieths on that machine (§A.4), so this
- * line is what decides what the committente actually gets: **the first step
- * keeps the shape of the window**, and the letterbox rule is held back for the
- * fractions where the picture is small enough that a 21:9 slice of it would be
- * paying for meadow nobody looks at.
+ * WHY IT IS FOUR FIFTHS AND NOT NINE TENTHS, WHICH IS WHERE IT STARTED. Nine
+ * tenths put the change of SHAPE exactly where the bench lands on the reference
+ * machine, and a threshold inside the instrument's own noise is a coin toss
+ * rather than a rule. The cost of each rung, and the reading that buys it:
+ *
+ *     f       tela          buffer a 0,85    modello    il banco deve leggere
+ *     1.00    1892 x 845    1 154 544        17.89 ms   sotto 13.00
+ *     0.95    1797 x 803    1 041 414        16.31      sotto 14.26
+ *     0.90    1703 x 761      934 762        14.83      sotto 15.68
+ *     0.85    1608 x 718      833 260        13.42      sotto 17.33
+ *     0.80    1514 x 676      738 164        12.09      sotto 19.23
+ *     0.75    1127 x 634      514 866         8.99      sotto 25.87   <- 16:9
+ *
+ * The bench reads 15.0 to 17.5 ms on that machine across first visits, so at
+ * nine tenths two openings of the same page could land on either side of the
+ * letterbox and hand the committente two different COMPOSITIONS — one of them
+ * with its flanks cut. At four fifths every rung that reading can reach (0.90,
+ * 0.85, 0.80) keeps the window's own shape, and the reading that would reach
+ * the letterbox is 19.23 ms, which is a machine a fifth slower than this one.
+ *
+ * So the wobble between two first visits is still there — it is the bench's own
+ * noise and this line cannot touch it — but it is now a wobble in SIZE and no
+ * longer in shape. That is the whole of what moving this number bought.
+ *
+ * Below four fifths the picture is small enough that a 21:9 slice of it would
+ * be paying for meadow nobody looks at, which is the argument the ceiling was
+ * always made of.
  */
-export const ASPECT_FROM = 0.9;
+export const ASPECT_FROM = 0.8;
 
 /**
  * THE ABSOLUTE CEILING, IN CSS PIXELS, AND WHY IT IS COUNTED THAT WAY.
