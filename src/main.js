@@ -24,7 +24,9 @@ import {
 import {
   askedFraction, deviceRatio, frameOf, windowPixels,
 } from './core/inquadratura.js';
-import { createBenchmark, decideFraming, tierOf } from './core/bench.js';
+import {
+  createBenchmark, decideFraming, decideNight, tierOf,
+} from './core/bench.js';
 import { buildHub } from './world/hub.js';
 import { needsAt } from './world/layers/registry.js';
 import { createStartOverlay } from './ui/overlay.js';
@@ -334,10 +336,75 @@ if (INTRO) {
 const PINNED = askedFraction();
 let fraction = PINNED ?? readStored()?.fraction ?? 1;
 
+// ------------------------------------------------------- the night around it
+
+/**
+ * Whether the night turns, and it is the BENCH's answer — not a preference.
+ *
+ * `?notte=animata|ferma|no` pins it, the way `?inquadratura=` pins the framing:
+ * for the plates, for the guards, and for anybody who wants to put a number on
+ * their own screen. `no` is the null every measurement of its cost is taken
+ * against, and it is the one value a visitor never gets by any other route.
+ */
+const NIGHT_CHOICE = (() => {
+  const raw = new URLSearchParams(window.location.search).get('notte');
+  return raw === 'animata' || raw === 'ferma' || raw === 'no' ? raw : null;
+})();
+
 // The night around the picture, mounted only where there is a picture smaller
-// than the window to put it around. It is null at a whole window and stays
-// null: see src/ui/notte.js.
+// than the window to put it around. It is null at a whole window and STAYS
+// null, and the module it comes from is never even fetched there: see
+// applyNight() below and src/ui/notte.js.
 let night = null;
+// AND IT DOES NOT TURN UNTIL SOMETHING SAYS IT MAY. The handle first, then what
+// the last visit was told, and with neither the still sky -- which is the
+// measured answer on the reference machine and the safe one on a machine
+// nobody has measured yet. See decideNight() in src/core/bench.js.
+let nightTurning = NIGHT_CHOICE
+  ? NIGHT_CHOICE === 'animata'
+  : readStored()?.notte === 'animata';
+let nightComing = false;
+
+/**
+ * Hangs the night behind the picture, or takes it away.
+ *
+ * THE CHUNK IS ASKED FOR ONLY WHERE IT IS WANTED. At a whole window nothing
+ * here runs at all — no import, no element, no canvas, not one byte on the
+ * wire — which is the same economy the opening scene has and the thing the byte
+ * comparison at `?inquadratura=1` stands on.
+ */
+function applyNight(framed) {
+  if (!framed || NIGHT_CHOICE === 'no') {
+    if (night) { night.dispose(); night = null; }
+    return;
+  }
+  if (night) {
+    if (night.animated === nightTurning) { night.relayout(); return; }
+    // The verdict changed under it, which happens once: the bench answers while
+    // the night is already up. A turn is a property the element is built with,
+    // so it is rebuilt -- behind the opening scene, where there is nothing to
+    // see it.
+    night.dispose();
+    night = null;
+  }
+  if (nightComing) return;
+  nightComing = true;
+  import('./ui/notte.js')
+    .then(({ createNight }) => {
+      nightComing = false;
+      // The framing may have gone away while the chunk was on the wire.
+      if (!document.body.classList.contains('is-inquadrata')) return;
+      night = createNight({ animated: nightTurning }).start();
+      if (import.meta.env.DEV && window.farfield) window.farfield.night = night;
+    })
+    .catch((error) => {
+      // A night that did not arrive is a picture on the page's own ground,
+      // which is already the night's colour (body.is-inquadrata in
+      // src/ui/style.css). Nothing about the world is lost.
+      nightComing = false;
+      console.warn('night not shown:', error.message);
+    });
+}
 
 /**
  * Puts the framing on the page: the canvas becomes a centred rectangle and the
@@ -907,13 +974,24 @@ function calibrate(force = false) {
         benchPixels: read.width * read.height,
       })
       : null;
+    // AND WHETHER THE SKY AROUND IT TURNS, on the same one reading. The handle
+    // outranks this too: a page opened at `?notte=` is a page whose night
+    // nobody may decide.
+    const turning = NIGHT_CHOICE === null
+      ? decideNight(verdict, read.width * read.height)
+      : null;
+    if (turning !== null) nightTurning = turning === 'animata';
     if (framing) setFraction(framing.fraction);
+    // The framing may not have moved -- a machine fast enough keeps the whole
+    // window -- and the night's verdict still has to reach whatever is up.
+    applyNight(document.body.classList.contains('is-inquadrata'));
     quality.setBenchmark(framing ? framing.tier : tier, verdict.medianMs, {
       // THE WINDOW AND NOT THE BUFFER: see the note over PIXEL_TOLERANCE in
       // src/core/quality.js. It is read after the framing has been applied on
       // purpose — the window is the one thing the framing did not change.
       pixels: windowPixels(),
       fraction: framing ? framing.fraction : null,
+      notte: turning,
     });
     if (import.meta.env.DEV) {
       console.info(`calibrazione: ${framing ? framing.tier : tier}, `
@@ -921,7 +999,8 @@ function calibrate(force = false) {
         + (framing
           ? `, inquadratura ${framing.fraction} (${framing.frame.width}x${framing.frame.height}, `
             + `${framing.predictedMs.toFixed(2)} ms previsti, ${framing.reason})`
-          : `, inquadratura inchiodata a ${fraction}`));
+          : `, inquadratura inchiodata a ${fraction}`)
+        + `, notte ${turning ?? NIGHT_CHOICE}`);
     }
   });
 }
@@ -1036,7 +1115,7 @@ function resize() {
   const { aspect } = renderer.resize(frame.width, frame.height);
   camera.aspect = aspect;
   camera.updateProjectionMatrix();
-  night?.relayout();
+  applyNight(frame.framed);
 }
 window.addEventListener('resize', resize);
 resize();

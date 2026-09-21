@@ -27,6 +27,33 @@
 // the whole scene free when it is switched off: no import, no chunk, no
 // stylesheet, not one byte on the wire.
 import './intro.css';
+// THE SKY ITSELF, WHICH THIS SCENE NO LONGER OWNS ALONE.
+//
+// Every knob that decides the night — where the pole sits, how many arcs, how
+// long they are, how bright, how long a turn takes, what the quiet is — and
+// every loop that draws one now lives in src/ui/notte.js, because a second
+// place draws the same sky: when the bench gives this machine a framing smaller
+// than its window (src/core/inquadratura.js), what stands around the world is
+// this night, on the same window, about the same pole.
+//
+// NOTHING ABOUT THE PICTURE MOVED. The constants are the constants, the loops
+// are the loops, the generator is seeded with the same words; the pixels this
+// scene lays down are the same pixels, which is checked rather than asserted —
+// the two bitmaps are deterministic, so their hashes before and after the
+// extraction are the proof. What is left in THIS file is what only a scene has:
+// the name, the sentence, the orbit and its comet, the lids of the waking, the
+// ledger and the gesture.
+import {
+  clamp01,
+  paintField as NOTTE_paintField,
+  paintTrails as NOTTE_paintTrails,
+  POLE_Y,
+  seedGlints as NOTTE_seedGlints,
+  smoothstep,
+  SPARK_MS,
+  SPIN_MS,
+  twinkle as NOTTE_twinkle,
+} from './notte.js';
 
 // ---------------------------------------------------------------- the ledger
 
@@ -51,68 +78,6 @@ const CLOSE = 0.04;
 // until the committente has looked at it on their own screen. They are gathered
 // here, each with the reason it is what it is, so that tuning the picture is a
 // line of arithmetic and not an excavation.
-
-/** Where the pole sits down the frame. High, because the sky has to have room
- *  to turn UNDER the name — a pole at the middle puts half the rotation off the
- *  bottom of the screen and the picture stops reading as a vortex. */
-const POLE_Y = 0.32;
-
-/** How many arcs. Under four hundred the sky reads as scattered marks; over six
- *  hundred the outer ring closes into a wash and the individual streak — the
- *  thing that says "long exposure" — is gone. */
-const TRAILS = 520;
-
-/** The angular length of one streak, in degrees, with jitter. This is the
- *  exposure time made visible and it is the SAME for every star: that constancy
- *  is what empties the middle. Nine to fifteen degrees is a long-ish exposure,
- *  around half an hour of sky. */
-const ARC_MIN_DEG = 9;
-const ARC_MAX_DEG = 15;
-
-/** The brightest a streak's head is allowed to be, as an alpha over the night.
- *  The design asked for 0.55, and 0.55 is what a LONE head would need to sit
- *  exactly on the committente's ceiling of 55% of white. But heads cross: at
- *  0.55 the crossings reached 67%, at 0.44 they still reached 59% and at 0.40
- *  one pixel in a million still reached 58%. This is the value at which NOT
- *  ONE pixel is over the ceiling at any of the four framings measured — the
- *  brightest is 54.0% — with the trails' own median at 18% and their 99.9th
- *  at 46%, and every pixel behind the type at four and a half. */
-const TRAIL_PEAK_ALPHA = 0.37;
-
-/** And the floor, at the edge of the quiet: not nought, or the band where the
- *  trails begin would have a visible rim. */
-const TRAIL_FLOOR_ALPHA = 0.1;
-
-/** Where the bell of brightness is full, in ρ = r / R_out. Inside 0.55 the sky
- *  is fading into the quiet; past 0.92 it is falling into the corners, which is
- *  what keeps the frame from having a lit edge. */
-const RHO_FULL_IN = 0.55;
-const RHO_FULL_OUT = 0.92;
-const RHO_DARK = 1.06;
-
-/** The colours of the sky, from style.css. The heads are the near-white the
- *  engravings are cut in; the bodies are the three teals the whole interface is
- *  already lit with, so the scene is the same world as the menu behind it. */
-const TRAIL_TINTS = ['158,236,249', '127,212,245', '217,248,255'];
-const TRAIL_HEAD = '238,246,251';
-
-/** One turn of the sky. 400 s is 0.9°/s — fast enough that a visitor sees the
- *  motion within a second of arriving, slow enough that it never becomes the
- *  thing they are looking at. ANTICLOCKWISE: the northern sky. */
-const SPIN_MS = 400000;
-
-/** The night itself, as three stops in ρ. Darkest at the pole (the type has to
- *  sit on something), opening at 0.7 where the trails are brightest, and deep
- *  again at the corners so the frame closes rather than bleeding off. */
-const SKY = [
-  [0.00, [4, 7, 15]],
-  [0.70, [11, 22, 38]],
-  [1.00, [6, 11, 20]],
-];
-
-/** Grains of far-off light in the static field. Not stars — stars have trails
- *  in this sky — but the dust that keeps a flat gradient from looking printed. */
-const DUST = 220;
 
 /** THE ORBIT. The bar is not a bar: it is the trail CLOSEST TO THE POLE, the
  *  one whose circle is small enough to close while the world loads, and the
@@ -283,13 +248,6 @@ const TYPE_WAIT_MS = 1500;
 const SWAP_MS = 200;
 const SWAP_STILL_MS = 120;
 
-/** The glints. Twenty-six points at ten a second: this is the one layer that is
- *  allowed to freeze during a stall, so it is also the one that must not be
- *  missed when it does. Never within a quarter again of the quiet radius. */
-const SPARKS = 26;
-const SPARK_MS = 100;
-const SPARK_KEEP_OUT = 1.25;
-
 /** The shortest the whole load is allowed to look, however warm the cache. A
  *  scene that opens and closes in four hundred milliseconds is a flash, not an
  *  arrival, and the committente asked for a breath. */
@@ -457,11 +415,6 @@ const EASE_HALF_OUT = 'cubic-bezier(0.333, 0.5, 0.2, 1)';
  *  is the seam between the two clipped layers going out. */
 const ORBIT_HAND_MS = 400;
 
-/** The biggest backing store the trails canvas may take, in physical pixels a
- *  side. Two thousand eight hundred squared is thirty-one megabytes, held for
- *  the length of the load and given back at the handover. */
-const CAP_PX = 2800;
-
 const WAITING = 'Il viaggio sta per iniziare…';
 const READY = 'Clicca per iniziare';
 
@@ -627,16 +580,6 @@ const RESIZE_MS = 180;
 
 // ---------------------------------------------------------------- arithmetic
 
-const clamp01 = (v) => (v < 0 ? 0 : (v > 1 ? 1 : v));
-
-/** Hermite between two edges: the only shape used for every ramp in here, so
- *  nothing in the picture has a corner the eye can find. */
-function smoothstep(edge0, edge1, x) {
-  if (edge1 === edge0) return x < edge0 ? 0 : 1;
-  const t = clamp01((x - edge0) / (edge1 - edge0));
-  return t * t * (3 - 2 * t);
-}
-
 /** A table of [ms, value] read at a time, with the corner taken off every
  *  junction. Hermite and not a straight line for the same reason everything
  *  else in this file is Hermite: a piecewise linear curve has a discontinuous
@@ -677,26 +620,6 @@ function lidKeyframes() {
   }).join('');
   return `@keyframes intro-lid-up{${frames(-1)}}\n`
     + `@keyframes intro-lid-down{${frames(1)}}`;
-}
-
-/**
- * The one source of chance in this scene, and it is a fixed one.
- *
- * Every arc, every grain of dust and every glint comes out of this, seeded with
- * a constant. A resize therefore REDRAWS THE SAME SKY at the new size instead
- * of dealing a new one: a walker who drags the window edge is meant to see the
- * picture stretch, not the picture change.
- *
- * xorshift32, the same generator the veil and the sky bake already use.
- */
-function seeded(seed) {
-  let state = seed >>> 0;
-  return () => {
-    state ^= state << 13; state >>>= 0;
-    state ^= state >> 17;
-    state ^= state << 5; state >>>= 0;
-    return state / 4294967296;
-  };
 }
 
 /** Whether a key press means "let me in" rather than something else entirely.
@@ -847,6 +770,8 @@ export function createIntro({
   let rOut = 1;
   let rQuiet = 1;
   let rOrbit = 1;
+  // The six of them together, for the sky: see the foot of measure().
+  let geom = { width: 1, height: 1, poleX: 0, poleY: 0, rOut: 1, rQuiet: 1 };
   const ringSrc = document.createElement('canvas');
 
   let shown = 0;
@@ -949,147 +874,20 @@ export function createIntro({
     root.appendChild(lids);
   }
 
-  // ------------------------------------------------------------- the field
+  // ------------------------------------------------- the sky, drawn by notte.js
   //
-  // One radial gradient centred on the pole, and NOT a CSS one. A dark ramp
-  // over a thousand pixels crosses maybe eight levels of blue, so the browser's
-  // own gradient lays down eight visible rings — the exact banding the arrival
-  // veil already answers, and it is answered here the same way: the ramp is
-  // computed per pixel and dithered with one least significant bit of
-  // triangular noise, two uniform draws subtracted. Painted at CSS resolution
-  // like the veil, because a dither is a property of the image grid and an
-  // image the browser upscales still carries it.
-  function paintField() {
-    const w = Math.max(1, Math.round(window.innerWidth));
-    const h = Math.max(1, Math.round(window.innerHeight));
-    field.width = w;
-    field.height = h;
-    field.style.width = `${w}px`;
-    field.style.height = `${h}px`;
-    const ctx = field.getContext('2d');
-    const image = ctx.createImageData(w, h);
-    const rand = seeded(0x2545f491);
-    for (let y = 0; y < h; y++) {
-      const dy = y + 0.5 - poleY;
-      for (let x = 0; x < w; x++) {
-        const dx = x + 0.5 - poleX;
-        const rho = Math.min(1, Math.sqrt(dx * dx + dy * dy) / rOut);
-        let i = 1;
-        while (i < SKY.length - 1 && rho > SKY[i][0]) i++;
-        const [r0, c0] = SKY[i - 1];
-        const [r1, c1] = SKY[i];
-        const t = (rho - r0) / (r1 - r0);
-        // ONE triangular sample for all three channels: the ramp is very nearly
-        // monochrome, so shared noise is a luma dither and leaves the hue where
-        // it was, where three independent draws would speckle it.
-        const d = rand() - rand();
-        const o = (y * w + x) * 4;
-        for (let c = 0; c < 3; c++) {
-          image.data[o + c] = Math.round(c0[c] + (c1[c] - c0[c]) * t + d);
-        }
-        image.data[o + 3] = 255;
-      }
-    }
-    ctx.putImageData(image, 0, 0);
+  // The ground of the night, the arcs over it and the glints among them are
+  // drawn by src/ui/notte.js out of the geometry this file measures. The three
+  // wrappers below are all that is left of them here, and they exist so that
+  // the rest of this scene goes on saying paintField() and paintTrails(): what
+  // moved is WHERE the loops live, not when they run.
 
-    // And the dust, over the top and outside the quiet: sub-pixel points, so
-    // the browser's own antialiasing gives them their softness for nothing.
-    ctx.fillStyle = '#cfeeff';
-    for (let i = 0; i < DUST; i++) {
-      const r = rQuiet * SPARK_KEEP_OUT + rand() * (rOut - rQuiet * SPARK_KEEP_OUT);
-      const a = rand() * Math.PI * 2;
-      const x = poleX + r * Math.cos(a);
-      const y = poleY + r * Math.sin(a);
-      if (x < 0 || y < 0 || x > w || y > h) continue;
-      ctx.globalAlpha = 0.04 + rand() * 0.11;
-      ctx.fillRect(x, y, 0.9, 0.9);
-    }
-    ctx.globalAlpha = 1;
+  function paintField() {
+    NOTTE_paintField(field, geom);
   }
 
-  // ------------------------------------------------------------- the trails
-  //
-  // ONE DRAWING, and then the compositor turns it. That is the whole anti-stall
-  // argument of this scene: during the arrival the main thread is not free —
-  // frames two and a third seconds apart were measured on this world — and
-  // anything redrawn per frame simply stops. A rigid rotation about the pole IS
-  // the star trail, so nothing is lost by giving it away to the compositor.
   function paintTrails() {
-    const side = 2 * rOut;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    // Two ceilings: the device's, halved at two because past that the picture
-    // is not better and the memory is real; and the absolute one, so an
-    // ultrawide cannot ask for a backing store the size of a texture atlas.
-    const scale = Math.min(dpr, CAP_PX / side);
-    trails.width = Math.max(1, Math.round(side * scale));
-    trails.height = trails.width;
-    trails.style.width = `${side}px`;
-    trails.style.height = `${side}px`;
-    trails.style.left = `${poleX - rOut}px`;
-    trails.style.top = `${poleY - rOut}px`;
-
-    const ctx = trails.getContext('2d');
-    // Drawing coordinates are CSS pixels with the origin ON THE POLE, whatever
-    // the backing store turned out to be. Every number below is therefore the
-    // number the design says, and the resolution is somebody else's problem.
-    ctx.setTransform(scale, 0, 0, scale, trails.width / 2, trails.height / 2);
-    ctx.clearRect(-rOut, -rOut, side, side);
-    ctx.lineCap = 'round';
-
-    const rand = seeded(0x9e3779b9);
-    const rhoQ = rQuiet / rOut;
-    // Never thinner than one physical pixel: a hairline that falls between two
-    // pixels of the backing store is a hairline the eye reads as flicker when
-    // the whole thing turns.
-    const thinnest = 1 / scale;
-
-    for (let i = 0; i < TRAILS; i++) {
-      // Uniform per unit AREA — r = R·√u — so a ring's share of the stars is
-      // its share of the sky, which is what makes the density rise with r on
-      // its own. Then the quiet gate, by rejection: near the pole almost
-      // nothing survives it, and the emptiness is a fact about the sampling
-      // rather than a mask laid over the result.
-      let r = 0;
-      let rho = 0;
-      for (let tries = 0; tries < 64; tries++) {
-        rho = Math.sqrt(rand());
-        r = rho * rOut;
-        if (rand() <= smoothstep(rhoQ, RHO_FULL_IN, rho)) break;
-      }
-
-      // The bell: a floor at the edge of the quiet so the band has no rim, full
-      // through the ring the eye is meant to land on, and down again into the
-      // corners so the frame closes.
-      const peak = TRAIL_FLOOR_ALPHA + (TRAIL_PEAK_ALPHA - TRAIL_FLOOR_ALPHA)
-        * smoothstep(rhoQ, RHO_FULL_IN, rho)
-        * (1 - smoothstep(RHO_FULL_OUT, RHO_DARK, rho));
-
-      const len = ((ARC_MIN_DEG + rand() * (ARC_MAX_DEG - ARC_MIN_DEG)) * Math.PI) / 180;
-      const a0 = rand() * Math.PI * 2;
-      const tint = TRAIL_TINTS[(rand() * TRAIL_TINTS.length) | 0];
-      const width = Math.max(thinnest, 0.9 + rand() * 1.1);
-
-      // The head is the LEADING end, and the sky turns anticlockwise on the
-      // screen, which in a coordinate system whose y points down is the
-      // direction of decreasing angle. So the head is at a0 and the tail
-      // trails behind it at a0 + len.
-      //
-      // The ramp is laid along the CHORD rather than along the arc: over
-      // fifteen degrees the two differ by less than a hundredth of the radius,
-      // and one stroke with one gradient costs what a dozen stitched
-      // sub-segments cost, without the seam where two round caps overlap.
-      const hx = r * Math.cos(a0);
-      const hy = r * Math.sin(a0);
-      const ramp = ctx.createLinearGradient(hx, hy, r * Math.cos(a0 + len), r * Math.sin(a0 + len));
-      ramp.addColorStop(0, `rgba(${TRAIL_HEAD},${peak.toFixed(3)})`);
-      ramp.addColorStop(0.18, `rgba(${tint},${(peak * 0.82).toFixed(3)})`);
-      ramp.addColorStop(1, `rgba(${tint},0)`);
-      ctx.strokeStyle = ramp;
-      ctx.lineWidth = width;
-      ctx.beginPath();
-      ctx.arc(0, 0, r, a0, a0 + len);
-      ctx.stroke();
-    }
+    NOTTE_paintTrails(trails, geom);
   }
 
   // THE PHASE OF THE TURN, KEPT ACROSS A REDRAW. The animation is restarted
@@ -1299,38 +1097,11 @@ export function createIntro({
   // half; a bar or a sky that stopped would be the scene breaking.
   let glints = [];
   function seedGlints() {
-    const rand = seeded(0x27d4eb2f);
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    glints = [];
-    const floor = rQuiet * SPARK_KEEP_OUT;
-    for (let i = 0; i < SPARKS * 4 && glints.length < SPARKS; i++) {
-      const r = floor + Math.sqrt(rand()) * Math.max(1, rOut - floor);
-      const a = rand() * Math.PI * 2;
-      const x = poleX + r * Math.cos(a);
-      const y = poleY + r * Math.sin(a);
-      if (x < 4 || y < 4 || x > w - 4 || y > h - 4) continue;
-      glints.push({
-        x, y, phase: rand(), period: 1400 + rand() * 2600, size: 1 + rand() * 1.4,
-      });
-    }
-    spark.width = Math.max(1, Math.round(w));
-    spark.height = Math.max(1, Math.round(h));
-    spark.style.width = `${w}px`;
-    spark.style.height = `${h}px`;
+    glints = NOTTE_seedGlints(spark, geom);
   }
 
   function twinkle() {
-    const ctx = spark.getContext('2d');
-    const now = performance.now();
-    ctx.clearRect(0, 0, spark.width, spark.height);
-    ctx.fillStyle = `rgba(${TRAIL_HEAD},1)`;
-    for (const g of glints) {
-      const s = 0.5 - 0.5 * Math.cos(2 * Math.PI * ((now / g.period + g.phase) % 1));
-      ctx.globalAlpha = 0.06 + 0.34 * s * s * s;
-      ctx.fillRect(g.x - g.size / 2, g.y - g.size / 2, g.size, g.size);
-    }
-    ctx.globalAlpha = 1;
+    NOTTE_twinkle(spark, glints);
   }
 
   /** How far the type has to move for its INK to sit on the pole.
@@ -1453,6 +1224,15 @@ export function createIntro({
     const halfDiagonal = Math.hypot(box.width / 2, box.height / 2 + Math.abs(shift));
     rOrbit = halfDiagonal + ORBIT_MARGIN_REM * rem;
     rQuiet = Math.max(0.30 * Math.min(w, h), rOrbit + ORBIT_PAD + 2 * rem);
+
+    // AND THE SAME SIX NUMBERS, GATHERED, because that is the whole interface
+    // between this scene and the sky it is drawn on. src/ui/notte.js takes
+    // these and nothing else: it never reads the window, never measures the
+    // block, and therefore cannot disagree with the five lines above about
+    // where the pole is.
+    geom = {
+      width: w, height: h, poleX, poleY, rOut, rQuiet,
+    };
 
     return `${w}x${h}|${Math.round(rQuiet / 16)}`;
   }

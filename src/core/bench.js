@@ -1,6 +1,6 @@
 import { BENCH_THRESHOLDS, DEFAULT_TIER, TIERS } from './quality.js';
 import {
-  bufferPixels, deviceRatio, FRACTIONS, frameOf, PIXEL_CEILING, predictMs,
+  bufferPixels, deviceRatio, FRACTIONS, frameOf, modelMs, PIXEL_CEILING, predictMs,
 } from './inquadratura.js';
 
 // The three seconds in which the machine is asked what it can do.
@@ -327,4 +327,55 @@ export function decideFraming(verdict, where) {
     rungs,
     reason: taken ? 'sotto il tetto del banco' : 'pavimento',
   };
+}
+
+// ===========================================================================
+// AND THE THIRD ANSWER: WHETHER THE NIGHT AROUND THE PICTURE TURNS.
+//
+// WHAT IT COSTS, MEASURED, AND IT IS NOT NOTHING. The night is not GL -- it is
+// a bitmap on the COMPOSITOR, two radii on a side, turning rigidly about the
+// pole -- so the driver's clock does not see it drawn. What sees it is the
+// interval between frames with the vsync unhooked, and the interval says:
+//
+//     braccio     intervallo medio   orologio del driver
+//     nessuna          12.156              11.176
+//     ferma            12.013              11.133
+//     animata          13.271              12.615
+//
+// Three rounds at f = 0.7 on the reference window, the order of the arms
+// reversed on alternate rounds, the median of the three taken. The STILL night
+// costs nothing that can be measured -- minus a seventh of a millisecond, which
+// is noise. The TURNING one costs 1.12 ms of frame, and the driver's own clock
+// moves with it by 1.44: a full window layer recomposited every frame contends
+// for the same fill the world is drawn with, so what looks like a compositor's
+// business lands on the world's GPU as well. That number is the reason this
+// decision exists at all rather than being an obvious yes.
+//
+// THE LINE IS THE COMMITTENTE'S: «animata se costa meno di 1 ms per fotogramma
+// su quella macchina, altrimenti ferma con le sole stelle che brillano». On the
+// reference machine 1.12 is over it, so the world ships with a still sky and a
+// slow breath in the stars; a machine a fifth faster than this desk gets the
+// turn. Both are reachable by hand at `?notte=animata|ferma` and the verdict is
+// remembered with the rest of the calibration.
+const NIGHT_SPIN_MS = 1.12;
+const NIGHT_CEILING_MS = 1;
+
+/**
+ * Whether this machine can afford a sky that turns.
+ *
+ * The same speed factor the framing is decided with: the cost above is the
+ * reference machine's, and this machine is however many times faster or slower
+ * than it the one bench reading says.
+ *
+ * ON THE BRANCH WITH NO TIMER QUERY THE ANSWER IS ALWAYS `ferma`, and that is a
+ * declared refusal rather than a measurement. The reading there is an interval
+ * and not a cost, so there is no factor to scale a millisecond by -- and a
+ * machine with no timer query is, on every one this campaign has met, the slow
+ * one (E-LINUX1). Guessing `animata` there would be spending a millisecond
+ * nobody counted on the machine least able to lend it.
+ */
+export function decideNight(verdict, benchPixels) {
+  if (!verdict || verdict.source !== 'gpu' || !(benchPixels > 0)) return 'ferma';
+  const factor = verdict.medianMs / modelMs(benchPixels);
+  return NIGHT_SPIN_MS * factor < NIGHT_CEILING_MS ? 'animata' : 'ferma';
 }
