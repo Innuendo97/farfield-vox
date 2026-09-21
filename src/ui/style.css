@@ -152,6 +152,45 @@ body.is-inquadrata .sky-veil {
  * change of colour. */
 body.is-inquadrata { background: #050b13; }
 
+/* ------------------------------------------------- and the frame around it
+ *
+ * src/core/cornice.js. The canvas above is now the picture PLUS the margin the
+ * halo spills into, which is why --inquadratura-w is read there and --quadro-w
+ * here: the arrival veil is the PICTURE's composition and stops where the
+ * picture does, and the halo outside it is the world's own light and carries no
+ * lens shading at all.
+ *
+ * WRITTEN AS A SECOND CLASS AND NOT FOLDED INTO THE FIRST, because the two are
+ * not the same question. A picture smaller than the window is what the bench
+ * decided; a soft edge is what the picture is made of, and at the whole window
+ * — where there is no `is-inquadrata` at all — there is still a frame, with the
+ * thin margin taken out of the picture (E-DECISIONI35, point 3: «sì, con
+ * margine sottile»). Later in the sheet than the rule above, so that on a page
+ * which has both it is this one the veil takes.
+ *
+ * NOTHING HERE TOUCHES THE CANVAS. The mask, the corner and the feather are in
+ * the composite's own fragment, where they cost a distance and a smoothstep
+ * inside a pass that was already visiting every pixel. A `border-radius` or a
+ * `mask-image` here would make the browser recompose a layer the size of the
+ * frame on every frame of the visit, which is the cost the night around the
+ * world was measured paying: +1.44 ms of the DRIVER's clock for one full
+ * window layer (U-INQUADRATURA-1, §B.3). */
+body.is-incorniciata .sky-veil {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: var(--quadro-w, 100vw);
+  height: var(--quadro-h, 100dvh);
+}
+
+/* AND THE PAGE UNDER THE SOFT EDGE IS THE NIGHT'S COLOUR WHEREVER THERE IS ONE.
+ * At the whole window there is no night element — nothing is mounted at f = 1,
+ * which is what `?inquadratura=1` is worth to a guard — so the thin band the
+ * feather opens shows the page itself, and the page has to be the colour the
+ * night would have been rather than the slate the world stands on. */
+body.is-incorniciata { background: #050b13; }
+
 #ui {
   position: fixed;
   inset: 0;

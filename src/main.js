@@ -24,6 +24,7 @@ import {
 import {
   askedFraction, deviceRatio, frameOf, windowPixels,
 } from './core/inquadratura.js';
+import { askedCornice, corniceOf } from './core/cornice.js';
 import {
   createBenchmark, decideFraming, decideNight, framingFromWindowAlone, tierOf,
 } from './core/bench.js';
@@ -247,6 +248,13 @@ if (INTRO) {
         root: ui,
         cover: introCover,
         bus: introBus,
+        // WHERE THE PICTURE IS, so that the eyes open inside it and the circle
+        // of the loading knows what it has to grow into (E-DECISIONI35, points
+        // 2 and 4). A function and not a rectangle: the bench decides the
+        // framing at the end of the load, behind this very scene, so what the
+        // scene needs is the answer at the moment it asks rather than the one
+        // that was true when it was built.
+        quadro: quadroRect,
         // THE GESTURE, AND THE THREE THINGS IT IS.
         //
         // Run synchronously inside the visitor's own event, because two of the
@@ -357,6 +365,26 @@ const TOUCH = touchWanted();
 const PINNED = TOUCH ? 1 : askedFraction();
 let fraction = PINNED ?? readStored()?.fraction ?? 1;
 
+// ------------------------------------------------------------ and its frame
+
+/**
+ * WHAT THE EDGE OF THE PICTURE IS MADE OF (src/core/cornice.js).
+ *
+ * «È quadrata, netta, poco bella esteticamente. Rendiamo gli angoli
+ * arrotondati, e l'intero bordo sfumato. Come se fosse un sogno/ricordo»
+ * (E-DECISIONI35, point 3). Read once, from the address, before anything is
+ * built: the canvas's own size depends on it and a context cannot be made
+ * twice.
+ *
+ * `?cornice=0` is the cut edge of sito-4 — what the byte comparison stands on
+ * and what every guard that photographs the WORLD opens the page at, for the
+ * same reason they pin `?inquadratura=1`: a rounded corner is not a fact about
+ * the meadow.
+ */
+const CORNICE = askedCornice();
+let shape = null;
+let lastFrame = { width: window.innerWidth, height: window.innerHeight, framed: false };
+
 // ------------------------------------------------------- the night around it
 
 /**
@@ -441,16 +469,63 @@ function applyNight(framed) {
  */
 function applyFraming() {
   const frame = frameOf(fraction, window.innerWidth, window.innerHeight);
+  // AND THE FRAME AROUND IT (src/core/cornice.js, E-DECISIONI35 point 3). The
+  // canvas is the picture plus the margin the halo lives in, and the picture is
+  // what the arithmetic above decided — except at the whole window, where there
+  // is nowhere to put a margin and the thin one is taken out of the picture
+  // instead. At `?cornice=0` the two are the same rectangle and every line
+  // below is the line that was here.
+  shape = corniceOf(frame, CORNICE, window.innerWidth, window.innerHeight);
   if (frame.framed) {
-    document.body.style.setProperty('--inquadratura-w', `${frame.width}px`);
-    document.body.style.setProperty('--inquadratura-h', `${frame.height}px`);
+    document.body.style.setProperty('--inquadratura-w', `${shape.tela.width}px`);
+    document.body.style.setProperty('--inquadratura-h', `${shape.tela.height}px`);
     document.body.classList.add('is-inquadrata');
   } else {
     document.body.classList.remove('is-inquadrata');
     document.body.style.removeProperty('--inquadratura-w');
     document.body.style.removeProperty('--inquadratura-h');
   }
+  if (shape.on) {
+    document.body.style.setProperty('--quadro-w', `${shape.quadro.width}px`);
+    document.body.style.setProperty('--quadro-h', `${shape.quadro.height}px`);
+    document.body.classList.add('is-incorniciata');
+  } else {
+    document.body.classList.remove('is-incorniciata');
+    document.body.style.removeProperty('--quadro-w');
+    document.body.style.removeProperty('--quadro-h');
+  }
   return frame;
+}
+
+/**
+ * The picture, in the window's own pixels: where it is and how big.
+ *
+ * Handed to the opening scene so that the lids can be shut over the PICTURE
+ * rather than over the glass (E-DECISIONI35, point 2 — «l'occhio si apre lungo
+ * tutto lo schermo e non solo nella finestra di esplorazione, questa cosa
+ * stona»), and so that the circle of the loading knows what it has to grow
+ * into. It is read and never written: the scene does not get to decide where
+ * the picture is.
+ */
+function quadroRect() {
+  const on = Boolean(shape && shape.on);
+  const w = on ? shape.quadro.width : lastFrame.width;
+  const h = on ? shape.quadro.height : lastFrame.height;
+  return {
+    // The three fields coverAt() in src/core/cornice.js reads, so that whoever
+    // is handed this can ask the outline the same question the composite asks
+    // it — one function, two callers, no second shape to keep true.
+    on,
+    quadro: { width: w, height: h },
+    radius: on ? shape.radius : 0,
+    feather: on ? shape.feather : 0,
+    // And where it sits on the glass, for whoever has to hang something over it.
+    width: w,
+    height: h,
+    left: (window.innerWidth - w) / 2,
+    top: (window.innerHeight - h) / 2,
+    framed: on || lastFrame.framed,
+  };
 }
 
 /**
@@ -468,7 +543,27 @@ function setFraction(next) {
   resize();
 }
 
-const renderer = new Renderer().init(canvas, applyFraming());
+const renderer = new Renderer().init(canvas, (lastFrame = applyFraming()), shape.tela);
+renderer.setCornice(shape);
+
+/** AND THE FRAME ARRIVES EVEN WHERE THERE IS NO CEREMONY (E-DECISIONI35, 4).
+ *
+ * «La prova con ?intro=0 deve avere comunque una nascita morbida (dissolvenza
+ * breve del bordo) e non un salto.» With the opening scene there is a circle to
+ * grow out of and the scene owns the whole of it; without one there is nothing
+ * to grow FROM, so what is left is the shortest honest thing: the picture and
+ * its halo come up together over four hundred and fifty milliseconds, which is
+ * the interface's own long fade and under half of the shortest thing a visitor
+ * waits for anywhere else on this page.
+ *
+ * NOTHING AT ALL AT `?cornice=0`: no ramp, no branch, no uniform written. That
+ * page is the page the byte comparison is taken on and it may not have a
+ * fourth thing happening in its first half second.
+ */
+const BIRTH_PLAIN_MS = 450;
+let plainBirth = CORNICE.on && !INTRO;
+let plainBirthFrom = 0;
+if (plainBirth) renderer.post.setNascita(1, 0, 0);
 // The far plane has to clear the furthest thing in the world, and the furthest
 // thing is not the meadow. The band of air sits at seven hundred metres and the
 // largest of the giants at five hundred and twenty: at four hundred both were
@@ -1158,7 +1253,21 @@ const FIRST_STEP_SPEED = 0.3;
  */
 function resize() {
   const frame = applyFraming();
-  const { aspect } = renderer.resize(frame.width, frame.height);
+  lastFrame = frame;
+  // THE PICTURE AND THE CANVAS, AND THEY ARE TWO RECTANGLES NOW. The world is
+  // drawn into the first — every buffer of src/core/post.js is its size, and the
+  // lens takes its shape — and the second is what the browser holds, larger by
+  // the margin the halo spills into. Equal wherever there is no frame.
+  const { aspect } = renderer.resize(
+    shape.quadro.width, shape.quadro.height, shape.tela.width, shape.tela.height,
+  );
+  renderer.setCornice(shape);
+  // WHERE THE FRAME IS BORN FROM IS NOT WRITTEN HERE, and that is deliberate:
+  // it is the circle the opening scene drew round the name, at a radius the
+  // scene MEASURED off the block of type the browser laid out. A fallback
+  // written here would be a second opinion about a number only one file can
+  // know, and there is no page on which it would be read — with no scene there
+  // is no circle, and the frame arrives by the short dissolve below instead.
   camera.aspect = aspect;
   camera.updateProjectionMatrix();
   // THE ARRIVAL VEIL IS THE PICTURE'S AND NOT THE WINDOW'S (E-DECISIONI33,
@@ -1166,7 +1275,12 @@ function resize() {
   // WINDOW resize; the bench moving the framing is not one, and a veil left at
   // the old size would carry the reference's corner shading on the wrong
   // corners for the whole of the arrival.
-  veil.relayout();
+  veil.relayout(quadroRect());
+  // AND THE OPENING SCENE, if it is still up: its lids are the PICTURE's now,
+  // and this is the one moment in a visit when the picture changes size without
+  // the window moving — the bench answering, behind the scene, where there is
+  // nothing to see it and nobody to send a resize event.
+  intro?.relayout();
   applyNight(frame.framed);
 }
 window.addEventListener('resize', resize);
@@ -1227,6 +1341,16 @@ new Loop()
     // nobody else: the scene turns itself off at the end of its own timeline
     // and puts the frame back to exactly what it was.
     if (intro) intro.drive(renderer.post, now);
+    // And the same channel, for a page with no scene on it. On the wall clock
+    // and not on the frame's, because `?t0` holds the frame's and this is not a
+    // thing anybody measures: it is over before the ground is.
+    if (plainBirth) {
+      const since = performance.now();
+      if (!plainBirthFrom) plainBirthFrom = since;
+      const p = Math.min(1, (since - plainBirthFrom) / BIRTH_PLAIN_MS);
+      renderer.post.setNascita(1, 0, p * p * (3 - 2 * p));
+      if (p >= 1) plainBirth = false;
+    }
     // And after the body, what the body can hear: the feet it just reported,
     // and nothing else that depends on where it is standing. There was water
     // here once, with a level set by the distance to it and a side set by the

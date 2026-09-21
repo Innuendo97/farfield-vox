@@ -825,8 +825,125 @@ ${DEPTH_GLSL}
   uniform vec4 uRainTrail;     // strength · drying · mist rows · mist density
   uniform vec4 uRainWet;       // wetness · micro streak · turn drag · what it sweeps up
   uniform vec2 uRainDrag;      // how the eye behind the glass is moving
+  // ------------------------------------------------------------- THE FRAME
+  //
+  // src/core/cornice.js: the picture is a memory and not a window. EVERY ONE OF
+  // THESE IS AT REST UNTIL SOMETHING PUTS A FRAME ON THE PAGE, and at rest the
+  // branch they guard is not taken — uQuadro is the whole canvas, so the first
+  // line of main() is uv = (vUv - 0.0) / 1.0, which is vUv to the bit, and the
+  // last is the vec4(colour, 1.0) it has always been.
+  uniform vec4 uQuadro;        // where the picture sits in the canvas, in uv
+  uniform vec4 uCornice;       // the picture, in CSS px: width · height · corner · feather
+  uniform vec4 uAlone;         // the halo: reach in px · gain · how far out the copy is blown · 0
+  uniform vec3 uNascita;       // the birth: how grown · how cyan · how much of it is there
+  uniform vec3 uSeme;          // and where it starts: centre x · y · radius, in the picture's px
+  uniform vec3 uSemeTint;      // the colour the circle of the loading was lit in
 
   bool stage(float bit) { return mod(floor(uStages / bit), 2.0) == 1.0; }
+
+  // THE OUTLINE, AS A DISTANCE AND NOT AS A CUT.
+  //
+  // Exact signed distance to a rounded rectangle: negative inside, positive
+  // out, in the picture's own pixels. Everything the frame is made of — the
+  // corner, the feather, the halo, the birth — is a function of this ONE
+  // number, which is why there is no second shape to keep in agreement with the
+  // first and why a corner is soft in exactly the same way a side is.
+  //
+  // The same five lines are in src/core/cornice.js, where a guard can call them
+  // on a commit instead of photographing them.
+  float roundBox(vec2 q, vec2 box, float radius) {
+    vec2 e = abs(q) - (box - vec2(radius));
+    return length(max(e, 0.0)) + min(max(e.x, e.y), 0.0) - radius;
+  }
+
+  /** How far this point is from the outline the frame has RIGHT NOW.
+   *
+   *  During the birth that outline is neither the circle of the loading nor
+   *  the picture but a blend of the two distance fields, which is a shape that
+   *  travels from one to the other without ever stopping being a shape — a
+   *  circle that grows, squares itself off and keeps its corners. Mixing two
+   *  fields is not mixing two outlines: it is one field, and every ramp below
+   *  reads it the same way at every instant of the growth. */
+  float frameDistance(vec2 q) {
+    if (uNascita.x >= 1.0) return roundBox(q, uCornice.xy * 0.5, uCornice.z);
+    // THE MORPH IS IN THE PARAMETERS AND NOT IN THE FIELD, and that is not a
+    // detail. A rounded rectangle whose half-sides and whose radius are all the
+    // same number IS a circle, so one shape travels from the circle of the
+    // loading to the picture without ever being anything else — and the ring
+    // the visitor is actually looking at, drawn on a 2D canvas in
+    // src/ui/intro.js, can be drawn from the SAME three interpolations. Mixing
+    // two distance fields instead would have given a third shape that neither
+    // of the two could be drawn as, and the border and the world would have
+    // disagreed about where the edge was for the whole of the growth.
+    float g = uNascita.x;
+    vec2 centre = mix(uSeme.xy, vec2(0.0), g);
+    vec2 arms = mix(vec2(uSeme.z), uCornice.xy * 0.5, g);
+    float corner = mix(uSeme.z, uCornice.z, g);
+    return roundBox(q - centre, arms, min(corner, min(arms.x, arms.y)));
+  }
+
+  /** THE HALO: the blurred copy of the bloom, blown outward and blurred again.
+   *
+   *  «Una specie di vibrazione di ciò che c'è dentro l'area esplorabile, che si
+   *  riflette/estende al di fuori.» There is no second picture here and no
+   *  effect over the first: it is the bloom buffer this frame already carries —
+   *  a quarter of the picture's own resolution, already one wide blur — sampled
+   *  at a uv blown out past the edge of the picture so that what was at the rim
+   *  is now in the margin, and taken four more times around each point so that
+   *  what arrives in the margin has no detail left to argue with the world.
+   *
+   *  IT MOVES WITH THE WORLD BECAUSE IT IS THE WORLD. Nothing animates it:
+   *  walk, and the halo walks; turn, and it turns. That is the whole of the
+   *  «vibrazione», and it is why this is worth a texture tap and not a
+   *  decoration somebody drew.
+   *
+   *  RETURNED PREMULTIPLIED, with its own opacity in w: the canvas carries
+   *  alpha now, and what is behind the margin is the night the picture stands
+   *  on. A halo that wrote an opaque colour there would be a rectangle again,
+   *  one shade lighter. */
+  vec4 aura(vec2 uv, float d) {
+    // Nought at the edge of the canvas, one at the outline, and squared so the
+    // last third of the margin is almost nothing: a glow that stopped linearly
+    // ends on a visible ring at the exact radius where it ran out.
+    float fall = 1.0 - clamp(d / max(1.0, uAlone.x), 0.0, 1.0);
+    fall *= fall;
+    if (fall <= 0.0) return vec4(0.0);
+    // Blown outward about the middle of the picture, so the light that was at
+    // the rim lands in the margin rather than being clamped there by the
+    // sampler — which is the difference between a halo and a smear.
+    vec2 gu = (uv - 0.5) / uAlone.z + 0.5;
+    vec2 hop = vec2(0.012, 0.012 * uCornice.x / max(1.0, uCornice.y));
+    vec3 glow = texture2D(tBloom, clamp(gu, 0.0, 1.0)).rgb * 2.0
+      + texture2D(tBloom, clamp(gu + vec2( hop.x, 0.0), 0.0, 1.0)).rgb
+      + texture2D(tBloom, clamp(gu + vec2(-hop.x, 0.0), 0.0, 1.0)).rgb
+      + texture2D(tBloom, clamp(gu + vec2(0.0,  hop.y), 0.0, 1.0)).rgb
+      + texture2D(tBloom, clamp(gu + vec2(0.0, -hop.y), 0.0, 1.0)).rgb;
+    glow *= uBloomStrength / 6.0;
+    // AND THE BIRTH BORROWS ITS COLOUR. The circle of the loading is lit in one
+    // cyan (src/ui/intro.css) and the committente asked that «il bagliore ciano
+    // del cerchio diventi il bordo sfumato»: so while the frame is growing the
+    // halo is that cyan, and by the time it has stopped it is the picture's own
+    // light and nothing else. One mix, on a channel that is nought at rest.
+    float born = uNascita.y;
+    if (born > 0.0) {
+      // EVEN ALL THE WAY ROUND, and that is what makes it the LOADING's border
+      // and not the picture's. The picture's own halo is as uneven as the
+      // picture is — bright where the sky is, almost nothing along the dark
+      // meadow — which is right for a reflection and wrong for a circle that
+      // was one line of even light a second ago. So while the frame is being
+      // born the halo is that one light, and it becomes the picture's over the
+      // handover: at born = 1 it is flat cyan, at nought it is the world's.
+      float lit = max(glow.r, max(glow.g, glow.b));
+      glow = mix(glow, uSemeTint * mix(lit, 0.42, born), born);
+    }
+    glow = max(glow, vec3(0.0)) * uAlone.y * fall;
+    // Premultiplied, and the opacity is the light's own peak: where the halo is
+    // dark the night behind it comes through untouched, which is what makes it
+    // read as light spilt on the sky rather than as a pane over it.
+    float peak = min(1.0, max(glow.r, max(glow.g, glow.b)));
+    if (peak <= 0.0) return vec4(0.0);
+    return vec4(glow * min(1.0, peak / max(glow.r, max(glow.g, glow.b))), peak);
+  }
 
   const mat3 SRGB_TO_REC2020 = mat3(
     0.6274, 0.0691, 0.0164,
@@ -1659,10 +1776,41 @@ ${DEPTH_GLSL}
     // moves the coordinate the whole pass reads from rather than smearing the
     // finished picture. One consequence, and it is the right one: what is seen
     // through a drop is developed and focused like the place it came from.
-    vec2 uv = vUv;
+    // THE CANVAS IS NOT THE PICTURE ANY MORE (src/core/cornice.js).
+    //
+    // Every tap below asks about the WORLD, and the world is drawn into the
+    // picture: the same buffers, at the same size, with the same contents they
+    // have always had. So the first thing this pass does is put the canvas's
+    // own coordinate back into the picture's, and everything after this line is
+    // the pass that was here before.
+    //
+    // AT REST THIS IS AN IDENTITY TO THE BIT. uQuadro is (0, 0, 1, 1) whenever
+    // there is no frame — ?cornice=0, every guard, the byte comparison — and
+    // (x - 0.0) / 1.0 is x in every floating point there has ever been.
+    vec2 pUv = (vUv - uQuadro.xy) / uQuadro.zw;
+
+    // AND WHERE THE FRAME IS, DECIDED BEFORE THE WORLD IS ASSEMBLED.
+    //
+    // A pixel out in the margin has no world in it at all — no scene tap, no
+    // depth, no tone curve, no grade, no rain, no eye. It takes one blurred
+    // bloom tap and leaves. That is what makes the margin affordable: the
+    // canvas grows by a quarter and the WORK does not grow at all.
+    float cover = 1.0;
+    float dist = -1.0;
+    if (uQuadro.w != 1.0 || uCornice.z > 0.0 || uCornice.w > 0.0) {
+      dist = frameDistance((pUv - 0.5) * uCornice.xy);
+      cover = 1.0 - smoothstep(-max(0.5, uCornice.w), 0.0, dist);
+      cover *= uNascita.z;
+      if (cover <= 0.0) {
+        gl_FragColor = aura(pUv, dist) * uNascita.z;
+        return;
+      }
+    }
+
+    vec2 uv = pUv;
     float bead = 0.0;
     if (stage(512.0) && uRain.x > 0.0) {
-      vec3 drop = rainAt(vUv);
+      vec3 drop = rainAt(pUv);
       uv += drop.xy;
       bead = drop.z;
     }
@@ -1989,6 +2137,24 @@ ${DEPTH_GLSL}
     // laid over it would simply erase it.
     if (stage(16.0)) {
       colour += (hash(gl_FragCoord.xy) - hash(gl_FragCoord.xy + 17.13)) / 255.0;
+    }
+
+    // AND THE EDGE, WHICH IS THE LAST THING AND NOT THE FIRST.
+    //
+    // Everything above is the picture, unchanged and complete. This is where it
+    // stops being there: the world is multiplied by how much of it this pixel
+    // keeps, the halo is added where it does not, and the alpha is the sum — so
+    // what shows through the soft edge is whatever is behind the canvas, which
+    // is the night the picture stands on.
+    //
+    // PREMULTIPLIED, because the renderer is built with premultipliedAlpha and
+    // the compositor's own rule is src + dst·(1 - a). A straight colour with a
+    // fractional alpha would be the same picture twice as bright at the rim.
+    if (cover < 1.0 || dist > -uCornice.w) {
+      vec4 halo = aura(pUv, dist);
+      gl_FragColor = vec4(colour * cover + halo.rgb * (1.0 - cover),
+        min(1.0, cover + halo.a * (1.0 - cover)));
+      return;
     }
 
     gl_FragColor = vec4(colour, 1.0);
@@ -3417,6 +3583,15 @@ export function createPostPipeline(gl) {
     tRays: { value: null },
     tProbe: { value: null },
     tGlow: { value: SOFT_GLOW_REST },
+    // THE FRAME, AT REST (src/core/cornice.js). The picture is the whole canvas,
+    // there is no corner, no feather, no halo and no birth: every branch these
+    // guard is not taken and this pass is the one that was measured.
+    uQuadro: { value: new Vector4(0, 0, 1, 1) },
+    uCornice: { value: new Vector4(1, 1, 0, 0) },
+    uAlone: { value: new Vector4(1, 0, 1, 0) },
+    uNascita: { value: new Vector3(1, 0, 1) },
+    uSeme: { value: new Vector3(0, 0, 1) },
+    uSemeTint: { value: new Vector3(0.62, 0.925, 0.976) },
     uExposure: { value: params.exposure },
     uBloomStrength: { value: params.bloomStrength },
     uLutIntensity: { value: params.lutIntensity },
@@ -3986,6 +4161,75 @@ export function createPostPipeline(gl) {
       } finally {
         gl.setRenderTarget(previous);
       }
+    },
+
+    /**
+     * WHERE THE PICTURE STOPS, AND WHAT IS AROUND IT (src/core/cornice.js).
+     *
+     * Everything this pass draws is still drawn into the PICTURE, at the
+     * picture's own size: setSize() below is handed the picture and every
+     * buffer in this file is the picture's. What this says is where that
+     * picture sits inside a canvas that is larger than it, and what the last
+     * pass does with the pixels that are not in it.
+     *
+     * THE HALO'S ENLARGEMENT IS NOT A TASTE, IT IS AN IDENTITY. Blown by
+     * exactly the ratio of the canvas to the picture, the bloom's own uv range
+     * lands on the canvas's edge to the pixel — so what was at the rim of the
+     * picture is at the rim of the canvas, and nothing is clamped or repeated
+     * anywhere in between. A number chosen by eye would have been a smear at
+     * one framing and a gap at another.
+     *
+     * @param {object|null} shape  what corniceOf() answered, or null for none
+     */
+    setCornice(shape) {
+      const u = composite.uniforms;
+      if (!shape || !shape.on) {
+        u.uQuadro.value.set(0, 0, 1, 1);
+        u.uCornice.value.set(1, 1, 0, 0);
+        u.uAlone.value.set(1, 0, 1, 0);
+        return false;
+      }
+      const tw = Math.max(1, shape.tela.width);
+      const th = Math.max(1, shape.tela.height);
+      const qw = Math.max(1, shape.quadro.width);
+      const qh = Math.max(1, shape.quadro.height);
+      u.uQuadro.value.set(shape.marginX / tw, shape.marginY / th, qw / tw, qh / th);
+      u.uCornice.value.set(qw, qh, shape.radius, shape.feather);
+      u.uAlone.value.set(shape.reach, shape.halo, Math.max(tw / qw, th / qh), 0);
+      return true;
+    },
+
+    /**
+     * THE FRAME BEING BORN, and it is driven from the frame loop.
+     *
+     * «La circonferenza del caricamento si allarga fino a raggiungere, in modo
+     * morbido e stile coerente, la dimensione della finestra esplorabile»
+     * (E-DECISIONI35, point 4). The shape of the mask above is a blend between
+     * the circle the loading drew and the picture; this is where on that
+     * journey it is.
+     *
+     * IT IS WRITTEN FROM THE FRAME LOOP AND NOT FROM A TIMER, for the same
+     * reason setWake() is (see src/ui/intro.js): the ring the visitor is
+     * looking at is drawn on the main thread against the same clock, and a mask
+     * that advanced on the compositor while the ring stalled would be a border
+     * with the world coming out of the wrong side of it.
+     *
+     * @param {number} grown     0 = the circle of the loading, 1 = the picture
+     * @param {number} cyan      how much of the halo is the loading's own light
+     * @param {number} presence  how much of the whole canvas is on the page
+     */
+    setNascita(grown, cyan = 0, presence = 1) {
+      composite.uniforms.uNascita.value.set(
+        Math.min(1, Math.max(0, grown)),
+        Math.min(1, Math.max(0, cyan)),
+        Math.min(1, Math.max(0, presence)),
+      );
+    },
+
+    /** Where the birth starts: the circle of the loading, in the picture's own
+     *  pixels, measured from the middle of the picture with y pointing up. */
+    setSeme(x, y, radius) {
+      composite.uniforms.uSeme.value.set(x, y, Math.max(1, radius));
     },
 
     setSize(nextWidth, nextHeight) {

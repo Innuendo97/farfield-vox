@@ -21,20 +21,50 @@ export class Renderer {
   #scale = 1;
   #width = 1;
   #height = 1;
+  // AND THE CANVAS IS NOT THE PICTURE (src/core/cornice.js). The world is drawn
+  // into the picture and only into it; the canvas is larger by the frame's
+  // margin, and the one pass that visits it is the composite. Equal to the
+  // picture wherever there is no frame, which is every measured page of this
+  // campaign and every guard.
+  #canvasWidth = 1;
+  #canvasHeight = 1;
 
   /**
    * @param {HTMLCanvasElement} canvas
    * @param {{width:number,height:number}|null} frame  the framing, if the page
    *        has already measured one. Without it the window is the framing,
    *        which is what every visit was before src/core/inquadratura.js.
+   * @param {{width:number,height:number}|null} tela   the canvas, when the
+   *        frame of src/core/cornice.js makes it larger than the picture.
+   *        Without it the canvas IS the picture, to the byte.
    */
-  init(canvas, frame = null) {
+  init(canvas, frame = null, tela = null) {
     this.#canvas = canvas;
     this.#gl = new WebGLRenderer({
       canvas,
       // Antialiasing is done by the offscreen buffer the scene is drawn into,
       // so asking for it on the canvas would only pay for it twice.
       antialias: false,
+      // AND THE CANVAS CARRIES ALPHA NOW, which is what lets the picture have
+      // a soft edge without a second layer over it: the composite writes how
+      // much of the world each pixel keeps, and what shows through is the night
+      // the picture stands on rather than a colour somebody matched to it.
+      //
+      // ASKED FOR ALWAYS AND NOT ONLY WHERE THERE IS A FRAME, and the reason is
+      // that it is a property of the CONTEXT: it is settled when the context is
+      // made, before anything on this page knows what the bench will decide, and
+      // a page that had to be reloaded to gain a soft edge is not a page. What
+      // it costs is measured in the verbale — the composite writes a fourth
+      // channel it was writing anyway, and the browser composites a layer it was
+      // already compositing — and at `?cornice=0` every pixel of that channel is
+      // one, so the picture on the glass is the picture that was measured.
+      //
+      // PREMULTIPLIED, and stated rather than left to the default: the
+      // composite's last line writes colour times coverage, which is what a
+      // compositor doing src + dst·(1 - a) needs. The two have to agree, and
+      // this is where they are made to.
+      alpha: true,
+      premultipliedAlpha: true,
       powerPreference: 'high-performance',
       stencil: false,
     });
@@ -43,7 +73,10 @@ export class Renderer {
     // baked, so the shadow pipeline must never be paid for.
     this.#gl.shadowMap.enabled = false;
     this.#post = createPostPipeline(this.#gl);
-    this.resize(frame ? frame.width : undefined, frame ? frame.height : undefined);
+    this.resize(
+      frame ? frame.width : undefined, frame ? frame.height : undefined,
+      tela ? tela.width : null, tela ? tela.height : null,
+    );
     return this;
   }
 
@@ -55,13 +88,22 @@ export class Renderer {
    * before main.js has measured anything. Everything after that hands the
    * numbers in. See src/core/inquadratura.js.
    */
-  resize(width = window.innerWidth, height = window.innerHeight) {
+  resize(width = window.innerWidth, height = window.innerHeight,
+    canvasWidth = null, canvasHeight = null) {
     this.#width = width;
     this.#height = height;
+    // The canvas holds the picture plus the frame's margin, and it is the
+    // picture wherever there is no frame. Kept so that setRenderScale() below
+    // can put both back without the caller having to remember either.
+    this.#canvasWidth = canvasWidth === null ? width : canvasWidth;
+    this.#canvasHeight = canvasHeight === null ? height : canvasHeight;
     const ratio = this.pixelRatio;
     this.#gl.setPixelRatio(ratio);
-    this.#gl.setSize(width, height, false);
-    // The offscreen buffers are sized in real pixels, not in layout pixels.
+    this.#gl.setSize(this.#canvasWidth, this.#canvasHeight, false);
+    // The offscreen buffers are sized in real pixels, not in layout pixels —
+    // and they are the PICTURE's, because that is where the world is drawn. The
+    // only pass that ever sees the canvas is the composite, and it is told
+    // where the picture sits in it by setCornice().
     this.#post.setSize(width * ratio, height * ratio);
     return { width, height, aspect: width / height };
   }
@@ -84,7 +126,7 @@ export class Renderer {
   setRenderScale(scale) {
     if (scale === this.#scale) return false;
     this.#scale = scale;
-    this.resize(this.#width, this.#height);
+    this.resize(this.#width, this.#height, this.#canvasWidth, this.#canvasHeight);
     return true;
   }
 
@@ -130,6 +172,9 @@ export class Renderer {
   setSamples(count) { return this.#post.setSamples(count); }
 
   setBloomTier(tier) { return this.#post.setBloomTier(tier); }
+
+  /** Where the picture stops and what is around it. See src/core/cornice.js. */
+  setCornice(shape) { return this.#post.setCornice(shape); }
 
   /**
    * Second lever of the tier, and the one that does NOT touch the picture the

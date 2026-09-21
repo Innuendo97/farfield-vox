@@ -1,5 +1,6 @@
 import SKY from '../../assets-src/sky/sky.json' with { type: 'json' };
 import { isClockFrozen } from './devhud.js';
+import { coverAt } from '../core/cornice.js';
 
 // The shading the reference framing carries, drawn at the front of the frame
 // for as long as the walker is arriving, and then gone.
@@ -209,11 +210,27 @@ export function createSkyVeil(before) {
   let raisedFor = null;
   el.style.setProperty('--veil-fade', `${fadeMs}ms`);
 
+  // AND THE SHAPE THE PICTURE HAS, WHICH THIS HAS TO HAVE TOO.
+  //
+  // The picture's corners are rounded and its whole edge is soft
+  // (src/core/cornice.js, E-DECISIONI35 point 3). This overlay is a rectangle
+  // of canvas laid over that picture, and a rectangle's corner sticks out past
+  // a rounded one: what the walker would see for the two and a half seconds of
+  // the arrival is four dark wedges outside the picture, in the night, exactly
+  // where the veil is DEEPEST.
+  //
+  // So the same coverage the composite multiplies the world by is multiplied
+  // into this overlay's alpha, in the loop that is already writing it per
+  // pixel. It is not a second mask — it is the same function, called from the
+  // other side of the canvas — and it costs nothing: this bitmap is painted
+  // once per size and never per frame.
+  let shape = null;
   let painted = '';
   const paint = () => {
     const width = Math.max(1, Math.round(el.clientWidth));
     const height = Math.max(1, Math.round(el.clientHeight));
-    const key = `${width}x${height}`;
+    const key = `${width}x${height}|${shape && shape.on ? `${shape.radius.toFixed(1)}`
+      + `/${shape.feather.toFixed(1)}` : 'netto'}`;
     if (key === painted) return;
     painted = key;
     el.width = width;
@@ -233,7 +250,11 @@ export function createSkyVeil(before) {
       const v = (y + 0.5) / height;
       for (let x = 0; x < width; x++) {
         const u = (x + 0.5) / width;
-        const alpha = 1 - (shadingAt(u, v) * lensAt(u, v)) ** (1 / DISPLAY_GAMMA);
+        let alpha = 1 - (shadingAt(u, v) * lensAt(u, v)) ** (1 / DISPLAY_GAMMA);
+        // The picture's own outline, where there is one. At rest — no frame,
+        // `?cornice=0`, every guard — coverAt() returns one on its first line
+        // and this is the multiply by one it has always not done.
+        if (shape) alpha *= coverAt((u - 0.5) * width, (v - 0.5) * height, shape);
         image.data[(y * width + x) * 4 + 3] = Math.min(255, Math.max(0,
           Math.round(alpha * 255 + (rand() - rand()))));
       }
@@ -293,7 +314,14 @@ export function createSkyVeil(before) {
      * Free when nothing moved: paint() compares the size it last drew at and
      * returns on a match.
      */
-    relayout() { paint(); },
+    relayout(next = null) {
+      // The frame's shape arrives from src/main.js on every resize, because the
+      // picture can change shape without the window moving: the bench decides
+      // the framing at the end of the load and the page resizes itself once,
+      // behind the opening scene, with no `resize` event anywhere.
+      if (next !== null) shape = next.on ? next : null;
+      paint();
+    },
 
     begin(why = 'col suolo intero') {
       if (letGo || raisedFor) return;
