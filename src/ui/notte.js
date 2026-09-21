@@ -118,6 +118,61 @@ export const SPARK_KEEP_OUT = 1.25;
  *  what separates a sky from an indicator. */
 export const SPARK_STILL_MS = 320;
 
+/** AND A STILL SKY HAS NO STREAKS IN IT AT ALL (E-DECISIONI35, point 1).
+ *
+ *  «In caso di notte ferma non devono esserci gli star trails (le strisce ferme
+ *  sono sgradevoli esteticamente): meglio il solo cielo stellato, i puntini
+ *  luminosi delle stelle che brillano, in maniera morbida.»
+ *
+ *  A streak is an EXPOSURE: it says "the sky turned while this was open". Held
+ *  still it says nothing and draws a comb of frozen scratches, which is what
+ *  the committente is looking at when he calls it unpleasant. So the still
+ *  night does not merely stop the turning bitmap — it never paints it, never
+ *  allocates it and never hangs it: what is left is the dithered ground, the
+ *  far dust in it, and twenty six stars breathing at their own periods.
+ *
+ *  THIS IS ALSO THE CHEAPEST THING THIS FILE CAN DO. The bitmap that is not
+ *  there is four and a nine tenths megapixels of backing store that is not
+ *  allocated and a compositor layer that is not composited — see §B.3 of the
+ *  verbale for what the one that IS there costs.
+ *
+ *  AND THE BREATH IS SOFTER THAN THE TURNING SKY'S. Twenty six points redrawn
+ *  three times a second, each on its own period between 1.4 and 4 s out of the
+ *  seeded draw in seedGlints, so nothing in here pulses together: a sky, and
+ *  never an indicator. The two numbers under it — the floor a star never falls
+ *  below and how far above it the brightest breath reaches — are lower and
+ *  shallower than the turning sky's, because with no streaks behind them the
+ *  same swing that read as twinkle reads as blinking. See twinkle(). */
+export const GLINT_BASE = 0.06;
+export const GLINT_SWING = 0.34;
+export const GLINT_STILL_BASE = 0.07;
+export const GLINT_STILL_SWING = 0.20;
+
+/** AND THE TURNING SKY IS DRAWN AT HALF THE PIXEL IT USED TO BE.
+ *
+ *  The turning bitmap is a square whose side is the window's own diagonal —
+ *  2214 px on the committente's window, four and nine tenths megapixels,
+ *  nineteen and a half megabytes of backing store — and the compositor samples
+ *  every frame of the visit out of it through a rotation. Measured
+ *  (U-INQUADRATURA-1, §B.3) that cost 1.12 ms of frame and 1.44 ms of the
+ *  DRIVER's own clock, over a ceiling of one millisecond: the night around the
+ *  world shipped still because of it.
+ *
+ *  A streak is the one thing in this sky that can afford it. It is a soft ramp
+ *  along a chord with a round cap at each end and no edge anywhere on it — the
+ *  picture has no detail at the pixel to lose — so the whole of what halving
+ *  the backing store takes away is a little of the thinnest streaks' bite, and
+ *  the plate at four times says it cannot be found. What it buys is a quarter
+ *  of the texels: four and nine tenths megapixels become one and two tenths,
+ *  and a rotation reads them out of a texture a quarter the size.
+ *
+ *  IT IS THE NIGHT'S OWN NUMBER AND NOT THE SCENE'S. src/ui/intro.js calls
+ *  paintTrails() with no third argument and therefore draws exactly the bytes
+ *  it has always drawn — the opening scene is a still picture held under type
+ *  for twenty seconds and it is the one place in this project where the pixel
+ *  of a streak is looked at closely. */
+export const TRAILS_RESOLUTION = 0.5;
+
 // ---------------------------------------------------------------- arithmetic
 
 export const clamp01 = (v) => (v < 0 ? 0 : (v > 1 ? 1 : v));
@@ -259,14 +314,22 @@ export function paintField(field, geom) {
 // redrawn per frame simply stops. A rigid rotation about the pole IS the star
 // trail, so nothing is lost by giving it away to the compositor.
 
-export function paintTrails(trails, geom) {
+export function paintTrails(trails, geom, resolution = 1) {
   const { poleX, poleY, rOut, rQuiet } = geom;
   const side = 2 * rOut;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   // Two ceilings: the device's, halved at two because past that the picture
   // is not better and the memory is real; and the absolute one, so an
   // ultrawide cannot ask for a backing store the size of a texture atlas.
-  const scale = Math.min(dpr, CAP_PX / side);
+  //
+  // AND A THIRD THING, WHICH IS NOT A CEILING: how much of that pixel the
+  // caller actually wants. One is the scene's, to the byte; a half is the
+  // night around the world (TRAILS_RESOLUTION). It multiplies the scale rather
+  // than dividing the side, so the DRAWING below is untouched — every number
+  // in it is still a CSS pixel about the same geometry — and what changes is
+  // only how finely the backing store records it.
+  const grain = Math.min(dpr, CAP_PX / side);
+  const scale = grain * Math.max(0.05, resolution);
   trails.width = Math.max(1, Math.round(side * scale));
   trails.height = trails.width;
   trails.style.width = `${side}px`;
@@ -287,7 +350,17 @@ export function paintTrails(trails, geom) {
   // Never thinner than one physical pixel: a hairline that falls between two
   // pixels of the backing store is a hairline the eye reads as flicker when
   // the whole thing turns.
-  const thinnest = 1 / scale;
+  //
+  // AND THE PHYSICAL PIXEL IS THE DEVICE'S AND NOT THE ECONOMY'S. Read off the
+  // reduced scale instead, a half resolution sky would floor every streak at
+  // two CSS pixels — which is not a thinner record of the same picture, it is
+  // a DIFFERENT picture: the widths are drawn from 0.9 to 2.0 and that floor
+  // collapses the whole distribution onto its top. Read off the grain, a one
+  // pixel streak is half a texel wide and the canvas's own antialiasing keeps
+  // its ink where its width was: it comes back a little softer and exactly as
+  // bright, which is the trade this economy is, and the plate at four times is
+  // where it is looked at.
+  const thinnest = 1 / grain;
 
   for (let i = 0; i < TRAILS; i++) {
     // Uniform per unit AREA — r = R·√u — so a ring's share of the stars is
@@ -368,14 +441,26 @@ export function seedGlints(spark, geom) {
   return glints;
 }
 
-export function twinkle(spark, glints) {
+export function twinkle(spark, glints, soft = false) {
   const ctx = spark.getContext('2d');
   const now = performance.now();
   ctx.clearRect(0, 0, spark.width, spark.height);
   ctx.fillStyle = `rgba(${TRAIL_HEAD},1)`;
+  // TWO SWINGS, AND THE SOFT ONE IS THE STILL SKY'S (E-DECISIONI35, point 1).
+  //
+  // Over a sky of streaks a star that goes from a twentieth of white to four
+  // tenths reads as twinkle, because there is a whole picture behind it doing
+  // the same thing more slowly. Over an EMPTY sky the same swing reads as
+  // blinking — twenty six points are the only thing moving, and the eye counts
+  // them. «I puntini luminosi delle stelle che brillano, in maniera morbida»:
+  // so the still sky's stars start a hair higher and reach a good deal lower,
+  // and the cube below — which is what keeps a star dark for most of its own
+  // period and bright for a moment of it — carries the rest of the softness.
+  const base = soft ? GLINT_STILL_BASE : GLINT_BASE;
+  const swing = soft ? GLINT_STILL_SWING : GLINT_SWING;
   for (const g of glints) {
     const s = 0.5 - 0.5 * Math.cos(2 * Math.PI * ((now / g.period + g.phase) % 1));
-    ctx.globalAlpha = 0.06 + 0.34 * s * s * s;
+    ctx.globalAlpha = base + swing * s * s * s;
     ctx.fillRect(g.x - g.size / 2, g.y - g.size / 2, g.size, g.size);
   }
   ctx.globalAlpha = 1;
@@ -425,6 +510,16 @@ export function createNight({ root = document.body, animated = true, reduced = n
       && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
     : reduced;
 
+  // WHETHER THIS SKY TURNS, DECIDED ONCE AND BEFORE ANYTHING IS BUILT.
+  //
+  // It is the difference between the two nights and not a setting on one of
+  // them: a sky that turns is a long exposure and has streaks in it; a sky that
+  // does not is a STAR FIELD, and a star field with the streaks left standing
+  // in it is the thing the committente looked at and refused (E-DECISIONI35,
+  // point 1). So the turning bitmap is not merely held still below — it is not
+  // made, not painted, not hung and not composited.
+  const turning = animated && !still;
+
   const el = document.createElement('div');
   el.className = 'notte';
   el.setAttribute('aria-hidden', 'true');
@@ -445,17 +540,21 @@ export function createNight({ root = document.body, animated = true, reduced = n
     `background:${NIGHT}`,
   ].join(';'));
   el.innerHTML = '<canvas class="notte-field"></canvas>'
-    + '<canvas class="notte-trails"></canvas>'
+    + (turning ? '<canvas class="notte-trails"></canvas>' : '')
     + '<canvas class="notte-spark"></canvas>';
 
   const field = el.querySelector('.notte-field');
   const trails = el.querySelector('.notte-trails');
   const spark = el.querySelector('.notte-spark');
-  for (const layer of [field, trails, spark]) layer.setAttribute('style', LAYER_STYLE);
-  // The turning bitmap is a square centred on the pole, so its own middle IS
-  // the pole and the rotation needs no correction.
-  trails.style.transformOrigin = '50% 50%';
-  trails.style.willChange = 'transform';
+  for (const layer of [field, trails, spark]) {
+    if (layer) layer.setAttribute('style', LAYER_STYLE);
+  }
+  if (trails) {
+    // The turning bitmap is a square centred on the pole, so its own middle IS
+    // the pole and the rotation needs no correction.
+    trails.style.transformOrigin = '50% 50%';
+    trails.style.willChange = 'transform';
+  }
 
   root.insertBefore(el, root.firstChild);
 
@@ -476,7 +575,7 @@ export function createNight({ root = document.body, animated = true, reduced = n
    *
    *  On the compositor, like the scene's: a transform and nothing else. */
   function turn() {
-    if (spin || still || !animated) return;
+    if (spin || !turning || !trails) return;
     if (typeof trails.animate !== 'function') return;
     spin = trails.animate(
       [{ transform: 'rotate(0deg)' }, { transform: 'rotate(-360deg)' }],
@@ -486,9 +585,13 @@ export function createNight({ root = document.body, animated = true, reduced = n
 
   function repaint() {
     paintField(field, geom);
-    paintTrails(trails, geom);
+    // HALF THE PIXEL, AND ONLY HERE. The scene draws the same loops at the
+    // device's own grain; around the world the streaks are a backdrop behind a
+    // picture and the eye is never on them, so a quarter of the texels buys the
+    // rotation back. See TRAILS_RESOLUTION.
+    if (trails) paintTrails(trails, geom, TRAILS_RESOLUTION);
     glints = seedGlints(spark, geom);
-    if (sparkTimer) twinkle(spark, glints);
+    if (sparkTimer) twinkle(spark, glints, !turning);
   }
 
   function measure() {
@@ -517,8 +620,11 @@ export function createNight({ root = document.body, animated = true, reduced = n
      * build the identical thing again.
      */
     get asked() { return animated; },
-    get turning() { return animated && !still; },
+    get turning() { return turning; },
     get still() { return still; },
+    /** Whether the turning bitmap exists at all. A still sky has no streaks in
+     *  it (E-DECISIONI35, point 1), and a guard has to be able to ask. */
+    get streaked() { return trails !== null; },
 
     /** Drawn, hung, and turning. */
     start() {
@@ -530,8 +636,8 @@ export function createNight({ root = document.body, animated = true, reduced = n
       // three times a second, which is the whole of what a still night does.
       // A visitor who asked for no motion gets neither.
       if (!still) {
-        sparkTimer = setInterval(() => twinkle(spark, glints),
-          animated ? SPARK_MS : SPARK_STILL_MS);
+        sparkTimer = setInterval(() => twinkle(spark, glints, !turning),
+          turning ? SPARK_MS : SPARK_STILL_MS);
       }
       return api;
     },
