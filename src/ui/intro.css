@@ -150,9 +150,33 @@
  * got wrong first and the recording found it: a gradient still banked against
  * the top and bottom edges at the moment the eyes were supposed to be all the
  * way open, and 98.2% of the frame read where 100 was wanted. */
+/* AND THE EYES OPEN INSIDE THE PICTURE, NOT ACROSS THE GLASS (E-DECISIONI35,
+ * point 2). «L'occhio si apre lungo tutto lo schermo e non solo nella finestra
+ * di esplorazione, questa cosa stona.»
+ *
+ * So this box is the PICTURE — src/main.js measures it and src/ui/intro.js
+ * writes the four numbers and the corner on here — and the night around it is
+ * never covered by a lid and never blinks. The four values below are the
+ * whole window, which is what the picture is when nothing has made it smaller.
+ *
+ * EVERYTHING INSIDE IT IS A PERCENTAGE OF THIS BOX AND NO LONGER OF THE GLASS.
+ * The lids used to be measured in vh, which was the same number while the
+ * picture WAS the window; with a picture eight tenths of the glass a lid of
+ * 80vh inside a box of 676 px would be a lid taller than the eye it belongs to
+ * and an aperture that means nothing the design said. The aperture table in
+ * src/ui/intro.js speaks in fractions of THE FRAME, and this is what makes the
+ * frame it speaks of the one on the page.
+ *
+ * `overflow: hidden` with a `border-radius` is what gives the lids the
+ * picture's own corners — the one clip in this whole file, over two black
+ * gradients that are already the colour of the night outside them. */
 .intro-lids {
   position: fixed;
-  inset: 0;
+  left: 0;
+  top: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
   z-index: 30;
   pointer-events: none;
   overflow: hidden;
@@ -178,7 +202,7 @@
   position: absolute;
   left: 0;
   width: 100%;
-  height: var(--lid-h, 80vh);
+  height: var(--lid-h, 80%);
   will-change: transform;
 }
 
@@ -213,6 +237,27 @@
 .intro-lids.is-gone {
   opacity: 0;
   transition: opacity var(--wake-grace, 300ms) linear;
+}
+
+/* ------------------------------------------------------- the picture, born
+ *
+ * The circle the star went round, growing into the rounded rectangle of the
+ * picture (E-DECISIONI35, point 4). It is a canvas painted from the frame loop
+ * in src/ui/intro.js — the one thing in this scene that is drawn per frame, and
+ * the note over it says why — and this is the whole of what the sheet has to
+ * know about it: that it is over the scene, that it takes no clicks, and that
+ * it is the size of the glass because the circle starts round the NAME and ends
+ * round the picture, which are two different rectangles.
+ *
+ * Z 32, over the scene's 31: the name and the sentence dissolve INTO this, so
+ * for the two hundred milliseconds the two overlap the border is what is in
+ * front. */
+.intro-born {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 32;
+  pointer-events: none;
 }
 
 /* ------------------------------------------------------------------ the sky */

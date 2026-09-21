@@ -564,6 +564,96 @@ const WAKE_EXPOSURE = [
  *  precisely the thing the setting exists to spare them. */
 const REDUCED_WAKE_MS = 1200;
 
+/** THE BIRTH OF THE PICTURE, AND IT COMES BEFORE THE WAKING (E-DECISIONI35, 4).
+ *
+ *  «Comparirà la forma della finestra esplorabile all'improvviso, e questo non
+ *  lo vorrei. Stavo pensando che la circonferenza del caricamento si allargasse
+ *  fino a raggiungere, in modo morbido e stile coerente, la dimensione della
+ *  finestra esplorabile.»
+ *
+ *  So the circle the star went round does not fade with the rest of the scene:
+ *  it GROWS, over a second and a half, into the rounded rectangle of the
+ *  picture, and its cyan becomes that picture's soft border. Only then do the
+ *  lids begin. The whole of the waking timeline above is unchanged and simply
+ *  starts later — `wokeAt` is set a birth ahead of the gesture — so every
+ *  number the design was given still means what it meant.
+ *
+ *  A SECOND AND A HALF, and the two things it is held between: under a second
+ *  the circle arrives before the name has finished dissolving (the scene takes
+ *  FADE_MS = 1300 to go) and the two read as one jump; over two the visitor has
+ *  already pressed and is waiting, which is the one thing an entrance may not
+ *  do. It overlaps the scene's own fade by two hundred milliseconds, which is
+ *  what makes it a handover rather than a queue.
+ *
+ *  HANDOVER is what happens after it lands: the drawn ring fades out while the
+ *  halo in the composite — which is the picture's own light, and is cyan for
+ *  exactly as long as this lasts — comes up under it. A crossfade of one border
+ *  into another, both driven from the same frame and therefore never apart. */
+const BIRTH_MS = 1500;
+const BIRTH_HANDOVER_MS = 500;
+
+/** AND IT ADVANCES BY FRAMES AND NOT BY MILLISECONDS, WHICH IS THE OPPOSITE OF
+ *  EVERYTHING ELSE IN THIS FILE, AND IT IS MEASURED.
+ *
+ *  The gesture is the busiest instant of the whole arrival: the walker is
+ *  engaged, the pointer lock is asked for, an audio context is opened, and the
+ *  world's first frames with a defocused copy in them compile the two passes
+ *  that draw it. Measured here with a screencast — which delivers the frames
+ *  the browser actually DREW — the page went 133 ms and then 712 after the
+ *  click: five hundred and eighty milliseconds with nothing on the glass, out
+ *  of a growth that is meant to last fifteen hundred.
+ *
+ *  On a clock, that stall is a border that stands still for six tenths of a
+ *  second and then jumps four tenths of its travel in one frame — which is
+ *  precisely the «all'improvviso» the committente asked to be rid of, moved
+ *  from the beginning of the movement into the middle of it.
+ *
+ *  So the growth is given a SPEED LIMIT instead of a deadline: each frame
+ *  advances it by the time that really passed, capped at this. A frame that
+ *  cost sixty milliseconds and one that cost six hundred move the border by the
+ *  same amount, so it can never jump; what a stall costs is that the birth ends
+ *  later, which is the one thing a visitor cannot see. Sixty is four frames of
+ *  a sixty hertz screen: under it an ordinary dropped frame would start
+ *  stretching the movement for nothing.
+ *
+ *  AND THERE IS A CEILING UNDER THAT PROMISE, for the same reason there is one
+ *  under the arrival veil's wait (VEIL_GROUND_CAP_MS in src/main.js): a page
+ *  that spent the birth in a background tab drew no frames at all, and a border
+ *  that waits for frames that will never come is a visitor who never gets in.
+ *  Nine hundred milliseconds of slack is longer than the worst stall measured
+ *  on the reference machine and shorter than anything a walker would call a
+ *  wait. */
+const BIRTH_STEP_CAP_MS = 60;
+const BIRTH_SLACK_MS = 900;
+
+/** How the circle grows. Soft at BOTH ends — Hermite's smoother cousin, whose
+ *  first AND second derivatives are nought at each end — because this movement
+ *  has nothing before it and nothing after it: it starts from a standing
+ *  circle and it stops on a standing picture, and a curve that arrived with any
+ *  speed left would need something to absorb it. */
+const grown = (x) => {
+  const t = x < 0 ? 0 : (x > 1 ? 1 : x);
+  return t * t * t * (t * (t * 6 - 15) + 10);
+};
+
+/** THE BORDER WHILE IT IS BEING BORN, drawn as four strokes and not as a blur.
+ *
+ *  A canvas shadow is the obvious way to make a line glow and it is the wrong
+ *  one here: `shadowBlur` is a full blur of the stroke's bounding box, which
+ *  during this second and a half is most of the window, on the main thread, on
+ *  the frames where the world is taking its first real ones. Four concentric
+ *  strokes of falling width and rising opacity are a glow the eye cannot tell
+ *  from a blurred one at this scale, and they cost four paths.
+ *
+ *  The widths are in CSS pixels and the alphas are what they are at full
+ *  strength; the colours are the orbit's own (src/ui/intro.css): the cool teal
+ *  for the halo and the near-white the star's head is cut in for the line. */
+const RING_COATS = [
+  [17, 0.055], [10, 0.10], [5, 0.20], [1.7, 0.80],
+];
+const RING_HALO = '158,236,249';
+const RING_LINE = '232,248,255';
+
 /** How a lid moves, and the three shapes are not one shape. Up is a lid FLYING
  *  — most of the travel in the first third — because that is what a muscle
  *  that has just been let go does; down is a lid FALLING, slow to leave and
@@ -612,11 +702,18 @@ function rampAt(table, t) {
 function lidKeyframes() {
   const steps = BLINKS.filter(([t]) => t >= WAKE.first);
   const eases = [EASE_OPEN, 'linear', EASE_SHUT, EASE_OPEN, 'linear', EASE_SHUT, EASE_LAND];
+  // THE TRAVEL IS A PERCENTAGE OF THE LID'S OWN HEIGHT AND NO LONGER OF THE
+  // GLASS (E-DECISIONI35, point 2). The lid is LID_VH per cent of the PICTURE
+  // and the travel is a fraction of the lid, so a fraction times a hundred is
+  // the same movement it always was — expressed in the one unit that follows
+  // the picture when the picture is smaller than the window. Nothing about the
+  // timeline, the curves or the apertures moves: this is the same number in
+  // another denominator.
   const frames = (sign) => steps.map(([t, aperture], i) => {
     const pc = ((t - WAKE.first) / WAKE.span) * 100;
-    const y = sign * travelFor(aperture) * LID_VH;
+    const y = sign * travelFor(aperture) * 100;
     const ease = i < eases.length ? `animation-timing-function:${eases[i]};` : '';
-    return `${pc.toFixed(3)}%{transform:translateY(${y.toFixed(3)}vh);${ease}}`;
+    return `${pc.toFixed(3)}%{transform:translateY(${y.toFixed(3)}%);${ease}}`;
   }).join('');
   return `@keyframes intro-lid-up{${frames(-1)}}\n`
     + `@keyframes intro-lid-down{${frames(1)}}`;
@@ -645,7 +742,7 @@ function isEntry(event) {
  * @param {Function}    onAwake   the world is theirs
  */
 export function createIntro({
-  root, cover, bus, onGesture, onAwake,
+  root, cover, bus, onGesture, onAwake, quadro = null,
 }) {
   const still = typeof window.matchMedia === 'function'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -805,6 +902,17 @@ export function createIntro({
   // clock the frame loop hands in, so the focus and the lids are measured from
   // one origin and not from two.
   let wokeAt = 0;
+  // The visitor's own gesture, which is where the BIRTH is counted from. It is
+  // a birth earlier than `wokeAt` above: see enter().
+  let bornAt = 0;
+  // How much of the birth has been DRAWN, which is not how much time has passed:
+  // see BIRTH_STEP_CAP_MS. And when the last frame of it was handed in, so that
+  // a stall is measured rather than assumed.
+  let borning = 0;
+  let lastFrameAt = 0;
+  let handedAt = 0;
+  let waking = false;
+  let birthTimer = null;
   let driving = false;
   let veiled = false;
   let lastPost = null;
@@ -833,6 +941,77 @@ export function createIntro({
   //
   // A visitor who asked for no motion gets neither these nor the focus: a blur
   // that pumps three times is exactly what the setting exists to spare them.
+  /** WHERE THE EYES ARE, and they are the picture's and not the glass's.
+   *
+   *  «L'occhio si apre lungo tutto lo schermo e non solo nella finestra di
+   *  esplorazione, questa cosa stona» (E-DECISIONI35, point 2). src/main.js
+   *  measures the picture — src/core/inquadratura.js decides how big it is and
+   *  src/core/cornice.js what its edge is made of — and hands it here. The box
+   *  the lids live in becomes that rectangle, with its corner, so the night
+   *  around the world is never covered by a lid and never blinks.
+   *
+   *  Without one the box is the window, which is what it always was and what a
+   *  picture at the whole window with no frame on it still is. */
+  function layoutLids() {
+    if (!lids) return;
+    const box = typeof quadro === 'function' ? quadro() : null;
+    if (!box || !box.framed) {
+      lids.style.left = '0px';
+      lids.style.top = '0px';
+      lids.style.width = '';
+      lids.style.height = '';
+      lidShape(grown(borning));
+      return;
+    }
+    lids.style.left = `${box.left}px`;
+    lids.style.top = `${box.top}px`;
+    lids.style.width = `${box.width}px`;
+    lids.style.height = `${box.height}px`;
+    lidShape(grown(borning));
+  }
+
+  /** AND THE EYES ARE THE SHAPE THE PICTURE HAS SO FAR, NOT THE SHAPE IT WILL
+   *  HAVE, and this is the line the first build got wrong.
+   *
+   *  A pair of lids on the picture's whole rectangle is a BLACK RECTANGLE, and
+   *  the night behind it is not the same black: measured on the plate, the lid
+   *  is #02060c and the night #050b13, so the moment the opening scene begins
+   *  to dissolve the visitor sees the finished shape of the picture standing
+   *  there — which is exactly the «comparira' la forma della finestra
+   *  esplorabile all'improvviso» the growth exists to do away with, arriving
+   *  three quarters of a second before the growth has finished.
+   *
+   *  So the lids are clipped to the SAME three interpolations the mask and the
+   *  ring are drawn from. One shape, three places, and the two that are DOM
+   *  read it from here.
+   *
+   *  A CLIP AND NOT A BOX. Moving the lids' own left/top/width/height per frame
+   *  would relayout them and repaint two radial gradients the size of the
+   *  picture on every frame of the birth; `clip-path` is a paint-time property
+   *  of a layer that is already rasterised, so what changes per frame is where
+   *  the compositor cuts it and nothing else. The prefixed spelling is there
+   *  because Safari wanted it until 13.1 and a border that silently did not
+   *  clip would be the defect this whole function exists to close. */
+  function lidShape(g) {
+    if (!lids) return;
+    const box = typeof quadro === 'function' ? quadro() : null;
+    if (!box || !box.framed) {
+      lids.style.clipPath = '';
+      lids.style.webkitClipPath = '';
+      return;
+    }
+    const cx = poleX + (box.left + box.width / 2 - poleX) * g;
+    const cy = poleY + (box.top + box.height / 2 - poleY) * g;
+    const hw = rOrbit + (box.width / 2 - rOrbit) * g;
+    const hh = rOrbit + (box.height / 2 - rOrbit) * g;
+    const r = Math.min(rOrbit + (box.radius - rOrbit) * g, Math.min(hw, hh));
+    const px = (v) => `${Math.max(0, v).toFixed(1)}px`;
+    const clip = `inset(${px(cy - hh - box.top)} ${px(box.left + box.width - cx - hw)} `
+      + `${px(box.top + box.height - cy - hh)} ${px(cx - hw - box.left)} round ${r.toFixed(1)}px)`;
+    lids.style.clipPath = clip;
+    lids.style.webkitClipPath = clip;
+  }
+
   const lids = still ? null : document.createElement('div');
   const lidSheet = still ? null : document.createElement('style');
   if (lids) {
@@ -864,7 +1043,7 @@ export function createIntro({
     // Vertical radius = the lid's own height, which leaves the horizontal one
     // to carry the arc: a wider ellipse is a flatter lid.
     const rx = 0.5 / Math.sqrt(1 - (1 - drop) ** 2);
-    lids.style.setProperty('--lid-h', `${LID_VH}vh`);
+    lids.style.setProperty('--lid-h', `${LID_VH}%`);
     lids.style.setProperty('--lid-rx', `${(rx * 100).toFixed(3)}%`);
     lids.style.setProperty('--lid-top', `${((solid + 1) * 100).toFixed(3)}%`);
     lids.style.setProperty('--lid-bottom', `${((-solid) * 100).toFixed(3)}%`);
@@ -872,6 +1051,92 @@ export function createIntro({
     lidSheet.textContent = lidKeyframes();
     document.head.appendChild(lidSheet);
     root.appendChild(lids);
+    layoutLids();
+  }
+
+  // ------------------------------------------------------------ the birth
+  //
+  // THE ONE THING IN THIS SCENE THAT IS PAINTED PER FRAME ON PURPOSE.
+  //
+  // Everything else that moves in here moves on the compositor, because during
+  // the LOAD the main thread disappears for seconds at a time. This does not,
+  // and the reason is the opposite of the usual one: what it has to stay in
+  // step with is the MASK IN THE COMPOSITE (src/core/cornice.js), which is a
+  // uniform written from the frame loop. A border animated on the compositor
+  // would keep perfect time with the clock and no time at all with the picture
+  // it is the border of — and the one frame where they disagreed would be a
+  // world coming out of the wrong side of its own edge.
+  //
+  // Above the scene rather than under it (z 32 against 31): the circle is what
+  // the name and the sentence dissolve INTO, so for the two hundred
+  // milliseconds they overlap it has to be the thing in front.
+  const bornEl = still ? null : document.createElement('canvas');
+  if (bornEl) {
+    bornEl.className = 'intro-born';
+    bornEl.setAttribute('aria-hidden', 'true');
+    root.appendChild(bornEl);
+  }
+  let bornScale = 1;
+  let bornSized = '';
+
+  /** The outline, at a given point of the growth, as the same three
+   *  interpolations the composite's own frameDistance() makes: a rounded
+   *  rectangle whose half-sides and whose corner are all one number IS the
+   *  circle the star went round, so there is one shape and not two. */
+  function bornPath(ctx, g, box) {
+    const cx = poleX + (box.left + box.width / 2 - poleX) * g;
+    const cy = poleY + (box.top + box.height / 2 - poleY) * g;
+    const hw = rOrbit + (box.width / 2 - rOrbit) * g;
+    const hh = rOrbit + (box.height / 2 - rOrbit) * g;
+    const r = Math.min(rOrbit + (box.radius - rOrbit) * g, Math.min(hw, hh));
+    // BUILT OUT OF arcTo AND NOT OUT OF roundRect, which is four years younger
+    // than this browser support target and would take the whole border away on
+    // the browsers that do not have it — silently, in the one second of the
+    // visit that is a ceremony. Four corners and four sides, which is what
+    // roundRect is anyway.
+    const l = cx - hw;
+    const t = cy - hh;
+    const rr = cx + hw;
+    const b = cy + hh;
+    ctx.beginPath();
+    ctx.moveTo(l + r, t);
+    ctx.arcTo(rr, t, rr, b, r);
+    ctx.arcTo(rr, b, l, b, r);
+    ctx.arcTo(l, b, l, t, r);
+    ctx.arcTo(l, t, rr, t, r);
+    ctx.closePath();
+  }
+
+  /** @param {number} g   how grown, 0..1
+   *  @param {number} fade how much of the border is still being drawn here */
+  function paintBorn(g, fade) {
+    if (!bornEl) return;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const key = `${w}x${h}`;
+    if (key !== bornSized) {
+      bornSized = key;
+      bornScale = Math.min(window.devicePixelRatio || 1, 2);
+      bornEl.width = Math.max(1, Math.round(w * bornScale));
+      bornEl.height = Math.max(1, Math.round(h * bornScale));
+      bornEl.style.width = `${w}px`;
+      bornEl.style.height = `${h}px`;
+    }
+    const ctx = bornEl.getContext('2d');
+    ctx.setTransform(bornScale, 0, 0, bornScale, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    if (fade <= 0) return;
+    const box = typeof quadro === 'function' ? quadro() : null;
+    if (!box) return;
+    ctx.lineJoin = 'round';
+    for (let i = 0; i < RING_COATS.length; i += 1) {
+      const [width, alpha] = RING_COATS[i];
+      ctx.lineWidth = width;
+      ctx.strokeStyle = `rgba(${i === RING_COATS.length - 1 ? RING_LINE : RING_HALO},`
+        + `${(alpha * fade).toFixed(3)})`;
+      bornPath(ctx, g, box);
+      ctx.stroke();
+    }
   }
 
   // ------------------------------------------------- the sky, drawn by notte.js
@@ -1439,6 +1704,11 @@ export function createIntro({
     // composite are not taken by anybody.
     driving = false;
     lastPost?.setWake(0, 1);
+    // AND THE FRAME IS PUT BACK THE SAME WAY, for the same reason: a picture
+    // left half born by a scene that no longer exists is a world nobody can
+    // walk into. Grown, no cyan, all of it there.
+    lastPost?.setNascita(1, 0, 1);
+    if (birthTimer) { clearTimeout(birthTimer); birthTimer = null; }
     if (awakeTimer) { clearTimeout(awakeTimer); awakeTimer = null; }
     if (lidTimer) { clearTimeout(lidTimer); lidTimer = null; }
     if (letGo) { clearTimeout(letGo); letGo = null; }
@@ -1462,6 +1732,7 @@ export function createIntro({
     // the collector to find: this is the moment the world needs every one of
     // them, and a canvas is only freed when its width is set to nothing.
     for (const c of [field, trails, spark, ringSrc, comet, ...rings]) { c.width = 0; c.height = 0; }
+    if (bornEl) { bornEl.width = 0; bornEl.height = 0; bornEl.remove(); }
     el.remove();
     lids?.remove();
     lidSheet?.remove();
@@ -1487,8 +1758,22 @@ export function createIntro({
   function enter() {
     if (state !== 'pronta') return;
     state = 'risveglio';
-    // The origin of the whole waking, taken before anything is told about it.
-    wokeAt = performance.now();
+    // THE ORIGIN OF THE WHOLE WAKING, AND IT IS A BIRTH AHEAD OF THE GESTURE.
+    //
+    // «PRIMA il cerchio cresce, POI l'occhio si apre dentro» (E-DECISIONI35,
+    // point 4). The timeline above is not touched by a millisecond: what
+    // changes is where its zero is. Between the gesture and that zero the
+    // circle grows, the tables hold at their first row — the eyes shut, the
+    // blur whole, the light too bright — and nothing else in this file knows
+    // the difference.
+    bornAt = performance.now();
+    lastFrameAt = bornAt;
+    // A PLACEHOLDER AND NOT A DECISION: drive() writes the real one on the
+    // frame the border lands. This is what the waking is measured from if no
+    // frame is ever drawn at all — a tab that spent the whole birth in the
+    // background — and on that page nothing is being looked at anyway.
+    wokeAt = bornAt + (still ? 0 : BIRTH_MS);
+    if (still) borning = 1;
     // The glints go first: nothing that runs on the main thread should still be
     // running while the world takes its first frames.
     stopGlints();
@@ -1509,10 +1794,14 @@ export function createIntro({
       return;
     }
 
-    // One class, and every one of the three clocks is already running: the lids
-    // on the compositor, the focus from the frame loop, the hearing on the
-    // audio thread. Nothing here is stepped by anything here.
-    lids.classList.add('is-waking');
+    // AND THE LIDS ARE NOT STARTED HERE ANY MORE. They used to be: one class,
+    // and the compositor ran the whole animation from its own delay. Now there
+    // is a birth in front of them, and the birth is drawn on the frame loop —
+    // so a lid whose delay ran on the compositor's clock would open on time
+    // through a stall that had left the border half grown. drive() adds the
+    // class on the frame the growth finishes, and from that instant the
+    // animation is exactly the compositor's own, with exactly the delay and the
+    // curves it was designed with.
     driving = true;
     // The veil's cue is given by the FRAME LOOP and not by this timer — see
     // drive() — because a setTimeout during this arrival arrives when the main
@@ -1521,12 +1810,34 @@ export function createIntro({
     // began three quarters of a second after the eyes had finished opening.
     // What is left of it here is the case the loop cannot cover: a tab that
     // spent the waking in the background, where no frame is drawn at all.
-    awakeTimer = setTimeout(raise, WAKE.veil + 400);
+    //
+    // ALL THREE ARE A BIRTH LATER THAN THEY WERE, for the same reason the
+    // waking's own zero is: they are counted from the gesture and the waking no
+    // longer begins at it.
+    const after = still ? 0 : BIRTH_MS + BIRTH_SLACK_MS;
+    // AND THE CEILING UNDER THE BIRTH'S OWN PROMISE. The growth advances by
+    // frames, so a tab that spent it in the background never finishes it and
+    // the eyes would never begin. This is the one thing in here that ends the
+    // birth on a CLOCK, and the slack over it is longer than the worst stall
+    // measured on the reference machine — on a page that is drawing at all,
+    // drive() has always already finished first and this finds nothing to do.
+    birthTimer = setTimeout(() => {
+      birthTimer = null;
+      if (borning < 1) {
+        borning = 1;
+        wokeAt = performance.now();
+        handedAt = wokeAt;
+      }
+      if (waking || !lids) return;
+      waking = true;
+      lids.classList.add('is-waking');
+    }, after);
+    awakeTimer = setTimeout(raise, after + WAKE.veil + 400);
     // Belt and braces of a different kind: at this point the lids are off the
     // top and the bottom of the frame anyway, and this is what covers a browser
     // that landed the animation a hair short of its last keyframe.
-    lidTimer = setTimeout(() => lids.classList.add('is-gone'), WAKE.total);
-    letGo = setTimeout(finish, WAKE.total + WAKE.grace);
+    lidTimer = setTimeout(() => lids.classList.add('is-gone'), after + WAKE.total);
+    letGo = setTimeout(finish, after + WAKE.total + WAKE.grace);
   }
 
   /**
@@ -1546,7 +1857,70 @@ export function createIntro({
     if (!driving) return;
     if (!post || typeof post.setWake !== 'function') { driving = false; return; }
     lastPost = post;
-    const t = (typeof nowMs === 'number' ? nowMs : performance.now()) - wokeAt;
+    const now = typeof nowMs === 'number' ? nowMs : performance.now();
+
+      // ------------------------------------------------------------ the birth
+    //
+    // The circle of the loading, growing into the picture. Two things move and
+    // they are the same three numbers: the mask in the composite, which is what
+    // the world is allowed to be, and the ring on the canvas above the lids,
+    // which is what the visitor is looking at. Written from HERE and not from
+    // two places, on the frame's own timestamp, so they cannot come apart.
+    if (bornEl) {
+      const step = Math.min(BIRTH_STEP_CAP_MS, Math.max(0, now - lastFrameAt));
+      lastFrameAt = now;
+      if (borning < 1) {
+        // Advanced by the time that really passed, capped: see the note over
+        // BIRTH_STEP_CAP_MS. A stall makes the birth longer and never makes it
+        // jump.
+        borning = Math.min(1, borning + step / BIRTH_MS);
+        const box = typeof quadro === 'function' ? quadro() : null;
+        if (box && box.framed) {
+          // Where the circle stands, in the picture's own pixels, measured from
+          // the middle of the picture with y pointing UP — which is the uv the
+          // composite works in and not the page's.
+          post.setSeme(
+            poleX - (box.left + box.width / 2),
+            (box.top + box.height / 2) - poleY,
+            rOrbit,
+          );
+        }
+        post.setNascita(grown(borning), 1, 1);
+        paintBorn(grown(borning), 1);
+        lidShape(grown(borning));
+        if (borning < 1) return;
+        // LANDED, AND THIS IS WHERE THE WAKING'S ZERO IS. Not a birth after the
+        // gesture — a birth after however long the birth actually took, which
+        // is the whole point of the speed limit above.
+        wokeAt = now;
+        handedAt = now;
+      }
+      if (bornSized !== '') {
+        // The handover: the drawn ring goes out while the halo in the composite
+        // — cyan for exactly as long as this lasts, and the picture's own light
+        // afterwards — comes up under it. One subtraction, two borders, no gap.
+        const hand = Math.min(1, Math.max(0, (now - handedAt) / BIRTH_HANDOVER_MS));
+        post.setNascita(1, 1 - hand, 1);
+        paintBorn(1, 1 - hand);
+        if (hand >= 1) {
+          // Thirty-odd megabytes of window-sized backing store, given back now
+          // rather than when the collector next looks.
+          bornSized = '';
+          bornEl.width = 0;
+          bornEl.height = 0;
+          bornEl.remove();
+        }
+      }
+    }
+
+    // AND THE EYES BEGIN ON THE FRAME THE BORDER LANDED ON. One class, once,
+    // and from here the lids are the compositor's exactly as they were.
+    if (!waking && lids) {
+      waking = true;
+      lids.classList.add('is-waking');
+    }
+
+    const t = now - wokeAt;
     if (t >= WAKE.veil) {
       // Exactly nought and exactly one, written once and then never again. Not
       // "small enough": the branches these guard in the composite have to stop
@@ -1617,6 +1991,12 @@ export function createIntro({
    *  their way up from nothing and the repaint cannot be seen, so it is simply
    *  done. */
   function relayout() {
+    // The eyes go where the picture went, and they go there FIRST: the picture
+    // can change shape without the window moving at all — the bench answers at
+    // the end of the load and the page resizes itself once, behind this very
+    // scene — and a pair of lids left on the old rectangle would open on a
+    // border of night.
+    layoutLids();
     if (swapTimer) { clearTimeout(swapTimer); swapTimer = null; }
     // Nothing the sky was drawn for has moved: put the name and the circle
     // where they now belong and leave the half million pixels alone.
@@ -1721,5 +2101,5 @@ export function createIntro({
   // five. The breath is now waited for from inside land(), where the picture
   // can be asked about as well.
 
-  return { drive, dispose };
+  return { drive, dispose, relayout };
 }
