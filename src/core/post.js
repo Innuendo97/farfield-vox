@@ -1802,7 +1802,22 @@ ${DEPTH_GLSL}
       cover = 1.0 - smoothstep(-max(0.5, uCornice.w), 0.0, dist);
       cover *= uNascita.z;
       if (cover <= 0.0) {
-        gl_FragColor = aura(pUv, dist) * uNascita.z;
+        vec4 only = aura(pUv, dist) * uNascita.z;
+        // AND THE HALO IS DITHERED TOO, for the reason everything else in this
+        // world is: a glow that falls from a fiftieth of white to nothing over
+        // fifty pixels of nearly black crosses one level of an eight bit
+        // channel every several pixels at its far end, which is a visible ring
+        // at a fixed radius -- the same banding the sky, the veil and the
+        // composite all already answer with one step of triangular noise.
+        // Two hashes, and only on the pixels that are outside the picture.
+        if (stage(16.0)) {
+          only.rgb += (hash(gl_FragCoord.xy) - hash(gl_FragCoord.xy + 17.13)) / 255.0;
+          only.rgb = max(only.rgb, vec3(0.0));
+          // Premultiplied means the colour may not run ahead of its own
+          // opacity, and a grain of noise over a transparent pixel would.
+          only.a = min(1.0, max(only.a, max(only.r, max(only.g, only.b))));
+        }
+        gl_FragColor = only;
         return;
       }
     }
@@ -2135,8 +2150,10 @@ ${DEPTH_GLSL}
     // quantised to eight bits. IT STAYS LAST. Everything above is a picture and
     // this is the noise that carries the picture through eight bits; anything
     // laid over it would simply erase it.
+    float grain = 0.0;
     if (stage(16.0)) {
-      colour += (hash(gl_FragCoord.xy) - hash(gl_FragCoord.xy + 17.13)) / 255.0;
+      grain = (hash(gl_FragCoord.xy) - hash(gl_FragCoord.xy + 17.13)) / 255.0;
+      colour += grain;
     }
 
     // AND THE EDGE, WHICH IS THE LAST THING AND NOT THE FIRST.
@@ -2151,9 +2168,20 @@ ${DEPTH_GLSL}
     // the compositor's own rule is src + dst·(1 - a). A straight colour with a
     // fractional alpha would be the same picture twice as bright at the rim.
     if (cover < 1.0 || dist > -uCornice.w) {
-      vec4 halo = aura(pUv, dist);
-      gl_FragColor = vec4(colour * cover + halo.rgb * (1.0 - cover),
-        min(1.0, cover + halo.a * (1.0 - cover)));
+      // Scaled by how much of the frame is on the page at all, exactly as the
+      // coverage above is: with no opening scene the picture and its halo come
+      // up TOGETHER over four hundred and fifty milliseconds, and a halo that
+      // arrived at full strength over a world that was still fading in would be
+      // a lit border round nothing.
+      vec4 halo = aura(pUv, dist) * uNascita.z;
+      // The noise is carried across the seam rather than fading out with the
+      // world: the line above already put it into the colour, and multiplying
+      // that by the coverage would take the dither away exactly in the band
+      // where the ramp is shallowest and needs it most. Its share on each side
+      // adds up to the one step it has always been.
+      float a = min(1.0, cover + halo.a * (1.0 - cover));
+      vec3 rgb = colour * cover + (halo.rgb + grain) * (1.0 - cover);
+      gl_FragColor = vec4(clamp(rgb, vec3(0.0), vec3(a)), a);
       return;
     }
 
