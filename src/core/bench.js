@@ -332,32 +332,72 @@ export function decideFraming(verdict, where) {
 // ===========================================================================
 // AND THE THIRD ANSWER: WHETHER THE NIGHT AROUND THE PICTURE TURNS.
 //
-// WHAT IT COSTS, MEASURED, AND IT IS NOT NOTHING. The night is not GL -- it is
-// a bitmap on the COMPOSITOR, two radii on a side, turning rigidly about the
-// pole -- so the driver's clock does not see it drawn. What sees it is the
-// interval between frames with the vsync unhooked, and the interval says:
+// THE LINE IS THE COMMITTENTE'S AND IT HAS NOT MOVED: «animata se costa meno di
+// 1 ms per fotogramma su quella macchina, altrimenti ferma con le sole stelle
+// che brillano». What moved is the number the line is held against, because the
+// instrument that produced the old one does not answer.
+//
+// WHAT IT USED TO SAY, AND WHY IT WAS WRONG (U-INQUADRATURA-1, §B.3). The night
+// is not GL -- it is a bitmap on the COMPOSITOR, two radii on a side, turning
+// rigidly about the pole. It was weighed by opening one page per arm, three
+// rounds, and taking the median of the three:
 //
 //     braccio     intervallo medio   orologio del driver
 //     nessuna          12.156              11.176
 //     ferma            12.013              11.133
 //     animata          13.271              12.615
 //
-// Three rounds at f = 0.7 on the reference window, the order of the arms
-// reversed on alternate rounds, the median of the three taken. The STILL night
-// costs nothing that can be measured -- minus a seventh of a millisecond, which
-// is noise. The TURNING one costs 1.12 ms of frame, and the driver's own clock
-// moves with it by 1.44: a full window layer recomposited every frame contends
-// for the same fill the world is drawn with, so what looks like a compositor's
-// business lands on the world's GPU as well. That number is the reason this
-// decision exists at all rather than being an obvious yes.
+// That put the turning sky at 1.12 ms, over the ceiling, and the world shipped
+// with a still one. Re-run on the same desk with the same code, that bench now
+// disagrees with ITSELF by up to 9.09 ms between three rounds of one arm -- it
+// even puts a night with ONE COMPOSITOR LAYER FEWER above its own null. Its
+// spread is not the sky, it is the drift between two page loads forty seconds
+// apart: a new world built each time while the GPU changes clock and the cache
+// fills. See §A.4 of the verbale of U-INQUADRATURA-2.
 //
-// THE LINE IS THE COMMITTENTE'S: «animata se costa meno di 1 ms per fotogramma
-// su quella macchina, altrimenti ferma con le sole stelle che brillano». On the
-// reference machine 1.12 is over it, so the world ships with a still sky and a
-// slow breath in the stars; a machine a fifth faster than this desk gets the
-// turn. Both are reachable by hand at `?notte=animata|ferma` and the verdict is
-// remembered with the rest of the calibration.
-const NIGHT_SPIN_MS = 1.12;
+// WHAT IT SAYS NOW, FROM AN INSTRUMENT THAT ANSWERS. Both arms live in ONE page
+// and alternate sixteen times on the same stream of frames, so what drifts
+// drifts across both together and the difference of the two medians is the
+// difference of the two states and nothing else
+// (per-il-committente/lav/2026-09-21-inquadratura-2-costo-ab.mjs, 1645 and 1612
+// frames):
+//
+//     la tela che gira     intervallo medio   orologio del driver
+//     non c'e'                 11.912               11.608
+//     e' appesa                12.163               11.662
+//     differenza               +0.25                +0.05
+//
+// A QUARTER OF A MILLISECOND, which is a quarter of the committente's line. So
+// on the reference machine the sky TURNS, and the still one is what a machine
+// four and a half times slower than this desk gets -- the exact arithmetic of
+// that is under decideNight() below, where the factor lives.
+//
+// AND THE PAGE CANNOT ASK THIS QUESTION OF ITSELF, which is the part worth
+// writing down, because it looks as though it should be able to. A visitor's
+// page has exactly two clocks and NEITHER of them can see this layer:
+//
+//   THE INTERVAL is pinned by the vsync. At sixty a second it reads 16.7 ms
+//   whatever is inside it, and it only starts moving once the machine is
+//   already over budget -- at which point it is measuring the machine and not
+//   the sky. The bench above only sees 0.25 ms because it is launched with
+//   --disable-gpu-vsync, and there is no way for a page to ask its own browser
+//   for that.
+//
+//   THE DRIVER'S CLOCK is what run() reads when it can (source: 'gpu'), and it
+//   sees 0.05 of the 0.25 -- a fifth, which is under anything a three second
+//   calibration could resolve. That is the same discovery from the other side:
+//   most of what a compositor layer costs lands outside the world's own pass.
+//
+// So the number is measured HERE, once, on the reference, with an instrument
+// that can unhook the vsync, and the page scales it by the one factor it has.
+// WHAT THAT SCALING ASSUMES, declared: that a machine which draws this world
+// n times slower also composites n times slower. It is the same ratio the
+// framing is decided with, and it is WEAKER here than there -- the framing
+// scales a cost of the world's own pass by a factor measured on the world's own
+// pass, and this scales a compositor's cost by it. It is the only factor a page
+// has, and a page that guessed instead would be spending a millisecond nobody
+// counted on the machine least able to lend it.
+const NIGHT_SPIN_MS = 0.25;
 const NIGHT_CEILING_MS = 1;
 
 /**
@@ -373,6 +413,21 @@ const NIGHT_CEILING_MS = 1;
  * machine with no timer query is, on every one this campaign has met, the slow
  * one (E-LINUX1). Guessing `animata` there would be spending a millisecond
  * nobody counted on the machine least able to lend it.
+ *
+ * WHAT THE NUMBERS COME TO, so that the two ends of this are visible in one
+ * place. The reference machine's own factor is 0.89 and not one -- it reads a
+ * median of 15.91 ms where the model puts that buffer at 17.89, which is the
+ * declared residue §7.5.6 of U-INQUADRATURA-1: the calibration runs while the
+ * world is still arriving and reads about a tenth under the settled frame. So
+ * the sky there is predicted at 0.22 ms and turns with more than three quarters
+ * of a millisecond to spare.
+ *
+ * The ceiling trips at a factor of exactly four, which on this scale is a
+ * machine FOUR AND A HALF TIMES SLOWER than the desk this campaign is judged
+ * on -- one that would read a median of 71.6 ms where this one reads 15.9.
+ * Between sito-4 and here nothing about any machine changed: what changed is
+ * that the number they are all compared against came from a bench that answers
+ * (E-DECISIONI36, point 1).
  */
 export function decideNight(verdict, benchPixels) {
   if (!verdict || verdict.source !== 'gpu' || !(benchPixels > 0)) return 'ferma';

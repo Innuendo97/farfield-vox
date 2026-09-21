@@ -1,7 +1,8 @@
 import {
   askedCornice, corniceOf, coverAt, distanceTo, FEATHER, MARGIN, MARGIN_WHOLE, OFF, RADIUS,
 } from '../../src/core/cornice.js';
-import { frameOf } from '../../src/core/inquadratura.js';
+import { frameOf, modelMs } from '../../src/core/inquadratura.js';
+import { decideNight } from '../../src/core/bench.js';
 import { read, reporter, selfTest } from './lib.mjs';
 
 // GUARD-CORNICE-VIVA -- IL QUADRO E' UN RICORDO: ANGOLI TONDI, BORDO SFUMATO,
@@ -75,6 +76,35 @@ export function bordo({
 /** La notte ferma, e la sola domanda che la riguarda. */
 export function cielo({ gira, scie }) {
   return { senzaScie: gira ? scie === 1 : scie === 0 };
+}
+
+/** IL VERDETTO DELLA NOTTE, e le quattro cose che lo tengono (E-DECISIONI36,
+ *  punto 1).
+ *
+ *  Non e' «il cielo gira»: quella e' una preferenza e cambierebbe con
+ *  l'hardware. E' che il verdetto venga da una misura che RISPONDE, con il
+ *  cancello del committente dove lui l'ha messo.
+ *
+ *  @param {object} how  il numero, il cancello, e i due verdetti agli estremi
+ */
+export function verdetto({
+  costoMs, cancelloMs, riferimento, lenta, senzaOrologio,
+}) {
+  return {
+    // Il cancello e' del committente e nessuno lo alza per far passare un
+    // cielo: «animata se costa meno di 1 ms per fotogramma su quella macchina».
+    cancello: cancelloMs === 1,
+    // E il numero e' quello dello strumento che risponde, non quello
+    // dell'altro: 0,25 e non 1,12.
+    misurato: costoMs > 0 && costoMs < 0.5,
+    // Sul riferimento il cielo gira.
+    riferimentoGira: riferimento === 'animata',
+    // E su una macchina abbastanza lenta no: un cancello che non scatta mai
+    // non e' un cancello.
+    lentaSiFerma: lenta === 'ferma',
+    // E dove non c'e' un orologio da leggere, il rifiuto resta dichiarato.
+    cieca: senzaOrologio === 'ferma',
+  };
 }
 
 /** Le palpebre: dove sono e che forma hanno.
@@ -153,13 +183,41 @@ if (process.argv.includes('--self')) {
       caught: !nascita({ passi: buoniPassi, palpebreA: 10 }).primaIlBordo,
     },
     {
+      what: 'il cancello della notte alzato per far passare un cielo che non ci sta',
+      caught: !verdetto({
+        costoMs: 0.25, cancelloMs: 4, riferimento: 'animata', lenta: 'animata',
+        senzaOrologio: 'ferma',
+      }).cancello,
+    },
+    {
+      what: 'il numero vecchio, quello del banco che non risponde',
+      caught: !verdetto({
+        costoMs: 1.12, cancelloMs: 1, riferimento: 'ferma', lenta: 'ferma',
+        senzaOrologio: 'ferma',
+      }).misurato,
+    },
+    {
+      what: 'un cancello che non scatta mai, nemmeno su una macchina cinque volte piu\' lenta',
+      caught: !verdetto({
+        costoMs: 0.25, cancelloMs: 1, riferimento: 'animata', lenta: 'animata',
+        senzaOrologio: 'ferma',
+      }).lentaSiFerma,
+    },
+    {
       what: 'e la cornice buona passa tutte e quattro',
       caught: Object.values(bordo(buonoBordo)).every(Boolean)
         && Object.values(cielo({ gira: true, scie: 1 })).every(Boolean)
         && Object.values(occhio({
           scatola: buonoBordo.quadro, quadro: buonoBordo.quadro, raggio: 30.4,
         })).every(Boolean)
-        && Object.values(nascita({ passi: buoniPassi, palpebreA: 31 })).every(Boolean),
+        && Object.values(nascita({ passi: buoniPassi, palpebreA: 31 })).every(Boolean)
+        && Object.values(verdetto({
+          costoMs: 0.25,
+          cancelloMs: 1,
+          riferimento: 'animata',
+          lenta: 'ferma',
+          senzaOrologio: 'ferma',
+        })).every(Boolean),
     },
   ]);
 }
@@ -338,6 +396,56 @@ report.check(!/paintTrails\([^)]*,\s*[A-Z_]*RESOLUTION/.test(intro)
 report.check(/export function twinkle\(spark, glints, soft = false\)/.test(notte)
   && /export const GLINT_STILL_SWING/.test(notte),
   'e il respiro del cielo fermo e\' piu\' morbido di quello del cielo che gira');
+
+// ------------------------- IL VERDETTO DELLA NOTTE (E-DECISIONI36, punto 1)
+//
+// LA REGOLA NON E' «IL CIELO GIRA». Quella e' una preferenza, e su una macchina
+// abbastanza lenta dev'essere falsa. La regola e' che il verdetto venga da una
+// misura che RISPONDE, col cancello del committente dove lui l'ha messo.
+{
+  const bench = read('src/core/bench.js');
+  const costo = Number((bench.match(/const NIGHT_SPIN_MS = ([\d.]+);/) || [])[1]);
+  const cancello = Number((bench.match(/const NIGHT_CEILING_MS = ([\d.]+);/) || [])[1]);
+  // I DUE ESTREMI SI CHIEDONO ALLA FUNZIONE VERA e non a una sua copia: il
+  // riferimento come il banco lo legge davvero (15,91 ms di mediana sul buffer
+  // che la calibrazione ha davanti, U-INQUADRATURA-1 §A.4-bis), e una macchina
+  // cinque volte piu' lenta.
+  const px = 1608 * 718;
+  const rif = { source: 'gpu', medianMs: 15.91, frames: 134 };
+  const lenta = { source: 'gpu', medianMs: 15.91 * 5, frames: 134 };
+  const cieca = { source: 'interval', medianMs: 15.91, frames: 134 };
+  const v = verdetto({
+    costoMs: costo,
+    cancelloMs: cancello,
+    riferimento: decideNight(rif, px),
+    lenta: decideNight(lenta, px),
+    senzaOrologio: decideNight(cieca, px),
+  });
+  const fattore = rif.medianMs / modelMs(px);
+  report.check(v.cancello,
+    'il cancello della notte e\' ancora quello del committente',
+    `${cancello} ms: «animata se costa meno di 1 ms per fotogramma su quella macchina»`);
+  report.check(v.misurato && /costo-ab\.mjs/.test(bench) && /disable-gpu-vsync/.test(bench),
+    'e il numero contro cui si misura viene dal banco che RISPONDE, nominato nella nota',
+    `${costo} ms dal banco A/B in una pagina sola, contro gli 1,12 del banco per pagina`);
+  report.check(v.riferimentoGira,
+    'quindi sul riferimento la notte GIRA (E-DECISIONI36, punto 1)',
+    `fattore ${fattore.toFixed(3)}, costo previsto ${(costo * fattore).toFixed(3)} ms `
+    + `sotto ${cancello}`);
+  report.check(v.lentaSiFerma,
+    'e su una macchina cinque volte piu\' lenta si ferma: un cancello che non scatta '
+    + 'mai non e\' un cancello',
+    `${(costo * (lenta.medianMs / modelMs(px))).toFixed(3)} ms previsti`);
+  report.check(v.cieca,
+    'e dove non c\'e\' un orologio del driver il rifiuto resta dichiarato');
+  // E LA RAGIONE PER CUI LA PAGINA NON PUO' CHIEDERSELO DA SOLA STA SCRITTA
+  // DOVE STA IL NUMERO, perche' e' la sola cosa che impedisce a qualcuno di
+  // "migliorare" questa decisione mettendoci un cronometro che non vede niente.
+  report.check(/pinned by the vsync/.test(bench) && /sees 0\.05 of the 0\.25/.test(bench),
+    'e la nota dice perche\' una pagina di visitatore non puo\' misurarlo da se\'',
+    'i suoi due orologi sono l\'intervallo, inchiodato dal vsync, e quello del driver, '
+    + 'che di quel livello vede un quinto');
+}
 
 // 2. LE PALPEBRE SONO DEL QUADRO.
 report.check(/function layoutLids\(\)/.test(intro) && /quadro = null/.test(intro),

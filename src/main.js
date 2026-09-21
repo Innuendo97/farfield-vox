@@ -406,9 +406,13 @@ const NIGHT_CHOICE = (() => {
 // applyNight() below and src/ui/notte.js.
 let night = null;
 // AND IT DOES NOT TURN UNTIL SOMETHING SAYS IT MAY. The handle first, then what
-// the last visit was told, and with neither the still sky -- which is the
-// measured answer on the reference machine and the safe one on a machine
-// nobody has measured yet. See decideNight() in src/core/bench.js.
+// the last visit was told, and with neither the still sky -- NOT because it is
+// the answer any more (since E-DECISIONI36 the reference machine's answer is
+// `animata`, at a measured 0.25 ms against a ceiling of one), but because it is
+// the answer for a machine NOBODY HAS ASKED YET. The verdict lands a few
+// seconds later, behind the opening scene, and a first visit that started
+// turning and had to stop would be the one visitor who saw it change. See
+// decideNight() in src/core/bench.js.
 let nightTurning = NIGHT_CHOICE
   ? NIGHT_CHOICE === 'animata'
   : readStored()?.notte === 'animata';
