@@ -18,6 +18,8 @@ import {
 import { createLooseStone } from '../../src/world/loose-stone.js';
 import { stoneSpecs } from '../../src/world/stone.js';
 import { hillAt } from '../../assets-src/distant/cornice.mjs';
+import { askedCornice, corniceOf } from '../../src/core/cornice.js';
+import { frameOf } from '../../src/core/inquadratura.js';
 import MASONRY from '../../assets-src/monoliths/masonry-spec.json' with { type: 'json' };
 import ROCK_PLAN from '../../assets-src/rocks/rocks.json' with { type: 'json' };
 import { Player } from '../../src/core/player.js';
@@ -668,10 +670,41 @@ const ARRIVO_FRAME = { width: VISITOR.width, height: VISITOR.height };
  * `fill` is what that box reads with him in it, and `control` the worst of four
  * boxes of the same size at the same rows out in the meadow either side.
  */
+/**
+ * AND THE BOX ENDS WHERE THE WORLD ENDS, WHICH SINCE E-DECISIONI35 IS NO LONGER
+ * THE BOTTOM OF THE FRAME.
+ *
+ * THIS LEG WENT RED AND IT WAS THE INSTRUMENT AND NOT THE PROPERTY. The picture
+ * a visitor is delivered now has a soft edge and a thin margin of night round it
+ * (src/core/cornice.js): at the whole window the world stops 19 px above the
+ * bottom of the glass and fades out over 24 more. The night down there is
+ * #050b13 -- dark, not green, and with its red no further ahead of its blue than
+ * 45 -- so isFigure() counts EVERY PIXEL OF IT as the body.
+ *
+ * That lifts his own box a little (his legs run off the bottom anyway) and lifts
+ * the four control boxes out in the meadow a great deal, because they were all
+ * meadow and are now one eighth night. Measured on the page as delivered: his
+ * box 76.2% against 20.6% in the meadow, a ratio of 3.7 under a floor of 4.
+ *
+ * THE WALKER IS STILL IN THE PICTURE. What broke is a box that was measured
+ * against the bottom EDGE OF THE FRAME on two plates taken before a frame
+ * existed. So the box is given the bottom of the WORLD instead, read from the
+ * same two modules the page reads it from -- and since the two plates that fixed
+ * `fill` and `control` had nothing but his body and meadow in the rows that are
+ * now dropped, the two numbers stand.
+ */
+function worldBottom(w, h) {
+  const shape = corniceOf(frameOf(1, w, h), askedCornice(''), w, h);
+  if (!shape.on) return h;
+  return Math.floor((h + shape.quadro.height) / 2 - shape.feather);
+}
+
 const ARRIVO = {
   crown: 525,
   centre: 797,
-  box: { x0: 745, x1: 855, y0: 525, y1: 845 },
+  box: {
+    x0: 745, x1: 855, y0: 525, y1: worldBottom(ARRIVO_FRAME.width, ARRIVO_FRAME.height),
+  },
   fill: 0.709,
   control: 0.089,
 };

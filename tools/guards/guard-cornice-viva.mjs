@@ -314,8 +314,23 @@ report.check(/\(turning \? '<canvas class="notte-trails"><\/canvas>' : ''\)/.tes
   'non appesa e poi ferma: proprio assente');
 report.check(/if \(trails\) paintTrails\(trails, geom, TRAILS_RESOLUTION\);/.test(notte),
   'e non viene dipinta: cinquecentoventi archi che nessuno vedrebbe non si disegnano');
-report.check(/export const TRAILS_RESOLUTION = 0\.5;/.test(notte),
-  'la notte attorno disegna le scie a meta\' risoluzione');
+report.check(/export function eachStar\(geom, thinnest, visit\)/.test(notte)
+  && /export function paintStars\(ctx, geom\)/.test(notte)
+  && /paintField\(field, geom, !turning\);/.test(notte),
+  'ma le cinquecentoventi STELLE ci sono lo stesso, come punti nel fondo',
+  'un cielo fermo e\' lo stesso cielo fotografato corto, non un cielo svuotato');
+report.check(/paintField\(field, geom, stars = false\)/.test(notte)
+  && /NOTTE_paintField\(field, geom\);/.test(intro),
+  'e la SCENA non le chiede, quindi il suo fondo e\' quello di sempre al byte');
+{
+  const grana = Number((notte.match(/export const TRAILS_RESOLUTION = ([\d.]+);/) || [])[1]);
+  report.check(Number.isFinite(grana) && grana > 0 && grana <= 1,
+    'la notte attorno ha una LEVA sulla grana delle scie, e la sua misura e\' scritta',
+    `${grana}: a un mezzo la stessa tela misura 12,607 ms contro 12,579 a uno — cioe' `
+    + 'niente — e la lastra a 4x dice che la meta\' NON e\' invisibile');
+  report.check(/if \(trails\) paintTrails\(trails, geom, TRAILS_RESOLUTION\);/.test(notte),
+    'e la passa la notte e non la scena');
+}
 report.check(!/paintTrails\([^)]*,\s*[A-Z_]*RESOLUTION/.test(intro)
   && /NOTTE_paintTrails\(trails, geom\);/.test(intro),
   'e la SCENA d\'apertura le disegna al pixel del dispositivo, come sempre',
@@ -509,9 +524,15 @@ if (!process.argv.includes('--self')) {
       const animata = await look('inquadratura=0.7&notte=animata');
       report.check(animata.scie === 1 && animata.gira === 1,
         'la notte animata ce l\'ha, e gira');
-      report.check(animata.grana !== null && Math.abs(animata.grana - 0.5) < 0.02,
-        'e la disegna a meta\' risoluzione del bitmap',
-        `${animata.grana === null ? '(assente)' : animata.grana.toFixed(3)} texel per pixel`);
+      // E LA GRANA CHE LA PAGINA MOSTRA E' QUELLA CHE IL MODULO DICHIARA, che
+      // e' la sola domanda che questa gamba puo' fare: il valore e' una LEVA
+      // (vedi sopra), e una guardia che inchiodasse la leva a un numero
+      // impedirebbe di girarla invece di difendere qualcosa.
+      const attesa = Number((notte.match(/export const TRAILS_RESOLUTION = ([\d.]+);/) || [])[1]);
+      report.check(animata.grana !== null && Math.abs(animata.grana - attesa) < 0.02,
+        'e la disegna alla grana che il modulo dichiara',
+        `${animata.grana === null ? '(assente)' : animata.grana.toFixed(3)} texel per pixel `
+        + `contro ${attesa}`);
 
       // LA NASCITA, CON LA SCENA VIVA.
       const scena = await browser.newPage({ viewport: WIN, deviceScaleFactor: 1 });

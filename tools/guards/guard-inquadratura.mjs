@@ -386,8 +386,27 @@ report.check(/surface\.addEventListener\('pointerdown'/.test(read('src/ui/touch.
 // E-DECISIONI33 punto 3: il velo d'arrivo e' del quadro, la scena resta sulla finestra.
 report.check(/body\.is-inquadrata \.sky-veil/.test(read('src/ui/style.css')),
   "il velo d'arrivo prende la misura dell'inquadratura e non della finestra");
-report.check(/veil\.relayout\(\)/.test(main) && /relayout\(\) \{ paint\(\); \}/.test(read('src/ui/veil.js')),
-  "e viene ridipinto quando il banco muove l'inquadratura, non solo al ridimensionamento");
+// E VIENE RIDIPINTO QUANDO IL BANCO MUOVE L'INQUADRATURA, e questa riga era
+// una CITAZIONE e adesso e' una regola.
+//
+// Cercava la stringa `relayout() { paint(); }`, e quella stringa non c'e' piu':
+// da E-DECISIONI35 il velo riceve anche la FORMA del quadro, perche' il quadro
+// ha gli angoli tondi e un rettangolo di velo sopra un quadro tondo mette
+// quattro cunei scuri fuori dal quadro per tutto l'arrivo (U-INQUADRATURA-2,
+// §B.4). La proprieta' difesa non si e' mossa: si e' rafforzata.
+//
+// Quindi si chiede la PROPRIETA' e non la scrittura: che src/main.js chiami
+// relayout dal suo resize, che il corpo di relayout ridipinga davvero, e che
+// quel che gli viene passato sia la forma del quadro e non niente.
+{
+  const velo = read('src/ui/veil.js');
+  const apre = velo.indexOf('relayout(');
+  const corpo = apre === -1 ? '' : braceBody(velo, velo.indexOf('{', apre));
+  report.check(/veil\.relayout\(quadroRect\(\)\)/.test(main) && /paint\(\)/.test(corpo),
+    "e viene ridipinto quando il banco muove l'inquadratura, non solo al ridimensionamento",
+    'e quel che gli si passa e\' la forma del quadro, perche\' il velo ne prende '
+    + 'anche gli angoli');
+}
 report.check(!/is-inquadrata[\s\S]{0,400}?\.intro\b/.test(read('src/ui/style.css')),
   'mentre il velo della SCENA resta sulla finestra');
 
