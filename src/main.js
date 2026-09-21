@@ -18,9 +18,13 @@ import {
 } from './core/poses.js';
 import { RIG, SWITCH } from './core/avatar.js';
 import { loadLut } from './core/post.js';
-import { createQuality, forgetStored, needsBenchmark } from './core/quality.js';
-import { askedFraction, deviceRatio, frameOf } from './core/inquadratura.js';
-import { createBenchmark, tierOf } from './core/bench.js';
+import {
+  createQuality, forgetStored, needsBenchmark, readStored,
+} from './core/quality.js';
+import {
+  askedFraction, deviceRatio, frameOf, windowPixels,
+} from './core/inquadratura.js';
+import { createBenchmark, decideFraming, tierOf } from './core/bench.js';
 import { buildHub } from './world/hub.js';
 import { needsAt } from './world/layers/registry.js';
 import { createStartOverlay } from './ui/overlay.js';
@@ -315,21 +319,25 @@ if (INTRO) {
 // outranks both, which is how every plate and every guard of this session pins
 // the world instead of photographing a verdict.
 //
-// With no handle it is one — the whole window, which is what this page has
-// always drawn — until the bench says otherwise.
-let fraction = askedFraction() ?? 1;
+// WHAT IT STARTS AT, AND WHY A RETURNING WALKER NEVER SEES IT MOVE.
+//
+// The handle outranks everything: `?inquadratura=<f>` pins the framing and the
+// bench never decides one, which is how every plate and every guard of this
+// session photographs a world instead of a verdict.
+//
+// Then the deposit. A machine that was measured on a previous visit already has
+// its answer, and needsBenchmark() below says so, so the bench does not run at
+// all and the picture is the size it was last time from the very first frame.
+//
+// And with neither, ONE: the whole window, which is what this page has always
+// drawn, until the bench says otherwise behind the opening scene.
+const PINNED = askedFraction();
+let fraction = PINNED ?? readStored()?.fraction ?? 1;
 
 // The night around the picture, mounted only where there is a picture smaller
 // than the window to put it around. It is null at a whole window and stays
 // null: see src/ui/notte.js.
 let night = null;
-
-/** The window, in the pixels a buffer would be built out of it. It is what the
- *  stored calibration is compared against: see needsBenchmark(). */
-function windowPixels() {
-  const r = deviceRatio();
-  return Math.floor(window.innerWidth * r) * Math.floor(window.innerHeight * r);
-}
 
 /**
  * Puts the framing on the page: the canvas becomes a centred rectangle and the
@@ -351,6 +359,21 @@ function applyFraming() {
     document.body.style.removeProperty('--inquadratura-h');
   }
   return frame;
+}
+
+/**
+ * The framing changes, once, when the bench has spoken.
+ *
+ * It is a reallocation of every buffer the frame is drawn into, so it happens
+ * exactly once per visit and behind the opening scene, where there is nothing
+ * to see it. With the scene off — which is every measured session, every guard
+ * and every plate — it is visible, and that is correct: those pages are opened
+ * at a pinned framing and this is never called on them at all.
+ */
+function setFraction(next) {
+  if (next === fraction) return;
+  fraction = next;
+  resize();
 }
 
 const renderer = new Renderer().init(canvas, applyFraming());
@@ -851,13 +874,12 @@ function plantWhenReady() {
  */
 function calibrate(force = false) {
   if (bench.active) return;
-  const buffer = renderer.drawingBuffer();
   // THE WAY OUT IS MARKED TOO, AND THAT IS THE POINT OF MARKING THIS AT ALL. A
   // machine that answered this question on a previous visit, or one small
   // enough never to be asked, never runs the three seconds — and a bar waiting
   // for a phase that is not going to happen would stop short of the end for
   // ever, on exactly the visits that are fastest.
-  if (!force && !needsBenchmark(buffer.width * buffer.height)) {
+  if (!force && !needsBenchmark(windowPixels())) {
     introBus?.report('bench', 1);
     return;
   }
@@ -866,9 +888,40 @@ function calibrate(force = false) {
     introBus?.report('bench', 1);
     const tier = tierOf(verdict);
     if (!tier) return;
-    quality.setBenchmark(tier, verdict.medianMs);
+    // WHAT THE BENCH READ, AND WHERE IT READ IT. The buffer is asked for AFTER
+    // the three seconds and not before: nothing moves it during them — the
+    // walker has no world yet and the governor is held — but a number taken on
+    // the other side of a wait is a number that can be argued with, and this
+    // one is the denominator of every prediction below.
+    const read = renderer.drawingBuffer();
+    // THE SECOND HALF OF THE VERDICT, and the handle outranks it: a page opened
+    // at a pinned framing is a page whose framing nobody may decide, so what is
+    // stored is the tier alone and the pin is not written into the deposit
+    // (`?inquadratura=0.6` must not be what a visitor finds on their next visit
+    // through the front door).
+    const framing = PINNED === null
+      ? decideFraming(verdict, {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        ratio: deviceRatio(),
+        benchPixels: read.width * read.height,
+      })
+      : null;
+    if (framing) setFraction(framing.fraction);
+    quality.setBenchmark(framing ? framing.tier : tier, verdict.medianMs, {
+      // THE WINDOW AND NOT THE BUFFER: see the note over PIXEL_TOLERANCE in
+      // src/core/quality.js. It is read after the framing has been applied on
+      // purpose — the window is the one thing the framing did not change.
+      pixels: windowPixels(),
+      fraction: framing ? framing.fraction : null,
+    });
     if (import.meta.env.DEV) {
-      console.info(`calibrazione: ${tier}, ${verdict.medianMs.toFixed(2)} ms mediana su ${verdict.frames} frame (${verdict.source})`);
+      console.info(`calibrazione: ${framing ? framing.tier : tier}, `
+        + `${verdict.medianMs.toFixed(2)} ms mediana su ${verdict.frames} frame (${verdict.source})`
+        + (framing
+          ? `, inquadratura ${framing.fraction} (${framing.frame.width}x${framing.frame.height}, `
+            + `${framing.predictedMs.toFixed(2)} ms previsti, ${framing.reason})`
+          : `, inquadratura inchiodata a ${fraction}`));
     }
   });
 }

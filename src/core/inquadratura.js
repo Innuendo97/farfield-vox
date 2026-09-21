@@ -205,3 +205,91 @@ export function askedFraction(search = (typeof window === 'undefined' ? '' : win
   if (!Number.isFinite(value)) return null;
   return Math.max(FRACTION_FLOOR, Math.min(1, value));
 }
+
+// ------------------------------------------------------------- the window
+
+/**
+ * The window, in the pixels a buffer would be built out of it.
+ *
+ * WHAT THE CALIBRATION IS AN ANSWER ABOUT, and the reason this is not the same
+ * number as the buffer. `PIXEL_TOLERANCE` in src/core/quality.js asks whether
+ * the frame has changed size enough for what was measured about this machine to
+ * have stopped being about this frame — and the framing is a DECISION taken on
+ * that measurement, not an input to it. Compared against the buffer, a stored
+ * answer would be re-asked the moment its own framing was applied, every visit,
+ * for ever: the bench reads the whole window, decides on eight tenths of it,
+ * and the next visit finds a buffer two thirds the size of the one it stored.
+ * Against the window it is a question about the glass, which is what it always
+ * meant.
+ */
+export function windowPixels(
+  width = (typeof window === 'undefined' ? 0 : window.innerWidth),
+  height = (typeof window === 'undefined' ? 0 : window.innerHeight),
+  ratio = deviceRatio(),
+) {
+  return Math.floor(width * ratio) * Math.floor(height * ratio);
+}
+
+// ------------------------------------------------------------- the model
+//
+// WHAT A FRAME COSTS, AS A FUNCTION OF HOW MANY PIXELS IT IS, MEASURED.
+//
+// The two terms below are a least squares fit over five framings on the
+// reference machine — 1892 x 845, the window every plate of this campaign is
+// taken at — at the tier the calibration itself runs at (`medio`, eight and a
+// half tenths of side), on the pose the calibration HOLDS (the arrival: see
+// SWEEP_DEGREES in src/core/bench.js, which is nought), with the eleven stage
+// timers OFF because a visitor's page has no `?dev` and the note over
+// setTiming() in src/core/renderer.js says what eleven timer queries cost.
+// Three rounds per framing, the order of the arms reversed on alternate rounds,
+// the median of the three taken:
+//
+//     frazione   buffer        Mpx      p50 dei tre giri          mediana
+//     1.0        1608 x 718    1.155    16.90 / 18.88 / 17.82     17.82
+//     0.9        1149 x 646    0.742    12.04 / 12.40 / 12.36     12.36
+//     0.8        1021 x 574    0.586    12.67 /  9.92 /  9.72      9.92
+//     0.7         894 x 503    0.450     8.23 /  7.96 /  7.91      7.96
+//     0.6         765 x 430    0.329     6.44 /  6.32 /  6.66      6.44
+//
+// The line through them misses no point by more than 0.21 ms over a range of
+// two and four fifths in pixels, with an rms of 0.12 — which is to say the
+// frame of this world IS a fixed cost plus a cost per pixel, and the second one
+// is almost all of it. That is the whole justification for buying milliseconds
+// with AREA, and it is why this file exists rather than a table of framings
+// somebody tuned by eye.
+//
+// THE FIXED TERM IS NOT THE SAME NUMBER U-PERF-7 READ, and it should not be:
+// that one was fitted at the tier `minimo`, which draws less grass, no
+// multisampling and a smaller ground disc. Two tiers are two lines. This is the
+// line of the tier the bench runs at, which is the only line the bench can use.
+export const MODEL = { fixedMs: 1.824, msPerMegapixel: 13.914 };
+
+/** What the model says a frame of this many pixels costs, in the reference
+ *  machine's own milliseconds. It is used as a RATIO and never as an absolute:
+ *  see predictMs(). */
+export function modelMs(pixels) {
+  return MODEL.fixedMs + MODEL.msPerMegapixel * (pixels / 1e6);
+}
+
+/**
+ * What a frame of `pixels` will cost on the machine that read `benchMs` at
+ * `benchPixels`.
+ *
+ * IT IS A RATIO AND NOT AN ABSOLUTE, which is what makes one measured line do
+ * for every machine. The model above is the reference machine's; another
+ * machine is taken to be some factor faster or slower than it, and the factor
+ * falls out of the one reading the bench actually took. So what is trusted is
+ * the SHAPE of the curve — a fixed part and a part per pixel — and never its
+ * height, and the height is measured on the machine in front of us, once, in
+ * three seconds.
+ *
+ * AND IT WORKS ON A READING THAT IS NOT MILLISECONDS AT ALL. Where there is no
+ * timer query, src/core/bench.js reads the INTERVAL between frames instead of
+ * their cost; a ratio of two model values is dimensionless, so the same
+ * arithmetic predicts an interval from an interval. What changes is the ceiling
+ * it is held to, and that is the caller's to pass.
+ */
+export function predictMs(benchMs, benchPixels, pixels) {
+  if (!(benchMs > 0) || !(benchPixels > 0)) return null;
+  return benchMs * (modelMs(pixels) / modelMs(benchPixels));
+}

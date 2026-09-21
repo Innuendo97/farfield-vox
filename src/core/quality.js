@@ -1,3 +1,5 @@
+import { windowPixels } from './inquadratura.js';
+
 // What the frame is allowed to cost on this machine, and what is given up to
 // keep it there.
 //
@@ -561,6 +563,22 @@ const SNAP_PATIENCE_MS = 2500;
 
 const STORAGE_KEY = 'farfield.quality';
 
+// WHAT SHAPE THE STORED ANSWER IS IN, AND WHY IT IS NUMBERED.
+//
+// The record gained two fields — the framing the bench decided and whether the
+// night around it turns — and one field CHANGED MEANING: `pixels` used to be
+// the BUFFER the bench read at and is now the WINDOW it read it in. The two are
+// not comparable numbers, and a record written under the old meaning read under
+// the new one would answer a question about the wrong thing: the buffer at the
+// default tier is seven tenths of the window, which is most of the way to
+// PIXEL_TOLERANCE all by itself.
+//
+// So a record that is not this version is treated as no record at all. It costs
+// a visitor who has been here before one calibration — three seconds, once, on
+// their next visit — which is the honest price of changing what a stored number
+// means, and it is the alternative to guessing.
+const STORAGE_VERSION = 2;
+
 // How far the frame may change size before what was measured about this machine
 // stops being about this frame.
 //
@@ -571,6 +589,12 @@ const STORAGE_KEY = 'farfield.quality';
 // treated as no answer and the three seconds are paid again — on the next
 // visit, never in the middle of one, because taking the eye off a walker who is
 // already walking is worse than any tier.
+// AND IT IS READ AGAINST THE WINDOW AND NOT AGAINST THE BUFFER (U-INQUADRATURA-1).
+// The framing is a DECISION taken on this measurement, not an input to it: read
+// against the buffer, a machine that was given eight tenths of its window would
+// find, on its very next visit, a buffer two thirds the size of the one it
+// stored and re-run the three seconds — every visit, for ever. See
+// windowPixels() in src/core/inquadratura.js.
 const PIXEL_TOLERANCE = 0.35;
 
 function tierIndex(id) {
@@ -584,11 +608,22 @@ export function readStored() {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const stored = JSON.parse(raw);
+    if (stored.v !== STORAGE_VERSION) return null;
+    const fraction = typeof stored.inquadratura === 'number' ? stored.inquadratura : null;
     return {
       tier: typeof stored.tier === 'string' ? stored.tier : null,
       choice: CHOICES.includes(stored.choice) ? stored.choice : 'auto',
       benchMs: typeof stored.benchMs === 'number' ? stored.benchMs : null,
+      // The WINDOW the calibration answered about, in buffer pixels. See the
+      // note over PIXEL_TOLERANCE.
       pixels: typeof stored.pixels === 'number' ? stored.pixels : null,
+      // WHAT FRACTION OF THAT WINDOW THE WORLD WAS GIVEN, and whether the night
+      // around it was found cheap enough to turn. Both are the bench's answers
+      // and both are held for the whole of the next visit: a walker who comes
+      // back must not watch the picture resize itself behind the scene a second
+      // time, and must not be shown a different night from the one they left.
+      fraction: fraction !== null && fraction > 0 && fraction <= 1 ? fraction : null,
+      notte: stored.notte === 'animata' || stored.notte === 'ferma' ? stored.notte : null,
     };
   } catch {
     return null;
@@ -604,7 +639,13 @@ function writeStored(state) {
   }
 }
 
-/** Whether this machine still has to be asked, for a frame of this many pixels. */
+/**
+ * Whether this machine still has to be asked, for a WINDOW of this many pixels.
+ *
+ * The argument is the window's own pixel count and not the buffer's: see the
+ * note over PIXEL_TOLERANCE, and windowPixels() in src/core/inquadratura.js,
+ * which is what every caller passes.
+ */
 export function needsBenchmark(pixels) {
   const stored = readStored();
   if (!stored?.tier) return true;
@@ -635,6 +676,13 @@ export function createQuality({ renderer, hub }) {
   // second calibration.
   let benchMs = stored?.benchMs ?? null;
   let benchPixels = stored?.pixels ?? null;
+  // The framing and the night, remembered beside the tier and moved by nobody
+  // but the bench. THE GOVERNOR BELOW NEVER TOUCHES EITHER: it moves the scale,
+  // the grass and the halo inside the picture, and the picture keeps the size
+  // it was given for the whole of the visit. A frame that changed size under a
+  // walker is the one thing in all of this that cannot be missed.
+  let fraction = stored?.fraction ?? null;
+  let notte = stored?.notte ?? null;
   let index = tierIndex(choice === 'auto' ? (benched ?? DEFAULT_TIER) : CHOICE_TIER[choice]);
   let applied = null;
 
@@ -718,7 +766,13 @@ export function createQuality({ renderer, hub }) {
 
   function store() {
     writeStored({
-      tier: benched, choice, benchMs, pixels: benchPixels,
+      v: STORAGE_VERSION,
+      tier: benched,
+      choice,
+      benchMs,
+      pixels: benchPixels,
+      inquadratura: fraction,
+      notte,
     });
   }
 
@@ -750,12 +804,27 @@ export function createQuality({ renderer, hub }) {
       announce();
     },
 
-    /** What the benchmark decided, which is only ever a starting point. */
-    setBenchmark(tierId, medianMs) {
-      const buffer = renderer.drawingBuffer();
+    /** What the framing was decided to be, and whether its night turns. Read
+     *  only: they are written by setBenchmark below and by nothing else. */
+    get fraction() { return fraction; },
+    get notte() { return notte; },
+
+    /**
+     * What the benchmark decided, which is only ever a starting point.
+     *
+     * @param {string} tierId
+     * @param {number} medianMs   what the bench read
+     * @param {object} framing    the bench's other two answers and the window
+     *                            it answered about: { pixels, fraction, notte }.
+     *                            `pixels` is the WINDOW's, not the buffer's —
+     *                            see the note over PIXEL_TOLERANCE.
+     */
+    setBenchmark(tierId, medianMs, framing = {}) {
       benched = tierId;
       benchMs = medianMs;
-      benchPixels = buffer.width * buffer.height;
+      benchPixels = framing.pixels ?? windowPixels();
+      if (framing.fraction != null) fraction = framing.fraction;
+      if (framing.notte != null) notte = framing.notte;
       store();
       if (choice !== 'auto') return;
       settle(tierId, { immediate: true });

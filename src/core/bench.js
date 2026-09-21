@@ -1,4 +1,7 @@
-import { BENCH_THRESHOLDS, TIERS } from './quality.js';
+import { BENCH_THRESHOLDS, DEFAULT_TIER, TIERS } from './quality.js';
+import {
+  bufferPixels, deviceRatio, FRACTIONS, frameOf, PIXEL_CEILING, predictMs,
+} from './inquadratura.js';
 
 // The three seconds in which the machine is asked what it can do.
 //
@@ -147,7 +150,15 @@ export function createBenchmark({ renderer, pose, ui }) {
         // the frame, so they are the interval itself.
         const interval = quantile(samples, 0.1) || mid;
         verdict = {
-          tier: tierForLag(mid / interval), medianMs: mid, source: 'interval',
+          tier: tierForLag(mid / interval),
+          medianMs: mid,
+          source: 'interval',
+          // WHAT THE DISPLAY IS OFFERING, carried out with the reading rather
+          // than thrown away with it. The framing is decided against a ceiling,
+          // and on this branch the ceiling is not a number of milliseconds —
+          // there are none to be had — it is a multiple of this. See
+          // decideFraming() at the foot of this file.
+          intervalMs: interval,
         };
       }
       verdict.p95Ms = quantile(samples, 0.95);
@@ -217,4 +228,103 @@ export function createBenchmark({ renderer, pose, ui }) {
 export function tierOf(verdict) {
   if (!verdict) return null;
   return TIERS.some((tier) => tier.id === verdict.tier) ? verdict.tier : null;
+}
+
+// ===========================================================================
+// AND THE SECOND HALF OF THE VERDICT: HOW BIG THE PICTURE IS.
+//
+// The calibration has always answered one question — what can this machine
+// afford — and given the answer as a TIER, which spends it on the scale, the
+// grass and the halo. E-DECISIONI32 gave it a second lever to spend it on, and
+// the committente put it FIRST in the order: «prima la scala fino a 0,85, poi
+// l'area». So the policy below is not "shrink the picture until the frame is
+// cheap"; it is "let the tiers do what they have always done down to the middle
+// rung, and buy the rest with area rather than with softness".
+//
+// WHAT IT ACTUALLY ASKS. The bench reads the frame at the framing the page was
+// built with, at the default tier. The model in src/core/inquadratura.js turns
+// that one reading into a prediction for any other number of pixels. The
+// largest framing whose predicted cost keeps this machine at the tier `medio`
+// or better is the one it gets — and `medio` is where it stops because that is
+// the last tier whose scale (0.85) the committente called acceptable: below it
+// the texel of the ground and the engraved writing start paying, which is the
+// thing area exists to avoid.
+//
+// AND IF EVEN THE FLOOR IS NOT ENOUGH, NOTHING DRAMATIC HAPPENS: the framing
+// stays at six tenths and the tier ladder carries on downwards exactly as it
+// did before any of this — `basso`, then `minimo`. A machine that cannot hold
+// six tenths of its window is not given a smaller picture, it is given the
+// cheaper world it was always given.
+//
+// THE TIER IS THEN READ OFF THE SAME PREDICTION, which is the one way to keep a
+// single law: it is the number the bench WOULD have read had it measured the
+// framing that was chosen. Nothing about tierForGpuMs or the thresholds moves.
+
+/** The scale the policy prices against: the default tier's own. Read from the
+ *  tier rather than written down, so a tier that is ever refitted cannot leave
+ *  a second opinion about its own scale in here. */
+const BENCH_SCALE = (TIERS.find((t) => t.id === DEFAULT_TIER) || { scale: 1 }).scale;
+
+/** How far over the interval the display offers a machine with no timer query
+ *  is allowed to sit before the area starts paying. It is LAG_THRESHOLDS.high:
+ *  the line under which that branch calls a machine `alto`, which is the same
+ *  place BENCH_THRESHOLDS.medium sits on the other branch — the edge of "this
+ *  machine is keeping up". */
+const LAG_CEILING = LAG_THRESHOLDS.high;
+
+/**
+ * The framing this verdict asks for, and the tier that goes with it.
+ *
+ * @param {object} verdict   what createBenchmark answered with
+ * @param {object} where     the window it was answered in, and the buffer it
+ *                           was read at: { width, height, ratio, benchPixels }
+ * @returns {{fraction:number, tier:string, predictedMs:number, rungs:object[],
+ *            reason:string}|null}
+ */
+export function decideFraming(verdict, where) {
+  if (!verdict || !(verdict.medianMs > 0) || !(where.benchPixels > 0)) return null;
+  const ratio = where.ratio ?? deviceRatio();
+  const clocked = verdict.source === 'gpu';
+  // On the lag branch the reading is an interval and the ceiling is a multiple
+  // of the interval the display offers; on the clocked branch both are
+  // milliseconds of GPU time. Either way what is compared are two numbers of
+  // the same kind, which is the whole reason predictMs works on a ratio.
+  const ceiling = clocked
+    ? BENCH_THRESHOLDS.medium
+    : LAG_CEILING * (verdict.intervalMs || verdict.medianMs);
+
+  const rungs = FRACTIONS.map((fraction) => {
+    const frame = frameOf(fraction, where.width, where.height, ratio);
+    const pixels = bufferPixels(frame, ratio, BENCH_SCALE);
+    return {
+      fraction,
+      frame,
+      pixels,
+      predictedMs: predictMs(verdict.medianMs, where.benchPixels, pixels),
+      // A RUNG THE ABSOLUTE CEILING FORBIDS, and on this ladder there is at most
+      // one of them: frameOf() already holds every framing below one under
+      // PIXEL_CEILING, and one is the rung it deliberately leaves alone,
+      // because one means "no framing at all". So this is where a 4K panel is
+      // stopped from being handed its whole self by a machine fast enough to
+      // ask for it.
+      overCeiling: bufferPixels(frame, ratio, 1) > PIXEL_CEILING,
+    };
+  });
+
+  const allowed = rungs.filter((rung) => !rung.overCeiling);
+  const taken = allowed.find((rung) => rung.predictedMs < ceiling);
+  const chosen = taken || allowed[allowed.length - 1] || rungs[rungs.length - 1];
+  const tier = clocked
+    ? tierForGpuMs(chosen.predictedMs)
+    : tierForLag(chosen.predictedMs / (verdict.intervalMs || verdict.medianMs));
+
+  return {
+    fraction: chosen.fraction,
+    frame: chosen.frame,
+    pixels: chosen.pixels,
+    predictedMs: chosen.predictedMs,
+    tier,
+    rungs,
+    reason: taken ? 'sotto il tetto del banco' : 'pavimento',
+  };
 }
