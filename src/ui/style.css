@@ -115,7 +115,8 @@ html, body {
  * window, by the module that owns the arithmetic — and a stylesheet cannot
  * measure a window against two ceilings and a floor.
  */
-body.is-inquadrata #stage {
+body.is-inquadrata #stage,
+body.is-inquadrata .sky-veil {
   position: fixed;
   left: 50%;
   top: 50%;
@@ -123,6 +124,25 @@ body.is-inquadrata #stage {
   width: var(--inquadratura-w, 100vw);
   height: var(--inquadratura-h, 100dvh);
 }
+
+/* AND THE ARRIVAL VEIL IS ON THAT LIST BECAUSE IT IS THE PICTURE'S
+ * (E-DECISIONI33, point 3).
+ *
+ * src/ui/veil.js puts back the corner shading the reference photograph carries,
+ * from a TABLE measured on that photograph — not a law of the radius, because
+ * "at one radius the reference wants a fifth of the light on one side of the
+ * frame and nine tenths on the other". A table measured on the corners of a
+ * picture has to be laid on the corners of that picture: stretched across the
+ * window instead, the picture's own corner would read a point somewhere in the
+ * middle of the table, and the arrival composition — the one every grade of
+ * this campaign was fitted against — would quietly stop being the one that was
+ * fitted.
+ *
+ * So it moves with the canvas, and the night around it stays clean: nothing
+ * shades it, nothing brightens under it when the veil dissolves.
+ *
+ * THE SCENE'S OWN VEIL DOES NOT MOVE. `.intro` covers the window, because what
+ * it is hiding is the whole page and not a composition. */
 
 /* AND THE PAGE UNDER IT IS THE NIGHT'S OWN COLOUR, not the slate the world
  * stands on. It is what the visitor sees for the frames between the page

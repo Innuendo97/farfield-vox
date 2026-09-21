@@ -278,6 +278,23 @@ export function createSkyVeil(before) {
      * a world in it rather than from the page: what it is holding is the arrival
      * composition, and there is no arrival until there is somewhere to arrive.
      */
+    /**
+     * The frame changed size under it, so the shading has to be laid again.
+     *
+     * WHY IT IS NOT ENOUGH TO LISTEN FOR A RESIZE (E-DECISIONI33, point 3).
+     * This veil covers the PICTURE now and not the window, and the picture can
+     * change size without the window moving at all: the calibration decides the
+     * framing at the end of the load and the page resizes itself once, behind
+     * the opening scene, with no `resize` event anywhere. A veil that missed
+     * that would spend the whole arrival laying the reference's corner shading
+     * on corners that are not the picture's — which is the one composition this
+     * entire campaign's grade was fitted against.
+     *
+     * Free when nothing moved: paint() compares the size it last drew at and
+     * returns on a match.
+     */
+    relayout() { paint(); },
+
     begin(why = 'col suolo intero') {
       if (letGo || raisedFor) return;
       // WHY IT WENT UP WHEN IT DID, kept for the arrival's own guard: the veil

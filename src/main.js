@@ -1117,6 +1117,12 @@ function resize() {
   const { aspect } = renderer.resize(frame.width, frame.height);
   camera.aspect = aspect;
   camera.updateProjectionMatrix();
+  // THE ARRIVAL VEIL IS THE PICTURE'S AND NOT THE WINDOW'S (E-DECISIONI33,
+  // point 3), so it changes size with the framing. It repaints itself on a
+  // WINDOW resize; the bench moving the framing is not one, and a veil left at
+  // the old size would carry the reference's corner shading on the wrong
+  // corners for the whole of the arrival.
+  veil.relayout();
   applyNight(frame.framed);
 }
 window.addEventListener('resize', resize);
