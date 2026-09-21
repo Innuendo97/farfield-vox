@@ -97,6 +97,41 @@ html, body {
   touch-action: none;
 }
 
+/* ---------------------------------------------------- the framing, when there is one
+ *
+ * NOT ONE DECLARATION ABOVE MOVES. The rule below is written against a class
+ * that src/main.js only ever adds when the framing is smaller than the window,
+ * so a visit at the whole window — which is every measured session of this
+ * campaign, every guard, and every machine the bench finds fast enough — draws
+ * the same canvas it always drew, out of the same rules, to the byte.
+ *
+ * WHY THE CANVAS IS TAKEN OUT OF THE FLOW. It is the only way a rectangle can
+ * be centred on the window without the box around it becoming something: a
+ * wrapper would be a new element between the world and the page, and the night
+ * behind it has to be a SIBLING of the canvas rather than its parent, so that
+ * neither can ever clip or composite the other.
+ *
+ * The two sizes arrive as custom properties because they are measured, per
+ * window, by the module that owns the arithmetic — and a stylesheet cannot
+ * measure a window against two ceilings and a floor.
+ */
+body.is-inquadrata #stage {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: var(--inquadratura-w, 100vw);
+  height: var(--inquadratura-h, 100dvh);
+}
+
+/* AND THE PAGE UNDER IT IS THE NIGHT'S OWN COLOUR, not the slate the world
+ * stands on. It is what the visitor sees for the frames between the page
+ * existing and the night being painted, and it is what shows through if the
+ * night never arrives at all: the same #050b13 the opening scene's cover is
+ * laid down in, so that the handover from the scene to the world is not also a
+ * change of colour. */
+body.is-inquadrata { background: #050b13; }
+
 #ui {
   position: fixed;
   inset: 0;

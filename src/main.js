@@ -19,6 +19,7 @@ import {
 import { RIG, SWITCH } from './core/avatar.js';
 import { loadLut } from './core/post.js';
 import { createQuality, forgetStored, needsBenchmark } from './core/quality.js';
+import { askedFraction, deviceRatio, frameOf } from './core/inquadratura.js';
 import { createBenchmark, tierOf } from './core/bench.js';
 import { buildHub } from './world/hub.js';
 import { needsAt } from './world/layers/registry.js';
@@ -303,14 +304,68 @@ if (INTRO) {
     });
 }
 
-const renderer = new Renderer().init(canvas);
+// ------------------------------------------------- how much of the window
+
+// WHAT FRACTION OF THE WINDOW THE WORLD IS DRAWN INTO, AND WHO DECIDES IT.
+//
+// It is the bench's answer, taken once in the load and remembered with the rest
+// of the calibration, and the governor never touches it afterwards: see
+// src/core/inquadratura.js for why it is an area and not a scale, and
+// calibrate() below for how the answer is reached. The handle in the address
+// outranks both, which is how every plate and every guard of this session pins
+// the world instead of photographing a verdict.
+//
+// With no handle it is one — the whole window, which is what this page has
+// always drawn — until the bench says otherwise.
+let fraction = askedFraction() ?? 1;
+
+// The night around the picture, mounted only where there is a picture smaller
+// than the window to put it around. It is null at a whole window and stays
+// null: see src/ui/notte.js.
+let night = null;
+
+/** The window, in the pixels a buffer would be built out of it. It is what the
+ *  stored calibration is compared against: see needsBenchmark(). */
+function windowPixels() {
+  const r = deviceRatio();
+  return Math.floor(window.innerWidth * r) * Math.floor(window.innerHeight * r);
+}
+
+/**
+ * Puts the framing on the page: the canvas becomes a centred rectangle and the
+ * night, if there is one, is told the new shape.
+ *
+ * NOTHING AT ALL HAPPENS AT ONE. No class, no custom property, no night — the
+ * page is the page it has always been, which is what `?inquadratura=1` is worth
+ * to a guard and what the byte comparison stands on.
+ */
+function applyFraming() {
+  const frame = frameOf(fraction, window.innerWidth, window.innerHeight, deviceRatio());
+  if (frame.framed) {
+    document.body.style.setProperty('--inquadratura-w', `${frame.width}px`);
+    document.body.style.setProperty('--inquadratura-h', `${frame.height}px`);
+    document.body.classList.add('is-inquadrata');
+  } else {
+    document.body.classList.remove('is-inquadrata');
+    document.body.style.removeProperty('--inquadratura-w');
+    document.body.style.removeProperty('--inquadratura-h');
+  }
+  return frame;
+}
+
+const renderer = new Renderer().init(canvas, applyFraming());
 // The far plane has to clear the furthest thing in the world, and the furthest
 // thing is not the meadow. The band of air sits at seven hundred metres and the
 // largest of the giants at five hundred and twenty: at four hundred both were
 // clipped away outright, which is why the ridge line ended in a wash of the
 // green the sky bake fills its lower half with. Depth precision is set by the
 // near plane, not by this, so moving it out costs nothing.
-const camera = new PerspectiveCamera(DEFAULT_FOV, window.innerWidth / window.innerHeight, 0.1, 1400);
+// THE LENS TAKES THE FRAMING'S SHAPE AND NOT THE WINDOW'S, which is the whole
+// of what a smaller picture does to the world: the same field of view over a
+// smaller rectangle is the same world seen from the same place, and nothing in
+// front of the camera knows anything happened. resize() below keeps the two
+// together for the rest of the visit.
+const camera = new PerspectiveCamera(DEFAULT_FOV, 1, 0.1, 1400);
 
 const hub = buildHub();
 const { scene, blockers, solids, groundHeightAt } = hub;
@@ -913,10 +968,22 @@ if (import.meta.env.DEV && isDevMode()) {
 // moment the walk is real.
 const FIRST_STEP_SPEED = 0.3;
 
+/**
+ * The window changed shape, and the framing keeps its FRACTION of it.
+ *
+ * Not its pixels: a walker who drags the window wider gets a wider picture in
+ * the same proportion of glass, which is what a fraction of the side means and
+ * what keeps the night around it the same band it was. The two ceilings and the
+ * floor are re-read on the new window, so an ultrawide dragged out past sixteen
+ * ninths, or a window thrown onto a 4K panel, is contained the moment it
+ * happens rather than at the next visit.
+ */
 function resize() {
-  const { aspect } = renderer.resize();
+  const frame = applyFraming();
+  const { aspect } = renderer.resize(frame.width, frame.height);
   camera.aspect = aspect;
   camera.updateProjectionMatrix();
+  night?.relayout();
 }
 window.addEventListener('resize', resize);
 resize();

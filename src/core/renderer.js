@@ -1,13 +1,15 @@
 import { WebGLRenderer, SRGBColorSpace } from 'three';
 import { createPostPipeline } from './post.js';
+import { MAX_PIXEL_RATIO, MIN_PIXEL_RATIO } from './inquadratura.js';
 
 // Presentation layer facade. Everything that draws goes through here so the
 // scene code never depends on a concrete graphics backend.
 
-// Above ~1.5 the extra pixels buy nothing visible on the target hardware
-// (mid-range integrated GPUs) while costing fill rate linearly.
-const MIN_PIXEL_RATIO = 1.0;
-const MAX_PIXEL_RATIO = 1.5;
+// THE TWO CEILINGS ON THE DEVICE RATIO MOVED, AND NOTHING ABOUT THEM CHANGED.
+// They live in src/core/inquadratura.js now, beside the two ceilings on the
+// framing and the floor under it, because that module's whole subject is how
+// many pixels this world is allowed to draw and these were the first two rules
+// of it. See the note there.
 
 export class Renderer {
   #gl = null;
@@ -20,7 +22,13 @@ export class Renderer {
   #width = 1;
   #height = 1;
 
-  init(canvas) {
+  /**
+   * @param {HTMLCanvasElement} canvas
+   * @param {{width:number,height:number}|null} frame  the framing, if the page
+   *        has already measured one. Without it the window is the framing,
+   *        which is what every visit was before src/core/inquadratura.js.
+   */
+  init(canvas, frame = null) {
     this.#canvas = canvas;
     this.#gl = new WebGLRenderer({
       canvas,
@@ -35,10 +43,18 @@ export class Renderer {
     // baked, so the shadow pipeline must never be paid for.
     this.#gl.shadowMap.enabled = false;
     this.#post = createPostPipeline(this.#gl);
-    this.resize();
+    this.resize(frame ? frame.width : undefined, frame ? frame.height : undefined);
     return this;
   }
 
+  /**
+   * The rectangle the world is drawn into, in CSS pixels.
+   *
+   * IT IS THE FRAMING'S AND NO LONGER THE WINDOW'S, and the default is left
+   * here only for the one caller that has no framing yet: init(), which runs
+   * before main.js has measured anything. Everything after that hands the
+   * numbers in. See src/core/inquadratura.js.
+   */
   resize(width = window.innerWidth, height = window.innerHeight) {
     this.#width = width;
     this.#height = height;
